@@ -1,18 +1,27 @@
 {
-    "name": "sash",
+    "name": "resash",
     "build": {
         "dockerfile": "../Dockerfile",
         "context": ".."
     },
     "workspaceFolder": "/home/sash",
-    "settings": {
-        "python.defaultInterpreterPath": "/usr/bin/python3",
-        "python.terminal.activateEnvInCurrentTerminal": true
+    "customizations": {
+        "vscode": {
+            "settings": {
+                "python.defaultInterpreterPath": "/usr/bin/python3",
+                "python.terminal.activateEnvInCurrentTerminal": true
+            },
+            "extensions": [
+                "ms-python.debugpy",
+                "ms-python.python",
+                "ms-python.vscode-pylance",
+                "ms-python.vscode-python-envs",
+                "GitHub.copilot",
+                "GitHub.copilot-chat"
+                // Add any other VS Code extensions you need inside the container
+            ]
+        }
     },
-    "extensions": [
-        "ms-python.python"
-        // Add any other VS Code extensions you need inside the container
-    ],
     "postCreateCommand": "echo done",
     "remoteUser": "root",
     "initializeCommand": "systemctl --user enable podman.socket --now" // For rootless Podman and socket activation
