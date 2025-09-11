@@ -1,0 +1,9 @@
+{
+    "recommendations": [
+        "ms-python.black-formatter",
+        "ms-python.isort",
+        "aaron-bond.better-comments",
+        "EditorConfig.EditorConfig",
+        "timonwong.shellcheck"
+    ]
+}
