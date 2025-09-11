@@ -4,15 +4,43 @@ A static analysis tool for the shell, based on symbolic execution.
 
 ## Getting Started
 
-### Prerequisites
+### Development Using Docker Containers (*Recommended*)
+
+#### Prerequisites
+
+* [`Docker`](https://docs.docker.com/get-docker/)
+
+#### Installation
+
+```bash
+git clone https://github.com/atlas-brown/resash.git
+cd resash
+docker build -t resash . # This might take a while, but only ever needs to be executed once
+docker run --rm -itv $(pwd):/app resash /bin/bash
+# You are now inside the container!
+# All changes you make locally will be immediately reflected in the container!
+# See https://docs.docker.com/get-started/ if you've never used Docker before
+```
+
+#### Verifying Installation
+
+```bash
+# Run these inside the container!
+uv run example # Verify you can run the project
+uv run pytest # Verify you can run the tests
+# Both commands should terminate without errors!
+```
+
+### Development Using Your Local Environment
+
+#### Prerequisites
 
 * [`uv`](https://github.com/astral-sh/uv)
 * `automake`, `autoconf`, `libtool` (required by the [`libdash`](https://github.com/binpash/libdash) module)
     * **Linux**: `apt install automake autoconf libtool`
-    * **macOS** (with `Homebrew`): brew install automake autoconf libtool`
-* [`Docker`](https://docs.docker.com/get-docker/) (optional but recommended, for containerized development and testing)
+    * **macOS** (with `Homebrew`): `brew install automake autoconf libtool`
 
-### Installation
+#### Installation
 
 ```bash
 git clone https://github.com/atlas-brown/resash.git
@@ -20,11 +48,11 @@ cd resash
 uv sync
 ```
 
-### Verifying the Installation
+#### Verifying the Installation
 
 ```bash
-uv run example # Verify the project runs
-uv run pytest  # Verify the tests run
+uv run example # Verify you can run the project
+uv run pytest # Verify you can run the tests
 # Both commands should terminate without errors!
 ```
 
@@ -47,19 +75,7 @@ uv run pytest  # Verify the tests run
   * Test files should be named with the prefix `test_` (e.g., `test_example.py`).
   * Test functions should also start with `test_`.
 
-### Using Docker
-
-* A `Dockerfile` is provided for running or developing the application inside a container.
-  ```bash
-  docker build -t resash .
-  docker run resash
-  docker run -it resash # To make container interactive
-  ```
-
 ### Contributing
 
-1. Create a *new* branch (`git checkout -b branch-name`)
-2. Commit your changes (`git commit -m "Add feature"`)
-3. Push to the branch (`git push branch-name`)
-4. Open a pull request when you think your changes are ready to be merged
-5. **Do NOT push directly onto the main branch!**
+1. Create a new branch (`git checkout -b branch-name`), **do NOT push directly onto the main branch**
+2. Open a pull request when you think your changes are ready to be merged
