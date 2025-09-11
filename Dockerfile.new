@@ -1,8 +1,5 @@
-# See https://hub.docker.com/_/python#simple-tags
-FROM python:3.10-slim-trixie
-
-# See https://docs.astral.sh/uv/guides/integration/docker/#installing-uv
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+# See https://docs.astral.sh/uv/guides/integration/docker/#available-images
+FROM ghcr.io/astral-sh/uv:trixie-slim
 
 # See https://github.com/binpash/libdash?tab=readme-ov-file#what-are-the-dependencies
 RUN apt-get update && \
@@ -14,7 +11,7 @@ RUN apt-get update && \
         make && \
     apt-get clean
 
-# Install the project into `/app`
+# Change working directory (something generic in case the project name ever changes)
 WORKDIR /app
 
 # Copy from the cache instead of linking since it's a mounted volume
@@ -29,18 +26,13 @@ ENV UV_TOOL_BIN_DIR=/usr/local/bin
 RUN --mount=type=cache,target=/root/.cache/uv \
     --mount=type=bind,source=uv.lock,target=uv.lock \
     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
-    uv sync --locked --no-cache --no-install-project
+    uv sync --locked --no-install-project
 
 # Copy the project into the image
-COPY . /app
+COPY ./ ./
 
 # Sync the project
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --locked --no-cache
-
-# Create a non-root user, transfer ownership of the project directory, and switch to that user
-RUN useradd --create-home --shell /bin/bash sash
-RUN chown --recursive sash /app
-USER sash
+    uv sync --locked
 
 CMD [ "uv", "run", "example" ]
