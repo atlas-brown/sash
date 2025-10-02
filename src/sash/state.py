@@ -1,30 +1,116 @@
-from dataclasses import dataclass, field
-import sash.pru as pru
+from dataclasses import dataclass, field, replace
+import sash.constraints
 import shasta.ast_node as AST
 import logging
+from typing import Callable, Optional
+
+
+@dataclass(frozen=True)
+class SymVar:
+    name: str
+
+@dataclass(frozen=True)
+class SymStr:
+    parts: list[str | SymVar] = field(default_factory=list)
+
+    def is_simple(self) -> bool:
+        """Return true if there are no adjacent strings in `parts`."""
+        last_was_str = False
+        for p in self.parts:
+            if isinstance(p, str):
+                if last_was_str:
+                    return False
+                last_was_str = True
+            else:
+                last_was_str = False
+        return True
+
+    def simplify(self) -> 'SymStr':
+        if self.is_simple():
+            return self
+
+        # collapse all adjacent strings into one string
+        new_parts = []
+        this_str = ""
+        for part in self.parts:
+            if isinstance(part, str):
+                this_str += part
+            else:
+                if this_str != "":
+                    new_parts.append(this_str)
+                    this_str = ""
+                new_parts.append(part)
+        if this_str != "":
+            new_parts.append(this_str)
+        return SymStr(new_parts)
+
+@dataclass(frozen=True)
+class CompletelyArbitrary:
+    source: AST.AstNode
+
+@dataclass(frozen=True)
+class WordCount:
+    min: int
+    max: int | float  # use `math.inf` for infinity
+
+@dataclass(frozen=True)
+class Field:
+    content: SymStr | CompletelyArbitrary
+    count: WordCount
+
+    def quote(self) -> 'Field':
+        return Field(self.content, WordCount(1, 1))
 
 @dataclass(frozen=True)
 class ShellVar:
-    value: SymbStr
+    value: Field
     readonly : bool = False
     export : bool = False
 
 @dataclass(frozen=True)
 class State:
-    pathcond: list[pru.PRU]
+    pathcond: list[sash.constraints.Constraint]
     env: dict[str, ShellVar]
     localenv: dict[str, ShellVar]
     fundefs: dict[str, AST.DefunNode]
-    last_exit_code: SymbStr
+    last_exit_code: SymStr
     last_cmd: Optional[AST.AstNode]
+
+    def set_env(self, var: str, value: ShellVar) -> 'State':
+        new_env = dict(self.env)
+        new_env[var] = value
+        return replace(self, env=new_env)
+    
+    def add_pathcond(self, cond: sash.constraints.Constraint) -> 'State':
+        new_pathcond = self.pathcond + [cond]
+        return replace(self, pathcond=new_pathcond)
+
+    def lookup(self, var: str) -> Optional[ShellVar]:
+        if var in self.localenv:
+            return self.localenv[var]
+        elif var in self.env:
+            return self.env[var]
+        else:
+            return None
 
 @dataclass(frozen=True)
 class Trace:
     states: list[State]
 
-    def extend(self, state: State) -> Trace:
-        return Trace(self.states + [state])
+    def extend(self, state: State | Callable[[State], State]) -> 'Trace':
+        if isinstance(state, State):
+            return Trace(self.states + [state])
+        else:
+            return Trace(self.states + [state(self.states[-1])])
 
+    @property
+    def latest_state(self):
+        return self.states[-1]
+
+Traces = list[Trace]
+
+def trace_map(traces: Traces, f: Callable[[State], State]) -> Traces:
+    return [trace.extend(f) for trace in traces]
 
 @dataclass
 class SetOptionStore:
