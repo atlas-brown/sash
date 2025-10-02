@@ -1,0 +1,53 @@
+#!/bin/bash
+
+# https://github.com/babun/babun/commit/4e49aebca73ff7d6ecb587a417945d21c4974a3f
+
+set -e -f -o pipefail
+source "/usr/local/etc/babun.instance"
+source "$babun_tools/script.sh"
+
+declare -A gitconfig
+declare -A gitalias
+declare -A gitmerge
+
+# general config
+gitconfig['color.ui']='true'
+gitconfig['core.editor']='vim'
+gitconfig['core.filemode']='false'
+gitconfig['credential.helper']='cache --timeout=3600'
+
+# alias config
+gitalias['alias.cp']='cherry-pick'
+gitalias['alias.st']='status -sb'
+gitalias['alias.cl']='clone'
+gitalias['alias.ci']='commit'
+gitalias['alias.co']='checkout'
+gitalias['alias.br']='branch'
+gitalias['alias.dc']='diff --cached'
+gitalias['alias.lg']="log --graph --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr) %Cblue<%an>%Creset' --abbrev-commit --date=relative --all"
+gitalias['alias.last']='git log -1 --stat'
+gitalias['alias.unstage']='reset HEAD --'
+
+# git mergetool config
+gitmerge['merge.tool']='vimdiff'
+gitmerge['mergetool.prompt']='false'
+gitmerge['mergetool.trustExitCode']='false'
+gitmerge['mergetool.keepBackups']='false'
+gitmerge['mergetool.keepTemporaries']='false'
+
+function apply_git_config {
+	eval "declare -A configMap="${1#*=}
+	
+	for configKey in "${!configMap[@]}"
+	do
+		git config --list | grep -q "$configKey" # bug here: fails when grep does not matc anything due to set -e
+		if [ $? -ne 0 ]; then # due to set -e, this can never be false
+			configValue="${configMap[$configKey]}"
+			git config --global "$configKey" "$configValue"
+		fi
+	done
+}
+
+apply_git_config "$(declare -p gitconfig)"
+apply_git_config "$(declare -p gitmerge)"
+apply_git_config "$(declare -p gitalias)"
