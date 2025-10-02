@@ -29,4 +29,4 @@ echo 'started'
 ls -la
 cd /tmp/kjhdakdha
 ls -la
-} 2> errorLog 1> OutputLog
+} 2> errorLog 1> OutputLog # bug here: redirecting stdout and stderr to functions
