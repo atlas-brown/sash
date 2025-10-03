@@ -32,6 +32,18 @@ class UnboundID(ShseerError):
         super().__init__("unbound", f"no definition found for {var}")
 
 
+class ConstantCondition(ShseerError):
+    def __init__(self):
+        super().__init__("const_cond", "condition is always true or false")
+
+class LoopRunsOnce(ShseerWarning):
+    def __init__(self):
+        super().__init__("loop_once", "loop runs only once")
+
+class DeleteSystemFile(ShseerError):
+    def __init__(self,filename:str):
+        super().__init__("del_sys_file",f"might delete system file {filename}")
+
 class Reporter:
     # Have this as a list even despite duplications for now
     _filename = ""
