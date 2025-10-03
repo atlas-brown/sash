@@ -33,7 +33,7 @@ class UnboundID(ShseerError):
 
 
 class Reporter:
-    #     # Have this as a list even despite duplications for now
+    # Have this as a list even despite duplications for now
     _filename = ""
     _error_messages:list[tuple[str,str]] = []
     _start_time = time.monotonic()
