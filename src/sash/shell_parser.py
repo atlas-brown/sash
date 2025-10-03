@@ -24,7 +24,7 @@ def parse_shell_to_asts(input_script_path : str):
     global INITIALIZE_LIBDASH
     try:
         if not os.path.isfile(input_script_path):
-            raise libdash.parser.ParsingException(f"File {input_script_path} does not exist")
+            raise ParseException(f"File {input_script_path} does not exist")
         logging.debug(f"Calling libdash parser initialization={INITIALIZE_LIBDASH} on {input_script_path}")
         new_ast_objects = libdash.parser.parse(input_script_path,init=INITIALIZE_LIBDASH)
         INITIALIZE_LIBDASH = False
