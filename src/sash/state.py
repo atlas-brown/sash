@@ -44,6 +44,9 @@ class SymStr:
             new_parts.append(this_str)
         return SymStr(new_parts)
 
+    def __str__(self) -> str:
+        return "".join(str(p) for p in self.parts)
+
 @dataclass(frozen=True)
 class CompletelyArbitrary:
     source: AST.AstNode
@@ -80,7 +83,7 @@ class State:
         new_env = dict(self.env)
         new_env[var] = value
         return replace(self, env=new_env)
-    
+
     def add_pathcond(self, cond: sash.constraints.Constraint) -> 'State':
         new_pathcond = self.pathcond + [cond]
         return replace(self, pathcond=new_pathcond)
@@ -163,7 +166,7 @@ class SetOptionStore:
                 self.vi = value
             case _:
                 logging.warning(f"Unknown option: {option}. Ignoring")
-                return False 
+                return False
         return True
 
 @dataclass(frozen=True)
