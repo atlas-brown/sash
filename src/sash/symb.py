@@ -224,6 +224,13 @@ def interp_node(traces: Traces, node: AST.AstNode, info: ScriptInfo) -> Traces:
             t2 = guarded_interp_node(traces, node.left_operand, info)
             return guarded_interp_node(t2, node.right_operand, info)
 
+        case AST.ForNode():
+            # warn if loop list is statically determined to contain at most one element
+            _, items = expand_args_dumb(traces, node.argument, info)
+            if all(field.count.max <= 1 for field in items):
+                Reporter.add_error(reporter.LoopRunsOnce())
+            return traces
+
 
         # todo bring other cases as needed
 

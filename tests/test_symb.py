@@ -52,3 +52,30 @@ def test_delete_system_file(tmp_path):
     report = symb.main(script)
     expected_error = reporter.DeleteSystemFile("/usr")
     assert_expected_report(report, [expected_error])
+
+def test_loop_runs_once(tmp_path):
+    # A loop over a single constant should produce a LoopRunsOnce warning
+    script = write_script(tmp_path, "for i in foo; do echo $i; done\n")
+    report = symb.main(script)
+    expected_warning = reporter.LoopRunsOnce()
+    assert_expected_report(report, [expected_warning])
+    script = write_script(tmp_path, "FOO=once\n"
+                                     "for i in $FOO; do echo $i; done\n")
+    report.clear()
+    report = symb.main(script)
+    expected_warning = reporter.LoopRunsOnce()
+    assert_expected_report(report, [expected_warning])
+
+def test_loop_runs_multiple_no_warning(tmp_path):
+    # A loop over multiple constants should not produce a LoopRunsOnce warning
+    script = write_script(tmp_path, "for i in foo bar; do echo $i; done\n")
+    report = symb.main(script)
+    assert_expected_report(report, [])
+
+    script = write_script(tmp_path, "for i in *.sh; do echo $i; done\n")
+    report = symb.main(script)
+    assert_expected_report(report, [])
+
+    script = write_script(tmp_path, "for i in $FOO*.sh; do echo $i; done\n")
+    report = symb.main(script)
+    assert_expected_report(report, [])
