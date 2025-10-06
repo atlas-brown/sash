@@ -84,6 +84,11 @@ class State:
         new_env[var] = value
         return replace(self, env=new_env)
 
+    def set_fundef(self, name: str, defn: AST.DefunNode) -> 'State':
+        new_fundefs = dict(self.fundefs)
+        new_fundefs[name] = defn
+        return replace(self, fundefs=new_fundefs)
+
     def add_pathcond(self, cond: sash.constraints.Constraint) -> 'State':
         new_pathcond = self.pathcond + [cond]
         return replace(self, pathcond=new_pathcond)
