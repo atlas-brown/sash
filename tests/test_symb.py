@@ -18,7 +18,7 @@ def assert_expected_report(report, expected_errors: list[reporter.Report]):
     """Helper to compare actual report with expected errors."""
     actual_errors = report["error_messages"]
     expected = [(err.code, err.message) for err in expected_errors]
-    assert set(actual_errors) >= set(expected)
+    assert set(actual_errors) == set(expected)
 # ======
 
 foo_var = AST.VArgChar(fmt="Normal", null=False, var="FOO", arg=[])
@@ -50,8 +50,9 @@ def test_delete_system_file(tmp_path):
 
     script = write_script(tmp_path, "rm $FOO/usr\n")
     report = symb.main(script)
-    expected_error = reporter.DeleteSystemFile("/usr")
-    assert_expected_report(report, [expected_error])
+    expected_error1 = reporter.DeleteSystemFile("/usr")
+    expected_error2 = reporter.UnboundID(foo_var.pretty())
+    assert_expected_report(report, [expected_error1, expected_error2])
 
 def test_loop_runs_once(tmp_path):
     # A loop over a single constant should produce a LoopRunsOnce warning
@@ -78,4 +79,5 @@ def test_loop_runs_multiple_no_warning(tmp_path):
 
     script = write_script(tmp_path, "for i in $FOO*.sh; do echo $i; done\n")
     report = symb.main(script)
-    assert_expected_report(report, [])
+    expected_error = reporter.UnboundID(foo_var.pretty())
+    assert_expected_report(report, [expected_error])
