@@ -13,7 +13,6 @@ from sash.state import *
 from sash.config import Config
 from sash.reporter import Reporter
 import sash.reporter as reporter
-import sash.exn as exn
 
 def handle_commandnode(traces: Traces, node: AST.CommandNode, info: ScriptInfo) -> Traces:
     logging.debug(f"Handling command node {trim_string_for_logging(node.pretty())} with {len(traces)} traces")
@@ -217,7 +216,7 @@ def interp_node(traces: Traces, node: AST.AstNode, info: ScriptInfo) -> Traces:
 
 
         case _:
-            raise exn.Unimplemented(
+            raise NotImplementedError(
                     f"node type {type(node)} not handled",
                     node
                 )
