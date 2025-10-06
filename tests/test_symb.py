@@ -41,6 +41,16 @@ def test_bound_variable_no_error(tmp_path):
     report = symb.main(script)
     assert_expected_report(report, [])
 
+    # Assign a variable inside a for loop
+    script = write_script(
+        tmp_path,
+        "for FOO in a b; do FOO=bar; done\n"
+        "echo $FOO\n"
+    )
+    report = symb.main(script)
+    assert_expected_report(report, [])
+
+
 def test_delete_system_file(tmp_path):
     # Deleting a system file should produce a DeleteSystemFile error
     script = write_script(tmp_path, "rm /usr\n")
