@@ -189,7 +189,7 @@ def guarded_interp_node(traces: Traces, node: AST.AstNode, info: ScriptInfo) -> 
 
 def interp_node(traces: Traces, node: AST.AstNode, info: ScriptInfo) -> Traces:
     # refer to https://github.com/binpash/shasta/blob/main/shasta/ast_node.py
-    logging.debug(f"interping {trim_string_for_logging(node.pretty())} with {len(traces)} traces")
+    logging.debug(f"Interpreting {trim_string_for_logging(node.pretty())} with {len(traces)} traces")
     match node:
         case AST.CommandNode() if not (node.arguments == [] and node.assignments != []):
             return handle_commandnode(traces, node, info)
