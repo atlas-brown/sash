@@ -59,13 +59,11 @@ def symb_string_of_arg(args : list[ArgChar], quote_mode=UNQUOTED) -> SymStr:
         result.append(current_str)
     return result
 
-def symbstr_to_str(symbstr : list[str | SymVar]) -> Optional[str]:
+def symbstr_to_str(symbstr : list[str | SymVar]) -> str:
     nls : list[str] = []
     for i in symbstr:
-        if isinstance(i,str):
-            nls.append(i)
-        else:
-            return None
+        assert isinstance(i,str)
+        nls.append(i)
     return "".join(nls)
 
 def argchar_conc_panic(ls : list[ArgChar],panic_msg:str="") -> str:
@@ -74,7 +72,7 @@ def argchar_conc_panic(ls : list[ArgChar],panic_msg:str="") -> str:
     else:
         raise ValueError(f"{panic_msg}: Expected concrete string but got symbolic string")
 
-def argchar_conc(ls : list[ArgChar]) -> Optional[str]:
+def argchar_conc(ls : list[ArgChar]) -> str:
     symb_ls = symb_string_of_arg(ls)
     conc_str = symbstr_to_str(symb_ls)
     return conc_str
