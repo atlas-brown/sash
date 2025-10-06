@@ -236,9 +236,11 @@ def interp_node(traces: Traces, node: AST.AstNode, info: ScriptInfo) -> Traces:
             return t4
             return traces
 
+        case AST.DefunNode():
+            trace_expansion_pairs = expand(traces, node.name, info)
+            return trace_map(traces, lambda s: s.set_fundef(symb_utils.argchar_conc(node.name), node))
 
         # todo bring other cases as needed
-
 
         case _:
             raise NotImplementedError(
