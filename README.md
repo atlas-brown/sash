@@ -51,9 +51,8 @@ uv sync
 #### Verifying the Installation
 
 ```bash
-uv run example # Verify you can run the project
-uv run pytest # Verify you can run the tests
-# Both commands should terminate without errors!
+uv run pytest # Verify you can run the tests (also verifies a correct installation)
+# The command should terminate without errors!
 ```
 
 ## Guidelines
@@ -71,6 +70,7 @@ uv run pytest # Verify you can run the tests
 ### Testing
 
 * This project uses [`pytest`](https://docs.pytest.org/).
+* To run all tests, use `uv run pytest`
 * To ensure [test discovery](https://docs.pytest.org/en/7.1.x/explanation/goodpractices.html#conventions-for-python-test-discovery) works correctly:
   * Test files should be named with the prefix `test_` (e.g., `test_example.py`).
   * Test functions should also start with `test_`.
