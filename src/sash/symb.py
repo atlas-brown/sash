@@ -13,10 +13,23 @@ from sash.state import *
 from sash.config import Config
 from sash.reporter import Reporter
 import sash.reporter as reporter
+import sash.symb_utils as symb_utils
 
 def handle_commandnode(traces: Traces, node: AST.CommandNode, info: ScriptInfo) -> Traces:
     logging.debug(f"Handling command node {trim_string_for_logging(node.pretty())} with {len(traces)} traces")
     new_traces, expanded_args = expand_args_dumb(traces, node.arguments, info)
+
+    if expanded_args and isinstance(expanded_args[0].content, SymStr):
+        cmd_name = symb_utils.symbstr_to_str(expanded_args[0].content.parts)
+        logging.debug(f"Handling command {cmd_name} with args {expanded_args[1:]}")
+        if cmd_name == "rm":
+            for arg_field in expanded_args[1:]:
+                if isinstance(arg_field.content, SymStr):
+                    path = symb_utils.symbstr_to_str(arg_field.content.parts)
+                    assert path is not None
+                    if any(path.startswith(p) for p in Config.get("PROTECTED_PATHS")):
+                        Reporter.add_error(reporter.DeleteSystemFile(path))
+
     logging.warning(f"Skipping command {trim_string_for_logging(node.pretty())} after expanding its args to {expanded_args} (it had assignments: {node.assignments})")
     return new_traces
 

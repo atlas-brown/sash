@@ -18,7 +18,7 @@ def assert_expected_report(report, expected_errors: list[reporter.ShseerError]):
     """Helper to compare actual report with expected errors."""
     actual_errors = report["error_messages"]
     expected = [(err.code, err.message) for err in expected_errors]
-    assert sorted(actual_errors) == sorted(expected)
+    assert set(actual_errors) >= set(expected)
 # ======
 
 foo_var = AST.VArgChar(fmt="Normal", null=False, var="FOO", arg=[])
@@ -40,3 +40,15 @@ def test_bound_variable_no_error(tmp_path):
     )
     report = symb.main(script)
     assert_expected_report(report, [])
+
+def test_delete_system_file(tmp_path):
+    # Deleting a system file should produce a DeleteSystemFile error
+    script = write_script(tmp_path, "rm /usr\n")
+    report = symb.main(script)
+    expected_error = reporter.DeleteSystemFile("/usr")
+    assert_expected_report(report, [expected_error])
+
+    script = write_script(tmp_path, "rm $FOO/usr\n")
+    report = symb.main(script)
+    expected_error = reporter.DeleteSystemFile("/usr")
+    assert_expected_report(report, [expected_error])

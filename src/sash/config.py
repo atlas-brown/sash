@@ -15,6 +15,7 @@ class Config:
     "DEBUG":True,
     "SCCHECK" : False,
     "CREATE_Z3" : False,
+    "PROTECTED_PATHS" : ["/bin","/usr/bin","/usr","/etc","/sbin","/usr/sbin","/var","/lib","/lib64","/home"]
     }
     __setters = ["DEBUG","CREATE_Z3"]
 
