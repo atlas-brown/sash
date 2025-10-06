@@ -64,6 +64,22 @@ def test_delete_system_file(tmp_path):
     expected_error2 = reporter.UnboundID(foo_var.pretty())
     assert_expected_report(report, [expected_error1, expected_error2])
 
+def test_redirect_to_function(tmp_path):
+    # Redirecting output to a function should produce an error
+    script = write_script(tmp_path, ("myfunc() { echo hi; }\n"
+                                     "echo hello > myfunc\n"))
+    report = symb.main(script)
+    expected_error = reporter.RedirectToFunction()
+    assert_expected_report(report, [expected_error])
+
+def test_redirect_to_variable_no_error(tmp_path):
+    # Redirecting output to a variable should not produce any errors
+    script = write_script(tmp_path, ("myvar=output.txt\n"
+                                     "echo hello > $myvar\n"))
+    report = symb.main(script)
+    assert_expected_report(report, [])
+
+
 def test_loop_runs_once(tmp_path):
     # A loop over a single constant should produce a LoopRunsOnce warning
     script = write_script(tmp_path, "for i in foo; do echo $i; done\n")

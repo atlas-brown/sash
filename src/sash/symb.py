@@ -17,7 +17,7 @@ import sash.symb_utils as symb_utils
 
 def handle_commandnode(traces: Traces, node: AST.CommandNode, info: ScriptInfo) -> Traces:
     logging.debug(f"Handling command node {trim_string_for_logging(node.pretty())} with {len(traces)} traces")
-    new_traces, expanded_args = expand_args_dumb(traces, node.arguments, info)
+    t1, expanded_args = expand_args_dumb(traces, node.arguments, info)
 
     if expanded_args and isinstance(expanded_args[0].content, SymStr):
         cmd_name = symb_utils.symbstr_to_str(expanded_args[0].content.parts)
@@ -30,8 +30,12 @@ def handle_commandnode(traces: Traces, node: AST.CommandNode, info: ScriptInfo) 
                     if any(path.startswith(p) for p in Config.get("PROTECTED_PATHS")):
                         Reporter.add_error(reporter.DeleteSystemFile(path))
 
-    logging.warning(f"Skipping command {trim_string_for_logging(node.pretty())} after expanding its args to {expanded_args} (it had assignments: {node.assignments})")
-    return new_traces
+    logging.warning(f"Done with command {trim_string_for_logging(node.pretty())} after expanding its args to {expanded_args} (it had assignments: {node.assignments})")
+
+    t2 = t1
+    for redir in node.redir_list:
+        t2 = t2.extend(guarded_interp_node(t1, redir, info)) or t2
+    return t2
 
 def record_assignment(trace: Trace, var: str, rhs: Field) -> Trace:
     return trace.extend(lambda s: s.set_env(var, ShellVar(rhs)))
@@ -234,6 +238,15 @@ def interp_node(traces: Traces, node: AST.AstNode, info: ScriptInfo) -> Traces:
             t3 = [record_assignment(t, symb_utils.argchar_conc(node.variable), join_fields(var)) for t, var in t2_expansion_pairs]
             t4 = guarded_interp_node(t3, node.body, info)
             return t4
+
+        case AST.FileRedirNode():
+            logging.warning(f"Skipping redirection node type: {node.redir_type} fd {node.fd} arg {node.arg}")
+            for trace in traces:
+                var = symb_utils.argchar_conc(node.arg)
+                if var in trace.latest_state.fundefs:
+                    # TODO: Associate the warning with the trace that caused it
+                    Reporter.add_error(reporter.RedirectToFunction())
+            # TODO: Also handle the effects of redirection on the FS
             return traces
 
         case AST.DefunNode():
