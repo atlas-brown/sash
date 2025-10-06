@@ -225,10 +225,15 @@ def interp_node(traces: Traces, node: AST.AstNode, info: ScriptInfo) -> Traces:
             return guarded_interp_node(t2, node.right_operand, info)
 
         case AST.ForNode():
-            # warn if loop list is statically determined to contain at most one element
-            _, items = expand_args_dumb(traces, node.argument, info)
-            if all(field.count.max <= 1 for field in items):
+            t1, items = expand_args_dumb(traces, node.argument, info)
+            t2_expansion_pairs = expand(t1, node.variable, info)
+            if join_fields(items).count.max <= 1:
                 Reporter.add_error(reporter.LoopRunsOnce())
+            # Interpret the for loop body
+            # TODO: Will want to interpret the body multiple times (up to max count of times)
+            t3 = [record_assignment(t, symb_utils.argchar_conc(node.variable), join_fields(var)) for t, var in t2_expansion_pairs]
+            t4 = guarded_interp_node(t3, node.body, info)
+            return t4
             return traces
 
 
