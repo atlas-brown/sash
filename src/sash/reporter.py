@@ -10,37 +10,37 @@ def make_unique(ls):
     return list(set(ls))
 
 @dataclass(frozen=True)
-class ShseerReport(ABC):
+class Report(ABC):
     code:str
     message : str
     def __repr__(self) -> str:
         return f"{self.code}:{self.message}"
 
-class ShseerError(ShseerReport):
+class Error(Report):
     pass
 
-class ShseerWarning(ShseerReport):
+class Warning(Report):
     pass
 
-class ParseError(ShseerError):
+class ParseError(Error):
     def __init__(self,msg : str ="") -> None:
         self.report = f"Failed to parse script {msg}"
         super().__init__("parse",self.report)
 
-class UnboundID(ShseerError):
+class UnboundID(Error):
     def __init__(self, var):
         super().__init__("unbound", f"no definition found for {var}")
 
 
-class ConstantCondition(ShseerError):
+class ConstantCondition(Error):
     def __init__(self):
         super().__init__("const_cond", "condition is always true or false")
 
-class LoopRunsOnce(ShseerWarning):
+class LoopRunsOnce(Warning):
     def __init__(self):
         super().__init__("loop_once", "loop runs only once")
 
-class DeleteSystemFile(ShseerError):
+class DeleteSystemFile(Error):
     def __init__(self,filename:str):
         super().__init__("del_sys_file",f"might delete system file {filename}")
 
@@ -59,7 +59,7 @@ class Reporter:
         cls._solver_time : float = 0
 
     @classmethod
-    def add_error(cls,rep:ShseerReport):
+    def add_error(cls,rep:Report):
         cls._error_messages.append((rep.code,rep.message))
 
     @classmethod

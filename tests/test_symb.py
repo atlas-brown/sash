@@ -14,7 +14,7 @@ def write_script(tmp_path, content: str) -> str:
     path.write_text(content)
     return str(path)
 
-def assert_expected_report(report, expected_errors: list[reporter.ShseerError]):
+def assert_expected_report(report, expected_errors: list[reporter.Report]):
     """Helper to compare actual report with expected errors."""
     actual_errors = report["error_messages"]
     expected = [(err.code, err.message) for err in expected_errors]
