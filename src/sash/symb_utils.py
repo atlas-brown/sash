@@ -3,7 +3,7 @@ from typing import Optional
 import shortuuid
 from shasta.ast_node import QUOTED, UNQUOTED, ArgChar, EArgChar, QArgChar, VArgChar
 import z3
-from shseer.defs import SymbArgChar, Symbstr
+from sash.state import SymStr, SymVar
 
 
 def string_of_arg(args, quote_mode=UNQUOTED):
@@ -20,18 +20,18 @@ def string_of_arg(args, quote_mode=UNQUOTED):
         text.append(c)
 
         i = i+1
-    
+
     text = "".join(text)
 
     return text
 
-def symb_string_of_arg(args : list[ArgChar], quote_mode=UNQUOTED) -> Symbstr:
+def symb_string_of_arg(args : list[ArgChar], quote_mode=UNQUOTED) -> SymStr:
     i = 0
     text = []
     for i in range(len(args)):
         if isinstance(args[i], VArgChar):
             raise ValueError("Trying to turn variable into string")
-        if isinstance(args[i], SymbArgChar):
+        if isinstance(args[i], SymVar):
             text.append(args[i])
             continue
         if isinstance(args[i],QArgChar):
@@ -57,15 +57,15 @@ def symb_string_of_arg(args : list[ArgChar], quote_mode=UNQUOTED) -> Symbstr:
             result.append(item)
     if current_str:
         result.append(current_str)
-    return result 
+    return result
 
-def symbstr_to_str(symbstr : list[str | SymbArgChar]) -> Optional[str]:
+def symbstr_to_str(symbstr : list[str | SymVar]) -> Optional[str]:
     nls : list[str] = []
     for i in symbstr:
         if isinstance(i,str):
             nls.append(i)
         else:
-            return None 
+            return None
     return "".join(nls)
 
 def argchar_conc_panic(ls : list[ArgChar],panic_msg:str="") -> str:
@@ -84,7 +84,7 @@ def create_fresh_varname(prefix:Optional[str] = None) -> str:
     prefix = prefix if prefix is not None else "vr"
     return str(z3.FreshConst(z3.StringSort(),prefix))
 
-def create_fresh_var(prefix:Optional[str] = None) -> SymbArgChar:
+def create_fresh_var(prefix:Optional[str] = None) -> SymVar:
     return SymbArgChar(create_fresh_varname(prefix))
 
 def is_float(s: str) -> bool:
@@ -93,7 +93,7 @@ def is_float(s: str) -> bool:
         return True
     except Exception:
         return False
-    
+
 def is_special_param(s:str) -> bool:
     return s in ["@", "*", "#", "$", "?", "_","-"]
 
@@ -101,11 +101,11 @@ def is_pos_param(s:str) -> bool:
     return s.isnumeric()
 
 
-def repr_symbstr(symbstr : Symbstr) -> str:
+def repr_symbstr(symbstr : SymStr) -> str:
     return "".join([i.pretty() if isinstance(i,SymbArgChar) else i  for i in symbstr])
 
 
 def assert_issymbstr(arg_ls : list[ArgChar]):
     for arg in arg_ls:
         assert isinstance(arg,SymbArgChar) or isinstance(arg,str)
-            
+
