@@ -19,7 +19,7 @@ dependencies = [
 
 [project.scripts]
 sash = "sash:symb.argmain"
-example = "sash:example.example"
+verify_installation = "sash:verify_installation.main"
 
 [build-system]
 requires = ["uv_build>=0.8.15,<0.9.0"]

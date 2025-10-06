@@ -26,7 +26,7 @@ docker run --rm -itv $(pwd):/app resash /bin/bash
 
 ```bash
 # Run these inside the container!
-uv run example # Verify you can run the project
+uv run verify_installation # Verify you can run the project
 uv run pytest # Verify you can run the tests
 # Both commands should terminate without errors!
 ```
