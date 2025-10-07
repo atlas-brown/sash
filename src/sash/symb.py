@@ -67,7 +67,7 @@ def handle_while(traces: Traces,
 
     logging.debug(f"Checking constant test cond")
     assert len(test_cmds) == 3
-    if is_constant_test(test_cmds[0], test_cmds[2]):
+    if is_constant_test(test_cmds[2], test_cmds[1]):
         Reporter.add_error(reporter.InfiniteLoop(node))
 
     return t5
