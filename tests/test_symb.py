@@ -109,8 +109,8 @@ def test_loop_runs_multiple_no_warning(tmp_path):
     assert_expected_report(report, [expected_error])
 
 def test_constant_while_condition(tmp_path):
-    # A while loop with a constant true condition should produce a ConstantCondition error
-    script = write_script(tmp_path, "A=a\nB=b\nwhile [ $A = $B ]; do echo hi; done\n")
+    # A while loop with a constant true condition should produce an InfiniteLoop error
+    script = write_script(tmp_path, "A=a\nB=b\nwhile [ $A != $B ]; do echo hi; done\n")
     report = symb.main(script)
     expected_error = reporter.InfiniteLoop(None) # Mock the location
     assert_expected_report(report, [expected_error])
