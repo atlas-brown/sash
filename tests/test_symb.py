@@ -5,7 +5,6 @@ These tests run sample shell scripts and verify that expected errors or warnings
 import sash.symb as symb
 import sash.reporter as reporter
 import shasta.ast_node as AST
-import sash.reporter as reporter
 
 # Utilities
 def write_script(tmp_path, content: str) -> str:
@@ -121,3 +120,11 @@ def test_changing_while_condition_no_error(tmp_path):
     script = write_script(tmp_path, "A=a\nB=b\nwhile [ $A != $B ]; do A=$B; done\n")
     report = symb.main(script)
     assert_expected_report(report, [])
+
+def test_changing_while_condition_error(tmp_path):
+    # A while loop where the condition never changes after the first iteration should error
+    script = write_script(tmp_path, "A=a\nB=b\nwhile [ $A != $B ]; do A=hello; done\n")
+    report = symb.main(script)
+    expected_error = reporter.InfiniteLoop(None) # Mock the location
+    assert_expected_report(report, [expected_error])
+
