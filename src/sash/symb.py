@@ -38,7 +38,7 @@ def handle_commandnode(traces: Traces,
 
     if cb is not None:
         cb(expanded_args)
-    logging.warning(f"Done with command {trim_string_for_logging(node.pretty())} after expanding its args to {expanded_args} (it had assignments: {node.assignments})")
+    logging.debug(f"Done with command {trim_string_for_logging(node.pretty())} after expanding its args to {expanded_args} (it had assignments: {node.assignments})")
     return t2
 
 def record_assignment(trace: Trace, var: str, rhs: Field) -> Trace:
@@ -66,7 +66,6 @@ def handle_while(traces: Traces,
     logging.debug(f"collected test_cmds: {test_cmds}")
 
     logging.debug(f"Checking constant test cond")
-    breakpoint()
     assert len(test_cmds) >= 3
     if is_constant_test(test_cmds[-1], test_cmds[-2]):
         Reporter.add_error(reporter.InfiniteLoop(node))
