@@ -240,7 +240,6 @@ def interp_node(traces: Traces, node: AST.AstNode, info: ScriptInfo) -> Traces:
             return t4
 
         case AST.FileRedirNode():
-            logging.warning(f"Skipping redirection node type: {node.redir_type} fd {node.fd} arg {node.arg}")
             for trace in traces:
                 var = symb_utils.argchar_conc(node.arg)
                 if var in trace.latest_state.fundefs:
