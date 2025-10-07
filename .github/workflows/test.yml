@@ -1,6 +1,3 @@
-# Run uv sync
-# Run uv run pytest
-
 name: Run Tests
 on: [push, pull_request]
 jobs:
