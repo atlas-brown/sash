@@ -72,11 +72,11 @@ def handle_while(traces: Traces,
 
     return t5
 
+def is_test(s):
+    return s in ["test", "["]
+
 def is_constant_test(cmd1: list[Field], cmd2: list[Field]) -> bool:
     """Return true if `cmd1` and `cmd2` are both tests that always have the same result."""
-
-    def is_test(s):
-        return s in ["test", "["]
 
     if len(cmd1) < 1 or len(cmd2) < 1 or len(cmd1) != len(cmd2):
         return False
@@ -87,7 +87,69 @@ def is_constant_test(cmd1: list[Field], cmd2: list[Field]) -> bool:
         case _:
             return False
 
+def interpret_test(cmd: list[Field]) -> bool:
+    """Return true if `cmd` is a test that always returns true. This only works for concrete arguments."""
+    logging.debug(f"Checking if test command {cmd} is constant true/false")
+    if len(cmd) < 1:
+        return False
 
+    if not isinstance(cmd[0].content, SymStr):
+        return False
+
+    if not is_test(cmd[0].content.parts[0]):
+        return False
+
+    args = cmd[1:]
+    if not len(args) in {3, 4}:
+        return False
+
+    # Check if if all arguments are concrete
+    field_content = [f.content for f in cmd]
+    if not all(isinstance(c, SymStr) for c in field_content):
+        return False
+    field_parts = [c.parts for c in field_content if isinstance(c, SymStr)]
+    if not all(all(isinstance(p, str) for p in parts) for parts in field_parts):
+        return False
+
+    if len(args) == 3:
+        match (args[0].content, args[1].content):
+            case (SymStr([s]), SymStr([op])) if op == "-n":
+                return s != ""
+            case (SymStr([s]), SymStr([op])) if op == "-z":
+                return s == ""
+            case _:
+                return False
+
+    if len(args) == 4:
+        match (args[0].content, args[1].content, args[2].content):
+            case (SymStr([s1]), SymStr([op]), SymStr([s2])) if op == "=":
+                return s1 == s2
+            case (SymStr([s1]), SymStr([op]), SymStr([s2])) if op == "!=":
+                return s1 != s2
+            case (SymStr([s1]), SymStr([op]), SymStr([s2])) if op in ["-eq", "-ne", "-lt", "-le", "-gt", "-ge"]:
+                try:
+                    assert isinstance(s1, str) and isinstance(s2, str)
+                    n1 = int(s1)
+                    n2 = int(s2)
+                except ValueError:
+                    return False
+                match op:
+                    case "-eq":
+                        return n1 == n2
+                    case "-ne":
+                        return n1 != n2
+                    case "-lt":
+                        return n1 < n2
+                    case "-le":
+                        return n1 <= n2
+                    case "-gt":
+                        return n1 > n2
+                    case "-ge":
+                        return n1 >= n2
+            case _:
+                return False
+
+    return False
 
 
 # ============================================================
