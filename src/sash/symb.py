@@ -248,6 +248,14 @@ def interp_node(traces: Traces, node: AST.AstNode, info: ScriptInfo) -> Traces:
             # TODO: Also handle the effects of redirection on the FS
             return traces
 
+        case AST.RedirNode():
+            t1 = guarded_interp_node(traces, node.node, info)
+            t2 = t1
+            for redir in node.redir_list:
+                t2 = t2.extend(guarded_interp_node(t1, redir, info)) or t2
+            return t2
+
+
         case AST.DefunNode():
             trace_expansion_pairs = expand(traces, node.name, info)
             return trace_map(traces, lambda s: s.set_fundef(symb_utils.argchar_conc(node.name), node))
