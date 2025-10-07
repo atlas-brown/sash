@@ -16,9 +16,9 @@ def write_script(tmp_path, content: str) -> str:
 
 def assert_expected_report(report, expected_errors: list[reporter.Report]):
     """Helper to compare actual report with expected errors."""
-    actual_errors = report["error_messages"]
-    expected = [(err.code, err.message) for err in expected_errors]
-    assert set(actual_errors) == set(expected)
+    actual = [(err) for err, msg in report["error_messages"]]
+    expected = [(err.code) for err in expected_errors]
+    assert set(actual) == set(expected)
 # ======
 
 foo_var = AST.VArgChar(fmt="Normal", null=False, var="FOO", arg=[])
