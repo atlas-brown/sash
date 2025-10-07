@@ -1,6 +1,4 @@
-#!/usr/bin/env bash
-
-# https://github.com/icy/bash-coding-style/blob/master/examples/steam.sh
+#!/usr/bin/env sh
 
 # Allow us to debug what's happening in the script if necessary
 if [ "$STEAM_DEBUG" ]; then
@@ -142,7 +140,7 @@ detect_package()
 detect_scriptversion()
 {
 	SCRIPT_VERSION=$(fgrep "$2=" "$1")
-	if [[ "$SCRIPT_VERSION" ]]; then
+	if [ "$SCRIPT_VERSION" ]; then
 		expr "$SCRIPT_VERSION" : ".*=\(.*\)"
 	else
 		echo "0"
@@ -158,7 +156,7 @@ check_scriptversion()
 	MINIMUM_VERSION=$3
 
 	VERSION="$(detect_scriptversion "$SCRIPT" $VERSION_TOKEN)"
-	if [[ "$VERSION" -lt "$MINIMUM_VERSION" ]]; then
+	if [ "$VERSION" -lt "$MINIMUM_VERSION" ]; then
 		return 1
 	fi
 	return 0
@@ -277,10 +275,10 @@ unpack_runtime()
 	EXISTING_CHECKSUM="$(cd "$(dirname "$STEAM_RUNTIME")"; md5sum "$(basename "$STEAM_RUNTIME.$ARCHIVE_EXT")")"
 	EXPECTED_CHECKSUM="$(cat "$STEAM_RUNTIME.checksum")"
 	if [ "$EXISTING_CHECKSUM" != "$EXPECTED_CHECKSUM" ]; then
-		echo $"Runtime checksum: $EXISTING_CHECKSUM, expected $EXPECTED_CHECKSUM" >&2
+		echo "Runtime checksum: $EXISTING_CHECKSUM, expected $EXPECTED_CHECKSUM" >&2
 		return 2
 	fi
-	if ! extract_archive $"Unpacking Steam Runtime" "$STEAM_RUNTIME.$ARCHIVE_EXT" "$EXTRACT_TMP"; then
+	if ! extract_archive "Unpacking Steam Runtime" "$STEAM_RUNTIME.$ARCHIVE_EXT" "$EXTRACT_TMP"; then
 		return 3
 	fi
 
@@ -370,13 +368,13 @@ reset_steam()
 	# Reinstall the bootstrap and we're done.
 	install_bootstrap
 
-	echo $"Reset complete!"
+	echo "Reset complete!"
 	exit
 }
 
 #determine platform
 UNAME=`uname`
-if [ "$UNAME" == "Linux" ]; then
+if [ "$UNAME" = "Linux" ]; then
 
 	# identify Linux distribution and pick an optimal bin dir
 	PLATFORM=`detect_platform`
@@ -489,11 +487,11 @@ if [ "$UNAME" == "Linux" ]; then
 
 				STEAM_RUNTIME_DEBUG_ARCHIVE="$STEAM_RUNTIME_DEBUG_DIR/$(basename "$STEAM_RUNTIME_DEBUG_URL")"
 				if [ ! -f "$STEAM_RUNTIME_DEBUG_ARCHIVE" ]; then
-					echo $"Downloading debug runtime: $STEAM_RUNTIME_DEBUG_URL"
+					echo "Downloading debug runtime: $STEAM_RUNTIME_DEBUG_URL"
 					(cd "$STEAM_RUNTIME_DEBUG_DIR" && \
-						download_archive $"Downloading debug runtime..." "$STEAM_RUNTIME_DEBUG_URL")
+						download_archive "Downloading debug runtime..." "$STEAM_RUNTIME_DEBUG_URL")
 				fi
-				if ! extract_archive $"Unpacking debug runtime..." "$STEAM_RUNTIME_DEBUG_ARCHIVE" "$STEAM_RUNTIME_DEBUG_DIR"; then
+				if ! extract_archive "Unpacking debug runtime..." "$STEAM_RUNTIME_DEBUG_ARCHIVE" "$STEAM_RUNTIME_DEBUG_DIR"; then
 					rm -rf "$STEAM_RUNTIME_DEBUG" "$STEAM_RUNTIME_DEBUG_ARCHIVE"
 				fi
 			fi
@@ -504,7 +502,7 @@ if [ "$UNAME" == "Linux" ]; then
 				# Set up the link to the source code
 				ln -sf "$STEAM_RUNTIME/source" /tmp/source
 			else
-				echo $"STEAM_RUNTIME couldn't download and unpack $STEAM_RUNTIME_DEBUG_URL, falling back to $STEAM_RUNTIME"
+				echo "STEAM_RUNTIME couldn't download and unpack $STEAM_RUNTIME_DEBUG_URL, falling back to $STEAM_RUNTIME"
 			fi
 		fi
 	elif [ "$STEAM_RUNTIME" = "1" ]; then
@@ -562,7 +560,7 @@ MAGIC_RESTART_EXITCODE=42
 # and launch steam
 STEAM_DEBUGGER=$DEBUGGER
 unset DEBUGGER # Don't use debugger if Steam launches itself recursively
-if [ "$STEAM_DEBUGGER" == "gdb" ] || [ "$STEAM_DEBUGGER" == "cgdb" ]; then
+if [ "$STEAM_DEBUGGER" = "gdb" ] || [ "$STEAM_DEBUGGER" = "cgdb" ]; then
 	ARGSFILE=$(mktemp $USER.steam.gdb.XXXX)
 
 	# Set the LD_PRELOAD varname in the debugger, and unset the global version.
@@ -574,7 +572,7 @@ if [ "$STEAM_DEBUGGER" == "gdb" ] || [ "$STEAM_DEBUGGER" == "cgdb" ]; then
 
 	$STEAM_DEBUGGER -x "$ARGSFILE" --args "$STEAMROOT/$PLATFORM/$STEAMEXE" "$@"
 	rm "$ARGSFILE"
-elif [ "$STEAM_DEBUGGER" == "valgrind" ]; then
+elif [ "$STEAM_DEBUGGER" = "valgrind" ]; then
 	DONT_BREAK_ON_ASSERT=1 G_SLICE=always-malloc G_DEBUG=gc-friendly valgrind --error-limit=no --undef-value-errors=no --suppressions=$PLATFORM/steam.supp $STEAM_VALGRIND "$STEAMROOT/$PLATFORM/$STEAMEXE" "$@" 2>&1 | tee steam_valgrind.txt
 else
 	$STEAM_DEBUGGER "$STEAMROOT/$PLATFORM/$STEAMEXE" "$@"

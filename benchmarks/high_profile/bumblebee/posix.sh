@@ -1,6 +1,4 @@
-#!/bin/bash -l
-
-# https://github.com/MrMEEE/bumblebee-Old-and-abbandoned/blob/6cd6b2485668e8a87485cb34ca8a0a937e73f16d/install.sh
+#!/bin/sh -l
 
 # ----------------------------------------------------------------------------
 # "Red Bull License"
@@ -12,7 +10,7 @@
 # %2edk&lc=US&item_name=The%20Bumblebee%20Project%20by%20Martin%20Juhl&amount=
 # 3%2e00&currency_code=EUR&currency_code=EUR&bn=PP%2dDonationsBF%3abtn_donateC
 # C_LG%2egif%3aNonHosted
-# 
+#
 # ----------------------------------------------------------------------------
 
 #
@@ -47,7 +45,7 @@ ROOT_UID=0
 #Determine Arch x86_64 or i686
 ARCH=`uname -m`
 
-#Get tools location 
+#Get tools location
 LSPCI=`which lspci`
 MODPROBE=`which modprobe`
 
@@ -69,8 +67,8 @@ elif [ `cat /etc/issue |grep -nir "Arch Linux" |wc -l` -gt 0  ]; then
   echo "You are running Arch Linux, please see the buildscript here for support:"
   echo
   echo "http://aur.archlinux.org/packages.php?ID=48866"
-  echo 
-  read
+  echo
+  read REPLY
   exit 0
 elif [ `cat /etc/issue |grep -nir "gentoo" |wc -l` -gt 0  ]; then
   DISTRO=GENTOO
@@ -78,7 +76,7 @@ elif [ `cat /etc/issue |grep -nir "gentoo" |wc -l` -gt 0  ]; then
   echo
   echo "https://github.com/iegor/bumblebee-Gentoo-support"
   echo
-  read
+  read REPLY
   exit 0
 fi
 
@@ -86,8 +84,7 @@ echo
 echo $DISTRO" distribution found."
 echo
 
-
-if [ $UID != $ROOT_UID ] || [ $HOME = /root ]; then
+if [ $(id -u) != $ROOT_UID ] || [ $HOME = /root ]; then
   echo "You don't have sufficient privileges to run this script."
   echo
   echo "Do not run this script as the root user."
@@ -131,17 +128,17 @@ BUMBLEBEEPWD=$PWD
 
 echo
 echo "Installing needed packages."
-echo 
+echo
 
 case "$DISTRO" in
 
  UBUNTU)
   VERSION=`cat /etc/issue | cut -f2 -d" "`
-  if [ $VERSION = 11.04 ]; then 
+  if [ $VERSION = 11.04 ]; then
    echo
-   echo "Ubuntu 11.04 Detected." 
+   echo "Ubuntu 11.04 Detected."
    echo
-  else 
+  else
    echo
    echo "Ubuntu "$VERSION" Detected."
    echo "Adding X-Swat Driver Repository."
@@ -159,21 +156,21 @@ case "$DISTRO" in
   ${MODPROBE} -r nouveau
   ${MODPROBE} nvidia-current
  ;;
- 
+
  FEDORA)
   yum -y install wget binutils gcc kernel-devel mesa-libGL mesa-libGLU
   if [ $? -ne 0 ]; then
-   echo 
+   echo
    echo "Package manager failed to install needed packages..."
-   echo     
-   exit 21       
+   echo
+   exit 21
   fi
   rm -rf /tmp/NVIDIA*
   echo "Getting latest NVidia drivers version"
   NV_DRIVERS_VERSION=`wget -q -O - http://www.nvidia.com/object/unix.html | grep "Linux x86_64/AMD64/EM64T" | cut -f5 -d">" | cut -f1 -d"<"`
   echo "Latest NVidia drivers version is $NV_DRIVERS_VERSION"
-  if [ "$ARCH" = "x86_64" ]; then  
-    wget http://us.download.nvidia.com/XFree86/Linux-x86_64/${NV_DRIVERS_VERSION}/NVIDIA-Linux-x86_64-${NV_DRIVERS_VERSION}.run -O /tmp/NVIDIA-Linux-driver.run    
+  if [ "$ARCH" = "x86_64" ]; then
+    wget http://us.download.nvidia.com/XFree86/Linux-x86_64/${NV_DRIVERS_VERSION}/NVIDIA-Linux-x86_64-${NV_DRIVERS_VERSION}.run -O /tmp/NVIDIA-Linux-driver.run
   elif [ "$ARCH" = "i686" ]; then
     wget http://us.download.nvidia.com/XFree86/Linux-x86/${NV_DRIVERS_VERSION}/NVIDIA-Linux-x86-${NV_DRIVERS_VERSION}.run -O /tmp/NVIDIA-Linux-driver.run
   fi
@@ -188,10 +185,10 @@ case "$DISTRO" in
   make install
   cd $BUMBLEBEEPWD
   depmod -a
-  ldconfig 
+  ldconfig
   ${MODPROBE} -r nouveau
   ${MODPROBE} nvidia
-  
+
   if [ "$ARCH" = "x86_64" ]; then
    rm -rf /usr/lib64/nvidia-current/
    rm -rf /usr/lib/nvidia-current/
@@ -264,7 +261,7 @@ case "$DISTRO" in
    *)
     echo
     echo "Please choose a valid option, Press any key to try again"
-    read
+    read REPLY
    ;;
    DEBIAN)
     apt-get update
@@ -318,7 +315,7 @@ if [ ! -f install-files/bumblebee-disablecard ]; then
 else
  # Already Exists
  echo
- echo "nVidia card disable-script: /usr/local/bin/bumblebee-disablecard, already exists not overwriting"    
+ echo "nVidia card disable-script: /usr/local/bin/bumblebee-disablecard, already exists not overwriting"
  echo
 fi
 
@@ -352,7 +349,7 @@ case "$DISTRO" in
   rm -rf /etc/alternatives/xorg_extra_modules-bumblebee
   rm -rf /usr /lib/nvidia-current/xorg/xorg # bug here
   ln -s /usr/lib/nvidia-current/xorg /etc/alternatives/xorg_extra_modules-bumblebee
-  ldconfig 
+  ldconfig
  ;;
  DEBIAN)
  rm /etc/alternatives/libglx.so
@@ -412,7 +409,7 @@ case "$DISTRO" in
  ;;
  OPENSUSE)
   cp install-files/bumblebee.script.openSUSE /etc/init.d/bumblebee
-  if [ "$ARCH" = "x86_64" ]; then   
+  if [ "$ARCH" = "x86_64" ]; then
    echo
    echo "64-bit system detected"
    echo
@@ -430,7 +427,7 @@ case "$DISTRO" in
    echo
    exit 20
   fi
- ;; 
+ ;;
 esac
 
 cp install-files/virtualgl.conf /etc/modprobe.d/
@@ -499,26 +496,26 @@ fi
 echo "blacklist nouveau" >> /etc/modprobe.d/nouveau-blacklist.conf
 
 INTELBUSID=`echo "PCI:"\`${LSPCI} |grep VGA |grep Intel |cut -f1 -d:\`":"\`${LSPCI} |grep VGA |grep Intel |cut -f2 -d: |cut -f1 -d.\`":"\`${LSPCI} |grep VGA |grep Intel |cut -f2 -d. |cut -f1 -d" "\``
-if [ `${LSPCI} |grep VGA |wc -l` -eq 2 ]; then 
+if [ `${LSPCI} |grep VGA |wc -l` -eq 2 ]; then
    NVIDIABUSID=`echo "PCI:"\`${LSPCI} |grep VGA |grep nVidia |cut -f1 -d:\`":"\`${LSPCI} |grep VGA |grep nVidia |cut -f2 -d: |cut -f1 -d.\`":"\`${LSPCI} |grep VGA |grep nVidia |cut -f2 -d. |cut -f1 -d" "\``
 elif [ `${LSPCI} |grep 3D |wc -l` -eq 1 ]; then
-   NVIDIABUSID=`echo "PCI:"\`${LSPCI} |grep 3D |grep nVidia |cut -f1 -d:\`":"\`${LSPCI} |grep 3D |grep nVidia |cut -f2 -d: |cut -f1 -d.\`":"\`${LSPCI} |grep 3D |grep nVidia |cut -f2 -d. |cut -f1 -d" "\``   
+   NVIDIABUSID=`echo "PCI:"\`${LSPCI} |grep 3D |grep nVidia |cut -f1 -d:\`":"\`${LSPCI} |grep 3D |grep nVidia |cut -f2 -d: |cut -f1 -d.\`":"\`${LSPCI} |grep 3D |grep nVidia |cut -f2 -d. |cut -f1 -d" "\``
 else
- echo 
+ echo
  echo "The BusID of the nVidia card can't be determined."
  echo "You must correct this manually in /etc/X11/xorg.conf.nvidia"
  echo "Please report this problem.."
  echo
  echo "Press Any Key to continue."
  echo
- read 
+ read REPLY
 fi
 
 clear
 
 echo
 echo "Changing Configuration to match your Machine."
-echo 
+echo
 
 sed -i 's/REPLACEWITHBUSID/'$INTELBUSID'/g' /etc/X11/xorg.conf
 sed -i 's/REPLACEWITHBUSID/'$NVIDIABUSID'/g' /etc/X11/xorg.conf.nvidia
@@ -573,19 +570,19 @@ CONNECTEDMONITOR="CRT-0"
 CONNECTEDMONITOR="CRT-0"
 ;;
 
-3)  
+3)
 CONNECTEDMONITOR="DFP-0"
 ;;
 
-4)  
+4)
 CONNECTEDMONITOR="DFP-0"
 ;;
-  
-5)  
+
+5)
 CONNECTEDMONITOR="DFP-0"
 ;;
-  
-6)  
+
+6)
 CONNECTEDMONITOR="DFP-0"
 ;;
 
@@ -625,7 +622,7 @@ CONNECTEDMONITOR=`echo $manualinput`
 *)
 echo
 echo "Please choose a valid option, Press any key to try again"
-read
+read REPLY
 clear
 
 ;;
@@ -647,7 +644,7 @@ echo
 case "$DISTRO" in
  UBUNTU)
   update-rc.d -f bumblebee remove
- ;; 
+ ;;
  DEBIAN)
   update-rc.d bumblebee defaults
  ;;
@@ -671,17 +668,17 @@ echo
 echo "The Image Transport is how the images are transferred from the"
 echo "nVidia card to the Intel card, people has different experiences of"
 echo "performance, but just select the default if you are in doubt."
-echo 
+echo
 echo "I recently found out that yuv and jpeg both has some lagging"
 echo "this is only noticable in fast moving games, such as 1st person"
 echo "shooters and for me, its only good enough with xv, even though"
 echo "xv sets down performance a little bit."
 echo
-echo "1) YUV"  
-echo "2) JPEG"     
+echo "1) YUV"
+echo "2) JPEG"
 echo "3) PROXY"
 echo "4) XV (default)"
-echo "5) RGB"  
+echo "5) RGB"
 
 echo
 read machine
@@ -694,15 +691,15 @@ IMAGETRANSPORT="yuv"
 ;;
 
 2)
-IMAGETRANSPORT="jpeg"    
+IMAGETRANSPORT="jpeg"
 ;;
 
 3)
-IMAGETRANSPORT="proxy"    
+IMAGETRANSPORT="proxy"
 ;;
 
 4)
-IMAGETRANSPORT="xv"    
+IMAGETRANSPORT="xv"
 ;;
 
 5)
@@ -711,11 +708,11 @@ IMAGETRANSPORT="rgb"
 *)
 echo
 echo "Please choose a valid option, Press any key to try again."
-read
+read REPLY
 clear
-  
+
 ;;
-     
+
 esac
 done
 
@@ -752,7 +749,7 @@ echo "Starting Services:"
 echo
 # Should be removed when changes from v.1.4.19+20 has been implemented on Fedora, OpenSuSE and Debian.
 
-if [ "$DISTRO" != UBUNTU ]; then 
+if [ "$DISTRO" != UBUNTU ]; then
 /etc/init.d/bumblebee start
 /usr/bin/vglclient-service &
 fi
@@ -761,7 +758,7 @@ echo
 echo "Setting up bumblebee user rights."
 echo
 #Support for starting/stopping the Bumblebee services ondemand.
-case "$DISTRO" in 
+case "$DISTRO" in
 UBUNTU)
 groupadd bumblebee
 gpasswd -a `env |grep SUDO_USER |cut -f2 -d=` bumblebee
@@ -803,7 +800,7 @@ fi
 echo
 echo "If you have any problems in or after the installation, please try to run the bumblebee-uninstall script and then"
 echo "rerun this script... if that doesn't work: please run the bumblebee-bugreport tool and send me a bugreport."
-echo 
+echo
 echo "Or even better.. create an issue on github... this really makes bugfixing much easier for me and faster for you."
 echo
 echo "If you need to reconfigure bumblebee the script bumblebee-config as available."
