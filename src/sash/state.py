@@ -3,6 +3,7 @@ import sash.constraints
 import shasta.ast_node as AST
 import logging
 from typing import Callable, Optional
+from enum import Enum
 
 
 @dataclass(frozen=True)
@@ -44,12 +45,24 @@ class SymStr:
             new_parts.append(this_str)
         return SymStr(new_parts)
 
+class ArbitraryType(Enum):
+    APPROXIMATION = 0
+    ENVIRONMENT = 1
     def __str__(self) -> str:
         return "".join(str(p) for p in self.parts)
 
 @dataclass(frozen=True)
 class CompletelyArbitrary:
     source: AST.AstNode
+    kind: ArbitraryType
+    producing_state: Optional['State'] # shouldn't ever result in cyclic data, because the state that is used to compute an arbitrary value should only ever be an ancester of the state the stores it, but beware
+
+    def __eq__(self, other):
+        return isinstance(other, CompletelyArbitrary) \
+            and self.source == other.source \
+            and self.kind == other.kind \
+            and self.producing_state == other.producing_state \
+            and self.producing_state is not None # If the state producing this is unknown, conservatively say it can't be equal to any other
 
 @dataclass(frozen=True)
 class WordCount:

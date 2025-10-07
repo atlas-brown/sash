@@ -15,7 +15,10 @@ from sash.reporter import Reporter
 import sash.reporter as reporter
 import sash.symb_utils as symb_utils
 
-def handle_commandnode(traces: Traces, node: AST.CommandNode, info: ScriptInfo) -> Traces:
+def handle_commandnode(traces: Traces,
+                       node: AST.CommandNode,
+                       info: ScriptInfo,
+                       cb: Optional[Callable[[list[Field]], None]]) -> Traces:
     logging.debug(f"Handling command node {trim_string_for_logging(node.pretty())} with {len(traces)} traces")
     t1, expanded_args = expand_args_dumb(traces, node.arguments, info)
 
@@ -29,16 +32,63 @@ def handle_commandnode(traces: Traces, node: AST.CommandNode, info: ScriptInfo) 
                     assert path is not None
                     if any(path.startswith(p) for p in Config.get("PROTECTED_PATHS")):
                         Reporter.add_error(reporter.DeleteSystemFile(path))
-
-    logging.warning(f"Done with command {trim_string_for_logging(node.pretty())} after expanding its args to {expanded_args} (it had assignments: {node.assignments})")
-
     t2 = t1
     for redir in node.redir_list:
         t2 = t2.extend(guarded_interp_node(t1, redir, info)) or t2
+
+    if cb is not None:
+        cb(expanded_args)
+    logging.warning(f"Done with command {trim_string_for_logging(node.pretty())} after expanding its args to {expanded_args} (it had assignments: {node.assignments})")
     return t2
 
 def record_assignment(trace: Trace, var: str, rhs: Field) -> Trace:
     return trace.extend(lambda s: s.set_env(var, ShellVar(rhs)))
+
+def handle_while(traces: Traces,
+                 node: AST.WhileNode,
+                 info: ScriptInfo):
+    logging.debug(f"Checking while loop for an infinite loop")
+    test_cmds = []
+    def get_the_test(cmd_fields):
+        test_cmds.append(cmd_fields)
+    logging.debug(f"Interpreting first iteration")
+    t1 = guarded_interp_node(traces, node.test, info, get_the_test)
+    logging.debug(f"collected test_cmds: {test_cmds}")
+    # todo extend path condition
+    t2 = guarded_interp_node(t1, node.body, info)
+    logging.debug(f"Interpreting second iteration")
+    t3 = guarded_interp_node(t2, node.test, info, get_the_test)
+    logging.debug(f"collected test_cmds: {test_cmds}")
+    # todo extend path condition
+    t4 = guarded_interp_node(t3, node.body, info)
+    logging.debug(f"Interpreting third test")
+    t5 = guarded_interp_node(t4, node.test, info, get_the_test)
+    logging.debug(f"collected test_cmds: {test_cmds}")
+
+    logging.debug(f"Checking constant test cond")
+    breakpoint()
+    assert len(test_cmds) >= 3
+    if is_constant_test(test_cmds[-1], test_cmds[-2]):
+        Reporter.add_error(reporter.InfiniteLoop(node))
+
+    return t5
+
+def is_constant_test(cmd1: list[Field], cmd2: list[Field]) -> bool:
+    """Return true if `cmd1` and `cmd2` are both tests that always have the same result."""
+
+    def is_test(s):
+        return s in ["test", "["]
+
+    if len(cmd1) < 1 or len(cmd2) < 1 or len(cmd1) != len(cmd2):
+        return False
+    match (cmd1[0].content, cmd2[0].content):
+        case (SymStr([t1]), SymStr([t2])) if is_test(t1) and is_test(t2):
+            # see CompletelyArbitrary __eq__, which makes this work
+            return all(f1 == f2 for f1, f2 in zip(cmd1[1:], cmd2[1:]))
+        case _:
+            return False
+
+
 
 
 # ============================================================
@@ -79,6 +129,7 @@ def expand_simple(stuff: list[AST.ArgChar], state: State) -> list[Field]:
 
         for argchar in chars:
             match argchar:
+                # todo what about globs?
                 case AST.CArgChar() as c:
                     if not quoted and c.pretty() in IFS:
                         # end this field
@@ -98,14 +149,14 @@ def expand_simple(stuff: list[AST.ArgChar], state: State) -> list[Field]:
                             add_a_field(v.value)
                         else:
                             logging.info(f"expansion: treating var {var.pretty()} with unhandled fmt {var.fmt} as completely arbitrary field")
-                            add_a_field(arbitrary_field(var))
+                            add_a_field(arbitrary_field(var), ArbitraryType.APPROXIMATION, state)
                     else:
-                        Reporter.add_error(reporter.UnboundID(var.pretty()))
-                        add_a_field(arbitrary_field(var))
+                        Reporter.add_error(reporter.UnboundID(var.pretty())) # todo we should report path information
+                        add_a_field(arbitrary_field(var, ArbitraryType.ENVIRONMENT, state)) # todo worth recording somehow that the value comes from the environment?
                 case _:
                     # todo: if its a command substitution, need to go interp it
                     logging.info(f"expansion: treating unhandled argchar as completely arbitrary field: {argchar.pretty()}")
-                    add_a_field(arbitrary_field(argchar))
+                    add_a_field(arbitrary_field(argchar, ArbitraryType.APPROXIMATION, state))
 
         if field_so_far != []:
             finish_field_so_far()
@@ -137,7 +188,7 @@ def expand_args_dumb(traces: Traces, args: list[list[AST.ArgChar]], info: Script
             expanded_args.extend(expanded_fields[0])
         else:
             # todo could be smarter about the ranges of word counts, but wont do unless needed
-            expanded_args.append(arbitrary_field(arg))
+            expanded_args.append(arbitrary_field(arg, ArbitraryType.APPROXIMATION, None))
     return res_traces, expanded_args
 
 
@@ -146,8 +197,9 @@ def expand_args_dumb(traces: Traces, args: list[list[AST.ArgChar]], info: Script
 #  Field manipulation
 # =====================
 
-def arbitrary_field(ast) -> Field:
-    return Field(CompletelyArbitrary(ast), WordCount(0, inf))
+def arbitrary_field(ast: AST.AstNode, kind: ArbitraryType, producing_state: State) -> Field:
+    return Field(CompletelyArbitrary(ast, kind, producing_state),
+                 WordCount(0, inf))
 
 def join_fields(fields: list[Field]) -> Field:
     content = []
@@ -160,6 +212,7 @@ def join_fields(fields: list[Field]) -> Field:
                 min_words += field.count.min
                 max_words += field.count.max
             case CompletelyArbitrary(_):
+                # TODO: this is not quite sound! If there are multiple arbitrary fields, we need to make a new one...
                 return field
 
     return Field(SymStr(content), WordCount(min_words, max_words))
@@ -173,8 +226,8 @@ def collapse_fields(fields: List[Field], source: AST.AstNode | None = None) -> F
         # otherwise, return a CompletelyArbitrary field with min/max word counts
         min_words = min(field.count.min for field in fields)
         max_words = max(field.count.max for field in fields)
-        return Field(CompletelyArbitrary(source), WordCount(min_words, max_words))
-
+        return Field(CompletelyArbitrary(source),
+                     WordCount(min_words, max_words))
 
 
 
@@ -184,19 +237,25 @@ def collapse_fields(fields: List[Field], source: AST.AstNode | None = None) -> F
 
 context_line = None
 
-def guarded_interp_node(traces: Traces, node: AST.AstNode, info: ScriptInfo) -> Traces:
+def guarded_interp_node(traces: Traces,
+                        node: AST.AstNode,
+                        info: ScriptInfo,
+                        command_cb: Optional[Callable[[list[Field]], None]] = None) -> Traces:
     try:
-        return interp_node(traces, node, info)
+        return interp_node(traces, node, info, command_cb)
     except Exception:
         logging.error(f"Interp raised: {traceback.format_exc()}. Ignoring.")
         return traces
 
-def interp_node(traces: Traces, node: AST.AstNode, info: ScriptInfo) -> Traces:
+def interp_node(traces: Traces,
+                node: AST.AstNode,
+                info: ScriptInfo,
+                command_cb: Optional[Callable[[list[Field]], None]] = None) -> Traces:
     # refer to https://github.com/binpash/shasta/blob/main/shasta/ast_node.py
     logging.debug(f"Interpreting {trim_string_for_logging(node.pretty())} with {len(traces)} traces")
     match node:
         case AST.CommandNode() if not (node.arguments == [] and node.assignments != []):
-            return handle_commandnode(traces, node, info)
+            return handle_commandnode(traces, node, info, command_cb)
         case AST.CommandNode() if node.arguments == [] and node.assignments != []: # why is kind of parse possible??
             # do the assignments inside
             t = traces
@@ -225,8 +284,12 @@ def interp_node(traces: Traces, node: AST.AstNode, info: ScriptInfo) -> Traces:
 
 
         case AST.SemiNode():
-            t2 = guarded_interp_node(traces, node.left_operand, info)
-            return guarded_interp_node(t2, node.right_operand, info)
+            t2 = guarded_interp_node(traces, node.left_operand, info, command_cb)
+            return guarded_interp_node(t2, node.right_operand, info, command_cb)
+
+
+        case AST.WhileNode():
+            return handle_while(traces, node, info)
 
         case AST.ForNode():
             t1, items = expand_args_dumb(traces, node.argument, info)
