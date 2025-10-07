@@ -108,3 +108,16 @@ def test_loop_runs_multiple_no_warning(tmp_path):
     report = symb.main(script)
     expected_error = reporter.UnboundID(foo_var.pretty())
     assert_expected_report(report, [expected_error])
+
+def test_constant_while_condition(tmp_path):
+    # A while loop with a constant true condition should produce a ConstantCondition error
+    script = write_script(tmp_path, "A=a\nB=b\nwhile [ $A = $B ]; do echo hi; done\n")
+    report = symb.main(script)
+    expected_error = reporter.InfiniteLoop(None) # Mock the location
+    assert_expected_report(report, [expected_error])
+
+def test_changing_while_condition_no_error(tmp_path):
+    # A while loop where the condition can change should not produce any errors
+    script = write_script(tmp_path, "A=a\nB=b\nwhile [ $A != $B ]; do A=$B; done\n")
+    report = symb.main(script)
+    assert_expected_report(report, [])
