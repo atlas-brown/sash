@@ -57,7 +57,7 @@ function HandleOther(){
 	validDomain=$(echo "$1" | perl -ne'print if /\b((?=[a-z0-9-]{1,63}\.)(xn--)?[a-z0-9]+(-[a-z0-9]+)*\.)+[a-z]{2,63}\b/')
 	if [ -z "$validDomain" ]; then
 		echo "$1" is not a valid argument or domain name
-	else	  
+	else
 	  domList=("${domList[@]}" $validDomain)
 	fi
 }
@@ -121,12 +121,12 @@ function ModifyHostFile(){
 	      numberOf=$(cat $blacklist | sed '/^\s*$/d' | wc -l)
         plural=; [[ "$numberOf" != "1" ]] && plural=s
         echo ":::"
-        echo -n "::: Modifying HOSTS file to blacklist $numberOf domain${plural}..."	   		    
-	    	if [[ -n $piholeIPv6 ]];then	    	  
+        echo -n "::: Modifying HOSTS file to blacklist $numberOf domain${plural}..."
+	    	if [[ -n $piholeIPv6 ]];then
 				$blacklist | awk -v ipv4addr="$piholeIP" -v ipv6addr="$piholeIPv6" '{sub(/\r$/,""); print ipv4addr" "$0"\n"ipv6addr" "$0}' >> $adList # bug here (1): missing "cat"
-	      	else	        
+	      	else
 				$blacklist | awk -v ipv4addr="$piholeIP" '{sub(/\r$/,""); print ipv4addr" "$0}' >>$adList # bug here (2): missing "cat"
-	      	fi		    
+	      	fi
 	  	fi
 	  else
 		echo ":::"
@@ -135,7 +135,7 @@ function ModifyHostFile(){
 	      #we need to remove the domains from the blacklist file and the host file
 			echo "::: $dom"
 			echo -n ":::    removing from HOSTS file..."
-	      	echo "$dom" | sed 's/\./\\./g' | xargs -I {} perl -i -ne'print unless /[^.]'{}'(?!.)/;' $adList  
+	      	echo "$dom" | sed 's/\./\\./g' | xargs -I {} perl -i -ne'print unless /[^.]'{}'(?!.)/;' $adList
 	      	echo " done!"
 	      	echo -n ":::    removing from blackist.txt..."
 	      	echo "$dom" | sed 's/\./\\./g' | xargs -I {} perl -i -ne'print unless /'{}'(?!.)/;' $blacklist
@@ -169,7 +169,7 @@ do
     "-nr"| "--noreload"  ) reload=false;;
     "-d" | "--delmode"   ) addmode=false;;
     "-f" | "--force"     ) force=true;;
-    "-q" | "--quiet"     ) versbose=false;;  			
+    "-q" | "--quiet"     ) versbose=false;;
     *                    ) HandleOther "$var";;
   esac
 done

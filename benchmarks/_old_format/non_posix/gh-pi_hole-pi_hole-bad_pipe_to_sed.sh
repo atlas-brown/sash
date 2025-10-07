@@ -183,7 +183,7 @@ do
     "-nr"| "--noreload"  ) reload=false;;
     "-d" | "--delmode"   ) addmode=false;;
     "-f" | "--force"     ) force=true;;
-    "-q" | "--quiet"     ) versbose=false;;  			
+    "-q" | "--quiet"     ) versbose=false;;
     *                    ) HandleOther "$var";;
   esac
 done

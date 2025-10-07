@@ -1,6 +1,4 @@
-#!/bin/bash
-
-# https://github.com/VSCodium/vscodium/commit/97eb57c196159bb0bcebc04adf5d5dac0885fb4d
+#!/bin/sh
 
 FILE="../patches/${1}.patch"
 
@@ -9,7 +7,7 @@ cd vscode || { echo "'vscode' dir not found"; exit 1; }
 git add .
 git reset -q --hard HEAD
 
-if [[ -f "${file}" ]]; then # bug here: file is unset
+if [ -f "${file}" ]; then # bug here: file is unset
   git apply --reject "${FILE}"
 fi
 

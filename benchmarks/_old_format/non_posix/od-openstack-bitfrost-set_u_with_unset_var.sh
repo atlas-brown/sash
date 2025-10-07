@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 
 # https://opendev.org/openstack/bifrost/commit/7fb32dd599c0d8b5d231cd30c5a8a1ef5142110a
 

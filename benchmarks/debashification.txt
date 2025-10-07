@@ -28,3 +28,6 @@ Another issue:  'continue' is used inside a function, which is now a bug, but ba
                 see https://www.shellcheck.net/wiki/SC2104
                 function itself is not called in a loop, but the function that calls it is
                 not sure what the behavior should be
+
+github/unset_var_2/
+not sure how to handle the read invocation
