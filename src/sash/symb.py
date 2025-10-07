@@ -54,10 +54,18 @@ def handle_while(traces: Traces,
     logging.debug(f"Interpreting first iteration")
     t1 = guarded_interp_node(traces, node.test, info, get_the_test)
     logging.debug(f"collected test_cmds: {test_cmds}")
+    # Special case: never runs
+    if interpret_test(test_cmds[0]) == False:
+        logging.debug(f"While loop never runs")
+        return t1
     # todo extend path condition
     t2 = guarded_interp_node(t1, node.body, info)
     logging.debug(f"Interpreting second iteration")
     t3 = guarded_interp_node(t2, node.test, info, get_the_test)
+    # Special case: only one iteration
+    if interpret_test(test_cmds[1]) == False:
+        logging.debug(f"While loop only runs once")
+        return t3
     logging.debug(f"collected test_cmds: {test_cmds}")
     # todo extend path condition
     t4 = guarded_interp_node(t3, node.body, info)
