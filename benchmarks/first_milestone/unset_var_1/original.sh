@@ -1,3 +1,5 @@
+#!/bin/sh
+
 # https://github.com/ohmyzsh/ohmyzsh/commit/f7bf566555a2c0e87deba5dfb3e344f23f4a51bb
 
 # Use colors, but only if connected to a terminal, and that terminal

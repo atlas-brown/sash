@@ -5,7 +5,7 @@
 
 # Recursively search outwards for a directory called "benchmarks"
 BENCHMARKS_DIR="$PWD"
-while [ ! -d "$BENCHMARKS_DIR/benchmarks_new" ]; do
+while [ ! -d "$BENCHMARKS_DIR/benchmarks" ]; do
     if [ "$BENCHMARKS_DIR" = "/" ]; then
         echo "Could not find benchmarks directory"
         exit 1
@@ -14,7 +14,7 @@ while [ ! -d "$BENCHMARKS_DIR/benchmarks_new" ]; do
     BENCHMARKS_DIR=$(dirname "$BENCHMARKS_DIR")
 done
 
-BENCHMARKS_DIR="$BENCHMARKS_DIR/benchmarks_new"
+BENCHMARKS_DIR="$BENCHMARKS_DIR/benchmarks"
 
 # Find all files or symlinks named posix.sh in the benchmarks directory and subdirectories
 find "$BENCHMARKS_DIR" -type f -name 'posix.sh' -o -type l -name 'posix.sh' | while read -r benchmark; do
