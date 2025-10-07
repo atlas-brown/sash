@@ -31,12 +31,11 @@ class UnboundID(Error):
     def __init__(self, var):
         super().__init__("unbound", f"no definition found for {var}")
 
-class InfiniteLoop(ShseerError):
+class InfiniteLoop(Error):
     def __init__(self, loop):
         super().__init__("infinite_loop", f"condition for loop {loop} never changes, causing an infinite loop")
 
-
-class ConstantCondition(Error):
+class ConstantCondition(Warning):
     def __init__(self):
         super().__init__("const_cond", "condition is always true or false")
 
