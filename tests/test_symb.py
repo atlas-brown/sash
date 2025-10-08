@@ -36,6 +36,12 @@ def test_bound_variable_no_error(tmp_path):
     report = symb.main(script)
     assert_expected_report(report, [])
 
+def test_unbound_variable(tmp_path):
+    # Using an unset variable should produce an unbound error
+    script = write_script(tmp_path, "echo $(echo $FOO)\n")
+    report = symb.main(script)
+    expected_error = reporter.UnboundID(foo_var.pretty())
+    assert_expected_report(report, [expected_error])
 
 def test_delete_system_file(tmp_path):
     # Deleting a system file should produce a DeleteSystemFile error
