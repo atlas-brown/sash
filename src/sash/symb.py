@@ -371,6 +371,7 @@ def interp_node(traces: Traces,
             return handle_while(traces, node, info)
 
         case AST.ForNode():
+            # Note: the type annotation in the Shasta source code is *wrong* for node.variable -- it's a string
             t1, items = expand_args_dumb(traces, node.argument, info)
             if join_fields(items).count.max <= 1:
                 Reporter.add_error(reporter.LoopRunsOnce())
@@ -409,6 +410,7 @@ def interp_node(traces: Traces,
 
 
         case AST.DefunNode():
+            # Note: the type annotation in the Shasta source code is *wrong* for node.name -- it's a string
             return trace_map(traces, lambda s: s.set_fundef(node.name, node))
 
         # todo bring other cases as needed
