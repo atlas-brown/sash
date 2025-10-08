@@ -271,6 +271,14 @@ def expand_args_dumb(traces: Traces, args: list[list[AST.ArgChar]], info: Script
     return res_traces, expanded_args
 
 
+def expand_assuming_single_constant_word(traces: Traces, stuff: list[AST.ArgChar], info: ScriptInfo) -> tuple[Traces, str]:
+    t0, fields = expand_args_dumb(traces, [stuff], info)
+    match fields:
+        case [Field(SymStr([one_word]), WordCount(1, 1))]:
+            return t0, one_word
+        case _:
+            assert False, f"expected {stuff} to be a single constant word, but found something else after expansion: {fields}"
+
 
 # =====================
 #  Field manipulation
@@ -371,14 +379,14 @@ def interp_node(traces: Traces,
             return handle_while(traces, node, info)
 
         case AST.ForNode():
-            # Note: the type annotation in the Shasta source code is *wrong* for node.variable -- it's a string
-            t1, items = expand_args_dumb(traces, node.argument, info)
+            t0, var_name = expand_assuming_single_constant_word(traces, node.variable, info)
+            t1, items = expand_args_dumb(t0, node.argument, info)
             if join_fields(items).count.max <= 1:
                 Reporter.add_error(reporter.LoopRunsOnce())
             # Interpret the for loop body
-            t2 = [record_assignment(t, node.variable, arbitrary_field(node.argument,
-                                                                      ArbitraryType.APPROXIMATION,
-                                                                      t.latest_state)) \
+            t2 = [record_assignment(t, var_name, arbitrary_field(node.argument,
+                                                                 ArbitraryType.APPROXIMATION,
+                                                                 t.latest_state)) \
                   for t in t1]
             # TODO: Will want to interpret the body multiple times (up to max count of times).
             # If the arguments are known statically we can even do every iteration.
@@ -392,11 +400,12 @@ def interp_node(traces: Traces,
             for t, redir_args in expand(traces, node.arg, info):
                 res.append(t)
                 match redir_args:
-                    case [Field(SymStr([something]), _)]:
+                    case [Field(SymStr([something]), WordCount(1, 1))]:
                         if something in t.latest_state.fundefs:
                             # TODO: Associate the warning with the trace that caused it
                             Reporter.add_error(reporter.RedirectToFunction(something))
                     case _:
+                        logging.warning(f"Found a redir to multiple words: {redir_args} - Ignoring.")
                         pass
             # TODO: Also handle the effects of redirection on the FS
             return res
@@ -411,7 +420,8 @@ def interp_node(traces: Traces,
 
         case AST.DefunNode():
             # Note: the type annotation in the Shasta source code is *wrong* for node.name -- it's a string
-            return trace_map(traces, lambda s: s.set_fundef(node.name, node))
+            t1, name = expand_assuming_single_constant_word(traces, node.name, info)
+            return trace_map(t1, lambda s: s.set_fundef(name, node))
 
         # todo bring other cases as needed
 
@@ -420,7 +430,6 @@ def interp_node(traces: Traces,
                     f"node type {type(node)} not handled",
                     node
                 )
-
 
 def starting_state() -> State:
     env = {}
