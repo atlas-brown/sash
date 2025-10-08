@@ -48,8 +48,8 @@ class DeleteSystemFile(Error):
         super().__init__("del_sys_file",f"might delete system file {filename}")
 
 class RedirectToFunction(Warning):
-    def __init__(self):
-        super().__init__("redir_func","redirecting output to a function actually writes to file with that name")
+    def __init__(self, function_name: str):
+        super().__init__("redir_func",f"redirecting output to {function_name}, which is a function, actually writes to a file with that name")
 
 class Reporter:
     # Have this as a list even despite duplications for now

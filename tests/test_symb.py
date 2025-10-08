@@ -36,7 +36,7 @@ def test_bound_variable_no_error(tmp_path):
     report = symb.main(script)
     assert_expected_report(report, [])
 
-def test_unbound_variable(tmp_path):
+def test_unbound_variable_cmdsubst(tmp_path):
     # Using an unset variable should produce an unbound error
     script = write_script(tmp_path, "echo $(echo $FOO)\n")
     report = symb.main(script)
@@ -61,7 +61,7 @@ def test_redirect_to_function(tmp_path):
     script = write_script(tmp_path, ("myfunc() { echo hi; }\n"
                                      "echo hello > myfunc\n"))
     report = symb.main(script)
-    expected_error = reporter.RedirectToFunction()
+    expected_error = reporter.RedirectToFunction("myfunc")
     assert_expected_report(report, [expected_error])
 
 def test_redirect_to_variable_no_error(tmp_path):

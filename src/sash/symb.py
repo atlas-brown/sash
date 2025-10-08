@@ -233,6 +233,7 @@ def expand_simple(stuff: list[AST.ArgChar], state: State) -> list[Field]:
                         add_a_field(arbitrary_field(var, ArbitraryType.ENVIRONMENT, state)) # todo worth recording somehow that the value comes from the environment?
                 case _:
                     # todo: if its a command substitution, need to go interp it
+                    logging.error(f"argchar: {argchar} {type(argchar)}")
                     logging.info(f"expansion: treating unhandled argchar as completely arbitrary field: {argchar.pretty()}")
                     add_a_field(arbitrary_field(argchar, ArbitraryType.APPROXIMATION, state))
 
@@ -371,35 +372,44 @@ def interp_node(traces: Traces,
 
         case AST.ForNode():
             t1, items = expand_args_dumb(traces, node.argument, info)
-            t2_expansion_pairs = expand(t1, node.variable, info)
             if join_fields(items).count.max <= 1:
                 Reporter.add_error(reporter.LoopRunsOnce())
             # Interpret the for loop body
-            # TODO: Will want to interpret the body multiple times (up to max count of times)
-            t3 = [record_assignment(t, symb_utils.argchar_conc(node.variable), join_fields(var)) for t, var in t2_expansion_pairs]
-            t4 = guarded_interp_node(t3, node.body, info)
-            return t4
+            t2 = [record_assignment(t, node.variable, arbitrary_field(node.argument,
+                                                                      ArbitraryType.APPROXIMATION,
+                                                                      t.latest_state)) \
+                  for t in t1]
+            # TODO: Will want to interpret the body multiple times (up to max count of times).
+            # If the arguments are known statically we can even do every iteration.
+            # Otherwise, we should do it with a *fresh* arbitrary_field every time!
+            # (maybe need to add an extra distinguisher to CompletelyArbitrary for that?)
+            t3 = guarded_interp_node(t2, node.body, info)
+            return t3
 
         case AST.FileRedirNode():
-            for trace in traces:
-                var = symb_utils.argchar_conc(node.arg)
-                if var in trace.latest_state.fundefs:
-                    # TODO: Associate the warning with the trace that caused it
-                    Reporter.add_error(reporter.RedirectToFunction())
+            res = []
+            for t, redir_args in expand(traces, node.arg, info):
+                res.append(t)
+                match redir_args:
+                    case [Field(SymStr([something]), _)]:
+                        if something in t.latest_state.fundefs:
+                            # TODO: Associate the warning with the trace that caused it
+                            Reporter.add_error(reporter.RedirectToFunction(something))
+                    case _:
+                        pass
             # TODO: Also handle the effects of redirection on the FS
-            return traces
+            return res
 
         case AST.RedirNode():
             t1 = guarded_interp_node(traces, node.node, info)
             t2 = t1
             for redir in node.redir_list:
-                t2 = t2.extend(guarded_interp_node(t1, redir, info)) or t2
+                t2 = guarded_interp_node(t2, redir, info)
             return t2
 
 
         case AST.DefunNode():
-            trace_expansion_pairs = expand(traces, node.name, info)
-            return trace_map(traces, lambda s: s.set_fundef(symb_utils.argchar_conc(node.name), node))
+            return trace_map(traces, lambda s: s.set_fundef(node.name, node))
 
         # todo bring other cases as needed
 
