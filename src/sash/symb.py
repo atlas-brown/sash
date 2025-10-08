@@ -351,6 +351,7 @@ def interp_node(traces: Traces,
             return t
 
         case AST.IfNode():
+            # todo: early exit if condition is constant false
             t1 = guarded_interp_node(traces, node.cond, info)
             # todo: extend pathcond with actual condition true/false
             t2 = guarded_interp_node(trace_map(t1, lambda s: s.add_pathcond(f"cond_L{context_line}:true")),
