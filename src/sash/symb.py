@@ -180,20 +180,29 @@ def expand_simple(stuff: list[AST.ArgChar], state: State) -> list[Field]:
     def expand_inner(chars: list[AST.ArgChar], quoted: bool = False) -> list[Field]:
         res = []
         field_so_far: list[str | SymVar] = []
+        field_so_far_words_min: int = 1
+        field_so_far_words_max: int | float = 1
 
         def add_a_field(one_field: Field) -> None:
-            nonlocal field_so_far, res
+            nonlocal field_so_far, field_so_far_words_min, field_so_far_words_max, res
             match one_field.content:
                 case CompletelyArbitrary():
                     field_so_far = []
+                    field_so_far_words_min = 1
+                    field_so_far_words_max = 1
+                    # TODO this is technically not right, if there are more arbitrary fields later the end result field should be a whole new arbitrary field
                     res.append(one_field)
                 case SymStr(parts):
                     field_so_far.extend(parts)
+                    if one_field.count.min > 1:
+                        field_so_far_words_min += one_field.count.min - 1
+                    if one_field.count.max > 1:
+                        field_so_far_words_max += one_field.count.max - 1
 
         def finish_field_so_far() -> None:
             nonlocal field_so_far, res
             res.append(Field(SymStr(field_so_far).simplify(),
-                             WordCount(1, 1)))
+                             WordCount(field_so_far_words_min, field_so_far_words_max)))
             field_so_far = []
 
         for argchar in chars:

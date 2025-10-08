@@ -5,20 +5,7 @@ These tests run sample shell scripts and verify that expected errors or warnings
 import sash.symb as symb
 import sash.reporter as reporter
 import shasta.ast_node as AST
-
-# Utilities
-def write_script(tmp_path, content: str) -> str:
-    """Helper to write a shell script to a temporary file."""
-    path = tmp_path / "script.sh"
-    path.write_text(content)
-    return str(path)
-
-def assert_expected_report(report, expected_errors: list[reporter.Report]):
-    """Helper to compare actual report with expected errors."""
-    actual = [(err) for err, msg in report["error_messages"]]
-    expected = [(err.code) for err in expected_errors]
-    assert set(actual) == set(expected)
-# ======
+from util import *
 
 foo_var = AST.VArgChar(fmt="Normal", null=False, var="FOO", arg=[])
 
