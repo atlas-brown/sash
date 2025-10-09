@@ -16,7 +16,6 @@ def test_unbound_variable(tmp_path):
     expected_error = reporter.UnboundID(foo_var.pretty())
     assert_expected_report(report, [expected_error])
 
-
 def test_bound_variable_no_error(tmp_path):
     # Assigning a variable before use should not produce any errors
     script = write_script(
@@ -54,7 +53,21 @@ def test_delete_system_file(tmp_path):
     report = symb.main(script)
     expected_error1 = reporter.DeleteSystemFile("/usr")
     expected_error2 = reporter.UnboundID(foo_var.pretty())
+    expected_error3 = reporter.DangerousWordSplit("$FOO")
+    assert_expected_report(report, [expected_error1, expected_error2, expected_error3])
+
+    script = write_script(tmp_path, "rm -rf /*\n")
+    report = symb.main(script)
+    expected_error = reporter.DeleteSystemFile("/*")
+    assert_expected_report(report, [expected_error])
+
+def test_delete_splitting(tmp_path):
+    script = write_script(tmp_path, "rm $UNQUOTED\n")
+    report = symb.main(script)
+    expected_error1 = reporter.DangerousWordSplit("$UNQUOTED")
+    expected_error2 = reporter.UnboundID(foo_var.pretty())
     assert_expected_report(report, [expected_error1, expected_error2])
+
 
 def test_redirect_to_function(tmp_path):
     # Redirecting output to a function should produce an error

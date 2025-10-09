@@ -23,16 +23,15 @@ def handle_commandnode(traces: Traces,
     logging.debug(f"Handling command node {trim_string_for_logging(node.pretty())} with {len(traces)} traces")
     t1, expanded_args = expand_args_dumb(traces, node.arguments, info)
 
-    if expanded_args and isinstance(expanded_args[0].content, SymStr):
-        cmd_name = symb_utils.symbstr_to_str(expanded_args[0].content.parts)
+    if expanded_args and (cmd_name := field_to_str(expanded_args[0])):
         logging.debug(f"Handling command {cmd_name} with args {expanded_args[1:]}")
         if cmd_name == "rm":
             for arg_field in expanded_args[1:]:
-                if isinstance(arg_field.content, SymStr):
-                    path = symb_utils.symbstr_to_str(arg_field.content.parts)
-                    assert path is not None
-                    if any(path.startswith(p) for p in Config.get("PROTECTED_PATHS")):
-                        Reporter.add_error(reporter.DeleteSystemFile(path))
+                if (path := field_to_str(arg_field)) \
+                   and any(path in [p, p + "/", p + "/*"] for p in Config.get("PROTECTED_PATHS")):
+                    Reporter.add_error(reporter.DeleteSystemFile(path))
+                elif isinstance(arg_field.content, CompletelyArbitrary) and arg_field.count.max > 1:
+                    Reporter.add_error(reporter.DangerousWordSplit(arg_field.content.source.pretty()))
     t2 = t1
     for redir in node.redir_list:
         t2 = t2.extend(guarded_interp_node(t1, redir, info)) or t2
@@ -279,6 +278,13 @@ def expand_assuming_single_constant_word(traces: Traces, stuff: list[AST.ArgChar
             return t0, one_word
         case _:
             assert False, f"expected {stuff} to be a single constant word, but found something else after expansion: {fields}"
+
+def field_to_str(field: Field) -> Optional[str]:
+    match field:
+        case Field(SymStr(parts), _):
+            return symb_utils.symbstr_to_str(parts)
+        case _:
+            return None
 
 
 # =====================

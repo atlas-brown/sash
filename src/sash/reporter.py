@@ -47,6 +47,10 @@ class DeleteSystemFile(Error):
     def __init__(self,filename:str):
         super().__init__("del_sys_file",f"might delete system file {filename}")
 
+class DangerousWordSplit(Warning):
+    def __init__(self, source):
+        super().__init__("word_split", f"{source} could be split, leading to unexpected arguments")
+
 class RedirectToFunction(Warning):
     def __init__(self, function_name: str):
         super().__init__("redir_func",f"redirecting output to {function_name}, which is a function, actually writes to a file with that name")
