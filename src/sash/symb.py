@@ -96,29 +96,29 @@ def is_constant_test(cmd1: list[Field], cmd2: list[Field]) -> bool:
         case _:
             return False
 
-def interpret_test(cmd: list[Field]) -> bool:
-    """Return true if `cmd` is a test that always returns true. This only works for concrete arguments."""
+def interpret_test(cmd: list[Field]) -> bool | None:
+    """Return true or false `cmd` is a test that always returns either of the two results. Return None if unknown."""
     logging.debug(f"Checking if test command {cmd} is constant true/false")
     if len(cmd) < 1:
-        return False
+        return None
 
     if not isinstance(cmd[0].content, SymStr):
-        return False
+        return None
 
     if not is_test(cmd[0].content.parts[0]):
-        return False
+        return None
 
     args = cmd[1:]
     if not len(args) in {3, 4}:
-        return False
+        return None
 
     # Check if if all arguments are concrete
     field_content = [f.content for f in cmd]
     if not all(isinstance(c, SymStr) for c in field_content):
-        return False
+        return None
     field_parts = [c.parts for c in field_content if isinstance(c, SymStr)]
     if not all(all(isinstance(p, str) for p in parts) for parts in field_parts):
-        return False
+        return None
 
     if len(args) == 3:
         match (args[0].content, args[1].content):
@@ -127,7 +127,7 @@ def interpret_test(cmd: list[Field]) -> bool:
             case (SymStr([s]), SymStr([op])) if op == "-z":
                 return s == ""
             case _:
-                return False
+                return None
 
     if len(args) == 4:
         match (args[0].content, args[1].content, args[2].content):
@@ -141,7 +141,7 @@ def interpret_test(cmd: list[Field]) -> bool:
                     n1 = int(s1)
                     n2 = int(s2)
                 except ValueError:
-                    return False
+                    return None
                 match op:
                     case "-eq":
                         return n1 == n2
@@ -156,9 +156,9 @@ def interpret_test(cmd: list[Field]) -> bool:
                     case "-ge":
                         return n1 >= n2
             case _:
-                return False
+                return None
 
-    return False
+    return None
 
 
 # ============================================================
