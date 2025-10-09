@@ -167,14 +167,14 @@ def interpret_test(cmd: list[Field]) -> bool | None:
 def expand(traces: Traces, stuff: list[AST.ArgChar], info: ScriptInfo) -> list[tuple[Trace, list[Field]]]:
     res = []
     for trace in traces:
-        res.append((trace, expand_simple(stuff, trace.latest_state)))
+        res.append((trace, expand_simple(stuff, trace.latest_state, info)))
         # if expanded := expand_simple(stuff, trace.latest_state):
         #     res.append((trace, expanded))
         # else:
         #     res.append((trace, [arbitrary_field(stuff)]))
     return res
 
-def expand_simple(stuff: list[AST.ArgChar], state: State) -> list[Field]:
+def expand_simple(stuff: list[AST.ArgChar], state: State, info: ScriptInfo) -> list[Field]:
     IFS = " \t\n"
 
     def expand_inner(chars: list[AST.ArgChar], quoted: bool = False) -> list[Field]:

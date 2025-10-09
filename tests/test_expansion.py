@@ -1,6 +1,7 @@
 """
 Tests for the simple symbolic expander.
 """
+import pytest
 import sash
 import sash.reporter as reporter
 from sash.symb import expand_simple, expand_args_dumb, starting_state
@@ -9,6 +10,15 @@ from sash.frozen import freeze
 import shasta.ast_node as AST
 from util import *
 from unittest.mock import Mock, MagicMock
+
+@pytest.fixture
+def mock_script_info():
+    """Fixture that returns a ScriptInfo mock with fake opts."""
+    mock_opts = MagicMock(name="SetOptionStoreMock")
+    # Can configure mock behavior if needed, e.g.:
+    # mock_opts.noglob = False
+    return ScriptInfo(opts=mock_opts)
+info = mock_script_info
 
 def constant_field(string: str, words: int = 1) -> Field:
     return Field(SymStr((string,)), WordCount(words, words))
@@ -21,7 +31,7 @@ def test_expand():
 
     state = starting_state()
 
-    expanded = [expand_simple(arg, state) for arg in script[0].arguments]
+    expanded = [expand_simple(arg, state, info) for arg in script[0].arguments]
     assert len(expanded) == 3
     assert expanded[0] == [constant_field("echo")]
     assert expanded[1] == [constant_field("hi")]
@@ -34,7 +44,7 @@ def test_expand_quotes():
 
     state = starting_state()
 
-    expanded = [expand_simple(arg, state) for arg in script[0].arguments]
+    expanded = [expand_simple(arg, state, info) for arg in script[0].arguments]
     assert len(expanded) == 3
     assert expanded[0] == [constant_field("echo")]
     assert expanded[1] == [constant_field("hi there")]
@@ -48,7 +58,7 @@ def test_expand_one_var():
     state = starting_state()\
         .set_env("A", ShellVar(constant_field("hi")))
 
-    expanded = expand_simple(script[0].arguments[0], state)
+    expanded = expand_simple(script[0].arguments[0], state, info)
     assert expanded == [constant_field("hi")]
 
 def test_expand_vars():
@@ -61,7 +71,7 @@ def test_expand_vars():
         .set_env("B", ShellVar(constant_field("there")))\
         .set_env("C", ShellVar(constant_field("and here")))
 
-    expanded = [expand_simple(arg, state) for arg in script[0].arguments]
+    expanded = [expand_simple(arg, state, info) for arg in script[0].arguments]
     assert len(expanded) == 4
     assert expanded[0] == [constant_field("echo")]
     assert expanded[1] == [constant_field("hi")]
@@ -80,7 +90,7 @@ def test_expand_vars_split():
         .set_env("B", ShellVar(constant_field("there there")))\
         .set_env("C", ShellVar(constant_field("and here")))
 
-    expanded = [expand_simple(arg, state) for arg in script[0].arguments]
+    expanded = [expand_simple(arg, state, info) for arg in script[0].arguments]
     assert len(expanded) == 4
     assert expanded[0] == [constant_field("echo")]
     assert expanded[1] == [constant_field("hi hello", 2)]
@@ -98,7 +108,7 @@ def test_expand_vars_joined():
         .set_env("A", ShellVar(constant_field("hi hello", 2)))\
         .set_env("B", ShellVar(constant_field("there")))
 
-    expanded = [expand_simple(arg, state) for arg in script[0].arguments]
+    expanded = [expand_simple(arg, state, info) for arg in script[0].arguments]
     assert len(expanded) == 7
     assert expanded[0] == [constant_field("echo")]
     assert expanded[1] == [constant_field("hi hellohi hello", 3)]
@@ -115,7 +125,7 @@ def test_expand_undefined_var():
 
     state = starting_state()
 
-    expanded = [expand_simple(arg, state) for arg in script[0].arguments]
+    expanded = [expand_simple(arg, state, info) for arg in script[0].arguments]
     assert len(expanded) == 2
     assert expanded[0] == [constant_field("echo")]
     assert expanded[1] == [Field(CompletelyArbitrary(freeze(script[0].arguments[1][0]),
@@ -131,7 +141,7 @@ def test_expand_cmdsubst():
 
     state = starting_state()
 
-    expanded = [expand_simple(arg, state) for arg in script[0].arguments]
+    expanded = [expand_simple(arg, state, info) for arg in script[0].arguments]
     assert len(expanded) == 2
     assert expanded[0] == [constant_field("echo")]
     assert expanded[1] == [Field(CompletelyArbitrary(freeze(script[0].arguments[1][0]),
