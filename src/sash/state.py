@@ -104,6 +104,9 @@ class State:
     def set_env(self, var: str, value: ShellVar) -> 'State':
         return replace(self, env=self.env.set(var, value))
 
+    def extend_env(self, new_vars: dict[str, ShellVar]) -> 'State':
+        return replace(self, env=(self.env | new_vars))
+
     def set_fundef(self, name: str, defn: FrozenAst) -> 'State':
         return replace(self, fundefs=self.fundefs.set(name, defn))
 

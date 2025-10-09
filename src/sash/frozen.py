@@ -72,3 +72,13 @@ class FrozenDict(Generic[K, V]):
 
     def set(self, k, v):
         return FrozenDict(**(self._d | {k: v}))
+
+    def __or__(self, other):
+        if not isinstance(other, (dict, FrozenDict)):
+            return NotImplemented
+        if isinstance(other, FrozenDict):
+            other = other._d
+        return FrozenDict({**self._d, **other})
+
+    def __ror__(self, other):
+        return self.__or__(other)

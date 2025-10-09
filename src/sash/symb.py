@@ -228,7 +228,7 @@ def expand_simple(stuff: list[AST.ArgChar], state: State) -> list[Field]:
                         else:
                             logging.info(f"expansion: treating var {var.pretty()} with unhandled fmt {var.fmt} as completely arbitrary field")
                             add_a_field(arbitrary_field(var, ArbitraryType.APPROXIMATION, state))
-                    elif not var.var.isdecimal():
+                    elif not is_special_var(var.var):
                         Reporter.add_error(reporter.UnboundID(var.pretty())) # todo we should report path information
                         add_a_field(arbitrary_field(var, ArbitraryType.ENVIRONMENT, state)) # todo worth recording somehow that the value comes from the environment?
                 case _:
@@ -286,6 +286,8 @@ def field_to_str(field: Field) -> Optional[str]:
         case _:
             return None
 
+def is_special_var(name: str) -> bool:
+    return name.isdecimal() or name in ["@", "#"]
 
 # =====================
 #  Field manipulation
@@ -458,7 +460,14 @@ def starting_state() -> State:
     # env["IFS"] = ShellVar(" \t\n")
     # for defaultvar in ["HOME", "PWD", "OLDPWD", "PATH"]:
     #     env[defaultvar] = ShellVar(symb_utils.create_fresh_var(f"default_{defaultvar}"))
-    return State((), FrozenDict(), FrozenDict(), FrozenDict(), SymStr(("0",)), None)
+    root = State((), FrozenDict(), FrozenDict(), FrozenDict(), SymStr(("0",)), None)
+    starter_env = {
+        "HOME": ShellVar(arbitrary_field(None, ArbitraryType.ENVIRONMENT, root)),
+        "PWD": ShellVar(arbitrary_field(None, ArbitraryType.ENVIRONMENT, root)),
+        "OLDPWD": ShellVar(arbitrary_field(None, ArbitraryType.ENVIRONMENT, root)),
+        "PATH": ShellVar(arbitrary_field(None, ArbitraryType.ENVIRONMENT, root))
+    }
+    return root.extend_env(starter_env)
 
 @dataclass(frozen=True)
 class AST_parse:
