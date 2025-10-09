@@ -4,7 +4,7 @@ import shasta.ast_node as AST
 import logging
 from typing import Callable, Optional
 from enum import Enum
-from sash.util import make_hashable
+from sash.frozen import FrozenAst, FrozenDict
 
 
 @dataclass(frozen=True)
@@ -13,7 +13,7 @@ class SymVar:
 
 @dataclass(frozen=True)
 class SymStr:
-    parts: list[str | SymVar] = field(default_factory=list)
+    parts: tuple[str | SymVar, ...] = field(default_factory=tuple)
 
     def is_simple(self) -> bool:
         """Return true if there are no adjacent strings in `parts`."""
@@ -44,7 +44,7 @@ class SymStr:
                 new_parts.append(part)
         if this_str != "":
             new_parts.append(this_str)
-        return SymStr(new_parts)
+        return SymStr(tuple(new_parts))
 
 class ArbitraryType(Enum):
     APPROXIMATION = 0
@@ -52,7 +52,7 @@ class ArbitraryType(Enum):
 
 @dataclass(frozen=True)
 class CompletelyArbitrary:
-    source: AST.AstNode
+    source: FrozenAst
     kind: ArbitraryType
     producing_state: Optional['State'] # shouldn't ever result in cyclic data, because the state that is used to compute an arbitrary value should only ever be an ancester of the state the stores it, but beware
 
@@ -84,16 +84,16 @@ class ShellVar:
 
 @dataclass(frozen=True)
 class State:
-    pathcond: list[sash.constraints.Constraint]
-    env: dict[str, ShellVar]
-    localenv: dict[str, ShellVar]
-    fundefs: dict[str, AST.DefunNode]
+    pathcond: tuple[sash.constraints.Constraint, ...]
+    env: FrozenDict[str, ShellVar]
+    localenv: FrozenDict[str, ShellVar]
+    fundefs: FrozenDict[str, FrozenAst]
     last_exit_code: SymStr
-    last_cmd: Optional[AST.AstNode]
+    last_cmd: Optional[FrozenAst]
 
     # NOTE: (and beware) intentionally ignoring pathcond in equality and hash
     def __hash__(self):
-        return make_hashable(replace(self, pathcond=[])).__hash__()
+        return hash((self.env, self.localenv, self.fundefs, self.last_exit_code, self.last_cmd))
     def __eq__(self, other):
         return self.env == other.env \
             and self.localenv == other.localenv \
@@ -102,17 +102,13 @@ class State:
             and self.last_cmd == other.last_cmd
 
     def set_env(self, var: str, value: ShellVar) -> 'State':
-        new_env = dict(self.env)
-        new_env[var] = value
-        return replace(self, env=new_env)
+        return replace(self, env=self.env.set(var, value))
 
-    def set_fundef(self, name: str, defn: AST.DefunNode) -> 'State':
-        new_fundefs = dict(self.fundefs)
-        new_fundefs[name] = defn
-        return replace(self, fundefs=new_fundefs)
+    def set_fundef(self, name: str, defn: FrozenAst) -> 'State':
+        return replace(self, fundefs=self.fundefs.set(name, defn))
 
     def add_pathcond(self, cond: sash.constraints.Constraint) -> 'State':
-        new_pathcond = self.pathcond + [cond]
+        new_pathcond = self.pathcond + (cond,)
         return replace(self, pathcond=new_pathcond)
 
     def lookup(self, var: str) -> Optional[ShellVar]:
@@ -125,13 +121,13 @@ class State:
 
 @dataclass(frozen=True)
 class Trace:
-    states: list[State]
+    states: tuple[State, ...]
 
     def extend(self, state: State | Callable[[State], State]) -> 'Trace':
         if isinstance(state, State):
-            return Trace(self.states + [state])
+            return Trace(self.states + (state,))
         else:
-            return Trace(self.states + [state(self.states[-1])])
+            return Trace(self.states + (state(self.states[-1]),))
 
     @property
     def latest_state(self):

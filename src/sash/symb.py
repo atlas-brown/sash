@@ -8,6 +8,7 @@ import traceback
 from argparse import ArgumentParser
 from typing import Any, Dict, List, Optional, Set
 import shasta.ast_node as AST
+from sash.frozen import FrozenAst, freeze, freeze_thing
 from sash.shell_parser import *
 from sash.state import *
 from sash.config import Config
@@ -201,7 +202,7 @@ def expand_simple(stuff: list[AST.ArgChar], state: State) -> list[Field]:
 
         def finish_field_so_far() -> None:
             nonlocal field_so_far, res
-            res.append(Field(SymStr(field_so_far).simplify(),
+            res.append(Field(SymStr(tuple(field_so_far)).simplify(),
                              WordCount(field_so_far_words_min, field_so_far_words_max)))
             field_so_far = []
 
@@ -227,7 +228,7 @@ def expand_simple(stuff: list[AST.ArgChar], state: State) -> list[Field]:
                             add_a_field(v.value)
                         else:
                             logging.info(f"expansion: treating var {var.pretty()} with unhandled fmt {var.fmt} as completely arbitrary field")
-                            add_a_field(arbitrary_field(var), ArbitraryType.APPROXIMATION, state)
+                            add_a_field(arbitrary_field(var, ArbitraryType.APPROXIMATION, state))
                     else:
                         Reporter.add_error(reporter.UnboundID(var.pretty())) # todo we should report path information
                         add_a_field(arbitrary_field(var, ArbitraryType.ENVIRONMENT, state)) # todo worth recording somehow that the value comes from the environment?
@@ -274,7 +275,7 @@ def expand_args_dumb(traces: Traces, args: list[list[AST.ArgChar]], info: Script
 def expand_assuming_single_constant_word(traces: Traces, stuff: list[AST.ArgChar], info: ScriptInfo) -> tuple[Traces, str]:
     t0, fields = expand_args_dumb(traces, [stuff], info)
     match fields:
-        case [Field(SymStr([one_word]), WordCount(1, 1))]:
+        case [Field(SymStr((one_word,)), WordCount(1, 1))] if isinstance(one_word, str):
             return t0, one_word
         case _:
             assert False, f"expected {stuff} to be a single constant word, but found something else after expansion: {fields}"
@@ -284,8 +285,8 @@ def expand_assuming_single_constant_word(traces: Traces, stuff: list[AST.ArgChar
 #  Field manipulation
 # =====================
 
-def arbitrary_field(ast: AST.AstNode, kind: ArbitraryType, producing_state: State) -> Field:
-    return Field(CompletelyArbitrary(ast, kind, producing_state),
+def arbitrary_field(ast: AST.AstNode, kind: ArbitraryType, producing_state: Optional[State]) -> Field:
+    return Field(CompletelyArbitrary(freeze_thing(ast), kind, producing_state),
                  WordCount(0, inf))
 
 def join_fields(fields: list[Field]) -> Field:
@@ -302,7 +303,7 @@ def join_fields(fields: list[Field]) -> Field:
                 # TODO: this is not quite sound! If there are multiple arbitrary fields, we need to make a new one...
                 return field
 
-    return Field(SymStr(content), WordCount(min_words, max_words))
+    return Field(SymStr(tuple(content)), WordCount(min_words, max_words))
 
 def collapse_fields(fields: List[Field], source: AST.AstNode | None = None) -> Field:
     """Collapse alternative versions of a field into one field abstracting over all of them."""
@@ -313,7 +314,9 @@ def collapse_fields(fields: List[Field], source: AST.AstNode | None = None) -> F
         # otherwise, return a CompletelyArbitrary field with min/max word counts
         min_words = min(field.count.min for field in fields)
         max_words = max(field.count.max for field in fields)
-        return Field(CompletelyArbitrary(source),
+        return Field(CompletelyArbitrary(freeze(source) if source is not None else source,
+                                         ArbitraryType.APPROXIMATION,
+                                         None),
                      WordCount(min_words, max_words))
 
 
@@ -330,7 +333,7 @@ def guarded_interp_node(traces: Traces,
                         command_cb: Optional[Callable[[list[Field]], None]] = None) -> Traces:
     try:
         return interp_node(traces, node, info, command_cb)
-    except Exception:
+    except NotImplementedError as e:
         logging.error(f"Interp raised: {traceback.format_exc()}. Ignoring.")
         return traces
 
@@ -339,6 +342,7 @@ def interp_node(traces: Traces,
                 info: ScriptInfo,
                 command_cb: Optional[Callable[[list[Field]], None]] = None) -> Traces:
     # refer to https://github.com/binpash/shasta/blob/main/shasta/ast_node.py
+    traces = maybe_collapse_traces(traces)
     logging.debug(f"Interpreting {trim_string_for_logging(node.pretty())} with {len(traces)} traces")
     match node:
         case AST.CommandNode() if not (node.arguments == [] and node.assignments != []):
@@ -402,7 +406,7 @@ def interp_node(traces: Traces,
                 res.append(t)
                 match redir_args:
                     case [Field(SymStr([something]), WordCount(1, 1))]:
-                        if something in t.latest_state.fundefs:
+                        if isinstance(something, str) and something in t.latest_state.fundefs:
                             # TODO: Associate the warning with the trace that caused it
                             Reporter.add_error(reporter.RedirectToFunction(something))
                     case [Field(CompletelyArbitrary(), _)]:
@@ -434,12 +438,21 @@ def interp_node(traces: Traces,
                     node
                 )
 
+trace_count = 1
+def maybe_collapse_traces(traces: Traces) -> Traces:
+    global trace_count
+    if len(traces) > trace_count:
+        logging.debug(f"Too many traces ({len(traces)}), collapsing")
+        traces = collapse_traces(traces)
+        trace_count = len(traces)
+        logging.debug(f"Collapsed to {trace_count} traces")
+    return traces
+
 def starting_state() -> State:
-    env = {}
     # env["IFS"] = ShellVar(" \t\n")
     # for defaultvar in ["HOME", "PWD", "OLDPWD", "PATH"]:
     #     env[defaultvar] = ShellVar(symb_utils.create_fresh_var(f"default_{defaultvar}"))
-    return State([], env, {}, {}, SymStr(["0"]), None)
+    return State((), FrozenDict(), FrozenDict(), FrozenDict(), SymStr(("0",)), None)
 
 @dataclass(frozen=True)
 class AST_parse:
@@ -454,17 +467,11 @@ def trim_string_for_logging(s: str, max_len: int = 300) -> str:
 def symb_engine(nodes: list[AST_parse], info: ScriptInfo) -> list[Trace]:
     global context_line
     logging.debug(f"Running symb engine with {len(nodes)} raw nodes")
-    traces = [Trace([starting_state()])]
-    trace_count = 1
+    traces = [Trace((starting_state(),))]
     for node in nodes:
         context_line = node.line_before
         logging.debug(f"Interpreting next node (line {context_line}) {trim_string_for_logging(node.ast_node.pretty())}")
         traces = guarded_interp_node(traces, node.ast_node, info)
-        if len(traces) > trace_count * 3:
-            logging.debug(f"Too many traces ({len(traces)}), collapsing")
-            traces = collapse_traces(traces)
-            trace_count = len(traces)
-            logging.debug(f"Collapsed to {trace_count} traces")
 
     return traces
 

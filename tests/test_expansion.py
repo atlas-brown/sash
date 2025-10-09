@@ -5,12 +5,13 @@ import sash
 import sash.reporter as reporter
 from sash.symb import expand_simple, expand_args_dumb, starting_state
 from sash.state import *
+from sash.frozen import freeze
 import shasta.ast_node as AST
 from util import *
 from unittest.mock import Mock, MagicMock
 
 def constant_field(string: str, words: int = 1) -> Field:
-    return Field(SymStr([string]), WordCount(words, words))
+    return Field(SymStr((string,)), WordCount(words, words))
 
 def test_expand():
     script = parse_script("""echo hi there""")
@@ -117,7 +118,7 @@ def test_expand_undefined_var():
     expanded = [expand_simple(arg, state) for arg in script[0].arguments]
     assert len(expanded) == 2
     assert expanded[0] == [constant_field("echo")]
-    assert expanded[1] == [Field(CompletelyArbitrary(script[0].arguments[1][0],
+    assert expanded[1] == [Field(CompletelyArbitrary(freeze(script[0].arguments[1][0]),
                                                      ArbitraryType.ENVIRONMENT,
                                                      state),
                                  WordCount(0, float('inf')))]
@@ -133,7 +134,7 @@ def test_expand_cmdsubst():
     expanded = [expand_simple(arg, state) for arg in script[0].arguments]
     assert len(expanded) == 2
     assert expanded[0] == [constant_field("echo")]
-    assert expanded[1] == [Field(CompletelyArbitrary(script[0].arguments[1][0],
+    assert expanded[1] == [Field(CompletelyArbitrary(freeze(script[0].arguments[1][0]),
                                                      ArbitraryType.APPROXIMATION,
                                                      state),
                                  WordCount(0, float('inf')))]
