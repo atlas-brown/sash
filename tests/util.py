@@ -14,7 +14,7 @@ def assert_expected_report(report, expected_errors: list[reporter.Report]):
     """Helper to compare actual report with expected errors."""
     actual = [(err) for err, msg in report["error_messages"]]
     expected = [(err.code) for err in expected_errors]
-    assert set(actual) == set(expected)
+    assert sorted(actual) == sorted(expected)
 
 def parse_script(script_content: str) -> AST.AstNode:
     with tempfile.TemporaryDirectory() as tmp_path:
