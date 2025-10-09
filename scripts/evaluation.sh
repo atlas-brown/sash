@@ -7,6 +7,11 @@ top="$(git rev-parse --show-toplevel)"
 cd "$top" || exit 1
 bench_dir="$top/benchmarks"
 
+# Get the first argument as the benchmark set name
+if [ -n "$1" ]; then
+    bench_dir="$bench_dir/$1"
+fi
+
 # Find all files or symlinks named posix.sh in the benchmarks directory and subdirectories
 find "$bench_dir" -type f -name 'posix.sh' -o -type l -name 'posix.sh' | while read -r benchmark; do
     echo "Running benchmark: $benchmark"
