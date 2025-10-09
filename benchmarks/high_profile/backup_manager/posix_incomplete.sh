@@ -1,7 +1,5 @@
 #! /usr/bin/env sh
 
-# https://git.launchpad.net/ubuntu/+source/backup-manager/commit/lib/backup-methods.sh?id=59cdd322f7772d40b6aff25b6720796271f4deba
-
 # Copyright (C) 2010 The Backup Manager Authors
 #
 # See the AUTHORS file for details.
