@@ -35,3 +35,4 @@ not sure how to handle the read invocation
 local VAR --> local_VAR= and then unset local_VAR before func exit
 
 &>file --> >file 2>&1
+a lot of code is needed to replace arrays, i can't explain everything here (huge changes in github/unset_func)
