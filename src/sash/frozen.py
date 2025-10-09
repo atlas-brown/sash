@@ -16,6 +16,8 @@ class FrozenAst:
 
     def __str__(self) -> str:
         return str(self.ast)
+    def __repr__(self) -> str:
+        return self.ast.__repr__()
     def pretty(self) -> str:
         return self.ast.pretty()
 

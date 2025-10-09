@@ -108,6 +108,19 @@ def test_constant_while_condition(tmp_path):
     expected_error = reporter.InfiniteLoop(None) # Mock the location
     assert_expected_report(report, [expected_error])
 
+def test_constant_while_condition2(tmp_path):
+    script = write_script(tmp_path, """
+NUMSNAPS=$(ls while | awk '{print $1}' | wc -l)
+RETAIN=2
+
+while [ "$RETAIN" -le "$NUMSNAPS" ]; do
+    echo hi
+done
+""")
+    report = symb.main(script)
+    expected_error = reporter.InfiniteLoop(None) # Mock the location
+    assert_expected_report(report, [expected_error])
+
 def test_changing_while_condition_no_error(tmp_path):
     # A while loop where the condition can change should not produce any errors
     script = write_script(tmp_path, "A=a\nB=b\nwhile [ $A != $B ]; do A=$B; done\n")
