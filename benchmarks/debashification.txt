@@ -33,3 +33,5 @@ github/unset_var_2/
 not sure how to handle the read invocation
 
 local VAR --> local_VAR= and then unset local_VAR before func exit
+
+&>file --> >file 2>&1

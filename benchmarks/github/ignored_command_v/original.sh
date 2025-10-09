@@ -1,3 +1,5 @@
+#!/bin/sh
+
 # https://github.com/ohmyzsh/ohmyzsh/commit/8f0ff4bb63a8fd26741128a851c224af323eb772
 
 main() {

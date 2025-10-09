@@ -1,3 +1,5 @@
+#!/bin/zsh
+
 # https://github.com/ohmyzsh/ohmyzsh/commit/5a5c93b33493b47d34dd470eb851aaf24fa87536
 
 # get the name of the branch we are on
@@ -78,7 +80,7 @@ unset -f git_compare_version()
 
 #compare the provided version of git to the version installed and on path
 #prints 1 if input version <= installed version
-#prints -1 otherwise 
+#prints -1 otherwise
 function git_compare_version() {
   local INPUT_GIT_VERSION=$1;
   local INSTALLED_GIT_VERSION
