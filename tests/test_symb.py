@@ -35,6 +35,12 @@ def test_bound_variable_no_error(tmp_path):
     report = symb.main(script)
     assert_expected_report(report, [])
 
+def test_parameter_no_unbound_error(tmp_path):
+    # Using a parameter variable should not produce an unbound error
+    script = write_script(tmp_path, "echo $1\n")
+    report = symb.main(script)
+    assert_expected_report(report, [])
+
 def test_unbound_variable_cmdsubst(tmp_path):
     # Using an unset variable should produce an unbound error
     script = write_script(tmp_path, "echo $(echo $FOO)\n")

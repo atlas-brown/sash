@@ -228,7 +228,7 @@ def expand_simple(stuff: list[AST.ArgChar], state: State) -> list[Field]:
                         else:
                             logging.info(f"expansion: treating var {var.pretty()} with unhandled fmt {var.fmt} as completely arbitrary field")
                             add_a_field(arbitrary_field(var, ArbitraryType.APPROXIMATION, state))
-                    else:
+                    elif not var.var.isdecimal():
                         Reporter.add_error(reporter.UnboundID(var.pretty())) # todo we should report path information
                         add_a_field(arbitrary_field(var, ArbitraryType.ENVIRONMENT, state)) # todo worth recording somehow that the value comes from the environment?
                 case _:
