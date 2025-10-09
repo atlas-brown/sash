@@ -231,6 +231,11 @@ def expand_simple(stuff: list[AST.ArgChar], state: State, info: ScriptInfo) -> l
                     elif not is_special_var(var.var):
                         Reporter.add_error(reporter.UnboundID(var.pretty())) # todo we should report path information
                         add_a_field(arbitrary_field(var, ArbitraryType.ENVIRONMENT, state)) # todo worth recording somehow that the value comes from the environment?
+                case AST.BArgChar() as b:
+                    logging.info(f"expansion: treating backquote argchar {b.pretty()} as completely arbitrary field")
+                    add_a_field(arbitrary_field(b, ArbitraryType.APPROXIMATION, state))
+                    # todo use the trace
+                    t = guarded_interp_node([Trace((state,))], b.node, info)
                 case _:
                     # todo: if its a command substitution, need to go interp it
                     logging.error(f"argchar: {argchar} {type(argchar)}")
