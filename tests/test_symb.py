@@ -48,6 +48,11 @@ def test_unbound_variable_cmdsubst(tmp_path):
     expected_error = reporter.UnboundID(foo_var.pretty())
     assert_expected_report(report, [expected_error])
 
+    script = write_script(tmp_path, "ls $(echo $FOO)\n")
+    report = symb.main(script)
+    expected_error = reporter.UnboundID(foo_var.pretty())
+    assert_expected_report(report, [expected_error])
+
 def test_delete_system_file(tmp_path):
     # Deleting a system file should produce a DeleteSystemFile error
     script = write_script(tmp_path, "rm /usr\n")
