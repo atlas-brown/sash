@@ -57,7 +57,14 @@ def test_delete_system_file(tmp_path):
 
     script = write_script(tmp_path, "rm $FOO/usr\n")
     report = symb.main(script)
-    expected_error1 = reporter.DeleteSystemFile("/usr")
+    expected_error1 = reporter.DeleteSystemFile("")
+    expected_error2 = reporter.UnboundID(foo_var.pretty())
+    assert_expected_report(report, [expected_error1, expected_error2])
+
+
+    script = write_script(tmp_path, "rm -rf $STEAMROOT/*\n")
+    report = symb.main(script)
+    expected_error1 = reporter.DeleteSystemFile("")
     expected_error2 = reporter.UnboundID(foo_var.pretty())
     expected_error3 = reporter.DangerousWordSplit("$FOO")
     assert_expected_report(report, [expected_error1, expected_error2, expected_error3])
