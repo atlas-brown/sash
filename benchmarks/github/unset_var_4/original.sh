@@ -1,3 +1,5 @@
+#!/bin/sh
+
 # https://github.com/nvm-sh/nvm/commit/6b70c40f151ca051d403453bf019e1707b33bd5b
 
 # Node Version Manager

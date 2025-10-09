@@ -23,4 +23,4 @@ gather_data
 tar cf /tmp/logs.tar "${TEMPDIR}"
 gzip -9 /tmp/logs.tar
 cd /
-rm -rf "${TEMPDIR}"/
+rm -rf "${TEMPDIR}"/  # this happened before --preserve-root was a thing

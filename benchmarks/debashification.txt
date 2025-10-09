@@ -31,3 +31,5 @@ Another issue:  'continue' is used inside a function, which is now a bug, but ba
 
 github/unset_var_2/
 not sure how to handle the read invocation
+
+local VAR --> local_VAR= and then unset local_VAR before func exit
