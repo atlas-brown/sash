@@ -4,6 +4,7 @@ import shasta.ast_node as AST
 import logging
 from typing import Callable, Optional
 from enum import Enum
+from sash.util import make_hashable
 
 
 @dataclass(frozen=True)
@@ -48,8 +49,6 @@ class SymStr:
 class ArbitraryType(Enum):
     APPROXIMATION = 0
     ENVIRONMENT = 1
-    def __str__(self) -> str:
-        return "".join(str(p) for p in self.parts)
 
 @dataclass(frozen=True)
 class CompletelyArbitrary:
@@ -92,6 +91,16 @@ class State:
     last_exit_code: SymStr
     last_cmd: Optional[AST.AstNode]
 
+    # NOTE: (and beware) intentionally ignoring pathcond in equality and hash
+    def __hash__(self):
+        return make_hashable(replace(self, pathcond=[])).__hash__()
+    def __eq__(self, other):
+        return self.env == other.env \
+            and self.localenv == other.localenv \
+            and self.fundefs == other.fundefs \
+            and self.last_exit_code == other.last_exit_code \
+            and self.last_cmd == other.last_cmd
+
     def set_env(self, var: str, value: ShellVar) -> 'State':
         new_env = dict(self.env)
         new_env[var] = value
@@ -132,6 +141,14 @@ Traces = list[Trace]
 
 def trace_map(traces: Traces, f: Callable[[State], State]) -> Traces:
     return [trace.extend(f) for trace in traces]
+
+def collapse_traces(traces: Traces) -> Traces:
+    traces_by_latest_states = {}
+    for t in traces:
+        if t.latest_state not in traces_by_latest_states:
+            traces_by_latest_states[t.latest_state] = t
+    return list(traces_by_latest_states.values())
+
 
 @dataclass
 class SetOptionStore:

@@ -405,8 +405,10 @@ def interp_node(traces: Traces,
                         if something in t.latest_state.fundefs:
                             # TODO: Associate the warning with the trace that caused it
                             Reporter.add_error(reporter.RedirectToFunction(something))
+                    case [Field(CompletelyArbitrary(), _)]:
+                        pass
                     case _:
-                        logging.warning(f"Found a redir to multiple words: {redir_args} - Ignoring.")
+                        logging.warning(f"Found a redir to multiple words: {trim_string_for_logging(str(redir_args))} - Ignoring.")
                         pass
             # TODO: Also handle the effects of redirection on the FS
             return res
@@ -446,17 +448,23 @@ class AST_parse:
     line_before: int
     line_after: int  # relevant for mysterious shell reasons
 
-def trim_string_for_logging(s: str, max_len: int = 120) -> str:
+def trim_string_for_logging(s: str, max_len: int = 300) -> str:
     return s if len(s) <= max_len else s[:max_len] + "..."
 
 def symb_engine(nodes: list[AST_parse], info: ScriptInfo) -> list[Trace]:
     global context_line
     logging.debug(f"Running symb engine with {len(nodes)} raw nodes")
     traces = [Trace([starting_state()])]
+    trace_count = 1
     for node in nodes:
-        logging.debug(f"Interpreting next node {trim_string_for_logging(node.ast_node.pretty())}")
         context_line = node.line_before
+        logging.debug(f"Interpreting next node (line {context_line}) {trim_string_for_logging(node.ast_node.pretty())}")
         traces = guarded_interp_node(traces, node.ast_node, info)
+        if len(traces) > trace_count * 3:
+            logging.debug(f"Too many traces ({len(traces)}), collapsing")
+            traces = collapse_traces(traces)
+            trace_count = len(traces)
+            logging.debug(f"Collapsed to {trace_count} traces")
 
     return traces
 
