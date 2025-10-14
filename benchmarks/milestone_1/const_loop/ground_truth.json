@@ -1,7 +1,10 @@
 {
     "errors": [
         {
-            "code": "infinite_loop"
+            "code": "infinite_loop",
+            "shellcheck": {
+                "detects": false
+            }
         }
     ]
 }

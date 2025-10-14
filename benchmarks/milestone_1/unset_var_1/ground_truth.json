@@ -1,10 +1,26 @@
 {
     "errors": [
         {
-            "code": "unbound"
+            "code": "unbound",
+            "shellcheck": {
+                "detects": false,
+                "code": "SC2164",
+                "note": "unbound ZSH"
+            }
         },
         {
-            "code": "unbound"
+            "code": "unbound",
+            "shellcheck": {
+                "detects": false,
+                "note": "unbound NORMAL"
+            }
+        },
+        {
+            "code": "unbound",
+            "shellcheck": {
+                "detects": false,
+                "note": "unbound RB_RESET"
+            }
         }
     ]
 }
