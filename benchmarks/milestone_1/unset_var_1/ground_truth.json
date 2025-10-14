@@ -5,21 +5,21 @@
             "shellcheck": {
                 "detects": false,
                 "code": "SC2164",
-                "note": "unbound ZSH"
+                "note": "Even though ShellCheck suggests to \"Use 'cd ... || exit' or 'cd ... || return' in case cd fails.,\" it does not detect that `ZSH` is unbound/unset."
             }
         },
         {
             "code": "unbound",
             "shellcheck": {
                 "detects": false,
-                "note": "unbound NORMAL"
+                "note": "ShellCheck does not detect that `NORMAL` is unbound/unset."
             }
         },
         {
             "code": "unbound",
             "shellcheck": {
                 "detects": false,
-                "note": "unbound RB_RESET"
+                "note": "ShellCheck does not detect that `RB_RESET` is unbound/unset."
             }
         }
     ]
