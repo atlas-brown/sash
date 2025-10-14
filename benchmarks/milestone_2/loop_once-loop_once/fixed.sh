@@ -5,14 +5,14 @@ x=1
 echo "Please enter directory"
 read directory
 
-for directory in "$DIR"; # bug here (1): does not glob (loops once)
+for directory in "$DIR"/*;
 do
         if [ -d  "$directory" ];
     then echo "This is a directory Please enter the file name"
             read filename
             while [ $x -le 3 ]; do
 
-            for filename in  "$directory"; # bug here (2): does not glob (loops once)
+            for filename in  "$directory"/*;
         do
             if [ -r "$filename" ]
             then echo "The filename is readable"

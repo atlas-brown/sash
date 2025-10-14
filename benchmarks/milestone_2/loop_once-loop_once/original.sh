@@ -1,23 +1,21 @@
-#!/bin/sh
-
-# https://stackoverflow.com/questions/48919816/i-am-having-a-hard-time-why-the-if-statements-dont-work-in-shellscript
+ #!/bin/sh
 
 DIR='/home/collin2/'
 x=1
 echo "Please enter directory"
 read directory
 
-for directory in "$DIR"; # bug here (1): should be $DIR*
+for directory in "$DIR";
 do
-        if [ -d  "$directory" ]; 
+        if [ -d  "$directory" ];
     then echo "This is a directory Please enter the file name"
             read filename
             while [ $x -le 3 ]; do
 
-            for filename in  "$directory"; # bug here (2): should be unquoted
+            for filename in  "$directory";
         do
             if [ -r "$filename" ]
-            then echo "The filename is readable" 
+            then echo "The filename is readable"
                 echo "Please Enter a word "
                 read word
                 grep "$word" "$filename"
@@ -28,7 +26,7 @@ do
 
         done
         echo "Doesn't exist please try again"
-        read filename 
+        read filename
 
 
         x=`expr $x + 1`

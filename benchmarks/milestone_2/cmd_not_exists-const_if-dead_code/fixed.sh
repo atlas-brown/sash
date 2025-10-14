@@ -1,7 +1,7 @@
-!/bin/bash
+#!/bin/sh
 
 backuptodirectory=/Volumes/Backup/date/
-directorytocopy=/Users/myname/Library/Application Support
+directorytocopy=/Users/myname/Library/Application\ Support
 
 if [ ! -d "$directorytocopy" ]; then
     echo "Source path: $directorytocopy doesn't exist"

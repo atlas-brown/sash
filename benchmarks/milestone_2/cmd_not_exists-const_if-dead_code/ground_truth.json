@@ -1,0 +1,13 @@
+{
+    "errors": [
+        {
+            "code": "unbound"
+        },
+        {
+            "code": "const_cond"
+        },
+        {
+            "code": "dead_code"
+        }
+    ]
+}

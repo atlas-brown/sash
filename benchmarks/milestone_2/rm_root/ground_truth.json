@@ -1,0 +1,34 @@
+{
+    "errors": [
+        {
+            "code": "del_sys_file"
+        },
+        {
+            "code": "del_sys_file"
+        },
+        {
+            "code": "word_split"
+        },
+        {
+            "code": "unbound"
+        },
+        {
+            "code": "unbound"
+        },
+        {
+            "code": "unbound"
+        },
+        {
+            "code": "unbound"
+        },
+        {
+            "code": "unbound"
+        },
+        {
+            "code": "unbound"
+        },
+        {
+            "code": "unbound"
+        }
+    ]
+}
