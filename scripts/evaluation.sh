@@ -25,15 +25,16 @@ while read -r benchmark; do
         continue
     fi
 
-    # Input: { ..., "errors": [ { "code": ..., ... }, ... ] }
-    # Output: [ { "code": ... }, ... ]
-    expected=$(jq --sort-keys '[.errors[] | {code}]' "$(dirname "$benchmark")/ground_truth.json")
+    # Input: { ..., "errors": [ { "code": <code>, ... }, ... ] }
+    # Output: <code> ...
+    expected=$(jq '.errors[].code' "$(dirname "$benchmark")/ground_truth.json" | sort)
 
-    # Input: { ..., "errors": [ { "code": ..., ... }, ... ] }
-    # Output: [ { "code": ... }, ... ]
-    actual=$(echo "$output" | jq --sort-keys '[.errors[] | {code}]')
+    # Input: { ..., "errors": [ { "code": <code>, ... }, ... ] }
+    # Output: <code> ...
+    actual=$(echo "$output" | jq '.errors[].code' | sort)
 
-    if [ "$expected" != "$actual" ]; then
+
+    if [ "$actual" != "$expected" ]; then
         echo "Unexpected output:"
         echo "$output" | jq '.errors'
         failure=$((failure + 1))
