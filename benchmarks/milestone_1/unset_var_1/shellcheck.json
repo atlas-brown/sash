@@ -1,0 +1,1585 @@
+{
+  "comments": [
+    {
+      "file": "benchmarks/milestone_1/unset_var_1/posix.sh",
+      "line": 30,
+      "endLine": 30,
+      "column": 3,
+      "endColumn": 8,
+      "level": "warning",
+      "code": 2034,
+      "message": "GREEN appears unused. Verify use (or export if used externally).",
+      "fix": null
+    },
+    {
+      "file": "benchmarks/milestone_1/unset_var_1/posix.sh",
+      "line": 31,
+      "endLine": 31,
+      "column": 3,
+      "endColumn": 9,
+      "level": "warning",
+      "code": 2034,
+      "message": "YELLOW appears unused. Verify use (or export if used externally).",
+      "fix": null
+    },
+    {
+      "file": "benchmarks/milestone_1/unset_var_1/posix.sh",
+      "line": 37,
+      "endLine": 37,
+      "column": 1,
+      "endColumn": 10,
+      "level": "warning",
+      "code": 2164,
+      "message": "Use 'cd ... || exit' or 'cd ... || return' in case cd fails.",
+      "fix": {
+        "replacements": [
+          {
+            "column": 10,
+            "endColumn": 10,
+            "endLine": 37,
+            "insertionPoint": "beforeStart",
+            "line": 37,
+            "precedence": 5,
+            "replacement": " || exit"
+          }
+        ]
+      }
+    },
+    {
+      "file": "benchmarks/milestone_1/unset_var_1/posix.sh",
+      "line": 60,
+      "endLine": 60,
+      "column": 84,
+      "endColumn": 91,
+      "level": "info",
+      "code": 2086,
+      "message": "Double quote to prevent globbing and word splitting.",
+      "fix": {
+        "replacements": [
+          {
+            "column": 84,
+            "endColumn": 84,
+            "endLine": 60,
+            "insertionPoint": "afterEnd",
+            "line": 60,
+            "precedence": 10,
+            "replacement": "\""
+          },
+          {
+            "column": 91,
+            "endColumn": 91,
+            "endLine": 60,
+            "insertionPoint": "beforeStart",
+            "line": 60,
+            "precedence": 10,
+            "replacement": "\""
+          }
+        ]
+      }
+    },
+    {
+      "file": "benchmarks/milestone_1/unset_var_1/posix.sh",
+      "line": 60,
+      "endLine": 60,
+      "column": 92,
+      "endColumn": 102,
+      "level": "info",
+      "code": 2086,
+      "message": "Double quote to prevent globbing and word splitting.",
+      "fix": {
+        "replacements": [
+          {
+            "column": 92,
+            "endColumn": 92,
+            "endLine": 60,
+            "insertionPoint": "afterEnd",
+            "line": 60,
+            "precedence": 10,
+            "replacement": "\""
+          },
+          {
+            "column": 102,
+            "endColumn": 102,
+            "endLine": 60,
+            "insertionPoint": "beforeStart",
+            "line": 60,
+            "precedence": 10,
+            "replacement": "\""
+          }
+        ]
+      }
+    },
+    {
+      "file": "benchmarks/milestone_1/unset_var_1/posix.sh",
+      "line": 60,
+      "endLine": 60,
+      "column": 103,
+      "endColumn": 113,
+      "level": "info",
+      "code": 2086,
+      "message": "Double quote to prevent globbing and word splitting.",
+      "fix": {
+        "replacements": [
+          {
+            "column": 103,
+            "endColumn": 103,
+            "endLine": 60,
+            "insertionPoint": "afterEnd",
+            "line": 60,
+            "precedence": 10,
+            "replacement": "\""
+          },
+          {
+            "column": 113,
+            "endColumn": 113,
+            "endLine": 60,
+            "insertionPoint": "beforeStart",
+            "line": 60,
+            "precedence": 10,
+            "replacement": "\""
+          }
+        ]
+      }
+    },
+    {
+      "file": "benchmarks/milestone_1/unset_var_1/posix.sh",
+      "line": 60,
+      "endLine": 60,
+      "column": 114,
+      "endColumn": 123,
+      "level": "info",
+      "code": 2086,
+      "message": "Double quote to prevent globbing and word splitting.",
+      "fix": {
+        "replacements": [
+          {
+            "column": 114,
+            "endColumn": 114,
+            "endLine": 60,
+            "insertionPoint": "afterEnd",
+            "line": 60,
+            "precedence": 10,
+            "replacement": "\""
+          },
+          {
+            "column": 123,
+            "endColumn": 123,
+            "endLine": 60,
+            "insertionPoint": "beforeStart",
+            "line": 60,
+            "precedence": 10,
+            "replacement": "\""
+          }
+        ]
+      }
+    },
+    {
+      "file": "benchmarks/milestone_1/unset_var_1/posix.sh",
+      "line": 60,
+      "endLine": 60,
+      "column": 124,
+      "endColumn": 132,
+      "level": "info",
+      "code": 2086,
+      "message": "Double quote to prevent globbing and word splitting.",
+      "fix": {
+        "replacements": [
+          {
+            "column": 124,
+            "endColumn": 124,
+            "endLine": 60,
+            "insertionPoint": "afterEnd",
+            "line": 60,
+            "precedence": 10,
+            "replacement": "\""
+          },
+          {
+            "column": 132,
+            "endColumn": 132,
+            "endLine": 60,
+            "insertionPoint": "beforeStart",
+            "line": 60,
+            "precedence": 10,
+            "replacement": "\""
+          }
+        ]
+      }
+    },
+    {
+      "file": "benchmarks/milestone_1/unset_var_1/posix.sh",
+      "line": 60,
+      "endLine": 60,
+      "column": 133,
+      "endColumn": 143,
+      "level": "info",
+      "code": 2086,
+      "message": "Double quote to prevent globbing and word splitting.",
+      "fix": {
+        "replacements": [
+          {
+            "column": 133,
+            "endColumn": 133,
+            "endLine": 60,
+            "insertionPoint": "afterEnd",
+            "line": 60,
+            "precedence": 10,
+            "replacement": "\""
+          },
+          {
+            "column": 143,
+            "endColumn": 143,
+            "endLine": 60,
+            "insertionPoint": "beforeStart",
+            "line": 60,
+            "precedence": 10,
+            "replacement": "\""
+          }
+        ]
+      }
+    },
+    {
+      "file": "benchmarks/milestone_1/unset_var_1/posix.sh",
+      "line": 60,
+      "endLine": 60,
+      "column": 144,
+      "endColumn": 154,
+      "level": "info",
+      "code": 2086,
+      "message": "Double quote to prevent globbing and word splitting.",
+      "fix": {
+        "replacements": [
+          {
+            "column": 144,
+            "endColumn": 144,
+            "endLine": 60,
+            "insertionPoint": "afterEnd",
+            "line": 60,
+            "precedence": 10,
+            "replacement": "\""
+          },
+          {
+            "column": 154,
+            "endColumn": 154,
+            "endLine": 60,
+            "insertionPoint": "beforeStart",
+            "line": 60,
+            "precedence": 10,
+            "replacement": "\""
+          }
+        ]
+      }
+    },
+    {
+      "file": "benchmarks/milestone_1/unset_var_1/posix.sh",
+      "line": 60,
+      "endLine": 60,
+      "column": 155,
+      "endColumn": 164,
+      "level": "info",
+      "code": 2086,
+      "message": "Double quote to prevent globbing and word splitting.",
+      "fix": {
+        "replacements": [
+          {
+            "column": 155,
+            "endColumn": 155,
+            "endLine": 60,
+            "insertionPoint": "afterEnd",
+            "line": 60,
+            "precedence": 10,
+            "replacement": "\""
+          },
+          {
+            "column": 164,
+            "endColumn": 164,
+            "endLine": 60,
+            "insertionPoint": "beforeStart",
+            "line": 60,
+            "precedence": 10,
+            "replacement": "\""
+          }
+        ]
+      }
+    },
+    {
+      "file": "benchmarks/milestone_1/unset_var_1/posix.sh",
+      "line": 61,
+      "endLine": 61,
+      "column": 84,
+      "endColumn": 91,
+      "level": "info",
+      "code": 2086,
+      "message": "Double quote to prevent globbing and word splitting.",
+      "fix": {
+        "replacements": [
+          {
+            "column": 84,
+            "endColumn": 84,
+            "endLine": 61,
+            "insertionPoint": "afterEnd",
+            "line": 61,
+            "precedence": 10,
+            "replacement": "\""
+          },
+          {
+            "column": 91,
+            "endColumn": 91,
+            "endLine": 61,
+            "insertionPoint": "beforeStart",
+            "line": 61,
+            "precedence": 10,
+            "replacement": "\""
+          }
+        ]
+      }
+    },
+    {
+      "file": "benchmarks/milestone_1/unset_var_1/posix.sh",
+      "line": 61,
+      "endLine": 61,
+      "column": 92,
+      "endColumn": 102,
+      "level": "info",
+      "code": 2086,
+      "message": "Double quote to prevent globbing and word splitting.",
+      "fix": {
+        "replacements": [
+          {
+            "column": 92,
+            "endColumn": 92,
+            "endLine": 61,
+            "insertionPoint": "afterEnd",
+            "line": 61,
+            "precedence": 10,
+            "replacement": "\""
+          },
+          {
+            "column": 102,
+            "endColumn": 102,
+            "endLine": 61,
+            "insertionPoint": "beforeStart",
+            "line": 61,
+            "precedence": 10,
+            "replacement": "\""
+          }
+        ]
+      }
+    },
+    {
+      "file": "benchmarks/milestone_1/unset_var_1/posix.sh",
+      "line": 61,
+      "endLine": 61,
+      "column": 103,
+      "endColumn": 113,
+      "level": "info",
+      "code": 2086,
+      "message": "Double quote to prevent globbing and word splitting.",
+      "fix": {
+        "replacements": [
+          {
+            "column": 103,
+            "endColumn": 103,
+            "endLine": 61,
+            "insertionPoint": "afterEnd",
+            "line": 61,
+            "precedence": 10,
+            "replacement": "\""
+          },
+          {
+            "column": 113,
+            "endColumn": 113,
+            "endLine": 61,
+            "insertionPoint": "beforeStart",
+            "line": 61,
+            "precedence": 10,
+            "replacement": "\""
+          }
+        ]
+      }
+    },
+    {
+      "file": "benchmarks/milestone_1/unset_var_1/posix.sh",
+      "line": 61,
+      "endLine": 61,
+      "column": 114,
+      "endColumn": 123,
+      "level": "info",
+      "code": 2086,
+      "message": "Double quote to prevent globbing and word splitting.",
+      "fix": {
+        "replacements": [
+          {
+            "column": 114,
+            "endColumn": 114,
+            "endLine": 61,
+            "insertionPoint": "afterEnd",
+            "line": 61,
+            "precedence": 10,
+            "replacement": "\""
+          },
+          {
+            "column": 123,
+            "endColumn": 123,
+            "endLine": 61,
+            "insertionPoint": "beforeStart",
+            "line": 61,
+            "precedence": 10,
+            "replacement": "\""
+          }
+        ]
+      }
+    },
+    {
+      "file": "benchmarks/milestone_1/unset_var_1/posix.sh",
+      "line": 61,
+      "endLine": 61,
+      "column": 124,
+      "endColumn": 132,
+      "level": "info",
+      "code": 2086,
+      "message": "Double quote to prevent globbing and word splitting.",
+      "fix": {
+        "replacements": [
+          {
+            "column": 124,
+            "endColumn": 124,
+            "endLine": 61,
+            "insertionPoint": "afterEnd",
+            "line": 61,
+            "precedence": 10,
+            "replacement": "\""
+          },
+          {
+            "column": 132,
+            "endColumn": 132,
+            "endLine": 61,
+            "insertionPoint": "beforeStart",
+            "line": 61,
+            "precedence": 10,
+            "replacement": "\""
+          }
+        ]
+      }
+    },
+    {
+      "file": "benchmarks/milestone_1/unset_var_1/posix.sh",
+      "line": 61,
+      "endLine": 61,
+      "column": 133,
+      "endColumn": 143,
+      "level": "info",
+      "code": 2086,
+      "message": "Double quote to prevent globbing and word splitting.",
+      "fix": {
+        "replacements": [
+          {
+            "column": 133,
+            "endColumn": 133,
+            "endLine": 61,
+            "insertionPoint": "afterEnd",
+            "line": 61,
+            "precedence": 10,
+            "replacement": "\""
+          },
+          {
+            "column": 143,
+            "endColumn": 143,
+            "endLine": 61,
+            "insertionPoint": "beforeStart",
+            "line": 61,
+            "precedence": 10,
+            "replacement": "\""
+          }
+        ]
+      }
+    },
+    {
+      "file": "benchmarks/milestone_1/unset_var_1/posix.sh",
+      "line": 61,
+      "endLine": 61,
+      "column": 144,
+      "endColumn": 154,
+      "level": "info",
+      "code": 2086,
+      "message": "Double quote to prevent globbing and word splitting.",
+      "fix": {
+        "replacements": [
+          {
+            "column": 144,
+            "endColumn": 144,
+            "endLine": 61,
+            "insertionPoint": "afterEnd",
+            "line": 61,
+            "precedence": 10,
+            "replacement": "\""
+          },
+          {
+            "column": 154,
+            "endColumn": 154,
+            "endLine": 61,
+            "insertionPoint": "beforeStart",
+            "line": 61,
+            "precedence": 10,
+            "replacement": "\""
+          }
+        ]
+      }
+    },
+    {
+      "file": "benchmarks/milestone_1/unset_var_1/posix.sh",
+      "line": 61,
+      "endLine": 61,
+      "column": 155,
+      "endColumn": 164,
+      "level": "info",
+      "code": 2086,
+      "message": "Double quote to prevent globbing and word splitting.",
+      "fix": {
+        "replacements": [
+          {
+            "column": 155,
+            "endColumn": 155,
+            "endLine": 61,
+            "insertionPoint": "afterEnd",
+            "line": 61,
+            "precedence": 10,
+            "replacement": "\""
+          },
+          {
+            "column": 164,
+            "endColumn": 164,
+            "endLine": 61,
+            "insertionPoint": "beforeStart",
+            "line": 61,
+            "precedence": 10,
+            "replacement": "\""
+          }
+        ]
+      }
+    },
+    {
+      "file": "benchmarks/milestone_1/unset_var_1/posix.sh",
+      "line": 62,
+      "endLine": 62,
+      "column": 84,
+      "endColumn": 91,
+      "level": "info",
+      "code": 2086,
+      "message": "Double quote to prevent globbing and word splitting.",
+      "fix": {
+        "replacements": [
+          {
+            "column": 84,
+            "endColumn": 84,
+            "endLine": 62,
+            "insertionPoint": "afterEnd",
+            "line": 62,
+            "precedence": 10,
+            "replacement": "\""
+          },
+          {
+            "column": 91,
+            "endColumn": 91,
+            "endLine": 62,
+            "insertionPoint": "beforeStart",
+            "line": 62,
+            "precedence": 10,
+            "replacement": "\""
+          }
+        ]
+      }
+    },
+    {
+      "file": "benchmarks/milestone_1/unset_var_1/posix.sh",
+      "line": 62,
+      "endLine": 62,
+      "column": 92,
+      "endColumn": 102,
+      "level": "info",
+      "code": 2086,
+      "message": "Double quote to prevent globbing and word splitting.",
+      "fix": {
+        "replacements": [
+          {
+            "column": 92,
+            "endColumn": 92,
+            "endLine": 62,
+            "insertionPoint": "afterEnd",
+            "line": 62,
+            "precedence": 10,
+            "replacement": "\""
+          },
+          {
+            "column": 102,
+            "endColumn": 102,
+            "endLine": 62,
+            "insertionPoint": "beforeStart",
+            "line": 62,
+            "precedence": 10,
+            "replacement": "\""
+          }
+        ]
+      }
+    },
+    {
+      "file": "benchmarks/milestone_1/unset_var_1/posix.sh",
+      "line": 62,
+      "endLine": 62,
+      "column": 103,
+      "endColumn": 113,
+      "level": "info",
+      "code": 2086,
+      "message": "Double quote to prevent globbing and word splitting.",
+      "fix": {
+        "replacements": [
+          {
+            "column": 103,
+            "endColumn": 103,
+            "endLine": 62,
+            "insertionPoint": "afterEnd",
+            "line": 62,
+            "precedence": 10,
+            "replacement": "\""
+          },
+          {
+            "column": 113,
+            "endColumn": 113,
+            "endLine": 62,
+            "insertionPoint": "beforeStart",
+            "line": 62,
+            "precedence": 10,
+            "replacement": "\""
+          }
+        ]
+      }
+    },
+    {
+      "file": "benchmarks/milestone_1/unset_var_1/posix.sh",
+      "line": 62,
+      "endLine": 62,
+      "column": 114,
+      "endColumn": 123,
+      "level": "info",
+      "code": 2086,
+      "message": "Double quote to prevent globbing and word splitting.",
+      "fix": {
+        "replacements": [
+          {
+            "column": 114,
+            "endColumn": 114,
+            "endLine": 62,
+            "insertionPoint": "afterEnd",
+            "line": 62,
+            "precedence": 10,
+            "replacement": "\""
+          },
+          {
+            "column": 123,
+            "endColumn": 123,
+            "endLine": 62,
+            "insertionPoint": "beforeStart",
+            "line": 62,
+            "precedence": 10,
+            "replacement": "\""
+          }
+        ]
+      }
+    },
+    {
+      "file": "benchmarks/milestone_1/unset_var_1/posix.sh",
+      "line": 62,
+      "endLine": 62,
+      "column": 124,
+      "endColumn": 132,
+      "level": "info",
+      "code": 2086,
+      "message": "Double quote to prevent globbing and word splitting.",
+      "fix": {
+        "replacements": [
+          {
+            "column": 124,
+            "endColumn": 124,
+            "endLine": 62,
+            "insertionPoint": "afterEnd",
+            "line": 62,
+            "precedence": 10,
+            "replacement": "\""
+          },
+          {
+            "column": 132,
+            "endColumn": 132,
+            "endLine": 62,
+            "insertionPoint": "beforeStart",
+            "line": 62,
+            "precedence": 10,
+            "replacement": "\""
+          }
+        ]
+      }
+    },
+    {
+      "file": "benchmarks/milestone_1/unset_var_1/posix.sh",
+      "line": 62,
+      "endLine": 62,
+      "column": 133,
+      "endColumn": 143,
+      "level": "info",
+      "code": 2086,
+      "message": "Double quote to prevent globbing and word splitting.",
+      "fix": {
+        "replacements": [
+          {
+            "column": 133,
+            "endColumn": 133,
+            "endLine": 62,
+            "insertionPoint": "afterEnd",
+            "line": 62,
+            "precedence": 10,
+            "replacement": "\""
+          },
+          {
+            "column": 143,
+            "endColumn": 143,
+            "endLine": 62,
+            "insertionPoint": "beforeStart",
+            "line": 62,
+            "precedence": 10,
+            "replacement": "\""
+          }
+        ]
+      }
+    },
+    {
+      "file": "benchmarks/milestone_1/unset_var_1/posix.sh",
+      "line": 62,
+      "endLine": 62,
+      "column": 144,
+      "endColumn": 154,
+      "level": "info",
+      "code": 2086,
+      "message": "Double quote to prevent globbing and word splitting.",
+      "fix": {
+        "replacements": [
+          {
+            "column": 144,
+            "endColumn": 144,
+            "endLine": 62,
+            "insertionPoint": "afterEnd",
+            "line": 62,
+            "precedence": 10,
+            "replacement": "\""
+          },
+          {
+            "column": 154,
+            "endColumn": 154,
+            "endLine": 62,
+            "insertionPoint": "beforeStart",
+            "line": 62,
+            "precedence": 10,
+            "replacement": "\""
+          }
+        ]
+      }
+    },
+    {
+      "file": "benchmarks/milestone_1/unset_var_1/posix.sh",
+      "line": 62,
+      "endLine": 62,
+      "column": 155,
+      "endColumn": 164,
+      "level": "info",
+      "code": 2086,
+      "message": "Double quote to prevent globbing and word splitting.",
+      "fix": {
+        "replacements": [
+          {
+            "column": 155,
+            "endColumn": 155,
+            "endLine": 62,
+            "insertionPoint": "afterEnd",
+            "line": 62,
+            "precedence": 10,
+            "replacement": "\""
+          },
+          {
+            "column": 164,
+            "endColumn": 164,
+            "endLine": 62,
+            "insertionPoint": "beforeStart",
+            "line": 62,
+            "precedence": 10,
+            "replacement": "\""
+          }
+        ]
+      }
+    },
+    {
+      "file": "benchmarks/milestone_1/unset_var_1/posix.sh",
+      "line": 63,
+      "endLine": 63,
+      "column": 84,
+      "endColumn": 91,
+      "level": "info",
+      "code": 2086,
+      "message": "Double quote to prevent globbing and word splitting.",
+      "fix": {
+        "replacements": [
+          {
+            "column": 84,
+            "endColumn": 84,
+            "endLine": 63,
+            "insertionPoint": "afterEnd",
+            "line": 63,
+            "precedence": 10,
+            "replacement": "\""
+          },
+          {
+            "column": 91,
+            "endColumn": 91,
+            "endLine": 63,
+            "insertionPoint": "beforeStart",
+            "line": 63,
+            "precedence": 10,
+            "replacement": "\""
+          }
+        ]
+      }
+    },
+    {
+      "file": "benchmarks/milestone_1/unset_var_1/posix.sh",
+      "line": 63,
+      "endLine": 63,
+      "column": 92,
+      "endColumn": 102,
+      "level": "info",
+      "code": 2086,
+      "message": "Double quote to prevent globbing and word splitting.",
+      "fix": {
+        "replacements": [
+          {
+            "column": 92,
+            "endColumn": 92,
+            "endLine": 63,
+            "insertionPoint": "afterEnd",
+            "line": 63,
+            "precedence": 10,
+            "replacement": "\""
+          },
+          {
+            "column": 102,
+            "endColumn": 102,
+            "endLine": 63,
+            "insertionPoint": "beforeStart",
+            "line": 63,
+            "precedence": 10,
+            "replacement": "\""
+          }
+        ]
+      }
+    },
+    {
+      "file": "benchmarks/milestone_1/unset_var_1/posix.sh",
+      "line": 63,
+      "endLine": 63,
+      "column": 103,
+      "endColumn": 113,
+      "level": "info",
+      "code": 2086,
+      "message": "Double quote to prevent globbing and word splitting.",
+      "fix": {
+        "replacements": [
+          {
+            "column": 103,
+            "endColumn": 103,
+            "endLine": 63,
+            "insertionPoint": "afterEnd",
+            "line": 63,
+            "precedence": 10,
+            "replacement": "\""
+          },
+          {
+            "column": 113,
+            "endColumn": 113,
+            "endLine": 63,
+            "insertionPoint": "beforeStart",
+            "line": 63,
+            "precedence": 10,
+            "replacement": "\""
+          }
+        ]
+      }
+    },
+    {
+      "file": "benchmarks/milestone_1/unset_var_1/posix.sh",
+      "line": 63,
+      "endLine": 63,
+      "column": 114,
+      "endColumn": 123,
+      "level": "info",
+      "code": 2086,
+      "message": "Double quote to prevent globbing and word splitting.",
+      "fix": {
+        "replacements": [
+          {
+            "column": 114,
+            "endColumn": 114,
+            "endLine": 63,
+            "insertionPoint": "afterEnd",
+            "line": 63,
+            "precedence": 10,
+            "replacement": "\""
+          },
+          {
+            "column": 123,
+            "endColumn": 123,
+            "endLine": 63,
+            "insertionPoint": "beforeStart",
+            "line": 63,
+            "precedence": 10,
+            "replacement": "\""
+          }
+        ]
+      }
+    },
+    {
+      "file": "benchmarks/milestone_1/unset_var_1/posix.sh",
+      "line": 63,
+      "endLine": 63,
+      "column": 124,
+      "endColumn": 132,
+      "level": "info",
+      "code": 2086,
+      "message": "Double quote to prevent globbing and word splitting.",
+      "fix": {
+        "replacements": [
+          {
+            "column": 124,
+            "endColumn": 124,
+            "endLine": 63,
+            "insertionPoint": "afterEnd",
+            "line": 63,
+            "precedence": 10,
+            "replacement": "\""
+          },
+          {
+            "column": 132,
+            "endColumn": 132,
+            "endLine": 63,
+            "insertionPoint": "beforeStart",
+            "line": 63,
+            "precedence": 10,
+            "replacement": "\""
+          }
+        ]
+      }
+    },
+    {
+      "file": "benchmarks/milestone_1/unset_var_1/posix.sh",
+      "line": 63,
+      "endLine": 63,
+      "column": 133,
+      "endColumn": 143,
+      "level": "info",
+      "code": 2086,
+      "message": "Double quote to prevent globbing and word splitting.",
+      "fix": {
+        "replacements": [
+          {
+            "column": 133,
+            "endColumn": 133,
+            "endLine": 63,
+            "insertionPoint": "afterEnd",
+            "line": 63,
+            "precedence": 10,
+            "replacement": "\""
+          },
+          {
+            "column": 143,
+            "endColumn": 143,
+            "endLine": 63,
+            "insertionPoint": "beforeStart",
+            "line": 63,
+            "precedence": 10,
+            "replacement": "\""
+          }
+        ]
+      }
+    },
+    {
+      "file": "benchmarks/milestone_1/unset_var_1/posix.sh",
+      "line": 63,
+      "endLine": 63,
+      "column": 144,
+      "endColumn": 154,
+      "level": "info",
+      "code": 2086,
+      "message": "Double quote to prevent globbing and word splitting.",
+      "fix": {
+        "replacements": [
+          {
+            "column": 144,
+            "endColumn": 144,
+            "endLine": 63,
+            "insertionPoint": "afterEnd",
+            "line": 63,
+            "precedence": 10,
+            "replacement": "\""
+          },
+          {
+            "column": 154,
+            "endColumn": 154,
+            "endLine": 63,
+            "insertionPoint": "beforeStart",
+            "line": 63,
+            "precedence": 10,
+            "replacement": "\""
+          }
+        ]
+      }
+    },
+    {
+      "file": "benchmarks/milestone_1/unset_var_1/posix.sh",
+      "line": 63,
+      "endLine": 63,
+      "column": 155,
+      "endColumn": 164,
+      "level": "info",
+      "code": 2086,
+      "message": "Double quote to prevent globbing and word splitting.",
+      "fix": {
+        "replacements": [
+          {
+            "column": 155,
+            "endColumn": 155,
+            "endLine": 63,
+            "insertionPoint": "afterEnd",
+            "line": 63,
+            "precedence": 10,
+            "replacement": "\""
+          },
+          {
+            "column": 164,
+            "endColumn": 164,
+            "endLine": 63,
+            "insertionPoint": "beforeStart",
+            "line": 63,
+            "precedence": 10,
+            "replacement": "\""
+          }
+        ]
+      }
+    },
+    {
+      "file": "benchmarks/milestone_1/unset_var_1/posix.sh",
+      "line": 64,
+      "endLine": 64,
+      "column": 84,
+      "endColumn": 91,
+      "level": "info",
+      "code": 2086,
+      "message": "Double quote to prevent globbing and word splitting.",
+      "fix": {
+        "replacements": [
+          {
+            "column": 84,
+            "endColumn": 84,
+            "endLine": 64,
+            "insertionPoint": "afterEnd",
+            "line": 64,
+            "precedence": 10,
+            "replacement": "\""
+          },
+          {
+            "column": 91,
+            "endColumn": 91,
+            "endLine": 64,
+            "insertionPoint": "beforeStart",
+            "line": 64,
+            "precedence": 10,
+            "replacement": "\""
+          }
+        ]
+      }
+    },
+    {
+      "file": "benchmarks/milestone_1/unset_var_1/posix.sh",
+      "line": 64,
+      "endLine": 64,
+      "column": 92,
+      "endColumn": 102,
+      "level": "info",
+      "code": 2086,
+      "message": "Double quote to prevent globbing and word splitting.",
+      "fix": {
+        "replacements": [
+          {
+            "column": 92,
+            "endColumn": 92,
+            "endLine": 64,
+            "insertionPoint": "afterEnd",
+            "line": 64,
+            "precedence": 10,
+            "replacement": "\""
+          },
+          {
+            "column": 102,
+            "endColumn": 102,
+            "endLine": 64,
+            "insertionPoint": "beforeStart",
+            "line": 64,
+            "precedence": 10,
+            "replacement": "\""
+          }
+        ]
+      }
+    },
+    {
+      "file": "benchmarks/milestone_1/unset_var_1/posix.sh",
+      "line": 64,
+      "endLine": 64,
+      "column": 103,
+      "endColumn": 113,
+      "level": "info",
+      "code": 2086,
+      "message": "Double quote to prevent globbing and word splitting.",
+      "fix": {
+        "replacements": [
+          {
+            "column": 103,
+            "endColumn": 103,
+            "endLine": 64,
+            "insertionPoint": "afterEnd",
+            "line": 64,
+            "precedence": 10,
+            "replacement": "\""
+          },
+          {
+            "column": 113,
+            "endColumn": 113,
+            "endLine": 64,
+            "insertionPoint": "beforeStart",
+            "line": 64,
+            "precedence": 10,
+            "replacement": "\""
+          }
+        ]
+      }
+    },
+    {
+      "file": "benchmarks/milestone_1/unset_var_1/posix.sh",
+      "line": 64,
+      "endLine": 64,
+      "column": 114,
+      "endColumn": 123,
+      "level": "info",
+      "code": 2086,
+      "message": "Double quote to prevent globbing and word splitting.",
+      "fix": {
+        "replacements": [
+          {
+            "column": 114,
+            "endColumn": 114,
+            "endLine": 64,
+            "insertionPoint": "afterEnd",
+            "line": 64,
+            "precedence": 10,
+            "replacement": "\""
+          },
+          {
+            "column": 123,
+            "endColumn": 123,
+            "endLine": 64,
+            "insertionPoint": "beforeStart",
+            "line": 64,
+            "precedence": 10,
+            "replacement": "\""
+          }
+        ]
+      }
+    },
+    {
+      "file": "benchmarks/milestone_1/unset_var_1/posix.sh",
+      "line": 64,
+      "endLine": 64,
+      "column": 124,
+      "endColumn": 132,
+      "level": "info",
+      "code": 2086,
+      "message": "Double quote to prevent globbing and word splitting.",
+      "fix": {
+        "replacements": [
+          {
+            "column": 124,
+            "endColumn": 124,
+            "endLine": 64,
+            "insertionPoint": "afterEnd",
+            "line": 64,
+            "precedence": 10,
+            "replacement": "\""
+          },
+          {
+            "column": 132,
+            "endColumn": 132,
+            "endLine": 64,
+            "insertionPoint": "beforeStart",
+            "line": 64,
+            "precedence": 10,
+            "replacement": "\""
+          }
+        ]
+      }
+    },
+    {
+      "file": "benchmarks/milestone_1/unset_var_1/posix.sh",
+      "line": 64,
+      "endLine": 64,
+      "column": 133,
+      "endColumn": 143,
+      "level": "info",
+      "code": 2086,
+      "message": "Double quote to prevent globbing and word splitting.",
+      "fix": {
+        "replacements": [
+          {
+            "column": 133,
+            "endColumn": 133,
+            "endLine": 64,
+            "insertionPoint": "afterEnd",
+            "line": 64,
+            "precedence": 10,
+            "replacement": "\""
+          },
+          {
+            "column": 143,
+            "endColumn": 143,
+            "endLine": 64,
+            "insertionPoint": "beforeStart",
+            "line": 64,
+            "precedence": 10,
+            "replacement": "\""
+          }
+        ]
+      }
+    },
+    {
+      "file": "benchmarks/milestone_1/unset_var_1/posix.sh",
+      "line": 64,
+      "endLine": 64,
+      "column": 144,
+      "endColumn": 154,
+      "level": "info",
+      "code": 2086,
+      "message": "Double quote to prevent globbing and word splitting.",
+      "fix": {
+        "replacements": [
+          {
+            "column": 144,
+            "endColumn": 144,
+            "endLine": 64,
+            "insertionPoint": "afterEnd",
+            "line": 64,
+            "precedence": 10,
+            "replacement": "\""
+          },
+          {
+            "column": 154,
+            "endColumn": 154,
+            "endLine": 64,
+            "insertionPoint": "beforeStart",
+            "line": 64,
+            "precedence": 10,
+            "replacement": "\""
+          }
+        ]
+      }
+    },
+    {
+      "file": "benchmarks/milestone_1/unset_var_1/posix.sh",
+      "line": 64,
+      "endLine": 64,
+      "column": 155,
+      "endColumn": 164,
+      "level": "info",
+      "code": 2086,
+      "message": "Double quote to prevent globbing and word splitting.",
+      "fix": {
+        "replacements": [
+          {
+            "column": 155,
+            "endColumn": 155,
+            "endLine": 64,
+            "insertionPoint": "afterEnd",
+            "line": 64,
+            "precedence": 10,
+            "replacement": "\""
+          },
+          {
+            "column": 164,
+            "endColumn": 164,
+            "endLine": 64,
+            "insertionPoint": "beforeStart",
+            "line": 64,
+            "precedence": 10,
+            "replacement": "\""
+          }
+        ]
+      }
+    },
+    {
+      "file": "benchmarks/milestone_1/unset_var_1/posix.sh",
+      "line": 65,
+      "endLine": 65,
+      "column": 84,
+      "endColumn": 91,
+      "level": "info",
+      "code": 2086,
+      "message": "Double quote to prevent globbing and word splitting.",
+      "fix": {
+        "replacements": [
+          {
+            "column": 84,
+            "endColumn": 84,
+            "endLine": 65,
+            "insertionPoint": "afterEnd",
+            "line": 65,
+            "precedence": 10,
+            "replacement": "\""
+          },
+          {
+            "column": 91,
+            "endColumn": 91,
+            "endLine": 65,
+            "insertionPoint": "beforeStart",
+            "line": 65,
+            "precedence": 10,
+            "replacement": "\""
+          }
+        ]
+      }
+    },
+    {
+      "file": "benchmarks/milestone_1/unset_var_1/posix.sh",
+      "line": 65,
+      "endLine": 65,
+      "column": 92,
+      "endColumn": 102,
+      "level": "info",
+      "code": 2086,
+      "message": "Double quote to prevent globbing and word splitting.",
+      "fix": {
+        "replacements": [
+          {
+            "column": 92,
+            "endColumn": 92,
+            "endLine": 65,
+            "insertionPoint": "afterEnd",
+            "line": 65,
+            "precedence": 10,
+            "replacement": "\""
+          },
+          {
+            "column": 102,
+            "endColumn": 102,
+            "endLine": 65,
+            "insertionPoint": "beforeStart",
+            "line": 65,
+            "precedence": 10,
+            "replacement": "\""
+          }
+        ]
+      }
+    },
+    {
+      "file": "benchmarks/milestone_1/unset_var_1/posix.sh",
+      "line": 65,
+      "endLine": 65,
+      "column": 103,
+      "endColumn": 113,
+      "level": "info",
+      "code": 2086,
+      "message": "Double quote to prevent globbing and word splitting.",
+      "fix": {
+        "replacements": [
+          {
+            "column": 103,
+            "endColumn": 103,
+            "endLine": 65,
+            "insertionPoint": "afterEnd",
+            "line": 65,
+            "precedence": 10,
+            "replacement": "\""
+          },
+          {
+            "column": 113,
+            "endColumn": 113,
+            "endLine": 65,
+            "insertionPoint": "beforeStart",
+            "line": 65,
+            "precedence": 10,
+            "replacement": "\""
+          }
+        ]
+      }
+    },
+    {
+      "file": "benchmarks/milestone_1/unset_var_1/posix.sh",
+      "line": 65,
+      "endLine": 65,
+      "column": 114,
+      "endColumn": 123,
+      "level": "info",
+      "code": 2086,
+      "message": "Double quote to prevent globbing and word splitting.",
+      "fix": {
+        "replacements": [
+          {
+            "column": 114,
+            "endColumn": 114,
+            "endLine": 65,
+            "insertionPoint": "afterEnd",
+            "line": 65,
+            "precedence": 10,
+            "replacement": "\""
+          },
+          {
+            "column": 123,
+            "endColumn": 123,
+            "endLine": 65,
+            "insertionPoint": "beforeStart",
+            "line": 65,
+            "precedence": 10,
+            "replacement": "\""
+          }
+        ]
+      }
+    },
+    {
+      "file": "benchmarks/milestone_1/unset_var_1/posix.sh",
+      "line": 65,
+      "endLine": 65,
+      "column": 124,
+      "endColumn": 132,
+      "level": "info",
+      "code": 2086,
+      "message": "Double quote to prevent globbing and word splitting.",
+      "fix": {
+        "replacements": [
+          {
+            "column": 124,
+            "endColumn": 124,
+            "endLine": 65,
+            "insertionPoint": "afterEnd",
+            "line": 65,
+            "precedence": 10,
+            "replacement": "\""
+          },
+          {
+            "column": 132,
+            "endColumn": 132,
+            "endLine": 65,
+            "insertionPoint": "beforeStart",
+            "line": 65,
+            "precedence": 10,
+            "replacement": "\""
+          }
+        ]
+      }
+    },
+    {
+      "file": "benchmarks/milestone_1/unset_var_1/posix.sh",
+      "line": 65,
+      "endLine": 65,
+      "column": 133,
+      "endColumn": 143,
+      "level": "info",
+      "code": 2086,
+      "message": "Double quote to prevent globbing and word splitting.",
+      "fix": {
+        "replacements": [
+          {
+            "column": 133,
+            "endColumn": 133,
+            "endLine": 65,
+            "insertionPoint": "afterEnd",
+            "line": 65,
+            "precedence": 10,
+            "replacement": "\""
+          },
+          {
+            "column": 143,
+            "endColumn": 143,
+            "endLine": 65,
+            "insertionPoint": "beforeStart",
+            "line": 65,
+            "precedence": 10,
+            "replacement": "\""
+          }
+        ]
+      }
+    },
+    {
+      "file": "benchmarks/milestone_1/unset_var_1/posix.sh",
+      "line": 65,
+      "endLine": 65,
+      "column": 144,
+      "endColumn": 154,
+      "level": "info",
+      "code": 2086,
+      "message": "Double quote to prevent globbing and word splitting.",
+      "fix": {
+        "replacements": [
+          {
+            "column": 144,
+            "endColumn": 144,
+            "endLine": 65,
+            "insertionPoint": "afterEnd",
+            "line": 65,
+            "precedence": 10,
+            "replacement": "\""
+          },
+          {
+            "column": 154,
+            "endColumn": 154,
+            "endLine": 65,
+            "insertionPoint": "beforeStart",
+            "line": 65,
+            "precedence": 10,
+            "replacement": "\""
+          }
+        ]
+      }
+    },
+    {
+      "file": "benchmarks/milestone_1/unset_var_1/posix.sh",
+      "line": 65,
+      "endLine": 65,
+      "column": 155,
+      "endColumn": 164,
+      "level": "info",
+      "code": 2086,
+      "message": "Double quote to prevent globbing and word splitting.",
+      "fix": {
+        "replacements": [
+          {
+            "column": 155,
+            "endColumn": 155,
+            "endLine": 65,
+            "insertionPoint": "afterEnd",
+            "line": 65,
+            "precedence": 10,
+            "replacement": "\""
+          },
+          {
+            "column": 164,
+            "endColumn": 164,
+            "endLine": 65,
+            "insertionPoint": "beforeStart",
+            "line": 65,
+            "precedence": 10,
+            "replacement": "\""
+          }
+        ]
+      }
+    }
+  ]
+}

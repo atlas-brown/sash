@@ -1,0 +1,412 @@
+{
+  "comments": [
+    {
+      "file": "benchmarks/milestone_1/redir_to_func-redir_to_func/posix.sh",
+      "line": 3,
+      "endLine": 3,
+      "column": 1,
+      "endColumn": 16,
+      "level": "warning",
+      "code": 2034,
+      "message": "DateForFileName appears unused. Verify use (or export if used externally).",
+      "fix": null
+    },
+    {
+      "file": "benchmarks/milestone_1/redir_to_func-redir_to_func/posix.sh",
+      "line": 3,
+      "endLine": 3,
+      "column": 17,
+      "endColumn": 42,
+      "level": "style",
+      "code": 2006,
+      "message": "Use $(...) notation instead of legacy backticks `...`.",
+      "fix": {
+        "replacements": [
+          {
+            "column": 17,
+            "endColumn": 18,
+            "endLine": 3,
+            "insertionPoint": "afterEnd",
+            "line": 3,
+            "precedence": 8,
+            "replacement": "$("
+          },
+          {
+            "column": 41,
+            "endColumn": 42,
+            "endLine": 3,
+            "insertionPoint": "beforeStart",
+            "line": 3,
+            "precedence": 8,
+            "replacement": ")"
+          }
+        ]
+      }
+    },
+    {
+      "file": "benchmarks/milestone_1/redir_to_func-redir_to_func/posix.sh",
+      "line": 7,
+      "endLine": 7,
+      "column": 23,
+      "endColumn": 25,
+      "level": "info",
+      "code": 2086,
+      "message": "Double quote to prevent globbing and word splitting.",
+      "fix": {
+        "replacements": [
+          {
+            "column": 23,
+            "endColumn": 23,
+            "endLine": 7,
+            "insertionPoint": "afterEnd",
+            "line": 7,
+            "precedence": 13,
+            "replacement": "\""
+          },
+          {
+            "column": 25,
+            "endColumn": 25,
+            "endLine": 7,
+            "insertionPoint": "beforeStart",
+            "line": 7,
+            "precedence": 13,
+            "replacement": "\""
+          }
+        ]
+      }
+    },
+    {
+      "file": "benchmarks/milestone_1/redir_to_func-redir_to_func/posix.sh",
+      "line": 11,
+      "endLine": 11,
+      "column": 3,
+      "endColumn": 7,
+      "level": "info",
+      "code": 2162,
+      "message": "read without -r will mangle backslashes.",
+      "fix": null
+    },
+    {
+      "file": "benchmarks/milestone_1/redir_to_func-redir_to_func/posix.sh",
+      "line": 12,
+      "endLine": 12,
+      "column": 8,
+      "endColumn": 23,
+      "level": "info",
+      "code": 2086,
+      "message": "Double quote to prevent globbing and word splitting.",
+      "fix": {
+        "replacements": [
+          {
+            "column": 8,
+            "endColumn": 8,
+            "endLine": 12,
+            "insertionPoint": "afterEnd",
+            "line": 12,
+            "precedence": 11,
+            "replacement": "\""
+          },
+          {
+            "column": 23,
+            "endColumn": 23,
+            "endLine": 12,
+            "insertionPoint": "beforeStart",
+            "line": 12,
+            "precedence": 11,
+            "replacement": "\""
+          }
+        ]
+      }
+    },
+    {
+      "file": "benchmarks/milestone_1/redir_to_func-redir_to_func/posix.sh",
+      "line": 12,
+      "endLine": 12,
+      "column": 24,
+      "endColumn": 35,
+      "level": "info",
+      "code": 2086,
+      "message": "Double quote to prevent globbing and word splitting.",
+      "fix": {
+        "replacements": [
+          {
+            "column": 24,
+            "endColumn": 24,
+            "endLine": 12,
+            "insertionPoint": "afterEnd",
+            "line": 12,
+            "precedence": 11,
+            "replacement": "\""
+          },
+          {
+            "column": 35,
+            "endColumn": 35,
+            "endLine": 12,
+            "insertionPoint": "beforeStart",
+            "line": 12,
+            "precedence": 11,
+            "replacement": "\""
+          }
+        ]
+      }
+    },
+    {
+      "file": "benchmarks/milestone_1/redir_to_func-redir_to_func/posix.sh",
+      "line": 12,
+      "endLine": 12,
+      "column": 50,
+      "endColumn": 53,
+      "level": "info",
+      "code": 2086,
+      "message": "Double quote to prevent globbing and word splitting.",
+      "fix": {
+        "replacements": [
+          {
+            "column": 50,
+            "endColumn": 50,
+            "endLine": 12,
+            "insertionPoint": "afterEnd",
+            "line": 12,
+            "precedence": 11,
+            "replacement": "\""
+          },
+          {
+            "column": 53,
+            "endColumn": 53,
+            "endLine": 12,
+            "insertionPoint": "beforeStart",
+            "line": 12,
+            "precedence": 11,
+            "replacement": "\""
+          }
+        ]
+      }
+    },
+    {
+      "file": "benchmarks/milestone_1/redir_to_func-redir_to_func/posix.sh",
+      "line": 16,
+      "endLine": 16,
+      "column": 2,
+      "endColumn": 6,
+      "level": "info",
+      "code": 2162,
+      "message": "read without -r will mangle backslashes.",
+      "fix": null
+    },
+    {
+      "file": "benchmarks/milestone_1/redir_to_func-redir_to_func/posix.sh",
+      "line": 18,
+      "endLine": 18,
+      "column": 7,
+      "endColumn": 22,
+      "level": "info",
+      "code": 2086,
+      "message": "Double quote to prevent globbing and word splitting.",
+      "fix": {
+        "replacements": [
+          {
+            "column": 7,
+            "endColumn": 7,
+            "endLine": 18,
+            "insertionPoint": "afterEnd",
+            "line": 18,
+            "precedence": 11,
+            "replacement": "\""
+          },
+          {
+            "column": 22,
+            "endColumn": 22,
+            "endLine": 18,
+            "insertionPoint": "beforeStart",
+            "line": 18,
+            "precedence": 11,
+            "replacement": "\""
+          }
+        ]
+      }
+    },
+    {
+      "file": "benchmarks/milestone_1/redir_to_func-redir_to_func/posix.sh",
+      "line": 18,
+      "endLine": 18,
+      "column": 23,
+      "endColumn": 34,
+      "level": "info",
+      "code": 2086,
+      "message": "Double quote to prevent globbing and word splitting.",
+      "fix": {
+        "replacements": [
+          {
+            "column": 23,
+            "endColumn": 23,
+            "endLine": 18,
+            "insertionPoint": "afterEnd",
+            "line": 18,
+            "precedence": 11,
+            "replacement": "\""
+          },
+          {
+            "column": 34,
+            "endColumn": 34,
+            "endLine": 18,
+            "insertionPoint": "beforeStart",
+            "line": 18,
+            "precedence": 11,
+            "replacement": "\""
+          }
+        ]
+      }
+    },
+    {
+      "file": "benchmarks/milestone_1/redir_to_func-redir_to_func/posix.sh",
+      "line": 18,
+      "endLine": 18,
+      "column": 43,
+      "endColumn": 46,
+      "level": "info",
+      "code": 2086,
+      "message": "Double quote to prevent globbing and word splitting.",
+      "fix": {
+        "replacements": [
+          {
+            "column": 43,
+            "endColumn": 43,
+            "endLine": 18,
+            "insertionPoint": "afterEnd",
+            "line": 18,
+            "precedence": 11,
+            "replacement": "\""
+          },
+          {
+            "column": 46,
+            "endColumn": 46,
+            "endLine": 18,
+            "insertionPoint": "beforeStart",
+            "line": 18,
+            "precedence": 11,
+            "replacement": "\""
+          }
+        ]
+      }
+    },
+    {
+      "file": "benchmarks/milestone_1/redir_to_func-redir_to_func/posix.sh",
+      "line": 22,
+      "endLine": 22,
+      "column": 7,
+      "endColumn": 22,
+      "level": "info",
+      "code": 2086,
+      "message": "Double quote to prevent globbing and word splitting.",
+      "fix": {
+        "replacements": [
+          {
+            "column": 7,
+            "endColumn": 7,
+            "endLine": 22,
+            "insertionPoint": "afterEnd",
+            "line": 22,
+            "precedence": 11,
+            "replacement": "\""
+          },
+          {
+            "column": 22,
+            "endColumn": 22,
+            "endLine": 22,
+            "insertionPoint": "beforeStart",
+            "line": 22,
+            "precedence": 11,
+            "replacement": "\""
+          }
+        ]
+      }
+    },
+    {
+      "file": "benchmarks/milestone_1/redir_to_func-redir_to_func/posix.sh",
+      "line": 22,
+      "endLine": 22,
+      "column": 23,
+      "endColumn": 34,
+      "level": "info",
+      "code": 2086,
+      "message": "Double quote to prevent globbing and word splitting.",
+      "fix": {
+        "replacements": [
+          {
+            "column": 23,
+            "endColumn": 23,
+            "endLine": 22,
+            "insertionPoint": "afterEnd",
+            "line": 22,
+            "precedence": 11,
+            "replacement": "\""
+          },
+          {
+            "column": 34,
+            "endColumn": 34,
+            "endLine": 22,
+            "insertionPoint": "beforeStart",
+            "line": 22,
+            "precedence": 11,
+            "replacement": "\""
+          }
+        ]
+      }
+    },
+    {
+      "file": "benchmarks/milestone_1/redir_to_func-redir_to_func/posix.sh",
+      "line": 22,
+      "endLine": 22,
+      "column": 49,
+      "endColumn": 51,
+      "level": "info",
+      "code": 2086,
+      "message": "Double quote to prevent globbing and word splitting.",
+      "fix": {
+        "replacements": [
+          {
+            "column": 49,
+            "endColumn": 49,
+            "endLine": 22,
+            "insertionPoint": "afterEnd",
+            "line": 22,
+            "precedence": 11,
+            "replacement": "\""
+          },
+          {
+            "column": 51,
+            "endColumn": 51,
+            "endLine": 22,
+            "insertionPoint": "beforeStart",
+            "line": 22,
+            "precedence": 11,
+            "replacement": "\""
+          }
+        ]
+      }
+    },
+    {
+      "file": "benchmarks/milestone_1/redir_to_func-redir_to_func/posix.sh",
+      "line": 28,
+      "endLine": 28,
+      "column": 1,
+      "endColumn": 18,
+      "level": "warning",
+      "code": 2164,
+      "message": "Use 'cd ... || exit' or 'cd ... || return' in case cd fails.",
+      "fix": {
+        "replacements": [
+          {
+            "column": 18,
+            "endColumn": 18,
+            "endLine": 28,
+            "insertionPoint": "beforeStart",
+            "line": 28,
+            "precedence": 8,
+            "replacement": " || exit"
+          }
+        ]
+      }
+    }
+  ]
+}
