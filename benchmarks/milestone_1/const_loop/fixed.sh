@@ -9,7 +9,7 @@ NUMSNAPS=$(ls while | awk '{print $1}' | wc -l)
 RETAIN=2
 
 while [ "$RETAIN" -le "$NUMSNAPS" ]; do
-    OLDEST=$(ls | awk '{print $1}' | head -n 1) lol
+    OLDEST=$(ls | awk '{print $1}' | head -n 1)
     rm "$OLDEST"
     NUMSNAPS=$(ls while | awk '{print $1}' | wc -l)
 done

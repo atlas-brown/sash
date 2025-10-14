@@ -9,6 +9,6 @@ NUMSNAPS=$(ls while | awk '{print $1}' | wc -l)
 RETAIN=2
 
 while [ "$RETAIN" -le "$NUMSNAPS" ]; do # bug here: NUMSNAPS is constant (infinite loop)
-    OLDEST=$(ls | awk '{print $1}' | head -n 1) lol
+    OLDEST=$(ls | awk '{print $1}' | head -n 1)
     rm "$OLDEST"
 done
