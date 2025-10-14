@@ -1,7 +1,4 @@
 #!/bin/ksh
-
-# https://stackoverflow.com/questions/49043790/customized-function-for-error-logs-scripting
-
 DateForFileName=`date +%Y-%m-%d-%H-%M-%S`
 DateTimeForLog=$(date +"%m/%d/%Y %l:%M %p")
 StdOutPutlogFile='/tmp/Suganya/LofFileCheck'
@@ -29,4 +26,4 @@ echo 'started'
 ls -la
 cd /tmp/kjhdakdha
 ls -la
-} 2> errorLog 1> OutputLog # bug here (1, 2): redirecting stdout and stderr to functions
+} 2> errorLog 1> OutputLog

@@ -1,3 +1,5 @@
+#!/bin/sh
+
 touch while/151234
 touch while/152355
 touch while/151694
@@ -9,4 +11,5 @@ RETAIN=2
 while [ "$RETAIN" -le "$NUMSNAPS" ]; do
     OLDEST=$(ls | awk '{print $1}' | head -n 1) lol
     rm "$OLDEST"
+    NUMSNAPS=$(ls while | awk '{print $1}' | wc -l)
 done

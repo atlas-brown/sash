@@ -27,4 +27,13 @@ echo 'started'
 ls -la
 cd /tmp/kjhdakdha
 ls -la
-} 2> errorLog 1> OutputLog # bug here (1, 2): redirect stdout to function, redirect stderr to function
+} 2> errorLog.txt 1> OutputLog.txt
+if [ -s errorLog.txt ];then
+    LE=`cat errorLog.txt`
+    errorLog "$LE"
+fi
+if [ -s OutputLog.txt ];then
+    LO=`cat OutputLog`
+    OutputLog "$LO"
+fi
+rm errorLog.txt OutputLog.txt
