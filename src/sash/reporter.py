@@ -1,10 +1,11 @@
-import time
 import logging
+import time
 import traceback
-from enum import Enum
 from abc import ABC
 from dataclasses import dataclass
+from enum import Enum
 from typing import Optional
+
 
 def make_unique(ls):
     return list(set(ls))
@@ -15,6 +16,12 @@ class Report(ABC):
     message : str
     def __repr__(self) -> str:
         return f"{self.code}:{self.message}"
+
+    def to_dict(self) -> dict:
+        return {
+            "code": self.code,
+            "message": self.message
+        }
 
 class Error(Report):
     pass
@@ -56,9 +63,8 @@ class RedirectToFunction(Warning):
         super().__init__("redir_func",f"redirecting output to {function_name}, which is a function, actually writes to a file with that name")
 
 class Reporter:
-    # Have this as a list even despite duplications for now
     _filename = ""
-    _error_messages:list[tuple[str,str]] = []
+    _errors: set[Report]
     _start_time = time.monotonic()
     _solver_time : float = 0
 
@@ -66,12 +72,13 @@ class Reporter:
     def initialize(cls,filename:str):
         cls._filename = filename
         cls._error_messages:list[tuple[str,str]] = []
+        cls._errors = set()
         cls._start_time = time.monotonic()
         cls._solver_time : float = 0
 
     @classmethod
     def add_error(cls,rep:Report):
-        cls._error_messages.append((rep.code,rep.message))
+        cls._errors.add(rep)
 
     @classmethod
     def get_report(cls) -> dict:
@@ -79,7 +86,7 @@ class Reporter:
         time_elapsed = round(end_time - cls._start_time,2)
         dct = {
             "filename": cls._filename,
-            "error_messages": make_unique(cls._error_messages),
+            "errors": [e.to_dict() for e in cls._errors],
             "time" : time_elapsed,
             "solver_time" : cls._solver_time,
         }

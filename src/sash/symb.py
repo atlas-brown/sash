@@ -549,8 +549,9 @@ def argmain():
     filename = arg_dict["filename"]
     logging.debug(f"Full filename is {os.path.realpath(filename)}")
     report_dict = main(filename)
-    print(json.dumps(report_dict))
+    print(json.dumps(report_dict, indent=2))
 
 
 if __name__ == "__main__":
     argmain()
+
