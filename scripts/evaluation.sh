@@ -19,13 +19,19 @@ while read -r benchmark; do
     echo "Running benchmark: $benchmark"
     output=$(uv run sash "$benchmark")
 
-    # Input: { "errors": [ { "code": ... }, ... ] }
-    # Output: [ { "code": ... }, ... ]
-    expected=$(jq --sort-keys '.errors' "$(dirname "$benchmark")/ground_truth.json")
+    if [ ! -f "$(dirname "$benchmark")/ground_truth.json" ]; then
+        # No ground truth, just print the output
+        echo "$output"
+        continue
+    fi
 
-    # Input: { ..., "errors": [ { "code": ..., message: ... }, ... ] }
+    # Input: { ..., "errors": [ { "code": ..., ... }, ... ] }
     # Output: [ { "code": ... }, ... ]
-    actual=$(echo "$output" | jq --sort-keys '[.errors[] | {code}]' 2>/dev/null)
+    expected=$(jq --sort-keys '[.errors[] | {code}]' "$(dirname "$benchmark")/ground_truth.json")
+
+    # Input: { ..., "errors": [ { "code": ..., ... }, ... ] }
+    # Output: [ { "code": ... }, ... ]
+    actual=$(echo "$output" | jq --sort-keys '[.errors[] | {code}]')
 
     if [ "$expected" != "$actual" ]; then
         echo "Unexpected output:"
