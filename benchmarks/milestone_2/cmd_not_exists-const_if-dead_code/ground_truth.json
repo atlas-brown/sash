@@ -12,7 +12,7 @@
             "shellcheck": {
                 "detects": true,
                 "code": "SC2154",
-                "note": "ShellCheck detects and warns that `directorytocopy` is referenced but not assigned."
+                "note": "ShellCheck detects the bug and warns that `directorytocopy` is referenced but not assigned."
             }
         },
         {

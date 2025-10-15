@@ -12,7 +12,7 @@
             "shellcheck": {
                 "detects": true,
                 "code": "SC2153",
-                "note": "ShellCheck detects and suggests that \"Possible misspelling: OPTARGS may not be assigned. Did you mean OPTARG?\""
+                "note": "ShellCheck detects the bug and suggests that \"Possible misspelling: OPTARGS may not be assigned. Did you mean OPTARG?\""
             }
         },
         {

@@ -1,0 +1,12 @@
+{
+    "errors": [
+        {
+            "code": "exit_code_check",
+            "shellcheck": {
+                "detects": true,
+                "code": "SC2182",
+                "note": "ShellCheck detects the bug and suggests to \"Check exit code directly with e.g. 'if ! mycmd;', not indirectly with $?.\""
+            }
+        }
+    ]
+}

@@ -1,0 +1,12 @@
+{
+    "errors": [
+        {
+            "code": "del_sys_dir",
+            "shellcheck": {
+                "detects": true,
+                "code": "SC2115",
+                "note": "ShellCheck detects the catastrophic bug at `rm -rf $N_PREFIX/$d` and suggests to \"Use ${var:?} to ensure this never expands to / .\""
+            }
+        }
+    ]
+}

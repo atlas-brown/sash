@@ -1,0 +1,19 @@
+{
+    "errors": [
+        {
+            "code": "possibly_empty_var",
+            "shellcheck": {
+                "detects": false,
+                "note": "ShellCheck does not detect the possibility of the `STEAMROOT` variable being empty at `STEAMROOT=\"$(cd \"${0%/*}\" && echo $PWD)\"`."
+            }
+        },
+        {
+            "code": "del_sys_dir_with_wildcard",
+            "shellcheck": {
+                "detects": true,
+                "code": "SC2115",
+                "note": "ShellCheck detects the catastrophic bug at `rm -rf \"$STEAMROOT/*\"` and suggests to \"Use ${var:?} to ensure this never expands to / .\""
+            }
+        }
+    ]
+}
