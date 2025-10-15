@@ -1,0 +1,11 @@
+{
+    "errors": [
+        {
+            "code": "unbound",
+            "shellcheck": {
+                "detects": true,
+                "code": "SC2154"
+            }
+        }
+    ]
+}

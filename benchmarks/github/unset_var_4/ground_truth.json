@@ -1,0 +1,11 @@
+{
+    "errors": [
+        {
+            "code": "unbound",
+            "shellcheck": {
+                "detects": false,
+                "note": "variable in caps"
+            }
+        }
+    ]
+}
