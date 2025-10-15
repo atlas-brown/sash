@@ -1,10 +1,18 @@
 {
     "errors": [
         {
-            "code": "loop_once"
+            "code": "loop_once",
+            "shellcheck": {
+                "detects": false,
+                "note": "ShellCheck does not detect loops that run only once due to a lack of globbing that leads to a single iteration."
+            }
         },
         {
-            "code": "loop_once"
+            "code": "loop_once",
+            "shellcheck": {
+                "detects": false,
+                "note": "ShellCheck does not detect loops that run only once due to a lack of globbing that leads to a single iteration."
+            }
         }
     ]
 }

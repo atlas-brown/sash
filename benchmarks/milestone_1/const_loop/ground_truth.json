@@ -4,7 +4,7 @@
             "code": "infinite_loop",
             "shellcheck": {
                 "detects": false,
-                "note": "ShellCheck does not detect infinite loops that are due to constant (fixed) variables."
+                "note": "ShellCheck does not detect infinite loops that are due to the constant condition always being true."
             }
         }
     ]

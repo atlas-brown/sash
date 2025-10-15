@@ -1,7 +1,11 @@
 {
     "errors": [
         {
-            "code": "loop_once"
+            "code": "loop_once",
+            "shellcheck": {
+                "detects": false,
+                "note": "ShellCheck does not detect loops that run only once due to the erroneous comma-separated list of variables."
+            }
         }
     ]
 }

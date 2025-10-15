@@ -1,34 +1,84 @@
 {
     "errors": [
         {
-            "code": "del_sys_file"
+            "code": "del_sys_file",
+            "shellcheck": {
+                "detects": false,
+                "code": "SC2115",
+                "note": "Even though ShellCheck does warn that \"Use \"${var:?}\" to ensure this never expands to /* .,\" it does not specifically warn about deleting files in the root directory."
+            }
         },
         {
-            "code": "del_sys_file"
+            "code": "del_sys_file",
+            "shellcheck": {
+                "detects": false,
+                "code": "SC2115",
+                "note": "Even though ShellCheck suggests to \"Use 'cd ... || exit' or 'cd ... || return' in case cd fails.,\" it does not detect that the arguments to `cd` are too many."
+            }
         },
         {
-            "code": "word_split"
+            "code": "word_split",
+            "shellcheck": {
+                "detects": true,
+                "code": "SC2086",
+                "note": "ShellCheck detects and suggests to \"Double quote to prevent globbing and word splitting.\""
+            }
         },
         {
-            "code": "unbound"
+            "code": "unbound",
+            "shellcheck": {
+                "detects": true,
+                "code": "SC1127",
+                "note": "ShellCheck detects and warns about the erroneous use `//` that intends to writing comment but instead triggers `//` being interpreted as a command."
+            }
         },
         {
-            "code": "unbound"
+            "code": "unbound",
+            "shellcheck": {
+                "detects": true,
+                "code": "SC1127",
+                "note": "ShellCheck detects and warns about the erroneous use `//` that intends to writing comment but instead triggers `//` being interpreted as a command."
+            }
         },
         {
-            "code": "unbound"
+            "code": "unbound",
+            "shellcheck": {
+                "detects": true,
+                "code": "SC1127",
+                "note": "ShellCheck detects and warns about the erroneous use `//` that intends to writing comment but instead triggers `//` being interpreted as a command."
+            }
         },
         {
-            "code": "unbound"
+            "code": "unbound",
+            "shellcheck": {
+                "detects": true,
+                "code": "SC1127",
+                "note": "ShellCheck detects and warns about the erroneous use `//` that intends to writing comment but instead triggers `//` being interpreted as a command."
+            }
         },
         {
-            "code": "unbound"
+            "code": "unbound",
+            "shellcheck": {
+                "detects": true,
+                "code": "SC1127",
+                "note": "ShellCheck detects and warns about the erroneous use `//` that intends to writing comment but instead triggers `//` being interpreted as a command."
+            }
         },
         {
-            "code": "unbound"
+            "code": "unbound",
+            "shellcheck": {
+                "detects": true,
+                "code": "SC1127",
+                "note": "ShellCheck detects and warns about the erroneous use `//` that intends to writing comment but instead triggers `//` being interpreted as a command."
+            }
         },
         {
-            "code": "unbound"
+            "code": "unbound",
+            "shellcheck": {
+                "detects": true,
+                "code": "SC1127",
+                "note": "ShellCheck detects and warns about the erroneous use `//` that intends to writing comment but instead triggers `//` being interpreted as a command."
+            }
         }
     ]
 }
