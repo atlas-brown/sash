@@ -5,7 +5,8 @@
             "shellcheck": {
                 "detects": true,
                 "code": "SC2115",
-                "note": "ShellCheck detects the catastrophic bug at `rm -rf $SQUID_PIDFILE_DIR/*` and suggests to \"Use ${var:?} to ensure this never expands to / .\""
+                "where": "rm -rf $SQUID_PIDFILE_DIR/*",
+                "note": "ShellCheck detects the catastrophic bug and suggests to \"Use ${var:?} to ensure this never expands to / .\""
             }
         }
     ]

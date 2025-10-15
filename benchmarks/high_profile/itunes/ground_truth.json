@@ -5,6 +5,7 @@
             "shellcheck": {
                 "detects": true,
                 "code": "SC2086",
+                "where": "rm -rf $2Applications/iTunes.app",
                 "note": "ShellCheck suggests to \"Double quote to prevent globbing and word splitting.\" at `rm -rf $2Applications/iTunes.app`"
             }
         }

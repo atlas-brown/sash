@@ -5,6 +5,7 @@
             "shellcheck": {
                 "detects": true,
                 "code": "SC2182",
+                "where": "if [ $? -gt 0 ];",
                 "note": "ShellCheck detects the bug and suggests to \"Check exit code directly with e.g. 'if ! mycmd;', not indirectly with $?.\""
             }
         }

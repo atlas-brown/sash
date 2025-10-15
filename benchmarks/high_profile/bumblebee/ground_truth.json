@@ -5,6 +5,7 @@
             "shellcheck": {
                 "detects": true,
                 "code": "SC2114",
+                "where": "rm -rf /usr /lib/nvidia-current/xorg/xorg",
                 "note": "ShellCheck detects the bug and warns that \"Warning: deletes a system directory.\""
             }
         }
