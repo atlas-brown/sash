@@ -4,14 +4,16 @@
             "code": "redir_func",
             "shellcheck": {
                 "detects": false,
-                "note": "ShellCheck does not detect that a (standard-error) redirection to a function is invalid."
+                "where": "2> errorLog",
+                "note": "ShellCheck fails to detect that a (standard-error) redirection to a function is invalid."
             }
         },
         {
             "code": "redir_func",
             "shellcheck": {
                 "detects": false,
-                "note": "ShellCheck does not detect that a (standard-output) redirection to a function is invalid."
+                "where": "1> OutputLog",
+                "note": "ShellCheck fails to detect that a (standard-output) redirection to a function is invalid."
             }
         }
     ]

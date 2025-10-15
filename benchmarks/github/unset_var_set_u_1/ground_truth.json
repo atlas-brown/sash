@@ -1,0 +1,12 @@
+{
+    "errors": [
+        {
+            "code": "fail_immediately_after_detecting_unset_var",
+            "shellcheck": {
+                "detects": false,
+                "where": "if [ -z \"${TEST_VM_NODE_NAMES}\" ];",
+                "note": "`set -u` informs the shell to treat unset variables as an error and immediately exit during command substitution, which is not the developers' intention here. ShellCheck fails to take this into account."
+            }
+        }
+    ]
+}

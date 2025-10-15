@@ -5,7 +5,7 @@
             "shellcheck": {
                 "detects": true,
                 "code": "SC2153",
-                "where": "$file",
+                "where": "$_source",
                 "note": "ShellCheck detects that the variable is referenced without being assigned."
             }
         }

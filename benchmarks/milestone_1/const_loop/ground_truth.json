@@ -4,7 +4,8 @@
             "code": "infinite_loop",
             "shellcheck": {
                 "detects": false,
-                "note": "ShellCheck does not detect infinite loops that are due to the constant condition always being true."
+                "where": "while [ \"$RETAIN\" -le \"$NUMSNAPS\" ]; do",
+                "note": "ShellCheck fails to detect infinite loops that are due to the constant condition always being true."
             }
         }
     ]

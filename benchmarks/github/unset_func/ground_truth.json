@@ -1,0 +1,13 @@
+{
+    "errors": [
+        {
+            "code": "function_declared_later",
+            "shellcheck": {
+                "detects": true,
+                "code": "SC2218",
+                "where": "git_compare_version \"1.7.2\"",
+                "note": "ShellCheck detects that the function is used before it is declared."
+            }
+        }
+    ]
+}

@@ -4,14 +4,16 @@
             "code": "unbound",
             "shellcheck": {
                 "detects": false,
-                "note": "ShellCheck does not detect that `Application Support` is supposed to be part of a path but is not quoted, which leads to a command-not-found error since `Support` is treated as an argument."
+                "where": "directorytocopy=/Users/myname/Library/Application Support",
+                "note": "ShellCheck fails to detect that `Application Support` is supposed to be part of a path but is not quoted, which leads to a command-not-found error since `Support` is treated as an argument."
             }
         },
         {
-            "code": "const_cond",
+            "code": "condition_always_true",
             "shellcheck": {
                 "detects": true,
                 "code": "SC2154",
+                "where": "if [ ! -d \"$directorytocopy\" ]:",
                 "note": "ShellCheck detects the bug and warns that `directorytocopy` is referenced but not assigned."
             }
         },
@@ -19,7 +21,8 @@
             "code": "dead_code",
             "shellcheck": {
                 "detects": false,
-                "note": "ShellCheck does not detect that the code is dead because it is unreachable due to the previous errors."
+                "where": "mkdir -p \"$backuptodirectory\"",
+                "note": "ShellCheck fails to detect that the code is dead because it is unreachable due to the previous errors."
             }
         }
     ]

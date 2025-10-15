@@ -4,7 +4,8 @@
             "code": "wrong_sed_range",
             "shellcheck": {
                 "detects": false,
-                "note": "ShellCheck does not detect that the command misses a comma between `1` and `$n`, which yields an incorrect range."
+                "where": "`\"1 $n d\"`",
+                "note": "ShellCheck fails to detect that the command misses a comma between `1` and `$n`, which yields an incorrect range."
             }
         }
     ]

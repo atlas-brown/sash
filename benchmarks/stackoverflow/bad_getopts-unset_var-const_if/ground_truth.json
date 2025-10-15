@@ -4,7 +4,8 @@
             "code": "missing_colon",
             "shellcheck": {
                 "detects": false,
-                "note": "ShellCheck does not detect that the option string misses a colon after `n`, which erroneously informs `getopts` that `-n` does not take an argument, and thus does not set the variable `$OPTARG`."
+                "where": ":i:x:n",
+                "note": "ShellCheck fails to detect that the option string misses a colon after `n`, which erroneously informs `getopts` that `-n` does not take an argument, and thus does not set the variable `$OPTARG`."
             }
         },
         {
@@ -12,6 +13,7 @@
             "shellcheck": {
                 "detects": true,
                 "code": "SC2153",
+                "where": "$OPTARGS",
                 "note": "ShellCheck detects the bug and suggests that \"Possible misspelling: OPTARGS may not be assigned. Did you mean OPTARG?\""
             }
         },
@@ -19,7 +21,8 @@
             "code": "wrong_dir_check",
             "shellcheck": {
                 "detects": false,
-                "note": "ShellCheck does not detect that the intention is to check if the directory exists, which should be done with `[ -d \"$OPTARG\" ]` instead of `[ -f \"$OPTARG\" ]`, and thus `mkdir` always fails because the directory does not exist."
+                "where": "if [ ! \"$dirName\" ]",
+                "note": "ShellCheck fails to detect that the intention is to check if the directory exists, which should be done with `[ -d \"$OPTARG\" ]` instead of `[ -f \"$OPTARG\" ]`, and thus `mkdir` always fails because the directory does not exist."
             }
         }
     ]

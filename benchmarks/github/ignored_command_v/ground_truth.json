@@ -1,0 +1,20 @@
+{
+    "errors": [
+        {
+            "code": "erroneous_command_check",
+            "shellcheck": {
+                "detects": false,
+                "where": "command -v zsh",
+                "note": "ShellCheck fails to detect the developer's intention to check for the absence of the `zsh` command. The command instead checks for its presence, which would always lead to abrupt termination if `zsh` is installed."
+            }
+        },
+        {
+            "code": "zsh_used_even_if_not_installed",
+            "shellcheck": {
+                "detects": false,
+                "where": "env zsh",
+                "note": "ShellCheck fails to detect that the script attempts to invoke `zsh` even if it is not installed, which may lead to a runtime error."
+            }
+        }
+    ]
+}

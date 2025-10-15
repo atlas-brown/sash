@@ -4,14 +4,16 @@
             "code": "loop_once",
             "shellcheck": {
                 "detects": false,
-                "note": "ShellCheck does not detect loops that run only once due to a lack of globbing that leads to a single iteration."
+                "where": "for directory in \"$DIR\"; do",
+                "note": "ShellCheck fails to detect loops that run only once due to a lack of globbing that leads to a single iteration."
             }
         },
         {
             "code": "loop_once",
             "shellcheck": {
                 "detects": false,
-                "note": "ShellCheck does not detect loops that run only once due to a lack of globbing that leads to a single iteration."
+                "where": "for filename in \"$directory\";",
+                "note": "ShellCheck fails to detect loops that run only once due to a lack of globbing that leads to a single iteration."
             }
         }
     ]

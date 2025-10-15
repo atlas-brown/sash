@@ -4,7 +4,7 @@
             "code": "unbound",
             "shellcheck": {
                 "detects": false,
-                "where": "${NODE_VERSION}",
+                "where": "$cwd",
                 "note": "ShellCheck fails to detect that the variable is referenced without being assigned."
             }
         }

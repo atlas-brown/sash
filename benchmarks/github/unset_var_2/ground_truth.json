@@ -4,7 +4,9 @@
             "code": "unbound",
             "shellcheck": {
                 "detects": true,
-                "code": "SC2154"
+                "code": "SC2154",
+                "where": "${file}",
+                "note": "ShellCheck detects that the variable is referenced without being assigned."
             }
         }
     ]

@@ -5,21 +5,24 @@
             "shellcheck": {
                 "detects": false,
                 "code": "SC2164",
-                "note": "Even though ShellCheck suggests to \"Use 'cd ... || exit' or 'cd ... || return' in case cd fails.,\" it does not detect that `ZSH` is unbound/unset."
+                "where": "cd \"$ZSH\"",
+                "note": "Even though ShellCheck suggests to \"Use 'cd ... || exit' or 'cd ... || return' in case cd fails.,\" it fails to detect that `ZSH` is unbound/unset."
             }
         },
         {
             "code": "unbound",
             "shellcheck": {
                 "detects": false,
-                "note": "ShellCheck does not detect that `NORMAL` is unbound/unset."
+                "where": "printf \"${BLUE}%s${NORMAL}\n\" \"Updating Oh My Zsh\"",
+                "note": "ShellCheck fails to detect that `NORMAL` is unbound/unset."
             }
         },
         {
             "code": "unbound",
             "shellcheck": {
                 "detects": false,
-                "note": "ShellCheck does not detect that `RB_RESET` is unbound/unset."
+                "where": "printf '%s         %s__      %s           %s        %s       %s     %s__   %s\n' $RB_RED $RB_ORANGE $RB_YELLOW $RB_GREEN $RB_BLUE $RB_INDIGO $RB_VIOLET $RB_RESET",
+                "note": "ShellCheck fails to detect that `RB_RESET` is unbound/unset."
             }
         }
     ]

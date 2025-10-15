@@ -1,0 +1,13 @@
+{
+    "errors": [
+        {
+            "code": "var_might_be_empty_but_expected",
+            "shellcheck": {
+                "detects": "undetermined",
+                "code": "SC2086",
+                "where": "$DYLD_LIBRARY_PATH",
+                "note": "ShellCheck does suggest to \"Double quote to prevent globbing and word splitting.,\" but it does not explicitly warn about the variable possibly being empty."
+            }
+        }
+    ]
+}
