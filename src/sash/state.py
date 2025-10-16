@@ -55,13 +55,21 @@ class CompletelyArbitrary:
     source: FrozenAst
     kind: ArbitraryType
     producing_state: Optional['State'] # shouldn't ever result in cyclic data, because the state that is used to compute an arbitrary value should only ever be an ancester of the state the stores it, but beware
+    prefix: Optional[SymStr] = None
+    suffix: Optional[SymStr] = None
 
     def __eq__(self, other):
+        # If the state producing this is unknown, conservatively say it can't be equal to any other
         return isinstance(other, CompletelyArbitrary) \
             and self.source == other.source \
             and self.kind == other.kind \
             and self.producing_state == other.producing_state \
-            and self.producing_state is not None # If the state producing this is unknown, conservatively say it can't be equal to any other
+            and self.producing_state is not None \
+            and self.prefix == other.prefix \
+            and self.suffix == other.suffix
+
+    def __repr__(self):
+        return f"CompletelyArbitrary(s`{repr(self.source)[:30]}`, {self.kind}, state<{hash(self.producing_state)}>, pre:{self.prefix}, suf:{self.suffix})"
 
 @dataclass(frozen=True)
 class WordCount:

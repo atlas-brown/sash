@@ -7,6 +7,7 @@ import sys
 import traceback
 from argparse import ArgumentParser
 from typing import Any, Dict, List, Optional, Set
+from sash.util import *
 import shasta.ast_node as AST
 from sash.frozen import FrozenAst, freeze, freeze_thing
 from sash.shell_parser import *
@@ -20,6 +21,10 @@ def handle_commandnode(traces: Traces,
                        node: AST.CommandNode,
                        info: ScriptInfo,
                        cb: Optional[Callable[[list[Field]], None]]) -> Traces:
+
+    def is_protected(path):
+        return any(path in [p, p + "/", p + "/*"] for p in Config.get("PROTECTED_PATHS"))
+
     logging.debug(f"Handling command node {trim_string_for_logging(node.pretty())} with {len(traces)} traces")
     t1, expanded_args = expand_args_dumb(traces, node.arguments, info)
 
@@ -27,11 +32,17 @@ def handle_commandnode(traces: Traces,
         logging.debug(f"Handling command {cmd_name} with args {expanded_args[1:]}")
         if cmd_name == "rm":
             for arg_field in expanded_args[1:]:
-                if (path := field_to_str(arg_field)) \
-                   and any(path in [p, p + "/", p + "/*"] for p in Config.get("PROTECTED_PATHS")):
+                if (path := field_to_str(arg_field)) and is_protected(path):
                     Reporter.add_error(reporter.DeleteSystemFile(path))
-                elif isinstance(arg_field.content, CompletelyArbitrary) and arg_field.count.max > 1:
-                    Reporter.add_error(reporter.DangerousWordSplit(arg_field.content.source.pretty()))
+                match arg_field:
+                    case Field(CompletelyArbitrary(source=source), WordCount(max=m)) if m > 1:
+                        Reporter.add_error(reporter.DangerousWordSplit(source))
+                match arg_field:
+                    case Field(CompletelyArbitrary(prefix=pre, suffix=suf), WordCount(min, max)) if min == 0 or max > 1:
+                        if pre is not None and (path := symb_utils.symbstr_to_str(pre.parts)) and is_protected(path):
+                            Reporter.add_error(reporter.DeleteSystemFile(path))
+                        if suf is not None and (path := symb_utils.symbstr_to_str(suf.parts)) and is_protected(path):
+                            Reporter.add_error(reporter.DeleteSystemFile(path))
     t2 = t1
     for redir in node.redir_list:
         t2 = t2.extend(guarded_interp_node(t1, redir, info)) or t2
@@ -174,24 +185,30 @@ def expand(traces: Traces, stuff: list[AST.ArgChar], info: ScriptInfo) -> list[t
         #     res.append((trace, [arbitrary_field(stuff)]))
     return res
 
+# Different fields are definitely separated; things within a field *may be separated as well!*
 def expand_simple(stuff: list[AST.ArgChar], state: State, info: ScriptInfo) -> list[Field]:
     IFS = " \t\n"
 
     def expand_inner(chars: list[AST.ArgChar], quoted: bool = False) -> list[Field]:
-        res = []
+        ## Notes on what's happening here:
+        # Need to build up fields with individual characters, and also SymStrs that we come across
+        # Along the way, will see some CompletelyArbitrarys
+        # The CompletelyArbitrarys kind of soak up the whole field -- if any part of a final field
+        # is arbitrary, then the whole field is arbitrary
+        # BUT -- we can preserve some info that will lead to better error messages:
+        # if there's some SymStr that's being prepended or appended to an arbitrary thing, we can
+        # record that the SymStr is a known prefix or suffix of the arbitrary thing
+        combined_fields_so_far: list[Field | None] = [] # None's mean a hard break due to IFS
         field_so_far: list[str | SymVar] = []
         field_so_far_words_min: int = 1
         field_so_far_words_max: int | float = 1
 
         def add_a_field(one_field: Field) -> None:
-            nonlocal field_so_far, field_so_far_words_min, field_so_far_words_max, res
+            nonlocal field_so_far, field_so_far_words_min, field_so_far_words_max, combined_fields_so_far
             match one_field.content:
                 case CompletelyArbitrary():
-                    field_so_far = []
-                    field_so_far_words_min = 1
-                    field_so_far_words_max = 1
-                    # TODO this is technically not right, if there are more arbitrary fields later the end result field should be a whole new arbitrary field
-                    res.append(one_field)
+                    finish_field_so_far()
+                    combined_fields_so_far.append(one_field)
                 case SymStr(parts):
                     field_so_far.extend(parts)
                     if one_field.count.min > 1:
@@ -199,20 +216,23 @@ def expand_simple(stuff: list[AST.ArgChar], state: State, info: ScriptInfo) -> l
                     if one_field.count.max > 1:
                         field_so_far_words_max += one_field.count.max - 1
 
-        def finish_field_so_far() -> None:
-            nonlocal field_so_far, res
-            res.append(Field(SymStr(tuple(field_so_far)).simplify(),
-                             WordCount(field_so_far_words_min, field_so_far_words_max)))
-            field_so_far = []
+        def finish_field_so_far(IFS: bool = False) -> None:
+            nonlocal field_so_far, field_so_far_words_min, field_so_far_words_max, combined_fields_so_far
+            if field_so_far != []:
+                combined_fields_so_far.append(Field(SymStr(tuple(field_so_far)).simplify(),
+                                                    WordCount(field_so_far_words_min, field_so_far_words_max)))
+                if IFS:
+                    combined_fields_so_far.append(None)
+                field_so_far = []
+                field_so_far_words_min = 1
+                field_so_far_words_max = 1
 
         for argchar in chars:
             match argchar:
                 # todo what about globs?
                 case AST.CArgChar() as c:
                     if not quoted and c.pretty() in IFS:
-                        # end this field
-                        if field_so_far != []:
-                            finish_field_so_far()
+                        finish_field_so_far(True)
                     else:
                         field_so_far.append(c.pretty(AST.QUOTED if quoted else AST.UNQUOTED))
                 case AST.EArgChar() as c:
@@ -228,9 +248,12 @@ def expand_simple(stuff: list[AST.ArgChar], state: State, info: ScriptInfo) -> l
                         else:
                             logging.info(f"expansion: treating var {var.pretty()} with unhandled fmt {var.fmt} as completely arbitrary field")
                             add_a_field(arbitrary_field(var, ArbitraryType.APPROXIMATION, state))
-                    elif not is_special_var(var.var):
-                        Reporter.add_error(reporter.UnboundID(var.pretty())) # todo we should report path information
-                        add_a_field(arbitrary_field(var, ArbitraryType.ENVIRONMENT, state)) # todo worth recording somehow that the value comes from the environment?
+                    else:
+                        if not is_special_var(var.var):
+                            Reporter.add_error(reporter.UnboundID(var.pretty())) # todo we should report path information
+                        add_a_field(arbitrary_field(var,
+                                                    ArbitraryType.APPROXIMATION if is_special_var(var.var) else ArbitraryType.ENVIRONMENT,
+                                                    state))
                 case AST.BArgChar() as b:
                     logging.info(f"expansion: treating backquote argchar {b.pretty()} as completely arbitrary field")
                     add_a_field(arbitrary_field(b, ArbitraryType.APPROXIMATION, state))
@@ -242,10 +265,11 @@ def expand_simple(stuff: list[AST.ArgChar], state: State, info: ScriptInfo) -> l
                     logging.info(f"expansion: treating unhandled argchar as completely arbitrary field: {argchar.pretty()}")
                     add_a_field(arbitrary_field(argchar, ArbitraryType.APPROXIMATION, state))
 
-        if field_so_far != []:
-            finish_field_so_far()
+        finish_field_so_far()
 
-        return res
+        # Join the combined fields so far, folding symstrs into arbitrary fields as prefixes and suffixes
+        split = split_at(combined_fields_so_far, None)
+        return [merge_partial_fields(part, None, state) for part in split if part != []]
 
     return expand_inner(stuff)
 
@@ -303,20 +327,71 @@ def arbitrary_field(ast: AST.AstNode, kind: ArbitraryType, producing_state: Opti
                  WordCount(0, inf))
 
 def join_fields(fields: list[Field]) -> Field:
-    content = []
-    min_words = 0
-    max_words = 0
-    for field in fields:
-        match field.content:
-            case SymStr(parts):
-                content.extend(parts)
-                min_words += field.count.min
-                max_words += field.count.max
-            case CompletelyArbitrary(_):
-                # TODO: this is not quite sound! If there are multiple arbitrary fields, we need to make a new one...
-                return field
+    """Join a list of fields into one field that approximates all of them."""
+    return merge_partial_fields(fields, sep=" ", state=None)
 
-    return Field(SymStr(tuple(content)), WordCount(min_words, max_words))
+def merge_partial_fields(fields: list[Field], sep: Optional[str] = " ", state: Optional[State] = None) -> Field:
+    """Merge a list of partial fields into one field, merging SymStrs and folding them into CompletelyArbitrarys as prefixes or suffixes."""
+
+    def merge_symstrs(symstrs: list[Field]) -> Field:
+        assert all(isinstance(f.content, SymStr) for f in symstrs)
+        match symstrs:
+            case []:
+                return Field(SymStr(()), WordCount(0, 0))
+            case [one]:
+                return one
+            case [Field(SymStr(parts), c), *rest]:
+                content = parts
+                count = c
+                for field in rest:
+                    content = content + ((sep,) if sep else ()) + field.content.parts # type: ignore (field.content is SymStr due to assert above)
+                    count = merge_counts(count, field.count, 1 if sep else 0)
+                return Field(SymStr(tuple(content)), count)
+            case _:
+                assert False, "unreachable"
+
+    def collect_prefixes_suffixes(fields: list[Field]) -> tuple[Field | None, Field | None]:
+        prefixes = []
+        for field in fields:
+            if isinstance(field.content, SymStr):
+                prefixes.append(field)
+            else:
+                break
+        suffixes = []
+        for field in reversed(fields):
+            if isinstance(field.content, SymStr):
+                suffixes.append(field)
+            else:
+                break
+        return (merge_symstrs(prefixes) if prefixes else None,
+                merge_symstrs(suffixes) if suffixes else None)
+
+    num_arbitraries = sum(1 for field in fields if isinstance(field.content, CompletelyArbitrary))
+    if num_arbitraries == 0:
+        # just join the symstrs
+        return merge_symstrs(fields)
+    elif num_arbitraries == 1:
+        arbitrary = [field for field in fields if isinstance(field.content, CompletelyArbitrary)][0]
+        prefix, suffix = collect_prefixes_suffixes(fields)
+        if prefix is not None:
+            arbitrary = add_prefix(arbitrary, prefix)
+        if suffix is not None:
+            arbitrary = add_suffix(arbitrary, suffix)
+        return arbitrary
+    else:
+        # multiple arbitraries -- give up and return a new arbitrary field
+        arbitraries = [field for field in fields if isinstance(field.content, CompletelyArbitrary)]
+        prefix, suffix = collect_prefixes_suffixes(fields)
+        arbitrary = Field(CompletelyArbitrary(freeze_thing([a.content.source for a in arbitraries]), # type: ignore
+                                              ArbitraryType.APPROXIMATION,
+                                              state),
+                          WordCount(0, inf))
+        if prefix is not None:
+            arbitrary = add_prefix(arbitrary, prefix)
+        if suffix is not None:
+            arbitrary = add_suffix(arbitrary, suffix)
+        return arbitrary
+
 
 def collapse_fields(fields: List[Field], source: AST.AstNode | None = None) -> Field:
     """Collapse alternative versions of a field into one field abstracting over all of them."""
@@ -331,6 +406,30 @@ def collapse_fields(fields: List[Field], source: AST.AstNode | None = None) -> F
                                          ArbitraryType.APPROXIMATION,
                                          None),
                      WordCount(min_words, max_words))
+
+def add_prefix(arbitrary_field: Field, prefix_symstr: Field) -> Field:
+    match (arbitrary_field, prefix_symstr):
+        case (Field(CompletelyArbitrary(prefix=None) as a, acount),
+              Field(SymStr() as s, scount)):
+            return Field(replace(a, prefix=s), merge_counts(acount, scount))
+        case (Field(CompletelyArbitrary(prefix=SymStr(pre_parts)) as a, acount),
+              Field(SymStr(more_parts) as s, scount)):
+            return Field(replace(a, prefix=SymStr(more_parts + pre_parts)), merge_counts(acount, scount))
+        case _:
+            assert False, "unreachable"
+def add_suffix(arbitrary_field: Field, suffix_symstr: Field) -> Field:
+    match (arbitrary_field, suffix_symstr):
+        case (Field(CompletelyArbitrary(suffix=None) as a, acount),
+              Field(SymStr() as s, scount)):
+            return Field(replace(a, suffix=s), merge_counts(acount, scount))
+        case (Field(CompletelyArbitrary(suffix=SymStr(suf_parts)) as a, acount),
+              Field(SymStr(more_parts) as s, scount)):
+            return Field(replace(a, suffix=SymStr(suf_parts + more_parts)), merge_counts(acount, scount))
+        case _:
+            assert False, "unreachable"
+def merge_counts(c1: WordCount, c2: WordCount, sep: int = 0) -> WordCount:
+    return WordCount(c1.min + max(c2.min - 1, 0) + sep,
+                     c1.max + max(c2.max - 1, 0) + sep)
 
 
 

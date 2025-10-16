@@ -6,7 +6,7 @@ import sash
 import sash.reporter as reporter
 from sash.symb import expand_simple, expand_args_dumb, starting_state
 from sash.state import *
-from sash.frozen import freeze
+from sash.frozen import freeze, freeze_thing
 import shasta.ast_node as AST
 from util import *
 from unittest.mock import Mock, MagicMock
@@ -149,3 +149,60 @@ def test_expand_cmdsubst():
                                                      state),
                                  WordCount(0, float('inf')))]
 
+def test_expand_d2concat():
+    script = parse_script("""rm -rf ${2}Applications/iTunes.app 2> /dev/null""")
+    assert len(script) == 1
+    assert isinstance(script[0], AST.CommandNode)
+
+    state = starting_state()
+    expanded = expand_simple(script[0].arguments[2], state)
+    assert expanded == [Field(CompletelyArbitrary(freeze(script[0].arguments[2][0]),
+                                                  ArbitraryType.APPROXIMATION,
+                                                  state,
+                                                  suffix=SymStr(("Applications/iTunes.app",))),
+                              WordCount(0, float('inf')))]
+
+def test_expand_pre_and_suffix():
+    script = parse_script("""rm -rf b${2}a""")
+    assert len(script) == 1
+    assert isinstance(script[0], AST.CommandNode)
+
+    state = starting_state()
+    expanded = expand_simple(script[0].arguments[2], state)
+    assert expanded == [Field(CompletelyArbitrary(freeze(script[0].arguments[2][1]),
+                                                  ArbitraryType.APPROXIMATION,
+                                                  state,
+                                                  prefix=SymStr(("b",)),
+                                                  suffix=SymStr(("a",))),
+                              WordCount(0, float('inf')))]
+
+    script = parse_script("""rm -rf b${2}m${3}a""")
+    assert len(script) == 1
+    assert isinstance(script[0], AST.CommandNode)
+
+    state = starting_state()
+    expanded = expand_simple(script[0].arguments[2], state)
+    assert expanded == [Field(CompletelyArbitrary(freeze_thing([script[0].arguments[2][1], script[0].arguments[2][3]]),
+                                                  ArbitraryType.APPROXIMATION,
+                                                  state,
+                                                  prefix=SymStr(("b",)),
+                                                  suffix=SymStr(("a",))),
+                              WordCount(0, float('inf')))]
+
+
+def test_expand_args_dumb():
+    script = parse_script("""rm -rf ${2}Applications/iTunes.app 2> /dev/null""")
+    assert len(script) == 1
+    assert isinstance(script[0], AST.CommandNode)
+
+    state = starting_state()
+
+    _, expanded = expand_args_dumb([Trace((state,))], script[0].arguments, None)
+    assert len(expanded) == 3
+    assert expanded[0] == constant_field("rm")
+    assert expanded[1] == constant_field("-rf")
+    assert expanded[2] == Field(CompletelyArbitrary(freeze(script[0].arguments[2][0]),
+                                                    ArbitraryType.APPROXIMATION,
+                                                    state,
+                                                    suffix=SymStr(("Applications/iTunes.app",))),
+                                 WordCount(0, float('inf')))

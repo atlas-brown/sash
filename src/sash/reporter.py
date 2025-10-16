@@ -56,7 +56,7 @@ class DeleteSystemFile(Error):
 
 class DangerousWordSplit(Warning):
     def __init__(self, source):
-        super().__init__("word_split", f"{source} could be split, leading to unexpected arguments")
+        super().__init__("word_split", f"{source} could be split in a dangerous position, leading to unexpected arguments to dangerous commands")
 
 class RedirectToFunction(Warning):
     def __init__(self, function_name: str):
