@@ -6,10 +6,6 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Optional
 
-
-def make_unique(ls):
-    return list(set(ls))
-
 @dataclass(frozen=True)
 class Report(ABC):
     code:str
@@ -23,6 +19,19 @@ class Report(ABC):
             "message": self.message
         }
 
+    @classmethod
+    def all_codes(cls) -> set[str]:
+        """Return the set of CODE values declared on Report subclasses."""
+        codes: set[str] = set()
+        def walk(c):
+            for s in c.__subclasses__():
+                code = getattr(s, "CODE", None)
+                if code:
+                    codes.add(code)
+                walk(s)
+        walk(cls)
+        return codes
+
 class Error(Report):
     pass
 
@@ -30,37 +39,45 @@ class Warning(Report):
     pass
 
 class ParseError(Error):
+    CODE = "parse"
     def __init__(self,msg : str ="") -> None:
         self.report = f"Failed to parse script {msg}"
-        super().__init__("parse",self.report)
+        super().__init__(self.CODE,self.report)
 
 class UnboundID(Error):
+    CODE = "unbound"
     def __init__(self, var):
-        super().__init__("unbound", f"no definition found for {var}")
+        super().__init__(self.CODE, f"no definition found for {var}")
 
 class InfiniteLoop(Error):
+    CODE = "infinite_loop"
     def __init__(self, loop):
-        super().__init__("infinite_loop", f"condition for loop {loop} never changes, causing an infinite loop")
+        super().__init__(self.CODE, f"condition for loop {loop} never changes, causing an infinite loop")
 
 class ConstantCondition(Warning):
+    CODE = "const_cond"
     def __init__(self):
-        super().__init__("const_cond", "condition is always true or false")
+        super().__init__(self.CODE, "condition is always true or false")
 
 class LoopRunsOnce(Warning):
+    CODE = "loop_once"
     def __init__(self):
-        super().__init__("loop_once", "loop runs only once")
+        super().__init__(self.CODE, "loop runs only once")
 
 class DeleteSystemFile(Error):
+    CODE = "del_sys_file"
     def __init__(self,filename:str):
-        super().__init__("del_sys_file",f"might delete system file {filename}")
+        super().__init__(self.CODE,f"might delete system file {filename}")
 
 class DangerousWordSplit(Warning):
+    CODE = "word_split"
     def __init__(self, source):
-        super().__init__("word_split", f"{source} could be split in a dangerous position, leading to unexpected arguments to dangerous commands")
+        super().__init__(self.CODE, f"{source} could be split in a dangerous position, leading to unexpected arguments to dangerous commands")
 
 class RedirectToFunction(Warning):
+    CODE = "redir_func"
     def __init__(self, function_name: str):
-        super().__init__("redir_func",f"redirecting output to {function_name}, which is a function, actually writes to a file with that name")
+        super().__init__(self.CODE,f"redirecting output to {function_name}, which is a function, actually writes to a file with that name")
 
 class Reporter:
     _filename = ""

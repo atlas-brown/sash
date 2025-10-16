@@ -13,9 +13,11 @@ if [ -n "$1" ]; then
 fi
 
 failure=0
+total=0
 
 # Find all files or symlinks named posix.sh in the benchmarks directory and subdirectories
 while read -r benchmark; do
+    printf "\n\n"
     echo "Running benchmark: $benchmark"
     output=$(uv run sash "$benchmark")
 
@@ -35,13 +37,22 @@ while read -r benchmark; do
 
 
     if [ "$actual" != "$expected" ]; then
-        echo "Unexpected output:"
+        echo "FAIL"
+	echo "Expected:"
+	echo "$expected"
+	echo "Actual:"
         echo "$output" | jq '.errors'
         failure=$((failure + 1))
+    else
+	echo "Pass"
     fi
+    total=$((total + 1))
 done < <(find "$bench_dir" -type f -name 'posix.sh' -o -type l -name 'posix.sh')
 
 if [ "$failure" -ne 0 ]; then
-    echo "$failure benchmarks failed"
+    echo "$failure/$total benchmarks failed"
     exit 1
+else
+    echo "All $total benchmarks passed!"
 fi
+

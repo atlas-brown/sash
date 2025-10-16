@@ -1,0 +1,121 @@
+#!/usr/bin/env python3
+import sys
+import os
+import subprocess
+import json
+import sash.reporter
+
+def run_cmd(cmd, check=False, capture_stdout=True):
+    proc = subprocess.run(cmd, shell=False, capture_output=True, text=True)
+    if check and proc.returncode != 0:
+        raise subprocess.CalledProcessError(proc.returncode, cmd, proc.stdout, proc.stderr)
+    return proc
+
+def get_git_toplevel():
+    proc = run_cmd(["git", "rev-parse", "--show-toplevel"])
+    if proc.returncode != 0:
+        print("Failed to determine git top-level directory", file=sys.stderr)
+        sys.exit(1)
+    return proc.stdout.strip()
+
+def find_benchmarks(bench_dir):
+    for root, dirs, files in os.walk(bench_dir):
+        for name in files:
+            if name == "posix.sh":
+                path = os.path.join(root, name)
+                # include regular files and symlinks
+                if os.path.isfile(path) or os.path.islink(path):
+                    yield path
+
+def load_expected_codes(gt_path):
+    try:
+        with open(gt_path, "r") as f:
+            data = json.load(f)
+        codes = [e.get("code") for e in data.get("errors", [])]
+        return sorted(codes, key=lambda x: (str(type(x)), str(x)))
+    except Exception as e:
+        print(f"Failed to read/parse ground truth {gt_path}: {e}", file=sys.stderr)
+        return []
+
+def extract_codes_from_output(output):
+    try:
+        data = json.loads(output)
+        codes = [e.get("code") for e in data.get("errors", [])]
+        return sorted(codes, key=lambda x: (str(type(x)), str(x))), data
+    except Exception:
+        return None, None
+    
+def get_all_reporter_codes():
+    return sash.reporter.Report.all_codes()
+
+def main():
+    top = get_git_toplevel()
+    os.chdir(top)
+    bench_dir = os.path.join(top, "benchmarks")
+    if len(sys.argv) > 1 and sys.argv[1]:
+        bench_dir = os.path.join(bench_dir, sys.argv[1])
+
+    known_codes = get_all_reporter_codes()
+
+    failure = 0
+    total = 0
+
+    for benchmark in find_benchmarks(bench_dir):
+        print("\n\n")
+        print(f"Running benchmark: {benchmark}")
+        proc = run_cmd(["uv", "run", "sash", benchmark])
+        output = proc.stdout
+
+        gt_path = os.path.join(os.path.dirname(benchmark), "ground_truth.json")
+        if not os.path.isfile(gt_path):
+            # No ground truth, just print the output
+            print(output, end="")
+            total += 1
+            continue
+
+        expected = load_expected_codes(gt_path)
+        # Check that all expected codes are valid
+        for code in expected:
+            if code not in known_codes:
+                print(f"Ground truth contains unknown error code: {code}")
+
+        actual_codes, parsed_json = extract_codes_from_output(output)
+        if actual_codes is None:
+            # Couldn't parse output as JSON; treat as failure
+            print("FAIL")
+            print("Expected:")
+            for c in expected:
+                print(c)
+            print("Actual (raw output, not valid JSON):")
+            print(output)
+            failure += 1
+            total += 1
+            continue
+
+        # Compare by string representation to mimic jq behaviour
+        expected_strs = [str(x) for x in expected]
+        actual_strs = [str(x) for x in actual_codes]
+
+        # Check that every expected code appears in the actual codes (actual may contain extras)
+        missing = [c for c in expected_strs if c not in actual_strs]
+        if missing:
+            print("FAIL")
+            print("Missing expected codes:")
+            for c in missing:
+                print(c)
+            print("Actual:")
+            print(json.dumps(parsed_json.get("errors", []), indent=2))
+            failure += 1
+        else:
+            print("Pass")
+        total += 1
+
+    if failure != 0:
+        print(f"{failure}/{total} benchmarks failed")
+        sys.exit(1)
+    else:
+        print(f"All {total} benchmarks passed!")
+        sys.exit(0)
+
+if __name__ == "__main__":
+    main()

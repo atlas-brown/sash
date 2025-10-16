@@ -1,7 +1,7 @@
 {
     "errors": [
         {
-            "code": "invalid_del_path",
+            "code": "word_split",
             "shellcheck": {
                 "detects": true,
                 "code": "SC2086",
