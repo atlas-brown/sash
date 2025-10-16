@@ -64,14 +64,13 @@ class RedirectToFunction(Warning):
 
 class Reporter:
     _filename = ""
-    _errors: set[Report]
+    _errors: set[Report] = set()
     _start_time = time.monotonic()
     _solver_time : float = 0
 
     @classmethod
     def initialize(cls,filename:str):
         cls._filename = filename
-        cls._error_messages:list[tuple[str,str]] = []
         cls._errors = set()
         cls._start_time = time.monotonic()
         cls._solver_time : float = 0

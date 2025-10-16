@@ -155,7 +155,7 @@ def test_expand_d2concat():
     assert isinstance(script[0], AST.CommandNode)
 
     state = starting_state()
-    expanded = expand_simple(script[0].arguments[2], state)
+    expanded = expand_simple(script[0].arguments[2], state, info)
     assert expanded == [Field(CompletelyArbitrary(freeze(script[0].arguments[2][0]),
                                                   ArbitraryType.APPROXIMATION,
                                                   state,
@@ -168,7 +168,7 @@ def test_expand_pre_and_suffix():
     assert isinstance(script[0], AST.CommandNode)
 
     state = starting_state()
-    expanded = expand_simple(script[0].arguments[2], state)
+    expanded = expand_simple(script[0].arguments[2], state, info)
     assert expanded == [Field(CompletelyArbitrary(freeze(script[0].arguments[2][1]),
                                                   ArbitraryType.APPROXIMATION,
                                                   state,
@@ -181,7 +181,7 @@ def test_expand_pre_and_suffix():
     assert isinstance(script[0], AST.CommandNode)
 
     state = starting_state()
-    expanded = expand_simple(script[0].arguments[2], state)
+    expanded = expand_simple(script[0].arguments[2], state, info)
     assert expanded == [Field(CompletelyArbitrary(freeze_thing([script[0].arguments[2][1], script[0].arguments[2][3]]),
                                                   ArbitraryType.APPROXIMATION,
                                                   state,
