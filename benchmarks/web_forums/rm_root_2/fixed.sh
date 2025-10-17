@@ -1,7 +1,5 @@
 #!/bin/sh
 
-# https://www.shellscript.sh/examples/rm-rf/
-
 gather_data()
 {
   # Gather data
@@ -17,10 +15,10 @@ gather_data()
   # etc etc
 }
 
-TEMPDIR=$(mktemp -d) # bug here: mktemp does not exist on all systems
+TEMPDIR=$(mktemp -d)
 cd "${TEMPDIR}"
 gather_data
 tar cf /tmp/logs.tar "${TEMPDIR}"
 gzip -9 /tmp/logs.tar
 cd /
-rm -rf "${TEMPDIR}"/  # this happened before --preserve-root was a thing
+rm -rf "${TEMPDIR:?}"/
