@@ -1,14 +1,14 @@
 {
     "errors": [
         {
-            "code": "possibly_empty_var",
+            "code": "empty_var",
             "shellcheck": {
                 "detects": false,
-                "note": "ShellCheck fails to detect the possibility of the `STEAMROOT` variable being empty at `STEAMROOT=\"$(cd \"${0%/*}\" && echo $PWD)\"`."
+                "note": "ShellCheck fails to detect the possibility of the `STEAMROOT` variable being empty."
             }
         },
         {
-            "code": "del_sys_dir_with_wildcard",
+            "code": "del_sys_file",
             "shellcheck": {
                 "detects": true,
                 "code": "SC2115",

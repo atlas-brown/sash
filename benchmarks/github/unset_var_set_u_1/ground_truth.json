@@ -1,7 +1,7 @@
 {
     "errors": [
         {
-            "code": "fail_immediately_after_detecting_unset_var",
+            "code": "unintended_immediate_exit",
             "shellcheck": {
                 "detects": false,
                 "where": "if [ -z \"${TEST_VM_NODE_NAMES}\" ];",

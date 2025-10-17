@@ -79,6 +79,41 @@ class RedirectToFunction(Warning):
     def __init__(self, function_name: str):
         super().__init__(self.CODE,f"redirecting output to {function_name}, which is a function, actually writes to a file with that name")
 
+class DeadCode(Warning):
+    CODE = "dead_code"
+    def __init__(self):
+        super().__init__(self.CODE, "code is unreachable and will never be executed")
+
+class EmptyVar(Warning):
+    CODE = "empty_var"
+    def __init__(self, varname: str):
+        super().__init__(self.CODE, f"variable {varname} might be empty")
+
+class MalformedSyntax(Warning):
+    CODE = "malformed_syntax"
+    def __init__(self, detail: str):
+        super().__init__(self.CODE, f"syntax might be malformed or invalid: {detail}")
+
+class EmptyPathSegment(Warning):
+    CODE = "empty_path_segment"
+    def __init__(self, path: str):
+        super().__init__(self.CODE, f"path '{path}' contains an empty segment that may or may not lead to unexpected behavior")
+
+class UnintendedCommand(Warning):
+    CODE = "unintended_cmd"
+    def __init__(self, command: str):
+        super().__init__(self.CODE, f"command '{command}' may not reflect the user's intent")
+
+class UnintendedImmediateExit(Warning):
+    CODE = "unintended_immediate_exit"
+    def __init__(self):
+        super().__init__(self.CODE, "script may exit immediately due to, for instance, 'set -u' and an unset variable access")
+
+class IgnoredCommandResult(Warning):
+    CODE = "ignored_cmd_result"
+    def __init__(self, command: str):
+        super().__init__(self.CODE, f"the result of command '{command}' is ignored.")
+
 class Reporter:
     _filename = ""
     _errors: set[Report] = set()

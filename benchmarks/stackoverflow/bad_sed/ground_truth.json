@@ -1,7 +1,7 @@
 {
     "errors": [
         {
-            "code": "wrong_sed_range",
+            "code": "malformed_syntax",
             "shellcheck": {
                 "detects": false,
                 "where": "`\"1 $n d\"`",

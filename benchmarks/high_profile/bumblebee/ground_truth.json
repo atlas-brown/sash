@@ -1,7 +1,7 @@
 {
     "errors": [
         {
-            "code": "del_sys_dir",
+            "code": "del_sys_file",
             "shellcheck": {
                 "detects": true,
                 "code": "SC2114",

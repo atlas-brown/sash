@@ -1,7 +1,7 @@
 {
     "errors": [
         {
-            "code": "erroneous_command_check",
+            "code": "unintended_cmd",
             "shellcheck": {
                 "detects": false,
                 "where": "command -v zsh",
@@ -9,7 +9,7 @@
             }
         },
         {
-            "code": "zsh_used_even_if_not_installed",
+            "code": "unbound",
             "shellcheck": {
                 "detects": false,
                 "where": "env zsh",

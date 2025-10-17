@@ -1,7 +1,7 @@
 {
     "errors": [
         {
-            "code": "function_declared_later",
+            "code": "unbound",
             "shellcheck": {
                 "detects": true,
                 "code": "SC2218",

@@ -9,7 +9,7 @@
             }
         },
         {
-            "code": "condition_always_true",
+            "code": "const_cond",
             "shellcheck": {
                 "detects": true,
                 "code": "SC2154",

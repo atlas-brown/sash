@@ -1,7 +1,7 @@
 {
     "errors": [
         {
-            "code": "missing_colon",
+            "code": "malformed_syntax",
             "shellcheck": {
                 "detects": false,
                 "where": ":i:x:n",
@@ -9,7 +9,7 @@
             }
         },
         {
-            "code": "typo_OPTARGS",
+            "code": "unbound",
             "shellcheck": {
                 "detects": true,
                 "code": "SC2153",
@@ -18,7 +18,7 @@
             }
         },
         {
-            "code": "wrong_dir_check",
+            "code": "unintended_cmd",
             "shellcheck": {
                 "detects": false,
                 "where": "if [ ! \"$dirName\" ]",

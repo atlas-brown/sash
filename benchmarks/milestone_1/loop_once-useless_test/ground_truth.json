@@ -9,7 +9,7 @@
             }
         },
         {
-            "code": "useless_test",
+            "code": "ignored_cmd_result",
             "shellcheck": {
                 "detects": false,
                 "where": "[ -f \"$f\" ]",
