@@ -37,7 +37,7 @@ def test_bound_variable_no_error(tmp_path):
 
 def test_special_vars_no_unbound_error(tmp_path):
     # Using a parameter variable should not produce an unbound error
-    script = write_script(tmp_path, 'echo $1 "$@" $# $HOME $PWD\n')
+    script = write_script(tmp_path, 'echo $1 $5 "$@" $# $HOME $PWD\n')
     report = symb.main(script)
     assert_expected_report(report, [])
 
@@ -166,3 +166,31 @@ def test_changing_while_condition_error(tmp_path):
     expected_error = reporter.InfiniteLoop(None) # Mock the location
     assert_expected_report(report, [expected_error])
 
+def test_function_call(tmp_path):
+    # A function that is called should not produce unbound variable errors for its parameters
+    script = write_script(tmp_path, """
+myfunc() {
+    rm "$1"
+}
+myfunc /usr
+""")
+    report = symb.main(script)
+    expected_error = reporter.DeleteSystemFile("/usr")
+    assert_expected_report(report, [expected_error])
+
+# def test_function_call_multipath(tmp_path):
+#     # A function that is called should not produce unbound variable errors for its parameters
+#     script = write_script(tmp_path, """
+# myfunc() {
+#     rm "$1"
+# }
+# if [ "$2" = "yes" ]; then
+#     FOO=/usr
+# else
+#     FOO=/something/totally/safe
+# fi
+# myfunc "$FOO"
+# """)
+#     report = symb.main(script)
+#     expected_error = reporter.DeleteSystemFile("/usr")
+#     assert_expected_report(report, [expected_error])

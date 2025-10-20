@@ -11,14 +11,7 @@ import shasta.ast_node as AST
 from util import *
 from unittest.mock import Mock, MagicMock
 
-@pytest.fixture
-def mock_script_info():
-    """Fixture that returns a ScriptInfo mock with fake opts."""
-    mock_opts = MagicMock(name="SetOptionStoreMock")
-    # Can configure mock behavior if needed, e.g.:
-    # mock_opts.noglob = False
-    return ScriptInfo(opts=mock_opts)
-info = mock_script_info
+info = ScriptInfo(SetOptionStore())
 
 def constant_field(string: str, words: int = 1) -> Field:
     return Field(SymStr((string,)), WordCount(words, words))
@@ -79,6 +72,17 @@ def test_expand_vars():
     # Note: '$C' is single-quoted, so it should not be expanded
     # and should remain as literal '$C'
     assert expanded[3] == [constant_field("$C")]
+
+def test_expand_localvars():
+    script = parse_script("""echo $2""")
+    assert len(script) == 1
+    assert isinstance(script[0], AST.CommandNode)
+
+    state = starting_state()\
+        .extend_localenv({"1": ShellVar(constant_field("a")),
+                          "2": ShellVar(constant_field("b"))})
+    expanded = expand_simple(script[0].arguments[1], state, info)
+    assert expanded == [constant_field("b")]
 
 def test_expand_vars_split():
     script = parse_script("""echo $A "$B" '$C'""")
@@ -197,7 +201,7 @@ def test_expand_args_dumb():
 
     state = starting_state()
 
-    _, expanded = expand_args_dumb([Trace((state,))], script[0].arguments, None)
+    _, expanded = expand_args_dumb([Trace((state,))], script[0].arguments, info)
     assert len(expanded) == 3
     assert expanded[0] == constant_field("rm")
     assert expanded[1] == constant_field("-rf")

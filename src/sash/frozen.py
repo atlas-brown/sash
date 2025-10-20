@@ -15,9 +15,9 @@ class FrozenAst:
         return isinstance(other, FrozenAst) and self.kind == other.kind and self.fields == other.fields
 
     def __str__(self) -> str:
-        return str(self.ast)
+        return f"Frozen({str(self.ast)})"
     def __repr__(self) -> str:
-        return self.ast.__repr__()
+        return f"Frozen({self.ast.__repr__()})"
     def pretty(self) -> str:
         return self.ast.pretty()
 
@@ -73,6 +73,9 @@ class FrozenDict(Generic[K, V]):
     def set(self, k, v):
         return FrozenDict(**(self._d | {k: v}))
 
+    def get(self, k, default=None):
+        return self._d.get(k, default)
+
     def __or__(self, other):
         if not isinstance(other, (dict, FrozenDict)):
             return NotImplemented
@@ -82,3 +85,6 @@ class FrozenDict(Generic[K, V]):
 
     def __ror__(self, other):
         return self.__or__(other)
+
+    def __bool__(self):
+        return bool(self._d)

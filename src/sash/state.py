@@ -115,8 +115,8 @@ class State:
     def extend_env(self, new_vars: dict[str, ShellVar]) -> 'State':
         return replace(self, env=(self.env | new_vars))
 
-    def set_fundef(self, name: str, defn: FrozenAst) -> 'State':
-        return replace(self, fundefs=self.fundefs.set(name, defn))
+    def extend_localenv(self, new_vars: dict[str, ShellVar]) -> 'State':
+        return replace(self, localenv=(self.localenv | new_vars))
 
     def add_pathcond(self, cond: sash.constraints.Constraint) -> 'State':
         new_pathcond = self.pathcond + (cond,)
@@ -125,10 +125,19 @@ class State:
     def lookup(self, var: str) -> Optional[ShellVar]:
         if var in self.localenv:
             return self.localenv[var]
+        elif self.localenv and var.isnumeric():
+            # Positional parameters are not dynamically scoped?
+            return None
         elif var in self.env:
             return self.env[var]
         else:
             return None
+
+    def set_fundef(self, name: str, defn: FrozenAst) -> 'State':
+        return replace(self, fundefs=self.fundefs.set(name, defn))
+
+    def lookup_fundef(self, name: str) -> Optional[FrozenAst]:
+        return self.fundefs.get(name, None)
 
 @dataclass(frozen=True)
 class Trace:

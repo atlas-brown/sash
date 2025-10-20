@@ -21,28 +21,20 @@ def handle_commandnode(traces: Traces,
                        node: AST.CommandNode,
                        info: ScriptInfo,
                        cb: Optional[Callable[[list[Field]], None]]) -> Traces:
-
-    def is_protected(path):
-        return any(path in [p, p + "/", p + "/*"] for p in Config.get("PROTECTED_PATHS"))
-
     logging.debug(f"Handling command node {trim_string_for_logging(node.pretty())} with {len(traces)} traces")
     t1, expanded_args = expand_args_dumb(traces, node.arguments, info)
+    logging.debug(f"Expanded cmd to {expanded_args}")
 
-    if expanded_args and (cmd_name := field_to_str(expanded_args[0])):
-        logging.debug(f"Handling command {cmd_name} with args {expanded_args[1:]}")
-        if cmd_name == "rm":
-            for arg_field in expanded_args[1:]:
-                if (path := field_to_str(arg_field)) and is_protected(path):
-                    Reporter.add_error(reporter.DeleteSystemFile(path))
-                match arg_field:
-                    case Field(CompletelyArbitrary(source=source), WordCount(max=m)) if m > 1:
-                        Reporter.add_error(reporter.DangerousWordSplit(source))
-                match arg_field:
-                    case Field(CompletelyArbitrary(prefix=pre, suffix=suf), WordCount(min, max)) if min == 0 or max > 1:
-                        if pre is not None and (path := symb_utils.symbstr_to_str(pre.parts)) and is_protected(path):
-                            Reporter.add_error(reporter.DeleteSystemFile(path))
-                        if suf is not None and (path := symb_utils.symbstr_to_str(suf.parts)) and is_protected(path):
-                            Reporter.add_error(reporter.DeleteSystemFile(path))
+    if expanded_args:
+        match field_to_str(expanded_args[0]):
+            case "rm":
+                handle_rm(expanded_args)
+            case some_name if isinstance(some_name, str):
+                # todo: we could actually not use `expand_args_dumb` here, and instead do trace-specific expansion, since the function body is handled trace-specifically anyway
+                # deferred for now until we actually need it (see test_function_call_multipath)
+                t1 = handle_function_call_or_unknown(some_name, expanded_args[1:], t1, info)
+            case _:
+                logging.debug(f"Non-constant command invocation {expanded_args}, optimistically treating as no-op")
     t2 = t1
     for redir in node.redir_list:
         t2 = t2.extend(guarded_interp_node(t1, redir, info)) or t2
@@ -51,6 +43,60 @@ def handle_commandnode(traces: Traces,
         cb(expanded_args)
     logging.debug(f"Done with command {trim_string_for_logging(node.pretty())} after expanding its args to {expanded_args} (it had assignments: {node.assignments})")
     return t2
+
+def handle_rm(expanded_args: List[Field]) -> None:
+    def is_protected(path):
+        return any(path in [p, p + "/", p + "/*"] for p in Config.get("PROTECTED_PATHS"))
+    for arg_field in expanded_args[1:]:
+        if (path := field_to_str(arg_field)) and is_protected(path):
+            Reporter.add_error(reporter.DeleteSystemFile(path))
+        match arg_field:
+            case Field(CompletelyArbitrary(source=source), WordCount(max=m)) if m > 1:
+                Reporter.add_error(reporter.DangerousWordSplit(source))
+        match arg_field:
+            case Field(CompletelyArbitrary(prefix=pre, suffix=suf), WordCount(min, max)) if min == 0 or max > 1:
+                if pre is not None and (path := symb_utils.symbstr_to_str(pre.parts)) and is_protected(path):
+                    Reporter.add_error(reporter.DeleteSystemFile(path))
+                if suf is not None and (path := symb_utils.symbstr_to_str(suf.parts)) and is_protected(path):
+                    Reporter.add_error(reporter.DeleteSystemFile(path))
+
+def handle_function_call_or_unknown(func_name: str,
+                                    arg_fields: List[Field],
+                                    traces: Traces,
+                                    info: ScriptInfo) -> Traces:
+    # is it a known function, and the same one across all traces?
+    func_defs = {t.latest_state.lookup_fundef(func_name) for t in traces}
+    if len(func_defs) == 1:
+        if None in func_defs:
+            logging.debug(f"Unknown command {func_name}, optimistically treating as no-op")
+            return traces
+        else:
+            the_func = func_defs.pop()
+            assert isinstance(the_func, FrozenAst)
+            return handle_function_call(the_func.ast, arg_fields, traces, info)
+    else:
+        logging.error(f"Name {func_name} is defined as different functions across traces, giving up on this call")
+        return traces
+
+def handle_function_call(func_node: AST.DefunNode,
+                         arg_fields: List[Field],
+                         traces: Traces,
+                         info: ScriptInfo) -> Traces:
+    logging.debug(f"Handling function call to {trim_string_for_logging(func_node.pretty())} with args {arg_fields}")
+    # As long as arg_fields are a single word, map those to local positional parameters
+    # as soon as we hit a field that is not a single word, give up
+    localenv: dict[str, ShellVar] = {}
+    for i, arg in enumerate(arg_fields):
+        if arg.count == WordCount(1, 1):
+            localenv[str(i + 1)] = ShellVar(arg)
+        else:
+            logging.debug(f"Function argument {i} is not guaranteed to be a single word, giving up on positional parameters ({arg})")
+            break
+    logging.debug(f"Bound localenv for call: {localenv}")
+    t1 = []
+    for t in traces:
+        t1.append(t.extend(lambda s: s.extend_localenv(localenv)))
+    return guarded_interp_node(t1, func_node.body, info)
 
 def record_assignment(trace: Trace, var: str, rhs: Field) -> Trace:
     return trace.extend(lambda s: s.set_env(var, ShellVar(rhs)))
@@ -540,7 +586,7 @@ def interp_node(traces: Traces,
         case AST.DefunNode():
             # Note: the type annotation in the Shasta source code is *wrong* for node.name -- it's a string
             t1, name = expand_assuming_single_constant_word(traces, node.name, info)
-            return trace_map(t1, lambda s: s.set_fundef(name, node))
+            return trace_map(t1, lambda s: s.set_fundef(name, freeze(node)))
 
         # todo bring other cases as needed
 
