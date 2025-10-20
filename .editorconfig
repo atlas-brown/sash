@@ -17,3 +17,8 @@ charset = utf-8
 [*.{sh,py}]
 indent_style = space
 indent_size = 4
+
+# Use 2 space indentation for JSON files
+[*.{json,jsonc}]
+indent_style = space
+indent_size = 2

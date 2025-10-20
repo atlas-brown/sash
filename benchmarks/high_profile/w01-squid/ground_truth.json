@@ -1,0 +1,13 @@
+{
+  "errors": [
+    {
+      "line": 9,
+      "code": "del_sys_file",
+      "shellcheck": {
+        "detects": true,
+        "code": "SC2115",
+        "where": "rm -rf $SQUID_PIDFILE_DIR/*"
+      }
+    }
+  ]
+}

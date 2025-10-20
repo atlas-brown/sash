@@ -1,0 +1,13 @@
+{
+  "errors": [
+    {
+      "line": 145,
+      "code": "del_sys_file",
+      "shellcheck": {
+        "detects": false,
+        "where": "rm -rf $N_PREFIX/$d",
+        "note": "Warns about deleting '/', which is not the case here."
+      }
+    }
+  ]
+}

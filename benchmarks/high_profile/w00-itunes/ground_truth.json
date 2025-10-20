@@ -1,0 +1,13 @@
+{
+  "errors": [
+    {
+      "line": 7,
+      "code": "word_split",
+      "shellcheck": {
+        "detects": true,
+        "code": "SC2086",
+        "where": "rm -rf $2Applications/iTunes.app"
+      }
+    }
+  ]
+}

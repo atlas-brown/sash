@@ -1,0 +1,21 @@
+{
+  "errors": [
+    {
+      "line": 17,
+      "code": "unbound",
+      "shellcheck": {
+        "detects": false
+      }
+    },
+    {
+      "line": 359,
+      "code": "del_sys_file",
+      "shellcheck": {
+        "detects": true,
+        "code": "SC2115",
+        "where": "rm -rf \"$STEAMROOT/*\"",
+        "note": "ShellCheck detects the catastrophic bug and suggests to \"Use ${var:?} to ensure this never expands to / .\""
+      }
+    }
+  ]
+}
