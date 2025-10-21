@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
 
-# https://github.com/icy/bash-coding-style/blob/master/examples/steam.sh
-
 # Allow us to debug what's happening in the script if necessary
 if [ "$STEAM_DEBUG" ]; then
 	set -x

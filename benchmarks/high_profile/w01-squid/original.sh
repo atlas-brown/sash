@@ -1,7 +1,5 @@
 #!/bin/sh
 
-# https://bugzilla.redhat.com/show_bug.cgi?id=1202858
-
 restart() {
 	stop
 	RETVAL=$?

@@ -1,7 +1,5 @@
 #!/usr/bin/env sh
 
-# https://github.com/tj/n/commit/d36c2b88047e3eae27e80938a13b1313df0c1f82
-
 # Library version
 
 VERSION="0.7.3"
