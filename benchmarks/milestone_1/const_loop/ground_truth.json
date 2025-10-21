@@ -1,12 +1,12 @@
 {
-    "errors": [
-        {
-            "code": "infinite_loop",
-            "shellcheck": {
-                "detects": false,
-                "where": "while [ \"$RETAIN\" -le \"$NUMSNAPS\" ]; do",
-                "note": "ShellCheck fails to detect infinite loops that are due to the constant condition always being true."
-            }
-        }
-    ]
+  "errors": [
+    {
+      "line": 11,
+      "code": "infinite_loop",
+      "shellcheck": {
+        "detects": false,
+        "where": "while [ \"$RETAIN\" -le \"$NUMSNAPS\" ]; do"
+      }
+    }
+  ]
 }

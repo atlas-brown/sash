@@ -1,20 +1,20 @@
 {
-    "errors": [
-        {
-            "code": "loop_once",
-            "shellcheck": {
-                "detects": false,
-                "where": "for f in $DIR",
-                "note": "ShellCheck fails to detect that the loop runs only once (loop once with `$f` equal to the string `/home/AutoTest`)."
-            }
-        },
-        {
-            "code": "ignored_cmd_result",
-            "shellcheck": {
-                "detects": false,
-                "where": "[ -f \"$f\" ]",
-                "note": "ShellCheck fails to detect that the test is \"useless,\" where the result of the test is never used."
-            }
-        }
-    ]
+  "errors": [
+    {
+      "line": 6,
+      "code": "loop_once",
+      "shellcheck": {
+        "detects": false,
+        "where": "for f in $DIR"
+      }
+    },
+    {
+      "line": 10,
+      "code": "ignored_cmd_result",
+      "shellcheck": {
+        "detects": false,
+        "where": "[ -f \"$f\" ]"
+      }
+    }
+  ]
 }
