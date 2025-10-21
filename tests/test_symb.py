@@ -178,6 +178,22 @@ myfunc /usr
     expected_error = reporter.DeleteSystemFile("/usr")
     assert_expected_report(report, [expected_error])
 
+def test_case(tmp_path):
+    # A case statement should handle all branches correctly
+    script = write_script(tmp_path, """
+case "$1" in
+    start)
+        rm /usr
+        ;;
+    *)
+        echo "fine"
+        ;;
+esac
+""")
+    report = symb.main(script)
+    expected_error = reporter.DeleteSystemFile("/usr")
+    assert_expected_report(report, [expected_error])
+
 # def test_function_call_multipath(tmp_path):
 #     # A function that is called should not produce unbound variable errors for its parameters
 #     script = write_script(tmp_path, """

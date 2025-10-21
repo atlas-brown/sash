@@ -49,11 +49,14 @@ def handle_rm(expanded_args: List[Field]) -> None:
         return any(path in [p, p + "/", p + "/*"] for p in Config.get("PROTECTED_PATHS"))
     for arg_field in expanded_args[1:]:
         if (path := field_to_str(arg_field)) and is_protected(path):
+            # TODO: we should have different errors for WILL delete system file, and could delete
+            # here it's a WILL...
             Reporter.add_error(reporter.DeleteSystemFile(path))
         match arg_field:
             case Field(CompletelyArbitrary(source=source), WordCount(max=m)) if m > 1:
                 Reporter.add_error(reporter.DangerousWordSplit(source))
         match arg_field:
+            # ... and these are may
             case Field(CompletelyArbitrary(prefix=pre, suffix=suf), WordCount(min, max)) if min == 0 or max > 1:
                 if pre is not None and (path := symb_utils.symbstr_to_str(pre.parts)) and is_protected(path):
                     Reporter.add_error(reporter.DeleteSystemFile(path))
@@ -527,6 +530,15 @@ def interp_node(traces: Traces,
             else:
                 return t2
 
+        case AST.CaseNode():
+            t1, case_arg_fields = expand_args_dumb(traces, [node.argument], info)
+            res = []
+            for case in node.cases:
+                # todo handle patterns; this is like a conditional, we could learn something about pathcond here
+                res.extend(guarded_interp_node(trace_map(t1, lambda s: s.add_pathcond(f"case_L{context_line}_pattern_{case['cpattern']}:matched")),
+                                               case["cbody"],
+                                               info))
+            return res
 
         case AST.AssignNode():
             trace_expansion_pairs = expand(traces, node.val, info)
