@@ -49,19 +49,16 @@ def handle_rm(expanded_args: List[Field]) -> None:
         return any(path in [p, p + "/", p + "/*"] for p in Config.get("PROTECTED_PATHS"))
     for arg_field in expanded_args[1:]:
         if (path := field_to_str(arg_field)) and is_protected(path):
-            # TODO: we should have different errors for WILL delete system file, and could delete
-            # here it's a WILL...
             Reporter.add_error(reporter.DeleteSystemFile(path))
         match arg_field:
             case Field(CompletelyArbitrary(source=source), WordCount(max=m)) if m > 1:
                 Reporter.add_error(reporter.DangerousWordSplit(source))
         match arg_field:
-            # ... and these are may
             case Field(CompletelyArbitrary(prefix=pre, suffix=suf), WordCount(min, max)) if min == 0 or max > 1:
                 if pre is not None and (path := symb_utils.symbstr_to_str(pre.parts)) and is_protected(path):
-                    Reporter.add_error(reporter.DeleteSystemFile(path))
+                    Reporter.add_error(reporter.CouldDeleteSystemFile(path))
                 if suf is not None and (path := symb_utils.symbstr_to_str(suf.parts)) and is_protected(path):
-                    Reporter.add_error(reporter.DeleteSystemFile(path))
+                    Reporter.add_error(reporter.CouldDeleteSystemFile(path))
 
 def handle_function_call_or_unknown(func_name: str,
                                     arg_fields: List[Field],

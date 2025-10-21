@@ -67,7 +67,13 @@ class LoopRunsOnce(Warning):
 class DeleteSystemFile(Error):
     CODE = "del_sys_file"
     def __init__(self,filename:str):
+        super().__init__(self.CODE,f"WILL delete system file {filename}")
+
+class CouldDeleteSystemFile(Error):
+    CODE = "could_del_sys_file"
+    def __init__(self,filename:str):
         super().__init__(self.CODE,f"might delete system file {filename}")
+
 
 class DangerousWordSplit(Warning):
     CODE = "word_split"
