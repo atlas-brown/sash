@@ -2,6 +2,7 @@
     "errors": [
         {
             "code": "loop_once",
+	    "line": 6,
             "shellcheck": {
                 "detects": false,
                 "where": "for i in $file1,$file2; do",

@@ -2,6 +2,7 @@
   "errors": [
     {
       "line": 179,
+      "note": "this is always const, along all paths; TODO review shellcheck detects result (style vs warnings?)",
       "code": "const_cond",
       "shellcheck": {
         "detects": false,
@@ -11,6 +12,7 @@
     },
     {
       "line": 203,
+      "note": "this is only const along one execution path",
       "code": "const_cond",
       "shellcheck": {
         "detects": false,

@@ -2,6 +2,7 @@
     "errors": [
         {
             "code": "unbound",
+	    "line": "todo awaiting posix",
             "shellcheck": {
                 "detects": false,
                 "where": "$cwd",

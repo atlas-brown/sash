@@ -32,16 +32,16 @@ def load_expected_codes(gt_path):
         with open(gt_path, "r") as f:
             data = json.load(f)
         codes = [e.get("code") for e in data.get("errors", [])]
-        return sorted(codes, key=lambda x: (str(type(x)), str(x)))
+        return set(codes)
     except Exception as e:
         print(f"Failed to read/parse ground truth {gt_path}: {e}", file=sys.stderr)
-        return []
+        return set()
 
 def extract_codes_from_output(output):
     try:
         data = json.loads(output)
         codes = [e.get("code") for e in data.get("errors", [])]
-        return sorted(codes, key=lambda x: (str(type(x)), str(x))), data
+        return set(codes), data
     except Exception:
         return None, None
     
@@ -56,6 +56,8 @@ def main():
         bench_dir = os.path.join(bench_dir, sys.argv[1])
 
     known_codes = get_all_reporter_codes()
+    with open(os.path.join(top, "benchmarks/codes_out_of_scope.json"), "r") as f:
+        out_of_scope_codes = set(json.load(f))
 
     failure = 0
     total = 0
@@ -74,10 +76,11 @@ def main():
             continue
 
         expected = load_expected_codes(gt_path)
+        expected_in_scope = expected - out_of_scope_codes
+        unknown_codes = expected_in_scope - known_codes
         # Check that all expected codes are valid
-        for code in expected:
-            if code not in known_codes:
-                print(f"Ground truth contains unknown error code: {code}")
+        for code in unknown_codes:
+            print(f"Ground truth contains unknown error code: {code}")
 
         actual_codes, parsed_json = extract_codes_from_output(output)
         if actual_codes is None:
@@ -92,14 +95,10 @@ def main():
             total += 1
             continue
 
-        # Compare by string representation to mimic jq behaviour
-        expected_strs = [str(x) for x in expected]
-        actual_strs = [str(x) for x in actual_codes]
-
         # Check that every expected code appears in the actual codes (actual may contain extras)
-        missing = [c for c in expected_strs if c not in actual_strs]
+        missing = expected - actual_codes
         if missing:
-            print("FAIL")
+            print(f"FAIL, time: {parsed_json.get('time', 'N/A')}s")
             print("Missing expected codes:")
             for c in missing:
                 print(c)
@@ -107,7 +106,7 @@ def main():
             print(json.dumps(parsed_json.get("errors", []), indent=2))
             failure += 1
         else:
-            print("Pass")
+            print(f"Pass, time: {parsed_json.get('time', 'N/A')}s")
         total += 1
 
     if failure != 0:

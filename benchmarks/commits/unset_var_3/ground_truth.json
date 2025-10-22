@@ -2,6 +2,7 @@
     "errors": [
         {
             "code": "unbound",
+	    "line": 25,
             "shellcheck": {
                 "detects": true,
                 "code": "SC2153",

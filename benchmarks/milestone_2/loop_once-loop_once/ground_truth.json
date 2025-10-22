@@ -2,6 +2,7 @@
     "errors": [
         {
             "code": "loop_once",
+	    "line": 8,
             "shellcheck": {
                 "detects": false,
                 "where": "for directory in \"$DIR\"; do",
@@ -10,6 +11,7 @@
         },
         {
             "code": "loop_once",
+	    "line": 15,
             "shellcheck": {
                 "detects": false,
                 "where": "for filename in \"$directory\";",

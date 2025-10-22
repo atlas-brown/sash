@@ -2,6 +2,8 @@
     "errors": [
         {
             "code": "unbound",
+	    "line": 10,
+	    "note": "todo argument to be made here about `const_cond` as well, but so far we only use that for conds truly guaranteed constant, whereas this one is not (if $file turns out to actually be bound in the env)"
             "shellcheck": {
                 "detects": true,
                 "code": "SC2154",

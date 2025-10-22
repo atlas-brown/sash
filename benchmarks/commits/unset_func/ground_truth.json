@@ -1,7 +1,9 @@
 {
     "errors": [
         {
-            "code": "unbound",
+            "code": "unbound_function",
+	    "note": "todo for implementation: catching this bug requires either two passes over the script, or tracking of every command executed (how to know that git_compare_version is not just a command?)",
+	    "line": 75,
             "shellcheck": {
                 "detects": true,
                 "code": "SC2218",

@@ -1,7 +1,9 @@
 {
     "errors": [
         {
-            "code": "malformed_syntax",
+            "code": "bad_command_argument_format",
+	    "note": "todo this feels out of scope",
+	    "line": 5,
             "shellcheck": {
                 "detects": false,
                 "where": ":i:x:n",
@@ -10,6 +12,7 @@
         },
         {
             "code": "unbound",
+	    "line": 9,
             "shellcheck": {
                 "detects": true,
                 "code": "SC2153",
@@ -18,10 +21,12 @@
             }
         },
         {
-            "code": "unintended_cmd",
+            "code": "command_can_only_fail",
+	    "line": 16,
+	    "note": "the real bug here is that mkdir can only ever fail",
             "shellcheck": {
                 "detects": false,
-                "where": "if [ ! \"$dirName\" ]",
+                "where": "mkdir $dirName",
                 "note": "ShellCheck fails to detect that the intention is to check if the directory exists, which should be done with `[ -d \"$OPTARG\" ]` instead of `[ -f \"$OPTARG\" ]`, and thus `mkdir` always fails because the directory does not exist."
             }
         }

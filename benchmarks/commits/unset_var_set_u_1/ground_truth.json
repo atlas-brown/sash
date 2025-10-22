@@ -1,7 +1,9 @@
 {
     "errors": [
-        {
-            "code": "unintended_immediate_exit",
+	{
+            "code": "unbound_setu",
+	    "note": "todo get consensus on new code",
+	    "line": 16,
             "shellcheck": {
                 "detects": false,
                 "where": "if [ -z \"${TEST_VM_NODE_NAMES}\" ];",

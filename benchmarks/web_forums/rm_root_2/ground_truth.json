@@ -1,0 +1,13 @@
+{
+    "errors": [
+        {
+            "code": "could_del_sys_file",
+	    "note": "todo worth discussing",
+	    "line": 24,
+            "shellcheck": {
+                "detects": true,
+                "where": "rm -rf \"${TEMPDIR}\"/"
+            }
+        }
+    ]
+}

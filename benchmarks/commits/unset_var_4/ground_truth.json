@@ -2,6 +2,7 @@
     "errors": [
         {
             "code": "unbound",
+	    "line": 204,
             "shellcheck": {
                 "detects": false,
                 "where": "${NODE_VERSION}",

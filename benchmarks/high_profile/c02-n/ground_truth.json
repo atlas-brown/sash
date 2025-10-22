@@ -3,6 +3,7 @@
     {
       "line": 145,
       "code": "del_sys_file",
+      "note": "in the case of taking default value for N_PREFIX, the rm WILL delete /usr/local/bin etc",
       "shellcheck": {
         "detects": false,
         "where": "rm -rf $N_PREFIX/$d",

@@ -1,7 +1,8 @@
 {
     "errors": [
         {
-            "code": "empty_path_segment",
+            "code": "unbound_setu",
+	    "line": 15,
             "shellcheck": {
                 "detects": false,
                 "code": "SC2086",

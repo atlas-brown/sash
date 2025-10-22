@@ -1,19 +1,12 @@
 {
     "errors": [
         {
-            "code": "unintended_cmd",
+            "code": "not_a_command",
+	    "note": "todo let's get consensus: I think this is essentially the same error as the `//` command bug (milestone_2/rm_root)",
+	    "line": 115,
             "shellcheck": {
                 "detects": false,
-                "where": "command -v zsh",
-                "note": "ShellCheck fails to detect the developer's intention to check for the absence of the `zsh` command. The command instead checks for its presence, which would always lead to abrupt termination if `zsh` is installed."
-            }
-        },
-        {
-            "code": "unbound",
-            "shellcheck": {
-                "detects": false,
-                "where": "env zsh",
-                "note": "ShellCheck fails to detect that the script attempts to invoke `zsh` even if it is not installed, which may lead to a runtime error."
+                "where": "env zsh"
             }
         }
     ]
