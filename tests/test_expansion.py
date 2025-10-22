@@ -7,11 +7,12 @@ import sash.reporter as reporter
 from sash.symb import expand_simple, expand_args_dumb, starting_state
 from sash.state import *
 from sash.frozen import freeze, freeze_thing
+from sash.interpreter_config import InterpConfig
 import shasta.ast_node as AST
 from util import *
 from unittest.mock import Mock, MagicMock
 
-info = ScriptInfo(SetOptionStore())
+config = InterpConfig()
 
 def constant_field(string: str, words: int = 1) -> Field:
     return Field(SymStr((string,)), WordCount(words, words))
@@ -24,7 +25,7 @@ def test_expand():
 
     state = starting_state()
 
-    expanded = [expand_simple(arg, state, info) for arg in script[0].arguments]
+    expanded = [expand_simple(arg, state, config) for arg in script[0].arguments]
     assert len(expanded) == 3
     assert expanded[0] == [constant_field("echo")]
     assert expanded[1] == [constant_field("hi")]
@@ -37,7 +38,7 @@ def test_expand_quotes():
 
     state = starting_state()
 
-    expanded = [expand_simple(arg, state, info) for arg in script[0].arguments]
+    expanded = [expand_simple(arg, state, config) for arg in script[0].arguments]
     assert len(expanded) == 3
     assert expanded[0] == [constant_field("echo")]
     assert expanded[1] == [constant_field("hi there")]
@@ -51,7 +52,7 @@ def test_expand_one_var():
     state = starting_state()\
         .set_env("A", ShellVar(constant_field("hi")))
 
-    expanded = expand_simple(script[0].arguments[0], state, info)
+    expanded = expand_simple(script[0].arguments[0], state, config)
     assert expanded == [constant_field("hi")]
 
 def test_expand_vars():
@@ -64,7 +65,7 @@ def test_expand_vars():
         .set_env("B", ShellVar(constant_field("there")))\
         .set_env("C", ShellVar(constant_field("and here")))
 
-    expanded = [expand_simple(arg, state, info) for arg in script[0].arguments]
+    expanded = [expand_simple(arg, state, config) for arg in script[0].arguments]
     assert len(expanded) == 4
     assert expanded[0] == [constant_field("echo")]
     assert expanded[1] == [constant_field("hi")]
@@ -81,7 +82,7 @@ def test_expand_localvars():
     state = starting_state()\
         .extend_localenv({"1": ShellVar(constant_field("a")),
                           "2": ShellVar(constant_field("b"))})
-    expanded = expand_simple(script[0].arguments[1], state, info)
+    expanded = expand_simple(script[0].arguments[1], state, config)
     assert expanded == [constant_field("b")]
 
 def test_expand_vars_split():
@@ -94,7 +95,7 @@ def test_expand_vars_split():
         .set_env("B", ShellVar(constant_field("there there")))\
         .set_env("C", ShellVar(constant_field("and here")))
 
-    expanded = [expand_simple(arg, state, info) for arg in script[0].arguments]
+    expanded = [expand_simple(arg, state, config) for arg in script[0].arguments]
     assert len(expanded) == 4
     assert expanded[0] == [constant_field("echo")]
     assert expanded[1] == [constant_field("hi hello", 2)]
@@ -112,7 +113,7 @@ def test_expand_vars_joined():
         .set_env("A", ShellVar(constant_field("hi hello", 2)))\
         .set_env("B", ShellVar(constant_field("there")))
 
-    expanded = [expand_simple(arg, state, info) for arg in script[0].arguments]
+    expanded = [expand_simple(arg, state, config) for arg in script[0].arguments]
     assert len(expanded) == 7
     assert expanded[0] == [constant_field("echo")]
     assert expanded[1] == [constant_field("hi hellohi hello", 3)]
@@ -129,7 +130,7 @@ def test_expand_undefined_var():
 
     state = starting_state()
 
-    expanded = [expand_simple(arg, state, info) for arg in script[0].arguments]
+    expanded = [expand_simple(arg, state, config) for arg in script[0].arguments]
     assert len(expanded) == 2
     assert expanded[0] == [constant_field("echo")]
     assert expanded[1] == [Field(CompletelyArbitrary(freeze(script[0].arguments[1][0]),
@@ -145,7 +146,7 @@ def test_expand_cmdsubst():
 
     state = starting_state()
 
-    expanded = [expand_simple(arg, state, info) for arg in script[0].arguments]
+    expanded = [expand_simple(arg, state, config) for arg in script[0].arguments]
     assert len(expanded) == 2
     assert expanded[0] == [constant_field("echo")]
     assert expanded[1] == [Field(CompletelyArbitrary(freeze(script[0].arguments[1][0]),
@@ -159,7 +160,7 @@ def test_expand_d2concat():
     assert isinstance(script[0], AST.CommandNode)
 
     state = starting_state()
-    expanded = expand_simple(script[0].arguments[2], state, info)
+    expanded = expand_simple(script[0].arguments[2], state, config)
     assert expanded == [Field(CompletelyArbitrary(freeze(script[0].arguments[2][0]),
                                                   ArbitraryType.APPROXIMATION,
                                                   state,
@@ -172,7 +173,7 @@ def test_expand_pre_and_suffix():
     assert isinstance(script[0], AST.CommandNode)
 
     state = starting_state()
-    expanded = expand_simple(script[0].arguments[2], state, info)
+    expanded = expand_simple(script[0].arguments[2], state, config)
     assert expanded == [Field(CompletelyArbitrary(freeze(script[0].arguments[2][1]),
                                                   ArbitraryType.APPROXIMATION,
                                                   state,
@@ -185,7 +186,7 @@ def test_expand_pre_and_suffix():
     assert isinstance(script[0], AST.CommandNode)
 
     state = starting_state()
-    expanded = expand_simple(script[0].arguments[2], state, info)
+    expanded = expand_simple(script[0].arguments[2], state, config)
     assert expanded == [Field(CompletelyArbitrary(freeze_thing([script[0].arguments[2][1], script[0].arguments[2][3]]),
                                                   ArbitraryType.APPROXIMATION,
                                                   state,
@@ -201,7 +202,7 @@ def test_expand_args_dumb():
 
     state = starting_state()
 
-    _, expanded = expand_args_dumb([Trace((state,))], script[0].arguments, info)
+    _, expanded = expand_args_dumb([Trace((state,))], script[0].arguments, config)
     assert len(expanded) == 3
     assert expanded[0] == constant_field("rm")
     assert expanded[1] == constant_field("-rf")

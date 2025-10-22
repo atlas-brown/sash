@@ -2,7 +2,7 @@ from dataclasses import dataclass, field, replace
 import sash.constraints
 import shasta.ast_node as AST
 import logging
-from typing import Callable, Optional
+from typing import Callable, Optional, Any
 from enum import Enum
 from sash.frozen import FrozenAst, FrozenDict
 
@@ -99,15 +99,18 @@ class State:
     last_exit_code: SymStr
     last_cmd: Optional[FrozenAst]
 
+    external_data: Any = None # ASSUMPTION: must be hashable
+
     # NOTE: (and beware) intentionally ignoring pathcond in equality and hash
     def __hash__(self):
-        return hash((self.env, self.localenv, self.fundefs, self.last_exit_code, self.last_cmd))
+        return hash((self.env, self.localenv, self.fundefs, self.last_exit_code, self.last_cmd, self.external_data))
     def __eq__(self, other):
         return self.env == other.env \
             and self.localenv == other.localenv \
             and self.fundefs == other.fundefs \
             and self.last_exit_code == other.last_exit_code \
-            and self.last_cmd == other.last_cmd
+            and self.last_cmd == other.last_cmd \
+            and self.external_data == other.external_data
 
     def set_env(self, var: str, value: ShellVar) -> 'State':
         return replace(self, env=self.env.set(var, value))
@@ -138,6 +141,9 @@ class State:
 
     def lookup_fundef(self, name: str) -> Optional[FrozenAst]:
         return self.fundefs.get(name, None)
+
+    def set_external(data) -> 'State':
+        return replace(self, external_data=data)
 
 @dataclass(frozen=True)
 class Trace:

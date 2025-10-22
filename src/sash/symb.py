@@ -14,15 +14,15 @@ from sash.shell_parser import *
 from sash.state import *
 from sash.config import Config
 from sash.reporter import Reporter
+from sash.interpreter_config import InterpConfig
 import sash.reporter as reporter
 import sash.symb_utils as symb_utils
 
 def handle_commandnode(traces: Traces,
                        node: AST.CommandNode,
-                       info: ScriptInfo,
-                       cb: Optional[Callable[[list[Field]], None]]) -> Traces:
+                       config: InterpConfig) -> Traces:
     logging.debug(f"Handling command node {trim_string_for_logging(node.pretty())} with {len(traces)} traces")
-    t1, expanded_args = expand_args_dumb(traces, node.arguments, info)
+    t1, expanded_args = expand_args_dumb(traces, node.arguments, config)
     logging.debug(f"Expanded cmd to {expanded_args}")
 
     if expanded_args:
@@ -32,15 +32,14 @@ def handle_commandnode(traces: Traces,
             case some_name if isinstance(some_name, str):
                 # todo: we could actually not use `expand_args_dumb` here, and instead do trace-specific expansion, since the function body is handled trace-specifically anyway
                 # deferred for now until we actually need it (see test_function_call_multipath)
-                t1 = handle_function_call_or_unknown(some_name, expanded_args[1:], t1, info)
+                t1 = handle_function_call_or_unknown(some_name, expanded_args[1:], t1, config)
             case _:
                 logging.debug(f"Non-constant command invocation {expanded_args}, optimistically treating as no-op")
     t2 = t1
     for redir in node.redir_list:
-        t2 = t2.extend(guarded_interp_node(t1, redir, info)) or t2
+        t2 = t2.extend(guarded_interp_node(t1, redir, config)) or t2
 
-    if cb is not None:
-        cb(expanded_args)
+    config.apply_expanded_command_cbs(expanded_args)
     logging.debug(f"Done with command {trim_string_for_logging(node.pretty())} after expanding its args to {expanded_args} (it had assignments: {node.assignments})")
     return t2
 
@@ -63,7 +62,7 @@ def handle_rm(expanded_args: List[Field]) -> None:
 def handle_function_call_or_unknown(func_name: str,
                                     arg_fields: List[Field],
                                     traces: Traces,
-                                    info: ScriptInfo) -> Traces:
+                                    config: InterpConfig) -> Traces:
     # is it a known function, and the same one across all traces?
     func_defs = {t.latest_state.lookup_fundef(func_name) for t in traces}
     if len(func_defs) == 1:
@@ -73,7 +72,7 @@ def handle_function_call_or_unknown(func_name: str,
         else:
             the_func = func_defs.pop()
             assert isinstance(the_func, FrozenAst)
-            return handle_function_call(the_func.ast, arg_fields, traces, info)
+            return handle_function_call(the_func.ast, arg_fields, traces, config)
     else:
         logging.error(f"Name {func_name} is defined as different functions across traces, giving up on this call")
         return traces
@@ -81,7 +80,7 @@ def handle_function_call_or_unknown(func_name: str,
 def handle_function_call(func_node: AST.DefunNode,
                          arg_fields: List[Field],
                          traces: Traces,
-                         info: ScriptInfo) -> Traces:
+                         config: InterpConfig) -> Traces:
     logging.debug(f"Handling function call to {trim_string_for_logging(func_node.pretty())} with args {arg_fields}")
     # As long as arg_fields are a single word, map those to local positional parameters
     # as soon as we hit a field that is not a single word, give up
@@ -96,38 +95,39 @@ def handle_function_call(func_node: AST.DefunNode,
     t1 = []
     for t in traces:
         t1.append(t.extend(lambda s: s.extend_localenv(localenv)))
-    return guarded_interp_node(t1, func_node.body, info)
+    return guarded_interp_node(t1, func_node.body, config)
 
 def record_assignment(trace: Trace, var: str, rhs: Field) -> Trace:
     return trace.extend(lambda s: s.set_env(var, ShellVar(rhs)))
 
 def handle_while(traces: Traces,
                  node: AST.WhileNode,
-                 info: ScriptInfo):
+                 config: InterpConfig):
     logging.debug(f"Checking while loop for an infinite loop")
     test_cmds = []
     def get_the_test(cmd_fields):
         test_cmds.append(cmd_fields)
+    temp_config = config.add_expanded_command_callback(get_the_test)
     logging.debug(f"Interpreting first iteration")
-    t1 = guarded_interp_node(traces, node.test, info, get_the_test)
+    t1 = guarded_interp_node(traces, node.test, temp_config)
     logging.debug(f"collected test_cmds: {test_cmds}")
     # Special case: never runs
     if interpret_test(test_cmds[0]) == False:
         logging.debug(f"While loop never runs")
         return t1
     # todo extend path condition
-    t2 = guarded_interp_node(t1, node.body, info)
+    t2 = guarded_interp_node(t1, node.body, config)
     logging.debug(f"Interpreting second iteration")
-    t3 = guarded_interp_node(t2, node.test, info, get_the_test)
+    t3 = guarded_interp_node(t2, node.test, temp_config)
     # Special case: only one iteration
     if interpret_test(test_cmds[1]) == False:
         logging.debug(f"While loop only runs once")
         return t3
     logging.debug(f"collected test_cmds: {test_cmds}")
     # todo extend path condition
-    t4 = guarded_interp_node(t3, node.body, info)
+    t4 = guarded_interp_node(t3, node.body, config)
     logging.debug(f"Interpreting third test")
-    t5 = guarded_interp_node(t4, node.test, info, get_the_test)
+    t5 = guarded_interp_node(t4, node.test, temp_config)
     logging.debug(f"collected test_cmds: {test_cmds}")
 
     logging.debug(f"Checking constant test cond")
@@ -221,10 +221,12 @@ def interpret_test(cmd: list[Field]) -> bool | None:
 #                  Symbolic Expander
 # ============================================================
 
-def expand(traces: Traces, stuff: list[AST.ArgChar], info: ScriptInfo) -> list[tuple[Trace, list[Field]]]:
+def expand(traces: Traces,
+           stuff: list[AST.ArgChar],
+           config: InterpConfig) -> list[tuple[Trace, list[Field]]]:
     res = []
     for trace in traces:
-        res.append((trace, expand_simple(stuff, trace.latest_state, info)))
+        res.append((trace, expand_simple(stuff, trace.latest_state, config)))
         # if expanded := expand_simple(stuff, trace.latest_state):
         #     res.append((trace, expanded))
         # else:
@@ -232,7 +234,9 @@ def expand(traces: Traces, stuff: list[AST.ArgChar], info: ScriptInfo) -> list[t
     return res
 
 # Different fields are definitely separated; things within a field *may be separated as well!*
-def expand_simple(stuff: list[AST.ArgChar], state: State, info: ScriptInfo) -> list[Field]:
+def expand_simple(stuff: list[AST.ArgChar],
+                  state: State,
+                  config: InterpConfig) -> list[Field]:
     IFS = " \t\n"
 
     def expand_inner(chars: list[AST.ArgChar], quoted: bool = False) -> list[Field]:
@@ -292,6 +296,7 @@ def expand_simple(stuff: list[AST.ArgChar], state: State, info: ScriptInfo) -> l
                         if var.fmt == "Normal":
                             add_a_field(v.value)
                         else:
+                            # TODO: a straightforward handling for default value expansion is to branch: in one case we treat the result as whatever the lookup gave (or arbitrary if unknown), and in the other case we use the default value
                             logging.info(f"expansion: treating var {var.pretty()} with unhandled fmt {var.fmt} as completely arbitrary field")
                             add_a_field(arbitrary_field(var, ArbitraryType.APPROXIMATION, state))
                     else:
@@ -304,7 +309,7 @@ def expand_simple(stuff: list[AST.ArgChar], state: State, info: ScriptInfo) -> l
                     logging.info(f"expansion: treating backquote argchar {b.pretty()} as completely arbitrary field")
                     add_a_field(arbitrary_field(b, ArbitraryType.APPROXIMATION, state))
                     # todo use the trace
-                    t = guarded_interp_node([Trace((state,))], b.node, info)
+                    t = guarded_interp_node([Trace((state,))], b.node, config)
                 case _:
                     # todo: if its a command substitution, need to go interp it
                     logging.error(f"argchar: {argchar} {type(argchar)}")
@@ -319,11 +324,13 @@ def expand_simple(stuff: list[AST.ArgChar], state: State, info: ScriptInfo) -> l
 
     return expand_inner(stuff)
 
-def expand_args_dumb(traces: Traces, args: list[list[AST.ArgChar]], info: ScriptInfo) -> tuple[Traces, list[Field]]:
+def expand_args_dumb(traces: Traces,
+                     args: list[list[AST.ArgChar]],
+                     config: InterpConfig) -> tuple[Traces, list[Field]]:
     expanded_args: List[Field] = []
     res_traces = traces
     for arg in args:
-        expansions = expand(res_traces, arg, info)
+        expansions = expand(res_traces, arg, config)
         res_traces = [expansion[0] for expansion in expansions]
         expanded_fields = [expansion[1] for expansion in expansions]
         # for each trace, we have a list of fields that this arg expands to
@@ -346,8 +353,10 @@ def expand_args_dumb(traces: Traces, args: list[list[AST.ArgChar]], info: Script
     return res_traces, expanded_args
 
 
-def expand_assuming_single_constant_word(traces: Traces, stuff: list[AST.ArgChar], info: ScriptInfo) -> tuple[Traces, str]:
-    t0, fields = expand_args_dumb(traces, [stuff], info)
+def expand_assuming_single_constant_word(traces: Traces,
+                                         stuff: list[AST.ArgChar],
+                                         config: InterpConfig) -> tuple[Traces, str]:
+    t0, fields = expand_args_dumb(traces, [stuff], config)
     match fields:
         case [Field(SymStr((one_word,)), WordCount(1, 1))] if isinstance(one_word, str):
             return t0, one_word
@@ -479,80 +488,91 @@ def merge_counts(c1: WordCount, c2: WordCount, sep: int = 0) -> WordCount:
 
 
 
+
+
 # ============================================================
 #                  Symbolic Interpreter
 # ============================================================
 
 context_line = None
 
+trace_count = 1
+def collapse_traces_if_too_many(traces: Traces) -> Traces:
+    global trace_count
+    if len(traces) > trace_count:
+        logging.debug(f"Too many traces ({len(traces)}), collapsing")
+        traces = collapse_traces(traces)
+        trace_count = len(traces)
+        logging.debug(f"Collapsed to {trace_count} traces")
+    return traces
+
 def guarded_interp_node(traces: Traces,
                         node: AST.AstNode,
-                        info: ScriptInfo,
-                        command_cb: Optional[Callable[[list[Field]], None]] = None) -> Traces:
+                        config: InterpConfig) -> Traces:
     try:
-        return interp_node(traces, node, info, command_cb)
+        return interp_node(traces, node, config)
     except NotImplementedError as e:
         logging.error(f"Interp raised: {traceback.format_exc()}. Ignoring.")
         return traces
 
 def interp_node(traces: Traces,
                 node: AST.AstNode,
-                info: ScriptInfo,
-                command_cb: Optional[Callable[[list[Field]], None]] = None) -> Traces:
+                config: InterpConfig) -> Traces:
     # refer to https://github.com/binpash/shasta/blob/main/shasta/ast_node.py
-    traces = maybe_collapse_traces(traces)
+    traces = config.trace_collapser(traces)
+    traces = config.apply_node_cbs(traces, node)
     logging.debug(f"Interpreting {trim_string_for_logging(node.pretty())} with {len(traces)} traces")
     match node:
         case AST.CommandNode() if not (node.arguments == [] and node.assignments != []):
-            return handle_commandnode(traces, node, info, command_cb)
+            return handle_commandnode(traces, node, config)
         case AST.CommandNode() if node.arguments == [] and node.assignments != []: # why is kind of parse possible??
             # do the assignments inside
             t = traces
             for assign in node.assignments:
-                t = guarded_interp_node(t, assign, info)
+                t = guarded_interp_node(t, assign, config)
             return t
 
         case AST.IfNode():
             # todo: early exit if condition is constant false
-            t1 = guarded_interp_node(traces, node.cond, info)
+            t1 = guarded_interp_node(traces, node.cond, config)
             # todo: extend pathcond with actual condition true/false
             t2 = guarded_interp_node(trace_map(t1, lambda s: s.add_pathcond(f"cond_L{context_line}:true")),
                                      node.then_b,
-                                     info)
+                                     config)
             if node.else_b is not None:
                 t3 = guarded_interp_node(trace_map(t1, lambda s: s.add_pathcond(f"cond_L{context_line}:false")),
                                          node.else_b,
-                                         info)
+                                         config)
                 return t2 + t3
             else:
                 return t2
 
         case AST.CaseNode():
-            t1, case_arg_fields = expand_args_dumb(traces, [node.argument], info)
+            t1, case_arg_fields = expand_args_dumb(traces, [node.argument], config)
             res = []
             for case in node.cases:
                 # todo handle patterns; this is like a conditional, we could learn something about pathcond here
                 res.extend(guarded_interp_node(trace_map(t1, lambda s: s.add_pathcond(f"case_L{context_line}_pattern_{case['cpattern']}:matched")),
                                                case["cbody"],
-                                               info))
+                                               config))
             return res
 
         case AST.AssignNode():
-            trace_expansion_pairs = expand(traces, node.val, info)
+            trace_expansion_pairs = expand(traces, node.val, config)
             return [record_assignment(t, node.var, join_fields(rhs)) for (t, rhs) in trace_expansion_pairs]
 
 
         case AST.SemiNode():
-            t2 = guarded_interp_node(traces, node.left_operand, info, command_cb)
-            return guarded_interp_node(t2, node.right_operand, info, command_cb)
+            t2 = guarded_interp_node(traces, node.left_operand, config)
+            return guarded_interp_node(t2, node.right_operand, config)
 
 
         case AST.WhileNode():
-            return handle_while(traces, node, info)
+            return handle_while(traces, node, config)
 
         case AST.ForNode():
-            t0, var_name = expand_assuming_single_constant_word(traces, node.variable, info)
-            t1, items = expand_args_dumb(t0, node.argument, info)
+            t0, var_name = expand_assuming_single_constant_word(traces, node.variable, config)
+            t1, items = expand_args_dumb(t0, node.argument, config)
             if join_fields(items).count.max <= 1:
                 Reporter.add_error(reporter.LoopRunsOnce())
             # Interpret the for loop body
@@ -564,12 +584,12 @@ def interp_node(traces: Traces,
             # If the arguments are known statically we can even do every iteration.
             # Otherwise, we should do it with a *fresh* arbitrary_field every time!
             # (maybe need to add an extra distinguisher to CompletelyArbitrary for that?)
-            t3 = guarded_interp_node(t2, node.body, info)
+            t3 = guarded_interp_node(t2, node.body, config)
             return t3
 
         case AST.FileRedirNode():
             res = []
-            for t, redir_args in expand(traces, node.arg, info):
+            for t, redir_args in expand(traces, node.arg, config):
                 res.append(t)
                 match redir_args:
                     case [Field(SymStr([something]), WordCount(1, 1))]:
@@ -585,16 +605,16 @@ def interp_node(traces: Traces,
             return res
 
         case AST.RedirNode():
-            t1 = guarded_interp_node(traces, node.node, info)
+            t1 = guarded_interp_node(traces, node.node, config)
             t2 = t1
             for redir in node.redir_list:
-                t2 = guarded_interp_node(t2, redir, info)
+                t2 = guarded_interp_node(t2, redir, config)
             return t2
 
 
         case AST.DefunNode():
             # Note: the type annotation in the Shasta source code is *wrong* for node.name -- it's a string
-            t1, name = expand_assuming_single_constant_word(traces, node.name, info)
+            t1, name = expand_assuming_single_constant_word(traces, node.name, config)
             return trace_map(t1, lambda s: s.set_fundef(name, freeze(node)))
 
         # todo bring other cases as needed
@@ -604,16 +624,6 @@ def interp_node(traces: Traces,
                     f"node type {type(node)} not handled",
                     node
                 )
-
-trace_count = 1
-def maybe_collapse_traces(traces: Traces) -> Traces:
-    global trace_count
-    if len(traces) > trace_count:
-        logging.debug(f"Too many traces ({len(traces)}), collapsing")
-        traces = collapse_traces(traces)
-        trace_count = len(traces)
-        logging.debug(f"Collapsed to {trace_count} traces")
-    return traces
 
 def starting_state() -> State:
     # env["IFS"] = ShellVar(" \t\n")
@@ -638,14 +648,14 @@ class AST_parse:
 def trim_string_for_logging(s: str, max_len: int = 300) -> str:
     return s if len(s) <= max_len else s[:max_len] + "..."
 
-def symb_engine(nodes: list[AST_parse], info: ScriptInfo) -> list[Trace]:
+def symb_engine(nodes: list[AST_parse], config: InterpConfig) -> list[Trace]:
     global context_line
     logging.debug(f"Running symb engine with {len(nodes)} raw nodes")
     traces = [Trace((starting_state(),))]
     for node in nodes:
         context_line = node.line_before
         logging.debug(f"Interpreting next node (line {context_line}) {trim_string_for_logging(node.ast_node.pretty())}")
-        traces = guarded_interp_node(traces, node.ast_node, info)
+        traces = guarded_interp_node(traces, node.ast_node, config)
 
     return traces
 
@@ -657,10 +667,11 @@ def parse_script(filename) -> list[AST_parse]:
     return nodes
 
 
-def symbexec_file(input_file: str) -> Traces:
+def symbexec_file(input_file: str,
+                  config: InterpConfig = InterpConfig(trace_collapser = collapse_traces_if_too_many)) -> Traces:
     nodes = parse_script(input_file)
     # opt_store = parse_shebang_args(input_file)
-    return symb_engine(nodes, ScriptInfo(None))
+    return symb_engine(nodes, config)
 
 
 def main(file: str) -> dict:
@@ -669,7 +680,7 @@ def main(file: str) -> dict:
     try:
         symbexec_file(file)
     except Exception:
-        logging.info(f"Failed due to {traceback.format_exc()}.Returning unknown")
+        logging.error(f"Failed due to {traceback.format_exc()}.Returning unknown")
 
     report_dict = Reporter.get_report()
     logging.info("Time taken: " + str(report_dict["time"]))
