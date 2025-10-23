@@ -1,5 +1,5 @@
 bugs:
-  line: 15
+- line: 15
   description: An unset variable is appended to itself while set -u is enabled
 
 sources:
