@@ -1,1 +1,0 @@
-https://stackoverflow.com/questions/49562688/trying-to-iterate-through-files-stored-in-variables

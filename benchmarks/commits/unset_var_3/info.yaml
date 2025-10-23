@@ -1,0 +1,14 @@
+bugs:
+- line: 25
+  description: An unset variable is used ($file)
+
+sources:
+- https://github.com/spf13/spf13-vim/commit/52355abace2a055ba41cf905f9e7f78d14f33398
+
+ground_truth:
+  errors:
+  - line: 25
+    code: unbound
+    shellcheck:
+      detects: true
+      code: SC2153

@@ -1,0 +1,14 @@
+bugs:
+- line: 7
+  description: Unquoted variable in rm can word-split and delete arbitrary files
+
+sources:
+- https://apple.slashdot.org/comments.pl?sid=23365&cid=2518563
+
+ground_truth:
+  errors:
+  - line: 7
+    code: word_split
+    shellcheck:
+      detects: true
+      code: SC2086

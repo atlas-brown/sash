@@ -1,0 +1,25 @@
+bugs:
+- line: 131
+  description: Everything under / is deleted when an environment variable is unset
+- line: 144
+  description: Everything under / is deleted when an environment variable is unset
+
+sources:
+- https://github.com/mozilla-services/squid-rpm/blob/47880414f17affdbb634b6f0a19a342995fb60f6/SOURCES/squid.init
+- https://bugzilla.redhat.com/show_bug.cgi?id=1102343
+
+notes:
+- The script is costructed by combining the full script from the first source with a snippet from the second source
+
+ground_truth:
+  errors:
+  - line: 131
+    code: del_sys_file
+    shellcheck:
+      detects: true
+      code: SC2115
+  - line: 144
+    code: del_sys_file
+    shellcheck:
+      detects: true
+      code: SC2115

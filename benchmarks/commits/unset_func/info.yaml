@@ -1,0 +1,18 @@
+bugs:
+- line: 75
+  description: Function is called before it is defined
+
+sources:
+- https://github.com/ohmyzsh/ohmyzsh/commit/5a5c93b33493b47d34dd470eb851aaf24fa87536
+
+ground_truth:
+  errors:
+  - line: 75
+    code: unbound_function
+    shellcheck:
+      detects: true
+      code: SC2218
+
+    note: 'todo for implementation: catching this bug requires either two passes over
+      the script, or tracking of every command executed (how to know that git_compare_version
+      is not just a command?)'

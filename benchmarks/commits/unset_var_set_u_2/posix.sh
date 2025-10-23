@@ -12,7 +12,7 @@ cd zita-resampler
 cmake .
 sudo make install
 cd ..
-export DYLD_LIBRARY_PATH=/usr/local/lib:$DYLD_LIBRARY_PATH # bug here: DYLD_LIBRARY_PATH could be empty but it's expected
+export DYLD_LIBRARY_PATH=/usr/local/lib:$DYLD_LIBRARY_PATH # bug here: DYLD_LIBRARY_PATH could be empty but that's expected
 # build audiowmark
 ./autogen.sh
 make

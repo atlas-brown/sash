@@ -1,0 +1,13 @@
+bugs:
+- TBD
+
+sources:
+- https://www.shellscript.sh/examples/rm-rf/
+
+ground_truth:
+  errors:
+  - line: 24
+    code: could_del_sys_file
+    note: todo worth discussing
+    shellcheck:
+      detects: true

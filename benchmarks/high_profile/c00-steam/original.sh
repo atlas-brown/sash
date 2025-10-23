@@ -14,7 +14,7 @@ ARCHIVE_EXT=tar.xz
 # directory lives - and all this in a subshell, so we don't affect
 # $PWD
 
-STEAMROOT="$(cd "${0%/*}" && echo $PWD)" # bug here (1)
+STEAMROOT="$(cd "${0%/*}" && echo $PWD)"
 STEAMDATA="$STEAMROOT"
 if [ -z $STEAMEXE ]; then
   STEAMEXE=`basename "$0" .sh`
@@ -356,7 +356,7 @@ reset_steam()
 	done
 
 	# Scary!
-	rm -rf "$STEAMROOT/"* # bug here (2)
+	rm -rf "$STEAMROOT/"*
 
 	# Move things back into place
 	mv -f "$STEAM_SAVE/"* "$STEAMROOT/"

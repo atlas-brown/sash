@@ -356,7 +356,7 @@ reset_steam()
 	done
 
 	# Scary!
-	rm -rf "$STEAMROOT/"* # bug here: will delete root if line 17 fails
+	rm -rf "${STEAMROOT:?}/"*
 
 	# Move things back into place
 	mv -f "$STEAM_SAVE/"* "$STEAMROOT/"

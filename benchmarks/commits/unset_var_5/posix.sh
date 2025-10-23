@@ -1,7 +1,5 @@
 #!/bin/sh
 
-# https://github.com/nvm-sh/nvm/commit/5904d41b253e03d7ad0f3b58ce081e46e44f3c9a
-
 set -e
 
 nvm_has() {
@@ -85,7 +83,7 @@ install_nvm_as_script() {
     echo "=> Downloading nvm as script to '$NVM_DIR'"
   fi
   nvm_download -s "$_source" -o "$NVM_DIR/nvm.sh" || { # bug here: _source is unset
-    echo >&2 "Failed to download '$_source'.."
+    echo >&2 "Failed to download '$_source'.." # bug here: _source is unset
     unset local_NVM_SOURCE
     return 1
   }

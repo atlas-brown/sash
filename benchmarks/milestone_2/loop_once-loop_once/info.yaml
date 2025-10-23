@@ -1,0 +1,19 @@
+bugs:
+- line: 8
+  description: For loop only iterates once because its argument is quoted
+- line: 15
+  description: For loop only iterates once because its argument is quoted
+
+sources:
+- https://stackoverflow.com/questions/48919816/i-am-having-a-hard-time-why-the-if-statements-dont-work-in-shellscript
+
+ground_truth:
+  errors:
+  - line: 8
+    code: loop_once
+    shellcheck:
+      detects: false
+  - line: 15
+    code: loop_once
+    shellcheck:
+      detects: false

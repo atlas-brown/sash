@@ -1,1 +1,0 @@
-https://github.com/icy/bash-coding-style/blob/master/examples/steam.sh

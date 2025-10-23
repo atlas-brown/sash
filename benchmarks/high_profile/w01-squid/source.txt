@@ -1,2 +1,0 @@
-https://github.com/mozilla-services/squid-rpm/blob/47880414f17affdbb634b6f0a19a342995fb60f6/SOURCES/squid.init
-https://bugzilla.redhat.com/show_bug.cgi?id=1102343

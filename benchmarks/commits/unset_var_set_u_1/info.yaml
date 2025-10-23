@@ -1,0 +1,14 @@
+bugs:
+- line: 16
+  description: An unset variable is checked for emptiness while set -u is enabled
+
+sources:
+- https://opendev.org/openstack/bifrost/commit/7fb32dd599c0d8b5d231cd30c5a8a1ef5142110a
+
+ground_truth:
+  errors:
+  - line: 16
+    code: unbound_setu
+    shellcheck:
+      detects: false
+      note: Unclear why it's not detected

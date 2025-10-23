@@ -1,3 +1,5 @@
+#!/bin/sh
+
 main() {
   # Use colors, but only if connected to a terminal, and that terminal
   # supports them.
@@ -24,7 +26,7 @@ main() {
   # which may fail on systems lacking tput or terminfo
   set -e
 
-  if command -v zsh >/dev/null 2>&1; then
+  if ! command -v zsh >/dev/null 2>&1; then
     printf "${YELLOW}Zsh is not installed!${NORMAL} Please install zsh first!\n"
     exit
   fi

@@ -1,0 +1,30 @@
+bugs:
+- line: 179
+  description: Log file is deleted due to improper exit code checking
+- line: 203
+  description: Log file is deleted due to improper exit code checking
+
+sources:
+- https://git.launchpad.net/ubuntu/+source/backup-manager/commit/lib/backup-methods.sh?id=59cdd322f7772d40b6aff25b6720796271f4deba
+
+notes:
+- To produce posix.sh, some array loops and references were changed to normal variable
+  loops and references, because the arrays in question are not defined in the script anyways.
+- The original fix uses PIPESTATUS, which is not POSIX compliant; the fixed version captures
+  the exit code of the first command in the pipeline by storing it in a temporary variable
+
+ground_truth:
+  errors:
+  - line: 179
+    code: const_cond
+    shellcheck:
+      detects: true
+      code: SC2181
+      note: Warns about not checking exit codes indirectly; it's a 'style' check
+  - line: 203
+    code: const_cond
+    note: This is only const along one execution path
+    shellcheck:
+      detects: true
+      code: SC2181
+      note: Warns about not checking exit codes indirectly; it's a 'style' check

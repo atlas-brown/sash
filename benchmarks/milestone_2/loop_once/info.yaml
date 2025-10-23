@@ -1,0 +1,13 @@
+bugs:
+- line: 6
+  description: For loop only iterates once because its argument expands to one word
+
+sources:
+- https://stackoverflow.com/questions/49562688/trying-to-iterate-through-files-stored-in-variables
+
+ground_truth:
+  errors:
+  - line: 6
+    code: loop_once
+    shellcheck:
+      detects: false

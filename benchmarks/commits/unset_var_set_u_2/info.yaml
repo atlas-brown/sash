@@ -1,0 +1,15 @@
+bugs:
+  line: 15
+  description: An unset variable is appended to itself while set -u is enabled
+
+sources:
+- https://code.uplex.de/stefan/audiowmark/commit/95db9c5f0b7788aff65f2d85eaedd0c01ba960ac
+
+ground_truth:
+  errors:
+  - line: 15
+    code: unbound_setu
+    shellcheck:
+      detects: false
+
+    note: Care is needed when implementing this check

@@ -1,0 +1,19 @@
+bugs:
+- line: 30
+  description: Command stdout is redirected to function
+- line: 30
+  description: Command stderr is redirected to function
+
+sources:
+- https://stackoverflow.com/questions/49043790/customized-function-for-error-logs-scripting
+
+ground_truth:
+  errors:
+  - line: 30
+    code: redir_func
+    shellcheck:
+      detects: false
+  - line: 30
+    code: redir_func
+    shellcheck:
+      detects: false

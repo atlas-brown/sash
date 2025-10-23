@@ -1,0 +1,26 @@
+bugs:
+- line: 6
+  description: An unset variable is used ($directorytocopy)
+- line: 6
+  description: If condition is constant
+- line: 10
+  description: Dead code due to guaranteed early exit
+
+sources:
+- https://stackoverflow.com/questions/48706718/error-with-bash-script-using-rsync-to-copy-directory-with-space-in-directory-nam
+
+ground_truth:
+  errors:
+  - line: 6
+    code: unset_var
+    shellcheck:
+      detects: true
+      code: SC2154
+  - line: 6
+    code: const_cond
+    shellcheck:
+      detects: false
+  - line: 10
+    code: dead_code
+    shellcheck:
+      detects: false

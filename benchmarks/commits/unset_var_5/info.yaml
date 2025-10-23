@@ -1,0 +1,21 @@
+bugs:
+- line: 85
+  description: An unset variable is used ($_source)
+- line: 86
+  description: An unset variable is used ($_source)
+
+sources:
+- https://github.com/nvm-sh/nvm/commit/5904d41b253e03d7ad0f3b58ce081e46e44f3c9a
+
+ground_truth:
+  errors:
+  - line: 85
+    code: unbound
+    shellcheck:
+      detects: true
+      code: SC2153
+  - line: 86
+    code: unbound
+    shellcheck:
+      detects: false
+      note: Probably fails because the variable is used in a brace command

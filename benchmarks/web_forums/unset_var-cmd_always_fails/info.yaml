@@ -1,0 +1,21 @@
+bugs:
+- line: 9
+  description: An unset variable is used ($OPTARGS)
+- line: 16
+  description: Mkdir fails because its argument is always empty
+
+sources:
+- https://stackoverflow.com/questions/48674985/mkdir-not-working-in-centos-7
+
+ground_truth:
+  errors:
+  - code: unbound
+    line: 9
+    shellcheck:
+      detects: true
+      code: SC2153
+      note: Detects that it's probably a misspelling of $OPTARG
+  - code: command_can_only_fail
+    line: 16
+    shellcheck:
+      detects: false
