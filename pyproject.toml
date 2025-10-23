@@ -8,7 +8,6 @@ authors = [
 ]
 requires-python = ">=3.10"
 dependencies = [
-    "black>=25.1.0",
     "libdash>=0.3.1",
     "pandas>=2.3.2",
     "pash-annotations>=0.2.4",
@@ -19,7 +18,6 @@ dependencies = [
 
 [project.scripts]
 sash = "sash:symb.argmain"
-verify_installation = "sash:verify_installation.main"
 
 [build-system]
 requires = ["uv_build>=0.8.15,<0.9.0"]
@@ -27,7 +25,9 @@ build-backend = "uv_build"
 
 [dependency-groups]
 dev = [
+    "black>=25.9.0",
     "pytest>=8.3.4",
+    "pyyaml>=6.0.3",
 ]
 
 [tool.uv.sources]

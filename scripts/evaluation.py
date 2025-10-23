@@ -3,6 +3,7 @@ import sys
 import os
 import subprocess
 import json
+import yaml
 import sash.reporter
 
 def run_cmd(cmd, check=False, capture_stdout=True):
@@ -20,6 +21,8 @@ def get_git_toplevel():
 
 def find_benchmarks(bench_dir):
     for root, dirs, files in os.walk(bench_dir):
+        # skip files in _not_integrated
+        dirs[:] = [d for d in dirs if d not in "_not_integrated"]
         for name in files:
             if name == "posix.sh":
                 path = os.path.join(root, name)
@@ -30,8 +33,8 @@ def find_benchmarks(bench_dir):
 def load_expected_codes(gt_path):
     try:
         with open(gt_path, "r") as f:
-            data = json.load(f)
-        codes = [e.get("code") for e in data.get("errors", [])]
+            data = yaml.safe_load(f)
+        codes = [e.get("code") for e in data.get("ground_truth", []).get("errors", [])]
         return set(codes)
     except Exception as e:
         print(f"Failed to read/parse ground truth {gt_path}: {e}", file=sys.stderr)
@@ -44,7 +47,7 @@ def extract_codes_from_output(output):
         return set(codes), data
     except Exception:
         return None, None
-    
+
 def get_all_reporter_codes():
     return sash.reporter.Report.all_codes()
 
@@ -56,8 +59,9 @@ def main():
         bench_dir = os.path.join(bench_dir, sys.argv[1])
 
     known_codes = get_all_reporter_codes()
-    with open(os.path.join(top, "benchmarks/codes_out_of_scope.json"), "r") as f:
-        out_of_scope_codes = set(json.load(f))
+    with open(os.path.join(top, "benchmarks/codes_out_of_scope.yaml"), "r") as f:
+        out_of_scope_codes = set(yaml.safe_load(f))
+        print(out_of_scope_codes)
 
     failure = 0
     total = 0
@@ -68,7 +72,7 @@ def main():
         proc = run_cmd(["uv", "run", "sash", benchmark])
         output = proc.stdout
 
-        gt_path = os.path.join(os.path.dirname(benchmark), "ground_truth.json")
+        gt_path = os.path.join(os.path.dirname(benchmark), "info.yaml")
         if not os.path.isfile(gt_path):
             # No ground truth, just print the output
             print(output, end="")
