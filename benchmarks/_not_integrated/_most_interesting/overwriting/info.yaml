@@ -1,0 +1,19 @@
+bugs:
+- line: 3
+  description: Xargs command overwrites all files to the same target
+- line: 5
+  description: Xargs command overwrites all files to the same target
+
+sources:
+- https://stackoverflow.com/questions/70017719/recovering-the-files-that-were-deleted-in-linux-by-using-mv
+
+ground_truth:
+  errors:
+  - line: 3
+    code: TBD
+    shellcheck:
+      detects: false
+  - line: 5
+    code: TBD
+    shellcheck:
+      detects: false
