@@ -13,7 +13,7 @@ def test_unbound_variable(tmp_path):
     # Using an unset variable should produce an unbound error
     script = write_script(tmp_path, "echo $FOO\n")
     report = symb.main(script)
-    expected_error = reporter.UnboundID(foo_var.pretty())
+    expected_error = reporter.UnboundID(foo_var.pretty(), 0)
     assert_expected_report(report, [expected_error])
 
 def test_bound_variable_no_error(tmp_path):
@@ -45,46 +45,46 @@ def test_unbound_variable_cmdsubst(tmp_path):
     # Using an unset variable should produce an unbound error
     script = write_script(tmp_path, "echo $(echo $FOO)\n")
     report = symb.main(script)
-    expected_error = reporter.UnboundID(foo_var.pretty())
+    expected_error = reporter.UnboundID(foo_var.pretty(), 0)
     assert_expected_report(report, [expected_error])
 
     script = write_script(tmp_path, "ls $(echo $FOO)\n")
     report = symb.main(script)
-    expected_error = reporter.UnboundID(foo_var.pretty())
+    expected_error = reporter.UnboundID(foo_var.pretty(), 0)
     assert_expected_report(report, [expected_error])
 
 def test_delete_system_file(tmp_path):
     # Deleting a system file should produce a DeleteSystemFile error
     script = write_script(tmp_path, "rm /usr\n")
     report = symb.main(script)
-    expected_error = reporter.DeleteSystemFile("/usr")
+    expected_error = reporter.DeleteSystemFile("/usr", 0)
     assert_expected_report(report, [expected_error])
 
     script = write_script(tmp_path, "rm $FOO/usr\n")
     report = symb.main(script)
-    expected_error1 = reporter.CouldDeleteSystemFile("")
-    expected_error2 = reporter.UnboundID(foo_var.pretty())
-    expected_error3 = reporter.DangerousWordSplit("$FOO")
+    expected_error1 = reporter.CouldDeleteSystemFile("", 0)
+    expected_error2 = reporter.UnboundID(foo_var.pretty(), 0)
+    expected_error3 = reporter.DangerousWordSplit("$FOO", 0)
     assert_expected_report(report, [expected_error1, expected_error2, expected_error3])
 
 
     script = write_script(tmp_path, "rm -rf $STEAMROOT/*\n")
     report = symb.main(script)
-    expected_error1 = reporter.CouldDeleteSystemFile("")
-    expected_error2 = reporter.UnboundID(foo_var.pretty())
-    expected_error3 = reporter.DangerousWordSplit("$FOO")
+    expected_error1 = reporter.CouldDeleteSystemFile("", 0)
+    expected_error2 = reporter.UnboundID(foo_var.pretty(), 0)
+    expected_error3 = reporter.DangerousWordSplit("$FOO", 0)
     assert_expected_report(report, [expected_error1, expected_error2, expected_error3])
 
     script = write_script(tmp_path, "rm -rf /*\n")
     report = symb.main(script)
-    expected_error = reporter.DeleteSystemFile("/*")
+    expected_error = reporter.DeleteSystemFile("/*", 0)
     assert_expected_report(report, [expected_error])
 
 def test_delete_splitting(tmp_path):
     script = write_script(tmp_path, "rm $UNQUOTED\n")
     report = symb.main(script)
-    expected_error1 = reporter.DangerousWordSplit("$UNQUOTED")
-    expected_error2 = reporter.UnboundID(foo_var.pretty())
+    expected_error1 = reporter.DangerousWordSplit("$UNQUOTED", 0)
+    expected_error2 = reporter.UnboundID(foo_var.pretty(), 0)
     assert_expected_report(report, [expected_error1, expected_error2])
 
 
@@ -93,7 +93,7 @@ def test_redirect_to_function(tmp_path):
     script = write_script(tmp_path, ("myfunc() { echo hi; }\n"
                                      "echo hello > myfunc\n"))
     report = symb.main(script)
-    expected_error = reporter.RedirectToFunction("myfunc")
+    expected_error = reporter.RedirectToFunction("myfunc", 0)
     assert_expected_report(report, [expected_error])
 
 def test_redirect_to_variable_no_error(tmp_path):
@@ -108,13 +108,13 @@ def test_loop_runs_once(tmp_path):
     # A loop over a single constant should produce a LoopRunsOnce warning
     script = write_script(tmp_path, "for i in foo; do echo $i; done\n")
     report = symb.main(script)
-    expected_warning = reporter.LoopRunsOnce()
+    expected_warning = reporter.LoopRunsOnce(None, 0)
     assert_expected_report(report, [expected_warning])
     script = write_script(tmp_path, "FOO=once\n"
                                      "for i in $FOO; do echo $i; done\n")
     report.clear()
     report = symb.main(script)
-    expected_warning = reporter.LoopRunsOnce()
+    expected_warning = reporter.LoopRunsOnce(None, 0)
     assert_expected_report(report, [expected_warning])
 
 def test_loop_runs_multiple_no_warning(tmp_path):
@@ -130,14 +130,14 @@ def test_loop_runs_multiple_no_warning(tmp_path):
 
     script = write_script(tmp_path, "for i in $FOO*.sh; do echo $i; done\n")
     report = symb.main(script)
-    expected_error = reporter.UnboundID(foo_var.pretty())
+    expected_error = reporter.UnboundID(foo_var.pretty(), 0)
     assert_expected_report(report, [expected_error])
 
 def test_constant_while_condition(tmp_path):
     # A while loop with a constant true condition should produce an InfiniteLoop error
     script = write_script(tmp_path, "A=a\nB=b\nwhile [ $A != $B ]; do echo hi; done\n")
     report = symb.main(script)
-    expected_error = reporter.InfiniteLoop(None) # Mock the location
+    expected_error = reporter.InfiniteLoop(None, 0) # Mock the location
     assert_expected_report(report, [expected_error])
 
 def test_constant_while_condition2(tmp_path):
@@ -150,7 +150,7 @@ while [ "$RETAIN" -le "$NUMSNAPS" ]; do
 done
 """)
     report = symb.main(script)
-    expected_error = reporter.InfiniteLoop(None) # Mock the location
+    expected_error = reporter.InfiniteLoop(None, 0) # Mock the location
     assert_expected_report(report, [expected_error])
 
 def test_changing_while_condition_no_error(tmp_path):
@@ -163,7 +163,7 @@ def test_changing_while_condition_error(tmp_path):
     # A while loop where the condition never changes after the first iteration should error
     script = write_script(tmp_path, "A=a\nB=b\nwhile [ $A != $B ]; do A=hello; done\n")
     report = symb.main(script)
-    expected_error = reporter.InfiniteLoop(None) # Mock the location
+    expected_error = reporter.InfiniteLoop(None, 0) # Mock the location
     assert_expected_report(report, [expected_error])
 
 def test_function_call(tmp_path):
@@ -175,7 +175,7 @@ myfunc() {
 myfunc /usr
 """)
     report = symb.main(script)
-    expected_error = reporter.DeleteSystemFile("/usr")
+    expected_error = reporter.DeleteSystemFile("/usr", 0)
     assert_expected_report(report, [expected_error])
 
 def test_case(tmp_path):
@@ -191,7 +191,7 @@ case "$1" in
 esac
 """)
     report = symb.main(script)
-    expected_error = reporter.DeleteSystemFile("/usr")
+    expected_error = reporter.DeleteSystemFile("/usr", 0)
     assert_expected_report(report, [expected_error])
 
 # def test_function_call_multipath(tmp_path):
@@ -208,5 +208,5 @@ esac
 # myfunc "$FOO"
 # """)
 #     report = symb.main(script)
-#     expected_error = reporter.DeleteSystemFile("/usr")
+#     expected_error = reporter.DeleteSystemFile("/usr", 0)
 #     assert_expected_report(report, [expected_error])

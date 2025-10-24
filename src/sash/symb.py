@@ -48,16 +48,16 @@ def handle_rm(expanded_args: List[Field]) -> None:
         return any(path in [p, p + "/", p + "/*"] for p in Config.get("PROTECTED_PATHS"))
     for arg_field in expanded_args[1:]:
         if (path := field_to_str(arg_field)) and is_protected(path):
-            Reporter.add_error(reporter.DeleteSystemFile(path))
+            Reporter.add_error(reporter.DeleteSystemFile(path, context_line))
         match arg_field:
             case Field(CompletelyArbitrary(source=source), WordCount(max=m)) if m > 1:
-                Reporter.add_error(reporter.DangerousWordSplit(source))
+                Reporter.add_error(reporter.DangerousWordSplit(source, context_line))
         match arg_field:
             case Field(CompletelyArbitrary(prefix=pre, suffix=suf), WordCount(min, max)) if min == 0 or max > 1:
                 if pre is not None and (path := symb_utils.symbstr_to_str(pre.parts)) and is_protected(path):
-                    Reporter.add_error(reporter.CouldDeleteSystemFile(path))
+                    Reporter.add_error(reporter.CouldDeleteSystemFile(path, context_line))
                 if suf is not None and (path := symb_utils.symbstr_to_str(suf.parts)) and is_protected(path):
-                    Reporter.add_error(reporter.CouldDeleteSystemFile(path))
+                    Reporter.add_error(reporter.CouldDeleteSystemFile(path, context_line))
 
 def handle_function_call_or_unknown(func_name: str,
                                     arg_fields: List[Field],
@@ -133,7 +133,7 @@ def handle_while(traces: Traces,
     logging.debug(f"Checking constant test cond")
     assert len(test_cmds) == 3
     if is_constant_test(test_cmds[2], test_cmds[1]):
-        Reporter.add_error(reporter.InfiniteLoop(node))
+        Reporter.add_error(reporter.InfiniteLoop(node, context_line))
 
     return t5
 
@@ -301,7 +301,7 @@ def expand_simple(stuff: list[AST.ArgChar],
                             add_a_field(arbitrary_field(var, ArbitraryType.APPROXIMATION, state))
                     else:
                         if not is_special_var(var.var):
-                            Reporter.add_error(reporter.UnboundID(var.pretty())) # todo we should report path information
+                            Reporter.add_error(reporter.UnboundID(var.pretty(), context_line)) # todo we should report path information
                         add_a_field(arbitrary_field(var,
                                                     ArbitraryType.APPROXIMATION if is_special_var(var.var) else ArbitraryType.ENVIRONMENT,
                                                     state))
@@ -574,7 +574,7 @@ def interp_node(traces: Traces,
             t0, var_name = expand_assuming_single_constant_word(traces, node.variable, config)
             t1, items = expand_args_dumb(t0, node.argument, config)
             if join_fields(items).count.max <= 1:
-                Reporter.add_error(reporter.LoopRunsOnce())
+                Reporter.add_error(reporter.LoopRunsOnce(node, context_line))
             # Interpret the for loop body
             t2 = [record_assignment(t, var_name, arbitrary_field(node.argument,
                                                                  ArbitraryType.APPROXIMATION,
@@ -595,7 +595,7 @@ def interp_node(traces: Traces,
                     case [Field(SymStr([something]), WordCount(1, 1))]:
                         if isinstance(something, str) and something in t.latest_state.fundefs:
                             # TODO: Associate the warning with the trace that caused it
-                            Reporter.add_error(reporter.RedirectToFunction(something))
+                            Reporter.add_error(reporter.RedirectToFunction(something, context_line))
                     case [Field(CompletelyArbitrary(), _)]:
                         pass
                     case _:

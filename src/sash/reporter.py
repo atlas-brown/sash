@@ -10,11 +10,14 @@ from typing import Optional
 class Report(ABC):
     code:str
     message : str
+    source_line: int
+
     def __repr__(self) -> str:
-        return f"{self.code}:{self.message}"
+        return f"L{self.source_line}:{self.code}:{self.message}"
 
     def to_dict(self) -> dict:
         return {
+            "line": self.source_line,
             "code": self.code,
             "message": self.message
         }
@@ -42,83 +45,63 @@ class ParseError(Error):
     CODE = "parse"
     def __init__(self,msg : str ="") -> None:
         self.report = f"Failed to parse script {msg}"
-        super().__init__(self.CODE,self.report)
+        super().__init__(self.CODE,self.report, None)
 
 class UnboundID(Error):
     CODE = "unbound"
-    def __init__(self, var):
-        super().__init__(self.CODE, f"no definition found for {var}")
+    def __init__(self, var, line):
+        super().__init__(self.CODE, f"no definition found for {var}", line)
 
 class InfiniteLoop(Error):
     CODE = "infinite_loop"
-    def __init__(self, loop):
-        super().__init__(self.CODE, f"condition for loop {loop} never changes, causing an infinite loop")
+    def __init__(self, loop, line):
+        super().__init__(self.CODE, f"condition for loop {loop} never changes, causing an infinite loop", line)
 
 class ConstantCondition(Warning):
     CODE = "const_cond"
-    def __init__(self):
-        super().__init__(self.CODE, "condition is always true or false")
+    def __init__(self, cond, line):
+        super().__init__(self.CODE, f"condition {cond} is always true or false", line)
 
 class LoopRunsOnce(Warning):
     CODE = "loop_once"
-    def __init__(self):
-        super().__init__(self.CODE, "loop runs only once")
+    def __init__(self, loop, line):
+        super().__init__(self.CODE, f"loop {loop} runs only once", line)
 
 class DeleteSystemFile(Error):
     CODE = "del_sys_file"
-    def __init__(self,filename:str):
-        super().__init__(self.CODE,f"WILL delete system file {filename}")
+    def __init__(self,filename:str, line):
+        super().__init__(self.CODE,f"WILL delete system file {filename}", line)
 
 class CouldDeleteSystemFile(Error):
     CODE = "could_del_sys_file"
-    def __init__(self,filename:str):
-        super().__init__(self.CODE,f"might delete system file {filename}")
+    def __init__(self,filename:str, line):
+        super().__init__(self.CODE,f"might delete system file {filename}", line)
 
 
 class DangerousWordSplit(Warning):
     CODE = "word_split"
-    def __init__(self, source):
-        super().__init__(self.CODE, f"{source} could be split in a dangerous position, leading to unexpected arguments to dangerous commands")
+    def __init__(self, source, line):
+        super().__init__(self.CODE, f"{source} could be split in a dangerous position, leading to unexpected arguments to dangerous commands", line)
 
 class RedirectToFunction(Warning):
     CODE = "redir_func"
-    def __init__(self, function_name: str):
-        super().__init__(self.CODE,f"redirecting output to {function_name}, which is a function, actually writes to a file with that name")
+    def __init__(self, function_name: str, line):
+        super().__init__(self.CODE,f"redirecting output to {function_name}, which is a function, actually writes to a file with that name", line)
 
 class DeadCode(Warning):
     CODE = "dead_code"
-    def __init__(self):
-        super().__init__(self.CODE, "code is unreachable and will never be executed")
+    def __init__(self, code, line):
+        super().__init__(self.CODE, f"{code} is unreachable and will never be executed", line)
 
 class EmptyVar(Warning):
     CODE = "empty_var"
-    def __init__(self, varname: str):
-        super().__init__(self.CODE, f"variable {varname} might be empty")
-
-class MalformedSyntax(Warning):
-    CODE = "malformed_syntax"
-    def __init__(self, detail: str):
-        super().__init__(self.CODE, f"syntax might be malformed or invalid: {detail}")
-
-class EmptyPathSegment(Warning):
-    CODE = "empty_path_segment"
-    def __init__(self, path: str):
-        super().__init__(self.CODE, f"path '{path}' contains an empty segment that may or may not lead to unexpected behavior")
-
-class UnintendedCommand(Warning):
-    CODE = "unintended_cmd"
-    def __init__(self, command: str):
-        super().__init__(self.CODE, f"command '{command}' may not reflect the user's intent")
-
-class UnintendedImmediateExit(Warning):
-    CODE = "unintended_immediate_exit"
-    def __init__(self):
-        super().__init__(self.CODE, "script may exit immediately due to, for instance, 'set -u' and an unset variable access")
+    def __init__(self, varname: str, line):
+        super().__init__(self.CODE, f"variable {varname} might be empty", line)
 
 class IgnoredCommandResult(Warning):
     CODE = "ignored_cmd_result"
-    def __init__(self, command: str):
-        super().__init__(self.CODE, f"the result of command '{command}' is ignored.")
+    def __init__(self, command: str, line):
+        super().__init__(self.CODE, f"the result of command '{command}' is ignored.", line)
 
 class Reporter:
     _filename = ""
