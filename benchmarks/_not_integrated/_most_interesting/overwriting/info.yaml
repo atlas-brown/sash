@@ -10,10 +10,10 @@ sources:
 ground_truth:
   errors:
   - line: 3
-    code: TBD
+    code: file_overwrite
     shellcheck:
       detects: false
   - line: 5
-    code: TBD
+    code: file_overwrite
     shellcheck:
       detects: false

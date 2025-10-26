@@ -10,10 +10,10 @@ sources:
 ground_truth:
   errors:
   - line: 3
-    code: TBD
+    code: unexpected_stdin
     shellcheck:
       detects: false
   - line: 4
-    code: TBD
+    code: unexpected_stdin
     shellcheck:
       detects: false

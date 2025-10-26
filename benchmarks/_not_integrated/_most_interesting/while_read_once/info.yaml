@@ -8,6 +8,6 @@ sources:
 ground_truth:
   errors:
     - line: 11
-      code: TBD
+      code: unexpected_stdin
       shellcheck:
         detects: false

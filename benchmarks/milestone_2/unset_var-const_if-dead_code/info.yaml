@@ -12,7 +12,7 @@ sources:
 ground_truth:
   errors:
   - line: 6
-    code: unset_var
+    code: unbound
     shellcheck:
       detects: true
       code: SC2154
