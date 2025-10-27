@@ -4,10 +4,13 @@ import os
 import subprocess
 import json
 import yaml
+import argparse
+import re
 import sash.reporter
 
-def run_cmd(cmd, check=False, capture_stdout=True):
-    proc = subprocess.run(cmd, shell=False, capture_output=True, text=True)
+# Note: if `timeout` supplied, may raise subprocess.TimeoutExpired
+def run_cmd(cmd, check=False, capture_stdout=True, timeout=None):
+    proc = subprocess.run(cmd, shell=False, capture_output=True, text=True, timeout=timeout)
     if check and proc.returncode != 0:
         raise subprocess.CalledProcessError(proc.returncode, cmd, proc.stdout, proc.stderr)
     return proc
@@ -58,11 +61,19 @@ def get_all_reporter_codes():
     return sash.reporter.Report.all_codes()
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--timeout', type=float, default=None, help='Timeout in seconds for each benchmark (default: no timeout)')
+    parser.add_argument('--benchmarks', type=str, default=None, help='Path to the benchmarks directory (default: top-level "benchmarks")')
+    parser.add_argument('--only', type=str, default=None, help='Regex to filter benchmarks to run (default: run all)')
+    args = parser.parse_args()
+
+    benchmark_filter = re.compile(args.only) if args.only else None
+
     top = get_git_toplevel()
     os.chdir(top)
     bench_dir = os.path.join(top, "benchmarks")
-    if len(sys.argv) > 1 and sys.argv[1]:
-        bench_dir = os.path.join(bench_dir, sys.argv[1])
+    if args.benchmarks:
+        bench_dir = os.path.join(bench_dir, args.benchmarks)
 
     known_codes = get_all_reporter_codes()
     with open(os.path.join(top, "benchmarks/codes_out_of_scope.yaml"), "r") as f:
@@ -73,10 +84,19 @@ def main():
     total = 0
 
     for benchmark in find_benchmarks(bench_dir):
+        if benchmark_filter and not benchmark_filter.search(benchmark):
+            continue
+
         print("\n\n")
         print(f"Running benchmark: {benchmark}")
-        proc = run_cmd(["uv", "run", "sash", benchmark])
-        output = proc.stdout
+        try:
+            proc = run_cmd(["uv", "run", "sash", benchmark], timeout=args.timeout)
+            output = proc.stdout
+        except subprocess.TimeoutExpired:
+            print(f"FAIL: Benchmark timed out after {args.timeout} seconds")
+            failure += 1
+            total += 1
+            continue
 
         gt_path = os.path.join(os.path.dirname(benchmark), "info.yaml")
         if not os.path.isfile(gt_path):
