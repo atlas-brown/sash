@@ -29,6 +29,8 @@ def handle_commandnode(traces: Traces,
         match field_to_str(expanded_args[0]):
             case "rm":
                 handle_rm(expanded_args)
+            case "set":
+                t1 = handle_set(expanded_args, t1)
             case some_name if isinstance(some_name, str):
                 # todo: we could actually not use `expand_args_dumb` here, and instead do trace-specific expansion, since the function body is handled trace-specifically anyway
                 # deferred for now until we actually need it (see test_function_call_multipath)
@@ -216,6 +218,20 @@ def interpret_test(cmd: list[Field]) -> bool | None:
 
     return None
 
+def handle_set(expanded_args: List[Field], traces: Traces) -> Traces:
+    to_set = set()
+    for arg in expanded_args[1:]:
+        match arg:
+            case Field(SymStr([flag]), WordCount(1, 1)) if isinstance(flag, str):
+                if flag.startswith("-"):
+                    to_set.update(flag[1:])
+                else:
+                    raise NotImplementedError(f"set: option unsetting not implemented: {expanded_args}")
+
+            case _:
+                raise NotImplementedError(f"set with non-constant args: {expanded_args}")
+    return trace_map(traces, lambda s: s.set_options(to_set))
+
 
 # ============================================================
 #                  Symbolic Expander
@@ -300,8 +316,10 @@ def expand_simple(stuff: list[AST.ArgChar],
                             logging.info(f"expansion: treating var {var.pretty()} with unhandled fmt {var.fmt} as completely arbitrary field")
                             add_a_field(arbitrary_field(var, ArbitraryType.APPROXIMATION, state))
                     else:
+                        # todo we should report path information
                         if not is_special_var(var.var):
-                            Reporter.add_error(reporter.UnboundID(var.pretty(), context_line)) # todo we should report path information
+                            error_code = reporter.UnboundIDSetU if state.opts.is_set(SetOptions.NOUNSET) else reporter.UnboundID
+                            Reporter.add_error(error_code(var.pretty(), context_line))
                         add_a_field(arbitrary_field(var,
                                                     ArbitraryType.APPROXIMATION if is_special_var(var.var) else ArbitraryType.ENVIRONMENT,
                                                     state))
@@ -633,7 +651,7 @@ def starting_state() -> State:
     # env["IFS"] = ShellVar(" \t\n")
     # for defaultvar in ["HOME", "PWD", "OLDPWD", "PATH"]:
     #     env[defaultvar] = ShellVar(symb_utils.create_fresh_var(f"default_{defaultvar}"))
-    root = State((), FrozenDict(), FrozenDict(), FrozenDict(), SymStr(("0",)), None)
+    root = State((), FrozenDict(), FrozenDict(), FrozenDict(), SymStr(("0",)), None, SetOptions())
     starter_env = {
         "HOME": ShellVar(arbitrary_field(None, ArbitraryType.ENVIRONMENT, root)),
         "PWD": ShellVar(arbitrary_field(None, ArbitraryType.ENVIRONMENT, root)),

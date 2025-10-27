@@ -52,6 +52,11 @@ class UnboundID(Error):
     def __init__(self, var, line):
         super().__init__(self.CODE, f"no definition found for {var}", line)
 
+class UnboundIDSetU(Error):
+    CODE = "unbound_setu"
+    def __init__(self, var, line):
+        super().__init__(self.CODE, f"no definition found for {var} in `set -u` mode", line)
+
 class UndefinedFunction(Error):
     CODE = "function_use_before_def"
     def __init__(self, name, line):
@@ -81,7 +86,6 @@ class CouldDeleteSystemFile(Error):
     CODE = "could_del_sys_file"
     def __init__(self,filename:str, line):
         super().__init__(self.CODE,f"might delete system file {filename}", line)
-
 
 class DangerousWordSplit(Warning):
     CODE = "word_split"

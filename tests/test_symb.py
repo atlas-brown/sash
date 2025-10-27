@@ -53,6 +53,13 @@ def test_unbound_variable_cmdsubst(tmp_path):
     expected_error = reporter.UnboundID(foo_var.pretty(), 0)
     assert_expected_report(report, [expected_error])
 
+def test_unbound_variable_setu(tmp_path):
+    # Using an unset variable with 'set -u' should produce an unbound error
+    script = write_script(tmp_path, "set -u\n echo $FOO\n")
+    report = symb.main(script)
+    expected_error = reporter.UnboundIDSetU(foo_var.pretty(), 0)
+    assert_expected_report(report, [expected_error])
+
 def test_delete_system_file(tmp_path):
     # Deleting a system file should produce a DeleteSystemFile error
     script = write_script(tmp_path, "rm /usr\n")

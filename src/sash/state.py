@@ -91,6 +91,17 @@ class ShellVar:
     export : bool = False
 
 @dataclass(frozen=True)
+class SetOptions:
+    NOUNSET = "u"
+    current: frozenset[str] = field(default_factory=frozenset)
+    def set_options(self, options: set[str]) -> 'SetOptions':
+       return SetOptions(current=self.current | options)
+    def unset_options(self, options: set[str]) -> 'SetOptions':
+       return SetOptions(current=self.current - options)
+    def is_set(self, option: str) -> bool:
+       return option in self.current
+
+@dataclass(frozen=True)
 class State:
     pathcond: tuple[sash.constraints.Constraint, ...]
     env: FrozenDict[str, ShellVar]
@@ -98,18 +109,20 @@ class State:
     fundefs: FrozenDict[str, FrozenAst]
     last_exit_code: SymStr
     last_cmd: Optional[FrozenAst]
+    opts: SetOptions
 
     external_data: Any = None # ASSUMPTION: must be hashable
 
     # NOTE: (and beware) intentionally ignoring pathcond in equality and hash
     def __hash__(self):
-        return hash((self.env, self.localenv, self.fundefs, self.last_exit_code, self.last_cmd, self.external_data))
+        return hash((self.env, self.localenv, self.fundefs, self.last_exit_code, self.last_cmd, self.opts, self.external_data))
     def __eq__(self, other):
         return self.env == other.env \
             and self.localenv == other.localenv \
             and self.fundefs == other.fundefs \
             and self.last_exit_code == other.last_exit_code \
             and self.last_cmd == other.last_cmd \
+            and self.opts == other.opts \
             and self.external_data == other.external_data
 
     def set_env(self, var: str, value: ShellVar) -> 'State':
@@ -142,8 +155,11 @@ class State:
     def lookup_fundef(self, name: str) -> Optional[FrozenAst]:
         return self.fundefs.get(name, None)
 
-    def set_external(data) -> 'State':
+    def set_external(self, data) -> 'State':
         return replace(self, external_data=data)
+
+    def set_options(self, options: set[str]) -> 'State':
+        return replace(self, opts=self.opts.set_options(options))
 
 @dataclass(frozen=True)
 class Trace:
@@ -172,61 +188,7 @@ def collapse_traces(traces: Traces) -> Traces:
     return list(traces_by_latest_states.values())
 
 
-@dataclass
-class SetOptionStore:
-    allexport : Optional[bool] = None
-    notify : Optional[bool] = None
-    noclobber : Optional[bool] = None
-    errexit : Optional[bool] = True
-    noglob : Optional[bool] = None
-    h : Optional[bool] = None
-    monitor : Optional[bool] = None
-    noexec : Optional[bool] = None
-    nounset : Optional[bool] = None
-    verbose : Optional[bool] = None
-    xtrace : Optional[bool] = None
-    ignoreeof : Optional[bool]  = None
-    nolog : Optional[bool] = None
-    pipefail : Optional[bool] = True
-    vi : Optional[bool] = None
-    def handle_option(self, option:str, value:bool) -> bool:
-        match option:
-            case 'a' | "allexport":
-                self.allexport = value
-            case 'b' | "notify":
-                self.notify = value
-            case 'C' | "noclobber":
-                self.noclobber = value
-            case 'e' | "errexit":
-                self.errexit = value
-            case 'f' | "noglob":
-                self.noglob = value
-            case 'h':
-                self.h = value
-            case 'm' | "monitor":
-                self.monitor = value
-            case 'n' | "noexec":
-                self.noexec = value
-            case 'u' | "nounset":
-                self.nounset = value
-            case 'v' | "verbose":
-                self.verbose = value
-            case 'x' | "xtrace":
-                self.xtrace = value
-            case 'ignoreeof':
-                self.ignoreeof = value
-            case 'nolog':
-                self.nolog = value
-            case 'pipefail':
-                self.pipefail = value
-            case 'vi':
-                self.vi = value
-            case _:
-                logging.warning(f"Unknown option: {option}. Ignoring")
-                return False
-        return True
-
 @dataclass(frozen=True)
 class ScriptInfo:
-    opts: SetOptionStore
+    unused: None = None
 
