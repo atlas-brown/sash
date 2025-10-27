@@ -8,7 +8,7 @@ sources:
 ground_truth:
   errors:
   - line: 75
-    code: unbound_function
+    code: function_use_before_def
     shellcheck:
       detects: true
       code: SC2218

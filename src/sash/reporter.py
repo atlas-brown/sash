@@ -52,6 +52,11 @@ class UnboundID(Error):
     def __init__(self, var, line):
         super().__init__(self.CODE, f"no definition found for {var}", line)
 
+class UndefinedFunction(Error):
+    CODE = "function_use_before_def"
+    def __init__(self, name, line):
+        super().__init__(self.CODE, f"function {name} is used before its definition", line)
+
 class InfiniteLoop(Error):
     CODE = "infinite_loop"
     def __init__(self, loop, line):

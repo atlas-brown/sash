@@ -78,7 +78,7 @@ def main():
     known_codes = get_all_reporter_codes()
     with open(os.path.join(top, "benchmarks/codes_out_of_scope.yaml"), "r") as f:
         out_of_scope_codes = set(yaml.safe_load(f))
-        print(out_of_scope_codes)
+        print(f"Out of scope codes: {out_of_scope_codes}")
 
     failure = 0
     total = 0
