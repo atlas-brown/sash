@@ -87,6 +87,12 @@ def test_delete_system_file(tmp_path):
     expected_error = reporter.DeleteSystemFile("/*", 0)
     assert_expected_report(report, [expected_error])
 
+    script = write_script(tmp_path, "rm -rf \"$FOO\"/\n")
+    report = symb.main(script)
+    expected_error1 = reporter.CouldDeleteSystemFile("/", 0)
+    expected_error2 = reporter.UnboundID(foo_var.pretty(), 0)
+    assert_expected_report(report, [expected_error1, expected_error2])
+
 def test_delete_splitting(tmp_path):
     script = write_script(tmp_path, "rm $UNQUOTED\n")
     report = symb.main(script)

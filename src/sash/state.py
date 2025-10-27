@@ -82,7 +82,8 @@ class Field:
     count: WordCount
 
     def quote(self) -> 'Field':
-        return Field(self.content, WordCount(1, 1))
+        return Field(self.content, WordCount(min(self.count.min, 1),
+                                             min(self.count.max, 1)))
 
 @dataclass(frozen=True)
 class ShellVar:
