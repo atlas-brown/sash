@@ -1,4 +1,4 @@
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, field, replace, fields
 import sash.constraints
 import shasta.ast_node as AST
 import logging
@@ -111,20 +111,17 @@ class State:
     last_exit_code: SymStr
     last_cmd: Optional[FrozenAst]
     opts: SetOptions
+    terminated: bool = False # by `exit` or similar
 
     external_data: Any = None # ASSUMPTION: must be hashable
 
     # NOTE: (and beware) intentionally ignoring pathcond in equality and hash
     def __hash__(self):
-        return hash((self.env, self.localenv, self.fundefs, self.last_exit_code, self.last_cmd, self.opts, self.external_data))
+        return hash(tuple(getattr(self, field.name) for field in fields(self) if field.name != "pathcond"))
     def __eq__(self, other):
-        return self.env == other.env \
-            and self.localenv == other.localenv \
-            and self.fundefs == other.fundefs \
-            and self.last_exit_code == other.last_exit_code \
-            and self.last_cmd == other.last_cmd \
-            and self.opts == other.opts \
-            and self.external_data == other.external_data
+        return isinstance(other, State) and \
+            all(getattr(self, field.name) == getattr(other, field.name)
+                for field in fields(self) if field.name != "pathcond")
 
     def set_env(self, var: str, value: ShellVar) -> 'State':
         return replace(self, env=self.env.set(var, value))
@@ -161,6 +158,9 @@ class State:
 
     def set_options(self, options: set[str]) -> 'State':
         return replace(self, opts=self.opts.set_options(options))
+
+    def terminate(self) -> 'State':
+        return replace(self, terminated=True)
 
 @dataclass(frozen=True)
 class Trace:

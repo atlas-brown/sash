@@ -217,6 +217,43 @@ echo hi && rm -rf /usr || rm -rf /*
     expected_error2 = reporter.DeleteSystemFile("/*", 0)
     assert_expected_report(report, [expected_error1, expected_error2])
 
+def test_const_cond(tmp_path):
+    # A constant condition in an if statement should be detected, and the dead code should not be interpreted
+    script = write_script(tmp_path, """
+if [ "a" = "b" ]; then
+    rm -rf /*
+fi
+""")
+    report = symb.main(script)
+    expected_error1 = reporter.ConstantCondition(None, 0) # Mock the location
+    expected_error2 = reporter.DeadCode("rm -rf /*", 0)
+    assert_expected_report(report, [expected_error1, expected_error2]) # Notice: no DeleteSystemFile error
+
+    script = write_script(tmp_path, """
+if [ "a" = "b" ]; then
+    rm -rf /*
+else
+    echo $FOO
+fi
+""")
+    report = symb.main(script)
+    expected_error1 = reporter.ConstantCondition(None, 0) # Mock the location
+    expected_error2 = reporter.DeadCode("rm -rf /*", 0)
+    expected_error3 = reporter.UnboundID(foo_var.pretty(), 0)
+    assert_expected_report(report, [expected_error1, expected_error2, expected_error3])
+
+def test_dead_code(tmp_path):
+    # Code after exit should not be interpreted
+    script = write_script(tmp_path, """
+echo $FOO
+exit 1
+rm -rf /usr
+""")
+    report = symb.main(script)
+    expected_error1 = reporter.UnboundID(foo_var.pretty(), 0)
+    expected_error2 = reporter.DeadCode("rm -rf /usr", 0)
+    assert_expected_report(report, [expected_error1, expected_error2]) # Notice: no DeleteSystemFile error
+
 # def test_function_call_multipath(tmp_path):
 #     # A function that is called should not produce unbound variable errors for its parameters
 #     script = write_script(tmp_path, """

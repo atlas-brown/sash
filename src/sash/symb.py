@@ -31,6 +31,8 @@ def handle_commandnode(traces: Traces,
                 handle_rm(expanded_args)
             case "set":
                 t1 = handle_set(expanded_args, t1)
+            case "exit":
+                t1 = handle_exit(t1)
             case some_name if isinstance(some_name, str):
                 # todo: we could actually not use `expand_args_dumb` here, and instead do trace-specific expansion, since the function body is handled trace-specifically anyway
                 # deferred for now until we actually need it (see test_function_call_multipath)
@@ -167,7 +169,7 @@ def interpret_test(cmd: list[Field]) -> bool | None:
         return None
 
     args = cmd[1:]
-    if not len(args) in {3, 4}:
+    if not len(args) in {2, 3, 4}:
         return None
 
     # Check if if all arguments are concrete
@@ -178,7 +180,17 @@ def interpret_test(cmd: list[Field]) -> bool | None:
     if not all(all(isinstance(p, str) for p in parts) for parts in field_parts):
         return None
 
+    if len(args) == 2:
+        match (args[0].content, args[1].content):
+            case (SymStr([s1]), SymStr([s2])) if s1 in {"-f", "-d", "-e"} and s2 == "":
+                return False
+            case _:
+                return None
+
     if len(args) == 3:
+        if args[0].content == SymStr(("!",)):
+            res = interpret_test(args[1:])
+            return not res if res is not None else None
         match (args[0].content, args[1].content):
             case (SymStr([s]), SymStr([op])) if op == "-n":
                 return s != ""
@@ -232,6 +244,43 @@ def handle_set(expanded_args: List[Field], traces: Traces) -> Traces:
                 raise NotImplementedError(f"set with non-constant args: {expanded_args}")
     return trace_map(traces, lambda s: s.set_options(to_set))
 
+def handle_if(traces: Traces, node: AST.IfNode, config: InterpConfig) -> Traces:
+    test_cmds = []
+    def get_the_test(cmd_fields):
+        test_cmds.append(cmd_fields)
+    temp_config = config.add_expanded_command_callback(get_the_test)
+    t1 = guarded_interp_node(traces, node.cond, temp_config)
+    logging.debug(f"collected test_cmds: {test_cmds}")
+    logging.debug(f"Checking constant test cond")
+    test_result = interpret_test(test_cmds[-1])
+    if test_result is not None:
+        Reporter.add_error(reporter.ConstantCondition(test_cmds, context_line))
+        if test_result == True and node.else_b is not None:
+            Reporter.add_error(reporter.DeadCode(node.else_b, context_line))
+        elif test_result == False:
+            Reporter.add_error(reporter.DeadCode(node.then_b, context_line))
+    # Several possibilities here:
+    # 1. Constant test true -- interpret then_b and return that
+    # 2. Constant test false with no else -- just return t1
+    # 3. Constant test false with else -- interpret else_b and return that
+    # 4. Non-constant test -- interpret both branches and combine results
+    res = t1
+    if test_result in {True, None}:
+        # todo: extend pathcond with actual condition true/false
+        res = guarded_interp_node(trace_map(t1, lambda s: s.add_pathcond(f"cond_L{context_line}:true")),
+                                    node.then_b,
+                                    config)
+    if node.else_b is not None and test_result in {False, None}:
+        t3 = guarded_interp_node(trace_map(t1, lambda s: s.add_pathcond(f"cond_L{context_line}:false")),
+                                    node.else_b,
+                                    config)
+        return res + t3
+    else:
+        return res
+
+def handle_exit(traces: Traces) -> Traces:
+    logging.debug(f"Handling exit command, terminating {len(traces)} traces")
+    return trace_map(traces, lambda s: s.terminate())
 
 # ============================================================
 #                  Symbolic Expander
@@ -524,6 +573,12 @@ def collapse_traces_if_too_many(traces: Traces) -> Traces:
         logging.debug(f"Collapsed to {trace_count} traces")
     return traces
 
+def drop_terminated_traces(traces: Traces) -> Traces:
+    active_traces = [t for t in traces if not t.latest_state.terminated]
+    if len(active_traces) < len(traces):
+        logging.debug(f"Dropping {len(traces) - len(active_traces)} terminated traces")
+    return active_traces
+
 def guarded_interp_node(traces: Traces,
                         node: AST.AstNode,
                         config: InterpConfig) -> Traces:
@@ -537,8 +592,14 @@ def interp_node(traces: Traces,
                 node: AST.AstNode,
                 config: InterpConfig) -> Traces:
     # refer to https://github.com/binpash/shasta/blob/main/shasta/ast_node.py
+    traces = drop_terminated_traces(traces)
     traces = config.trace_collapser(traces)
     traces = config.apply_node_cbs(traces, node)
+    if not traces:
+        logging.debug(f"No active traces when interpreting {trim_string_for_logging(node.pretty())}, reporting dead code and returning early")
+        Reporter.add_error(reporter.DeadCode(node, context_line))
+        return traces
+
     logging.debug(f"Interpreting {trim_string_for_logging(node.pretty())} with {len(traces)} traces")
     match node:
         case AST.CommandNode() if not (node.arguments == [] and node.assignments != []):
@@ -551,19 +612,7 @@ def interp_node(traces: Traces,
             return t
 
         case AST.IfNode():
-            # todo: early exit if condition is constant false
-            t1 = guarded_interp_node(traces, node.cond, config)
-            # todo: extend pathcond with actual condition true/false
-            t2 = guarded_interp_node(trace_map(t1, lambda s: s.add_pathcond(f"cond_L{context_line}:true")),
-                                     node.then_b,
-                                     config)
-            if node.else_b is not None:
-                t3 = guarded_interp_node(trace_map(t1, lambda s: s.add_pathcond(f"cond_L{context_line}:false")),
-                                         node.else_b,
-                                         config)
-                return t2 + t3
-            else:
-                return t2
+            return handle_if(traces, node, config)
 
         case AST.CaseNode():
             t1, case_arg_fields = expand_args_dumb(traces, [node.argument], config)
