@@ -8,7 +8,10 @@ sources:
 ground_truth:
   errors:
   - line: 145
-    code: del_sys_file
+    code:
+      - del_sys_file
+      - word_split
+    note: along the path where the default value of N_PREFIX is used
     shellcheck:
       detects: false
       note: Warns about deleting '/', which is not the case here.

@@ -14,12 +14,16 @@ notes:
 ground_truth:
   errors:
   - line: 131
-    code: del_sys_file
+    code:
+      - del_sys_file
+      - word_split
     shellcheck:
       detects: true
       code: SC2115
   - line: 144
-    code: del_sys_file
+    code:
+      - del_sys_file
+      - word_split
     shellcheck:
       detects: true
       code: SC2115

@@ -98,11 +98,13 @@ ground_truth:
       code: SC2086
   - code: del_sys_file
     line: 12
+    note: for "$OUT_DIR/*"
     shellcheck:
       detects: true
       code: SC2115
   - code: del_sys_file
     line: 12
+    note: for "//"
     shellcheck:
       detects: true
       code: SC2114

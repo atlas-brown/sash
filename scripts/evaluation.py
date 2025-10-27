@@ -34,8 +34,14 @@ def load_expected_codes(gt_path):
     try:
         with open(gt_path, "r") as f:
             data = yaml.safe_load(f)
-        codes = [e.get("code") for e in data.get("ground_truth", []).get("errors", [])]
-        return set(codes)
+        codes = set()
+        for entry in data.get("ground_truth", []).get("errors", []):
+            code = entry.get("code")
+            if isinstance(code, str):
+                codes.add(code)
+            elif isinstance(code, list):
+                codes.update(code)
+        return codes
     except Exception as e:
         print(f"Failed to read/parse ground truth {gt_path}: {e}", file=sys.stderr)
         return set()
