@@ -617,6 +617,10 @@ def interp_node(traces: Traces,
             t1, name = expand_assuming_single_constant_word(traces, node.name, config)
             return trace_map(t1, lambda s: s.set_fundef(name, freeze(node)))
 
+        case AST.AndNode() | AST.OrNode():
+            t1 = guarded_interp_node(traces, node.left_operand, config)
+            return guarded_interp_node(traces, node.right_operand, config)
+
         # todo bring other cases as needed
 
         case _:

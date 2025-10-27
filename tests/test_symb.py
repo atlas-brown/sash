@@ -183,7 +183,7 @@ def test_case(tmp_path):
     script = write_script(tmp_path, """
 case "$1" in
     start)
-        rm /usr
+        rm -rf /usr
         ;;
     *)
         echo "fine"
@@ -193,6 +193,16 @@ esac
     report = symb.main(script)
     expected_error = reporter.DeleteSystemFile("/usr", 0)
     assert_expected_report(report, [expected_error])
+
+def test_and_or(tmp_path):
+    # A case statement should handle all branches correctly
+    script = write_script(tmp_path, """
+echo hi && rm -rf /usr || rm -rf /*
+""")
+    report = symb.main(script)
+    expected_error1 = reporter.DeleteSystemFile("/usr", 0)
+    expected_error2 = reporter.DeleteSystemFile("/*", 0)
+    assert_expected_report(report, [expected_error1, expected_error2])
 
 # def test_function_call_multipath(tmp_path):
 #     # A function that is called should not produce unbound variable errors for its parameters
