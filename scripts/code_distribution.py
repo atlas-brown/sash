@@ -23,7 +23,8 @@ for benchmark in benchmarks:
     errors = benchmark.get('ground_truth', {}).get('errors', [])
     for error in errors:
         code = error.get('code')
-        code_distribution[code] += 1
+        for c in (code if isinstance(code, list) else [code]):
+            code_distribution[c] += 1
 
 code_distribution = dict(sorted(code_distribution.items(), key=lambda item: item[1], reverse=True))
 
