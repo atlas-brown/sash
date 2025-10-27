@@ -254,6 +254,13 @@ rm -rf /usr
     expected_error2 = reporter.DeadCode("rm -rf /usr", 0)
     assert_expected_report(report, [expected_error1, expected_error2]) # Notice: no DeleteSystemFile error
 
+    script = write_script(tmp_path, """
+wget foobar || exit 1
+echo "not dead code!"
+""")
+    report = symb.main(script)
+    assert_expected_report(report, []) # Notice: no DeadCode error
+
 # def test_function_call_multipath(tmp_path):
 #     # A function that is called should not produce unbound variable errors for its parameters
 #     script = write_script(tmp_path, """

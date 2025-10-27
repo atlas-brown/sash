@@ -686,7 +686,11 @@ def interp_node(traces: Traces,
 
         case AST.AndNode() | AST.OrNode():
             t1 = guarded_interp_node(traces, node.left_operand, config)
-            return guarded_interp_node(traces, node.right_operand, config)
+            t2 = guarded_interp_node(trace_map(t1, lambda s: s.add_pathcond(f"{node.NodeName}_L{context_line}:{'true' if isinstance(node, AST.AndNode) else 'false'}")),
+                                               node.right_operand,
+                                               config)
+            t3 = trace_map(t1, lambda s: s.add_pathcond(f"{node.NodeName}_L{context_line}:{'false' if isinstance(node, AST.AndNode) else 'true'}"))
+            return t2 + t3
 
         # todo bring other cases as needed
 
