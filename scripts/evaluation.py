@@ -65,7 +65,10 @@ def main():
     parser.add_argument('--timeout', type=float, default=None, help='Timeout in seconds for each benchmark (default: no timeout)')
     parser.add_argument('--benchmarks', type=str, default=None, help='Path to the benchmarks directory (default: top-level "benchmarks")')
     parser.add_argument('--only', type=str, default=None, help='Regex to filter benchmarks to run (default: run all)')
+    parser.add_argument('--output', type=str, default=None, help='File to write output to (default: stdout)')
     args = parser.parse_args()
+
+    output_file = open(args.output, "w") if args.output else sys.stdout
 
     benchmark_filter = re.compile(args.only) if args.only else None
 
@@ -78,22 +81,24 @@ def main():
     known_codes = get_all_reporter_codes()
     with open(os.path.join(top, "benchmarks/codes_out_of_scope.yaml"), "r") as f:
         out_of_scope_codes = set(yaml.safe_load(f))
-        print(f"Out of scope codes: {out_of_scope_codes}")
+        print(f"Out of scope codes: {out_of_scope_codes}", file=sys.stderr)
 
     failure = 0
     total = 0
+
+    print("benchmark,time,detected", file=output_file)
 
     for benchmark in find_benchmarks(bench_dir):
         if benchmark_filter and not benchmark_filter.search(benchmark):
             continue
 
-        print("\n\n")
-        print(f"Running benchmark: {benchmark}")
+        print("\n\n", file=sys.stderr)
+        print(f"Running benchmark: {benchmark, top}", file=sys.stderr)
         try:
             proc = run_cmd(["uv", "run", "sash", benchmark], timeout=args.timeout)
             output = proc.stdout
         except subprocess.TimeoutExpired:
-            print(f"FAIL: Benchmark timed out after {args.timeout} seconds")
+            print(f"FAIL: Benchmark timed out after {args.timeout} seconds", file=sys.stderr)
             failure += 1
             total += 1
             continue
@@ -110,17 +115,18 @@ def main():
         unknown_codes = expected_in_scope - known_codes
         # Check that all expected codes are valid
         for code in unknown_codes:
-            print(f"Ground truth contains unknown error code: {code}")
+            print(f"Ground truth contains unknown error code: {code}", file=sys.stderr)
 
         actual_codes, parsed_json = extract_codes_from_output(output)
+
         if actual_codes is None:
             # Couldn't parse output as JSON; treat as failure
-            print("FAIL")
-            print("Expected:")
+            print("FAIL", file=sys.stderr)
+            print("Expected:", file=sys.stderr)
             for c in expected:
                 print(c)
-            print("Actual (raw output, not valid JSON):")
-            print(output)
+            print("Actual (raw output, not valid JSON):", file=sys.stderr)
+            print(output, file=sys.stderr)
             failure += 1
             total += 1
             continue
@@ -128,22 +134,28 @@ def main():
         # Check that every expected code appears in the actual codes (actual may contain extras)
         missing = expected - actual_codes
         if missing:
-            print(f"FAIL, time: {parsed_json.get('time', 'N/A')}s")
-            print("Missing expected codes:")
+            print(f"FAIL, time: {parsed_json.get('time', 'N/A')}s", file=sys.stderr)
+            print("Missing expected codes:", file=sys.stderr)
             for c in missing:
                 print(c)
             print("Actual:")
-            print(json.dumps(parsed_json.get("errors", []), indent=2))
+            print(json.dumps(parsed_json.get("errors", []), indent=2), file=sys.stderr)
             failure += 1
         else:
-            print(f"Pass, time: {parsed_json.get('time', 'N/A')}s")
+            print(f"Pass, time: {parsed_json.get('time', 'N/A')}s", file=sys.stderr)
         total += 1
 
+        # Output to CSV
+        benchmark_rel = os.path.relpath(benchmark, top)
+        print(f"{benchmark_rel},{parsed_json.get('time', 'N/A')},{1 if not missing else 0}", file=output_file)
+
+    output_file.close()
+
+    print(f"{total - failure}/{total} benchmarks succeeded", file=sys.stderr)
+
     if failure != 0:
-        print(f"{failure}/{total} benchmarks failed")
         sys.exit(1)
     else:
-        print(f"All {total} benchmarks passed!")
         sys.exit(0)
 
 if __name__ == "__main__":
