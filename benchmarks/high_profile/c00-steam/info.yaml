@@ -2,6 +2,8 @@ bugs:
 - line: 359
   description: Everything under / is deleted when the script is invoked in certain ways
 
+name: "Steam Updater"
+
 sources:
 - https://github.com/indrora/steam_latest/blob/21cc14158c171f5912b04b83abf41205eb804b31/scripts/steam.sh
 - https://github.com/icy/bash-coding-style/blob/master/examples/steam.sh

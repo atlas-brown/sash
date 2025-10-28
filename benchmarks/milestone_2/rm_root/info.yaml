@@ -34,6 +34,8 @@ bugs:
 - line: 16
   description: An unset variable is used ($DAYS)
 
+name: "MongoDB backup script"
+
 sources:
 - https://stackoverflow.com/questions/55323391/deleted-database-accidentally-by-a-bash-script-rescue-please
 

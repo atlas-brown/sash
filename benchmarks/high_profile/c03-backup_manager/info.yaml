@@ -4,6 +4,8 @@ bugs:
 - line: 203
   description: Log file is deleted due to improper exit code checking
 
+name: "Ubuntu backup manager"
+
 sources:
 - https://git.launchpad.net/ubuntu/+source/backup-manager/commit/lib/backup-methods.sh?id=59cdd322f7772d40b6aff25b6720796271f4deba
 

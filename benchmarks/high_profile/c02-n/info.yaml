@@ -2,6 +2,8 @@ bugs:
 - line: 145
   description: Directories under /usr/local are deleted when an environment variable is unset
 
+name: "Node.js version manager"
+
 sources:
 - https://github.com/tj/n/commit/d36c2b88047e3eae27e80938a13b1313df0c1f82
 

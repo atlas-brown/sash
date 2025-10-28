@@ -4,6 +4,8 @@ bugs:
 - line: 5
   description: Xargs command overwrites all files to the same target
 
+name: "HPC cluster file movement"
+
 sources:
 - https://stackoverflow.com/questions/70017719/recovering-the-files-that-were-deleted-in-linux-by-using-mv
 

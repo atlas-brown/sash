@@ -2,6 +2,8 @@ bugs:
 - line: 7
   description: Unquoted variable in rm can word-split and delete arbitrary files
 
+name: "iTunes updater"
+
 sources:
 - https://apple.slashdot.org/comments.pl?sid=23365&cid=2518563
 
