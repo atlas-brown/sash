@@ -1,6 +1,8 @@
 bugs:
 - line: 6
   description: For loop only iterates once because its argument expands to one word
+- line: 10
+  description: The output of a test command is unused
 
 name: "AutoTest config rename"
 
@@ -11,5 +13,9 @@ ground_truth:
   errors:
   - line: 6
     code: loop_once
+    shellcheck:
+      detects: false
+  - line: 10
+    code: ignored_cmd_result
     shellcheck:
       detects: false

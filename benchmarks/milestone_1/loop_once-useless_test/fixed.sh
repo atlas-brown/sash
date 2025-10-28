@@ -7,6 +7,5 @@ for f in $DIR/*
 do
     cp $f $f.bak
    sed 's+$OLD+$NEW+g' $f.bak &gt; $f
-   [ -f "$f" ] && \
-   rm -f $f.bak
+   [ -f "$f" ] && rm -f $f.bak
 done
