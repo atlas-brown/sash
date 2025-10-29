@@ -1,5 +1,6 @@
 bugs:
-- TBD
+- line: 24
+  descritption: If TEMPDIR is empty, will delete root
 
 name: "AIX server data gather"
 
