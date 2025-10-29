@@ -44,7 +44,7 @@ am_doing_phase () {
   # usage:   if am_doing_phase finddebs; then ...; fi
   local_x=""
   for local_x in "$@"; do
-    if echo " $WHAT_TO_DO " | grep -q " $1 "; then return 0; fi
+    if echo " $WHAT_TO_DO " | grep -q " $1 "; then return 0; fi # bug here as well: should be $local_x and not $1
   done
   unset local_x
   return 1

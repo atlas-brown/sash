@@ -1,4 +1,7 @@
 bugs:
+- line: 47
+  description: Variable in for loop is never used/For loop body is constant
+  note: unclear if we should try to catch this
 - line: 490
   description: An invocation of the script deletes the process working directory
 
@@ -9,6 +12,10 @@ sources:
 
 ground_truth:
   errors:
+  - line: 47
+    code: unused_loop_var/const_loop_body
+    shellcheck:
+      detects: true
   - line: 490
     code: could_del_sys_file
     shellcheck:
