@@ -1,7 +1,16 @@
 bugs:
-- lines:
+- line: 707
+  description: Deletion of user-supplied directory without warning
 
 sources:
 - https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=833525
 - https://salsa.debian.org/installer-team/debootstrap/-/commit/23504dcc3be1937404fdde3055529764a9a3461b
 - https://salsa.debian.org/installer-team/debootstrap/-/commit/2cf272041781056b4bcc9f157ea5ee578129ae5e
+
+
+ground_truth:
+  errors:
+  - line: 707
+    code: TBD
+    shellcheck:
+      detects: false
