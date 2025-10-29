@@ -1,0 +1,11 @@
+note:
+  Let's discuss this before I bring it it
+  From what I unserstand, this requires cross-file functions as well (although we could inline them)
+  It looks similar to the bug where the arguments to grep change semantic meaning based on word splitting
+  Specifically, the word after -O becomes the destination file and all other words are treated as URLs
+  ShellCheck detects this as a warning SC2086
+  Less obviously, this can also overwrite files (as wget creates the -O argument even if it fails), so this is arguably catastrophic
+
+sources:
+- https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=947173
+- https://salsa.debian.org/installer-team/debootstrap/-/commit/14f0b7aafb4d568b027baeecee08cfac6c4f874d
