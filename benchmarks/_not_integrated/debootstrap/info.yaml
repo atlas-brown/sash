@@ -1,0 +1,15 @@
+bugs:
+- line: 490
+  description: An invocation of the script deletes the process working directory
+
+sources:
+- https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=337230
+- https://snapshot.debian.org/archive/debian/20051030T000000Z/pool/main/d/debootstrap/debootstrap_0.3.2.2.tar.gz
+- https://snapshot.debian.org/archive/debian/20061116T213413Z/pool/main/d/debootstrap/debootstrap_0.3.3.tar.gz
+
+ground_truth:
+  errors:
+  - line: 490
+    code: could_del_sys_file
+    shellcheck:
+      detects: false
