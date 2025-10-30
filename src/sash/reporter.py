@@ -115,14 +115,14 @@ class IgnoredCommandResult(Warning):
 class Reporter:
     _filename = ""
     _errors: set[Report] = set()
-    _start_time = time.monotonic()
+    _start_time = time.perf_counter()
     _solver_time : float = 0
 
     @classmethod
     def initialize(cls,filename:str):
         cls._filename = filename
         cls._errors = set()
-        cls._start_time = time.monotonic()
+        cls._start_time = time.perf_counter()
         cls._solver_time : float = 0
 
     @classmethod
@@ -131,8 +131,8 @@ class Reporter:
 
     @classmethod
     def get_report(cls) -> dict:
-        end_time = time.monotonic()
-        time_elapsed = round(end_time - cls._start_time,2)
+        end_time = time.perf_counter()
+        time_elapsed = end_time - cls._start_time
         dct = {
             "filename": cls._filename,
             "errors": [e.to_dict() for e in cls._errors],
