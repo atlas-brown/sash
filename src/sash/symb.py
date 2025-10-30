@@ -71,8 +71,7 @@ def handle_function_call_or_unknown(func_name: str,
     func_defs = {t.latest_state.lookup_fundef(func_name) for t in traces}
     if len(func_defs) == 1:
         if None in func_defs:
-            logging.debug(f"Unknown command {func_name}, optimistically treating as no-op")
-            return traces
+            return handle_unknown_command(func_name, arg_fields, traces, config)
         else:
             the_func = func_defs.pop()
             assert isinstance(the_func, FrozenAst)
@@ -80,6 +79,15 @@ def handle_function_call_or_unknown(func_name: str,
     else:
         logging.error(f"Name {func_name} is defined as different functions across traces, giving up on this call")
         return traces
+
+def handle_unknown_command(name: str,
+                           arg_fields: List[Field],
+                           traces: Traces,
+                           config: InterpConfig) -> Traces:
+    if name.endswith("/") or any(name in t.latest_state.known_nonexistant_commands for t in traces):
+        Reporter.add_error(reporter.NotACommand(name, context_line))
+    logging.debug(f"Unknown command {name}, optimistically treating as no-op")
+    return traces
 
 def handle_function_call(func_node: AST.DefunNode,
                          arg_fields: List[Field],

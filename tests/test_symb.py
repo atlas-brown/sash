@@ -274,6 +274,15 @@ echo "not dead code!"
     report = symb.main(script)
     assert_expected_report(report, []) # Notice: no DeadCode error
 
+def test_non_command(tmp_path):
+    # Invoking a non-command should produce a NotACommand error
+    script = write_script(tmp_path, """
+foo=bar // this was not a command
+""")
+    report = symb.main(script)
+    expected_error = reporter.NotACommand("//", 0)
+    assert_expected_report(report, [expected_error])
+
 # def test_function_call_multipath(tmp_path):
 #     # A function that is called should not produce unbound variable errors for its parameters
 #     script = write_script(tmp_path, """

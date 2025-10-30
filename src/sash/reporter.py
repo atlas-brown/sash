@@ -112,6 +112,11 @@ class IgnoredCommandResult(Warning):
     def __init__(self, command: str, line):
         super().__init__(self.CODE, f"the result of command '{command}' is ignored.", line)
 
+class NotACommand(Error):
+    CODE = "not_a_command"
+    def __init__(self, name: str, line):
+        super().__init__(self.CODE, f"'{name}' is invoked as a command, but it cannot be one", line)
+
 class Reporter:
     _filename = ""
     _errors: set[Report] = set()

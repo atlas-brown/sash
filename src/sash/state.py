@@ -110,14 +110,15 @@ class SetOptions:
 
 @dataclass(frozen=True)
 class State:
-    pathcond: tuple[sash.constraints.Constraint, ...]
-    env: FrozenDict[str, ShellVar]
-    localenv: FrozenDict[str, ShellVar]
-    fundefs: FrozenDict[str, FrozenAst]
-    last_exit_code: SymStr
-    last_cmd: Optional[FrozenAst]
-    opts: SetOptions
-    terminated: bool = False # by `exit` or similar
+    pathcond:                    tuple[sash.constraints.Constraint, ...] = field(default_factory=tuple)
+    env:                         FrozenDict[str, ShellVar]               = field(default_factory=FrozenDict)
+    localenv:                    FrozenDict[str, ShellVar]               = field(default_factory=FrozenDict)
+    fundefs:                     FrozenDict[str, FrozenAst]              = field(default_factory=FrozenDict)
+    last_exit_code:              SymStr                                  = SymStr(("0",))
+    last_cmd:                    Optional[FrozenAst]                     = None
+    opts:                        SetOptions                              = field(default_factory=SetOptions)
+    known_nonexistant_commands:  frozenset[str]                          = field(default_factory=frozenset)
+    terminated:                  bool                                    = False # by `exit` or similar
 
     external_data: Any = None # ASSUMPTION: must be hashable
 
@@ -167,6 +168,9 @@ class State:
 
     def terminate(self) -> 'State':
         return replace(self, terminated=True)
+
+    def record_nonexistant_command(self, name: str) -> 'State':
+        return replace(self, known_nonexistant_commands=self.known_nonexistant_commands | {name})
 
 @dataclass(frozen=True)
 class Trace:
