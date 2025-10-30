@@ -2,13 +2,16 @@
 FROM ghcr.io/astral-sh/uv:trixie-slim
 
 # See https://github.com/binpash/libdash?tab=readme-ov-file#what-are-the-dependencies
+# Certificates are needed for uv to be able to clone libdash over HTTPS
 RUN apt-get update && \
     apt-get install --yes --no-install-recommends \
         git \
         autoconf \
         automake \
         libtool \
-        make && \
+        make \
+        ca-certificates && \
+    update-ca-certificates && \
     apt-get clean
 
 # Change working directory (something generic in case the project name ever changes)
@@ -34,3 +37,6 @@ COPY ./ ./
 # Sync the project
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked
+
+# Set the entrypoint
+ENTRYPOINT ["uv", "run", "sash", "--"]
