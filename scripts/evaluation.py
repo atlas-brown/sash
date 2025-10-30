@@ -144,7 +144,7 @@ def main():
         # Check that every expected code appears in the actual codes (actual may contain extras)
         missing = [e for e in expected_in_scope if e not in actual_codes]
         if missing:
-            print(f"FAIL, time: {parsed_json.get('time', 'N/A')}s", file=sys.stderr)
+            print(f"FAIL", file=sys.stderr)
             print("Missing expected codes:", file=sys.stderr)
             for c in missing:
                 print(c)
@@ -152,7 +152,7 @@ def main():
             print(json.dumps(parsed_json.get("errors", []), indent=2), file=sys.stderr)
             failure += 1
         else:
-            print(f"Pass, time: {parsed_json.get('time', 'N/A')}s", file=sys.stderr)
+            print(f"PASS", file=sys.stderr)
         total += 1
 
         shellcheck_results = load_shellcheck_results(gt_path)
@@ -160,10 +160,11 @@ def main():
         expected_codes = f"{';'.join(expected)}"
         actual_caught_codes = f"{';'.join(actual_codes)}"
         shellcheck_codes = f"{';'.join(shellcheck_results)}"
+        time_elapsed = f"{parsed_json.get('time', 'N/A')}"
 
         # Output to CSV
         benchmark_rel = os.path.relpath(benchmark, top)
-        print(f"{benchmark_rel},{parsed_json.get('time', 'N/A')},{1 if not missing else 0},{expected_codes},{actual_caught_codes},{shellcheck_codes}", file=output_file)
+        print(f"{benchmark_rel},{time_elapsed},{1 if not missing else 0},{expected_codes},{actual_caught_codes},{shellcheck_codes}", file=output_file)
 
     output_file.close()
 

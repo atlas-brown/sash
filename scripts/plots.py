@@ -2,6 +2,7 @@ import argparse
 import pandas as pd
 import numpy as np
 import os
+from io import StringIO
 
 import matplotlib.pyplot as plt
 from matplotlib_set_diagrams import EulerDiagram
@@ -13,6 +14,22 @@ def load_csv(file_path):
     except Exception as e:
         print(f"Error loading CSV file: {e}")
         exit(1)
+
+def get_loc(path):
+    proc = os.popen(f"cloc --json {path}")
+    output = proc.read()
+    proc.close()
+    data = None
+    data = pd.read_json(StringIO(output))
+    loc = int(data.get("SUM", {}).get("code", 0))
+    # assert loc > 0, f"Failed to get LoC for path: {path}"
+    return loc
+
+def get_bm_name(path):
+    subpath = os.path.dirname(path)
+    parts = subpath.split(os.sep)[1:]
+    result = os.path.join(*parts)
+    return result[-10:]
 
 sysname = "SaSh"
 figsize = (7, 4)
@@ -50,13 +67,28 @@ def plot_bug_detection(data, output_path):
         (0, 1): only_shell,         # Only ShellCheck
     }
 
-
     plt.figure(figsize=figsize)
     dgm = EulerDiagram(combination_counts, set_labels=[sysname, "ShellCheck"], set_colors=color_scheme)
     plt.title(None)
     plt.tight_layout()
     plt.savefig(output_path, format="pdf")
     plt.close()
+
+def plot_runtime(data, output_path):
+    plt.figure(figsize=figsize)
+    data = data.sort_values(by="time", ascending=False)
+    benchmarks = data["benchmark"].apply(get_bm_name)
+    times = data["time"]
+    locs = data["loc"]
+    bars = plt.bar(benchmarks, times, color=color_scheme[0])
+    plt.xticks(rotation=45, ha="right")
+    plt.ylabel("Time (s)")
+    plt.yscale("log")
+    for bar, loc in zip(bars, locs):
+        height = bar.get_height()
+        plt.text(bar.get_x() + bar.get_width() / 2, height, f"{loc}", ha='center', va='bottom', fontsize=4)
+    plt.tight_layout()
+    plt.savefig(output_path, format="pdf")
 
 def main():
     parser = argparse.ArgumentParser()
@@ -83,7 +115,9 @@ def main():
     })
 
     results_data = load_csv(args.results_csv)
+    results_data["loc"] = results_data["benchmark"].apply(get_loc)
     plot_bug_detection(results_data, os.path.join(args.output_dir, "bug-detection-overview.pdf"))
+    plot_runtime(results_data, os.path.join(args.output_dir, "runtime.pdf"))
 
 if __name__ == "__main__":
     main()
