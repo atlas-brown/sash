@@ -1004,32 +1004,33 @@ backup_method_svn()
     done
 }
 
-backup_method_pipe()
-{
-    method="$1"
-    debug "backup_method_pipe ($method)"
-
-    info "Using method \"\$method\"."
-    index=0
-
-    # parse each BM_PIPE_NAME's
-    #for archive in ${BM_PIPE_NAME[*]}
-    for archive in $BM_PIPE_NAME # this isn't defined locally anyways
-    do
-        # make sure everything is here for this archive
-        if [ -z "${BM_PIPE_COMMAND[$index]}" ] ||
-           [ -z "${BM_PIPE_FILETYPE[$index]}" ]; then
-                warning "Not enough args for this archive (\$archive), skipping."
-                continue
-        fi
-        command="${BM_PIPE_COMMAND[$index]}"
-        filetype="${BM_PIPE_FILETYPE[$index]}"
-        file_to_create="$BM_REPOSITORY_ROOT/$BM_ARCHIVE_PREFIX-$archive.$TODAY.$filetype"
-        #compress="${BM_PIPE_COMPRESS[$index]}"
-        compress=$BM_PIPE_COMPRESS # this isn't defined locally anyways
-        __create_file_with_meta_command || error "Cannot create archive."
-
-        # update the index mark
-        index=$(($index + 1))
-    done
-}
+# This is never used by the script so it's safe to comment out
+#backup_method_pipe()
+#{
+#    method="$1"
+#    debug "backup_method_pipe ($method)"
+#
+#    info "Using method \"\$method\"."
+#    index=0
+#
+#    # parse each BM_PIPE_NAME's
+#    #for archive in ${BM_PIPE_NAME[*]}
+#    for archive in $BM_PIPE_NAME # this isn't defined locally anyways
+#    do
+#        # make sure everything is here for this archive
+#        if [ -z "${BM_PIPE_COMMAND[$index]}" ] ||
+#           [ -z "${BM_PIPE_FILETYPE[$index]}" ]; then
+#                warning "Not enough args for this archive (\$archive), skipping."
+#                continue
+#        fi
+#        command="${BM_PIPE_COMMAND[$index]}"
+#        filetype="${BM_PIPE_FILETYPE[$index]}"
+#        file_to_create="$BM_REPOSITORY_ROOT/$BM_ARCHIVE_PREFIX-$archive.$TODAY.$filetype"
+#        #compress="${BM_PIPE_COMPRESS[$index]}"
+#        compress=$BM_PIPE_COMPRESS # this isn't defined locally anyways
+#        __create_file_with_meta_command || error "Cannot create archive."
+#
+#        # update the index mark
+#        index=$(($index + 1))
+#    done
+#}
