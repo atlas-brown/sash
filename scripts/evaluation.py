@@ -10,10 +10,17 @@ import sash.reporter
 
 # Note: if `timeout` supplied, may raise subprocess.TimeoutExpired
 def run_cmd(cmd, check=False, capture_stdout=True, timeout=None):
-    proc = subprocess.run(cmd, shell=False, capture_output=True, text=True, timeout=timeout)
-    if check and proc.returncode != 0:
-        raise subprocess.CalledProcessError(proc.returncode, cmd, proc.stdout, proc.stderr)
-    return proc
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, start_new_session=True)
+    try:
+        stdout, stderr = proc.communicate(timeout=timeout)
+        result = subprocess.CompletedProcess(cmd, proc.returncode, stdout, stderr)
+        if check and proc.returncode != 0:
+            raise subprocess.CalledProcessError(proc.returncode, cmd, stdout, stderr)
+        return result
+    except subprocess.TimeoutExpired:
+        os.killpg(os.getpgid(proc.pid), 9)
+        proc.wait()
+        raise
 
 def get_git_toplevel():
     proc = run_cmd(["git", "rev-parse", "--show-toplevel"])
