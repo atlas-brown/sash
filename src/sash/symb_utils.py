@@ -1,9 +1,9 @@
-from typing import Optional
+from typing import Iterable, Optional
 import z3
 from sash.state import SymStr, SymVar
 
 
-def symbstr_to_str(symbstr : list[str | SymVar]) -> str | None:
+def symbstr_to_str(symbstr : Iterable[str | SymVar]) -> str | None:
     nls : list[str] = []
     for i in symbstr:
         if isinstance(i,str):
