@@ -10,7 +10,6 @@ sources:
 ground_truth:
   errors:
   - line: 24
-    code: could_del_sys_file
-    note: todo worth discussing
+    code: word_split_del_sys_file
     shellcheck:
       detects: true

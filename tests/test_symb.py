@@ -69,7 +69,7 @@ def test_delete_system_file(tmp_path):
 
     script = write_script(tmp_path, "rm $FOO/usr\n")
     report = symb.main(script)
-    expected_error1 = reporter.CouldDeleteSystemFile("", 0)
+    expected_error1 = reporter.WordSplitCouldDeleteSystemFile("", 0)
     expected_error2 = reporter.UnboundID(foo_var.pretty(), 0)
     expected_error3 = reporter.DangerousWordSplit("$FOO", 0)
     assert_expected_report(report, [expected_error1, expected_error2, expected_error3])
@@ -77,7 +77,7 @@ def test_delete_system_file(tmp_path):
 
     script = write_script(tmp_path, "rm -rf $STEAMROOT/*\n")
     report = symb.main(script)
-    expected_error1 = reporter.CouldDeleteSystemFile("", 0)
+    expected_error1 = reporter.WordSplitCouldDeleteSystemFile("", 0)
     expected_error2 = reporter.UnboundID(foo_var.pretty(), 0)
     expected_error3 = reporter.DangerousWordSplit("$FOO", 0)
     assert_expected_report(report, [expected_error1, expected_error2, expected_error3])
@@ -89,7 +89,7 @@ def test_delete_system_file(tmp_path):
 
     script = write_script(tmp_path, "rm -rf \"$FOO\"/\n")
     report = symb.main(script)
-    expected_error1 = reporter.CouldDeleteSystemFile("/", 0)
+    expected_error1 = reporter.WordSplitCouldDeleteSystemFile("/", 0)
     expected_error2 = reporter.UnboundID(foo_var.pretty(), 0)
     assert_expected_report(report, [expected_error1, expected_error2])
 

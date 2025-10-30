@@ -11,7 +11,7 @@ sources:
 ground_truth:
   errors:
   - line: 359
-    code: could_del_sys_file
+    code: word_split_del_sys_file
     shellcheck:
       detects: true
       code: SC2115

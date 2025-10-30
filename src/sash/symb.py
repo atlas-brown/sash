@@ -59,9 +59,9 @@ def handle_rm(expanded_args: List[Field]) -> None:
         match arg_field:
             case Field(CompletelyArbitrary(prefix=pre, suffix=suf), WordCount(min, max)) if min == 0 or max > 1:
                 if pre is not None and (path := symb_utils.symbstr_to_str(pre.parts)) and is_protected(path):
-                    Reporter.add_error(reporter.CouldDeleteSystemFile(path, context_line))
+                    Reporter.add_error(reporter.WordSplitCouldDeleteSystemFile(path, context_line))
                 if suf is not None and (path := symb_utils.symbstr_to_str(suf.parts)) and is_protected(path):
-                    Reporter.add_error(reporter.CouldDeleteSystemFile(path, context_line))
+                    Reporter.add_error(reporter.WordSplitCouldDeleteSystemFile(path, context_line))
 
 def handle_function_call_or_unknown(func_name: str,
                                     arg_fields: List[Field],

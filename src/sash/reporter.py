@@ -82,10 +82,10 @@ class DeleteSystemFile(Error):
     def __init__(self,filename:str, line):
         super().__init__(self.CODE,f"WILL delete system file {filename}", line)
 
-class CouldDeleteSystemFile(Error):
-    CODE = "could_del_sys_file"
+class WordSplitCouldDeleteSystemFile(Error):
+    CODE = "word_split_del_sys_file"
     def __init__(self,filename:str, line):
-        super().__init__(self.CODE,f"might delete system file {filename}", line)
+        super().__init__(self.CODE,f"word splitting or empty variable could lead to deletion of system file {filename}", line)
 
 class DangerousWordSplit(Warning):
     CODE = "word_split"
