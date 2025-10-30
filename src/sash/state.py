@@ -104,6 +104,10 @@ class SetOptions:
     def is_set(self, option: str) -> bool:
        return option in self.current
 
+    @classmethod
+    def relevant(cls, option: str) -> bool:
+        return option.strip("-") not in {"x"}
+
 @dataclass(frozen=True)
 class State:
     pathcond: tuple[sash.constraints.Constraint, ...]

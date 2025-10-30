@@ -236,7 +236,10 @@ def handle_set(expanded_args: List[Field], traces: Traces) -> Traces:
         match arg:
             case Field(SymStr([flag]), WordCount(1, 1)) if isinstance(flag, str):
                 if flag.startswith("-"):
-                    to_set.update(flag[1:])
+                    if SetOptions.relevant(flag):
+                        to_set.update(flag[1:])
+                    else:
+                        logging.debug(f"set: ignoring irrelevant option: {flag}")
                 else:
                     raise NotImplementedError(f"set: option unsetting not implemented: {expanded_args}")
 
