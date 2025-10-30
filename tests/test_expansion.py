@@ -211,3 +211,26 @@ def test_expand_args_dumb():
                                                     state,
                                                     suffix=SymStr(("Applications/iTunes.app",))),
                                  WordCount(0, float('inf')))
+
+def test_expand_args_dumb_multipath():
+    script = parse_script("""
+rm -rf $UNBOUND/*
+""")
+    assert len(script) == 1
+    assert isinstance(script[0], AST.CommandNode)
+
+    state = starting_state()
+    state1 = state.set_env("A", ShellVar(constant_field("value1")))
+    state2 = state.set_env("A", ShellVar(constant_field("value2")))
+    traces, expanded = expand_args_dumb([Trace((state1,)), Trace((state2,))],
+                                         script[0].arguments,
+                                         config)
+    assert len(traces) == 2
+    assert len(expanded) == 3
+    assert expanded[0] == constant_field("rm")
+    assert expanded[1] == constant_field("-rf")
+    assert expanded[2] == Field(CompletelyArbitrary(freeze(script[0].arguments[2][0]),
+                                                    ArbitraryType.ENVIRONMENT,
+                                                    traces[0].latest_state,
+                                                    suffix=SymStr(("/*",))),
+                                 WordCount(0, float('inf')))

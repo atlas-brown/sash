@@ -69,7 +69,7 @@ def test_delete_system_file(tmp_path):
 
     script = write_script(tmp_path, "rm $FOO/usr\n")
     report = symb.main(script)
-    expected_error1 = reporter.WordSplitCouldDeleteSystemFile("", 0)
+    expected_error1 = reporter.WordSplitCouldDeleteSystemFile("/usr", 0)
     expected_error2 = reporter.UnboundID(foo_var.pretty(), 0)
     expected_error3 = reporter.DangerousWordSplit("$FOO", 0)
     assert_expected_report(report, [expected_error1, expected_error2, expected_error3])
@@ -77,9 +77,9 @@ def test_delete_system_file(tmp_path):
 
     script = write_script(tmp_path, "rm -rf $STEAMROOT/*\n")
     report = symb.main(script)
-    expected_error1 = reporter.WordSplitCouldDeleteSystemFile("", 0)
+    expected_error1 = reporter.WordSplitCouldDeleteSystemFile("/*", 0)
     expected_error2 = reporter.UnboundID(foo_var.pretty(), 0)
-    expected_error3 = reporter.DangerousWordSplit("$FOO", 0)
+    expected_error3 = reporter.DangerousWordSplit("$STEAMROOT", 0)
     assert_expected_report(report, [expected_error1, expected_error2, expected_error3])
 
     script = write_script(tmp_path, "rm -rf /*\n")
@@ -92,6 +92,19 @@ def test_delete_system_file(tmp_path):
     expected_error1 = reporter.WordSplitCouldDeleteSystemFile("/", 0)
     expected_error2 = reporter.UnboundID(foo_var.pretty(), 0)
     assert_expected_report(report, [expected_error1, expected_error2])
+
+    script = write_script(tmp_path, """
+if [ "$FOO" = "yes" ]; then
+    A=yes
+else
+    A=no
+fi
+rm -rf "$FOO/"
+""")
+    report = symb.main(script)
+    expected_error1 = reporter.WordSplitCouldDeleteSystemFile("/", 0)
+    expected_error2 = reporter.UnboundID(foo_var.pretty(), 0)
+    assert_expected_report(report, [expected_error1, expected_error2, expected_error2])
 
 def test_delete_splitting(tmp_path):
     script = write_script(tmp_path, "rm $UNQUOTED\n")

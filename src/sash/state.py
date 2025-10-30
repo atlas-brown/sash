@@ -60,10 +60,12 @@ class CompletelyArbitrary:
 
     def __eq__(self, other):
         # If the state producing this is unknown, conservatively say it can't be equal to any other
+        # Another twist here, the producing state is only relevant for the APPROXIMATION kind, because
+        # arbitrariness due to the environment should be the same regardless of state
         return isinstance(other, CompletelyArbitrary) \
             and self.source == other.source \
             and self.kind == other.kind \
-            and self.producing_state == other.producing_state \
+            and (self.kind == ArbitraryType.ENVIRONMENT or self.producing_state == other.producing_state) \
             and self.producing_state is not None \
             and self.prefix == other.prefix \
             and self.suffix == other.suffix
