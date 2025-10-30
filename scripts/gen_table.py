@@ -3,13 +3,10 @@ import sys
 import os
 from io import StringIO
 
+EPSILON = 1e-3
+
 results_path = "scripts/results.csv"
 results = pd.read_csv(results_path)
-
-# df = pd.read_csv(csv_path)
-# latex_table = df.to_latex(index=False, escape=False, float_format="%.2f", label=label)
-# with open(latex_path, "w") as f:
-#     f.write(latex_table)
 
 names = {
     "high_profile/c00-steam": "Steam updater",
@@ -83,10 +80,11 @@ def create_table_line(result):
         print(f"Unknown benchmark name {bm_name} for path: {path}", file=sys.stderr)
         return
     description = descriptions[bm_name]
+    time = f"{time:.2f}s" if time > EPSILON else "<1ms"
     loc = get_loc(path)
     source = sources.get(bm_name, "")
     detected = r"\checkmark" if bool(detected) else ""
-    return f"{name} & {loc}  & {description} & {detected} & {time:.2f} &  &  &  & {source}  \\\\"
+    return f"{name} & {loc}  & {description} & {detected} & {time} &  &  &  & {source}  \\\\"
 
 rest_of_benchmarks = []
 
@@ -109,7 +107,7 @@ for result in results.to_dict(orient="records"):
 # find time range for rest_of_benchmarks
 min_time = min(r["time"] for r in rest_of_benchmarks)
 max_time = max(r["time"] for r in rest_of_benchmarks)
-time_range = f"{min_time:.2f}--{max_time:.2f}"
+time_range = f"{min_time:.2f}--{max_time:.2f}s"
 
 locs = [get_loc(r["benchmark"]) for r in rest_of_benchmarks]
 min_loc = min(locs)
