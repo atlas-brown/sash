@@ -1,0 +1,35 @@
+#!/bin/sh
+
+download_repos() {
+  user_name="$1"
+  temp_dir=$(mktemp -q /tmp/repo_archive.XXXXXX) # missing -d
+  if [ $? -ne 0 ]; then
+      echo "$0: Can't create a temp file!"
+      exit 1
+  fi
+
+  echo "Using the following temp dir: $temp_dir"
+  cd "$temp_dir" && # bug here: cd into file due to missing -d in mktemp
+  virtualenv env &&
+  . env/bin/activate &&
+  pip install ghcloneall &&
+  ghcloneall --init --user "$user_name" &&
+  ghcloneall &&
+  deactivate &&
+  cd ~
+  destination="$1""_repo_archive.tar"
+  tar -cvf "$destination" "$temp_dir"
+  rm -rf "$temp_dir"
+  echo "All repositories of $user_name have been written to $destination"
+}
+
+main() {
+    if [ "$#" -ne 1 ]; then
+        echo "Usage: download_all_github_repos.sh [github_username]"
+        exit 1
+    fi
+
+    download_repos "$1"
+}
+
+main "$@"

@@ -1,0 +1,13 @@
+bugs:
+- line: 12
+  description: Change directory into a file (due to missing -d flag in mktemp)
+
+sources:
+- https://github.com/djeada/Bash-Scripts/commit/3e28d0238393215d5b70432d067b719359176143
+
+ground_truth:
+  errors:
+  - line: 12
+    code: cd_into_file
+    shellcheck:
+      detects: false
