@@ -34,20 +34,30 @@ def find_benchmarks(bench_dir):
                     yield path
 
 def load_expected_codes(gt_path):
-    try:
-        with open(gt_path, "r") as f:
-            data = yaml.safe_load(f)
-        codes = set()
-        for entry in data.get("ground_truth", []).get("errors", []):
-            code = entry.get("code")
-            if isinstance(code, str):
-                codes.add(code)
-            elif isinstance(code, list):
-                codes.update(code)
-        return codes
-    except Exception as e:
-        print(f"Failed to read/parse ground truth {gt_path}: {e}", file=sys.stderr)
-        return set()
+    with open(gt_path, "r") as f:
+        data = yaml.safe_load(f)
+    codes = []
+    for entry in data.get("ground_truth", []).get("errors", []):
+        code = entry.get("code")
+        if isinstance(code, str):
+            codes.append(code)
+        elif isinstance(code, list):
+            codes.extend(code)
+    return codes
+
+def load_shellcheck_results(gt_path):
+    results = []
+    with open(gt_path, "r") as f:
+        data = yaml.safe_load(f)
+        errors = data.get("ground_truth", {}).get("errors", [])
+        for error in errors:
+            if error["shellcheck"]["detects"]:
+                if isinstance(error["code"], str):
+                    results.append(error["code"])
+                elif isinstance(error["code"], list):
+                    results.extend(error["code"])
+    return results
+
 
 def extract_codes_from_output(output):
     try:
@@ -86,7 +96,7 @@ def main():
     failure = 0
     total = 0
 
-    print("benchmark,time,detected", file=output_file)
+    print("benchmark,time,detected,expected,actual,shellcheck", file=output_file)
 
     for benchmark in find_benchmarks(bench_dir):
         if benchmark_filter and not benchmark_filter.search(benchmark):
@@ -111,8 +121,8 @@ def main():
             continue
 
         expected = load_expected_codes(gt_path)
-        expected_in_scope = expected - out_of_scope_codes
-        unknown_codes = expected_in_scope - known_codes
+        expected_in_scope = [e for e in expected if e not in out_of_scope_codes]
+        unknown_codes = [e for e in expected_in_scope if e not in known_codes]
         # Check that all expected codes are valid
         for code in unknown_codes:
             print(f"Ground truth contains unknown error code: {code}", file=sys.stderr)
@@ -132,7 +142,7 @@ def main():
             continue
 
         # Check that every expected code appears in the actual codes (actual may contain extras)
-        missing = expected - actual_codes
+        missing = [e for e in expected_in_scope if e not in actual_codes]
         if missing:
             print(f"FAIL, time: {parsed_json.get('time', 'N/A')}s", file=sys.stderr)
             print("Missing expected codes:", file=sys.stderr)
@@ -145,9 +155,15 @@ def main():
             print(f"Pass, time: {parsed_json.get('time', 'N/A')}s", file=sys.stderr)
         total += 1
 
+        shellcheck_results = load_shellcheck_results(gt_path)
+
+        expected_codes = f"{';'.join(expected)}"
+        actual_caught_codes = f"{';'.join(actual_codes)}"
+        shellcheck_codes = f"{';'.join(shellcheck_results)}"
+
         # Output to CSV
         benchmark_rel = os.path.relpath(benchmark, top)
-        print(f"{benchmark_rel},{parsed_json.get('time', 'N/A')},{1 if not missing else 0}", file=output_file)
+        print(f"{benchmark_rel},{parsed_json.get('time', 'N/A')},{1 if not missing else 0},{expected_codes},{actual_caught_codes},{shellcheck_codes}", file=output_file)
 
     output_file.close()
 
