@@ -116,7 +116,7 @@ def main():
         gt_path = os.path.join(os.path.dirname(benchmark), "info.yaml")
         if not os.path.isfile(gt_path):
             # No ground truth, just print the output
-            print(output, end="")
+            print(output, end="", file=sys.stderr)
             total += 1
             continue
 
@@ -134,7 +134,7 @@ def main():
             print("FAIL", file=sys.stderr)
             print("Expected:", file=sys.stderr)
             for c in expected:
-                print(c)
+                print(c, file=sys.stderr)
             print("Actual (raw output, not valid JSON):", file=sys.stderr)
             print(output, file=sys.stderr)
             failure += 1
@@ -148,7 +148,7 @@ def main():
             print("Missing expected codes:", file=sys.stderr)
             for c in missing:
                 print(c)
-            print("Actual:")
+            print("Actual:", file=sys.stderr)
             print(json.dumps(parsed_json.get("errors", []), indent=2), file=sys.stderr)
             failure += 1
         else:
