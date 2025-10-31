@@ -612,7 +612,7 @@ __get_backup_tarball_command()
     echo "$nice_bin -n $BM_ARCHIVE_NICE_LEVEL $command"
 }
 
-build_clear_archive
+build_clear_archive()
 {
     debug "build_clear_archive ()"
 
@@ -646,7 +646,7 @@ build_clear_archive
 }
 
 
-build_encrypted_archive
+build_encrypted_archive()
 {
     debug "build_encrypted_archive"
     logfile=$(mktemp ${BM_TEMP_DIR}/bm-tarball.log.XXXXXX)
@@ -745,7 +745,7 @@ __build_remote_archive()
     done
 }
 
-__make_remote_tarball_token
+__make_remote_tarball_token()
 {
     t="$1"
     debug "__make_remote_tarball_token ($t)"
@@ -755,7 +755,7 @@ __make_remote_tarball_token
     __build_remote_archive "$t" "$dir_name"
 }
 
-__make_local_tarball_token
+__make_local_tarball_token()
 {
     t="$1"
     debug "__make_local_tarball_token ($t)"
