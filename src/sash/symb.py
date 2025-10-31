@@ -379,7 +379,10 @@ def expand_simple(stuff: list[AST.ArgChar],
                         # todo we should report path information
                         if not is_special_var(var.var):
                             error_code = reporter.UnboundIDSetU if state.opts.is_set(SetOptions.NOUNSET) else reporter.UnboundID
-                            Reporter.add_error(error_code(var.pretty(), context_line))
+                            refined_line = refine_line_for_var(getattr(var, "var", None), context_line)
+                            if refined_line == context_line:
+                                refined_line = refine_line_for_token(var.pretty(), context_line)
+                            Reporter.add_error(error_code(var.pretty(), refined_line))
                         add_a_field(arbitrary_field(var,
                                                     ArbitraryType.APPROXIMATION if is_special_var(var.var) else ArbitraryType.ENVIRONMENT,
                                                     state))
@@ -573,6 +576,67 @@ def merge_counts(c1: WordCount, c2: WordCount, sep: int = 0) -> WordCount:
 # ============================================================
 
 context_line = None
+# Top-level raw text of the current node being interpreted.
+current_top_rawtext: Optional[str] = None
+# Absolute line number before the current top-level raw text.
+current_top_line_before: Optional[int] = None
+# Full-file raw text of the current file being interpreted
+# (for fallback line refinement when not found in current top-level node).
+current_file_rawtext: Optional[str] = None
+
+
+def refine_line_for_token(token_text: str, fallback_line: Optional[int]) -> Optional[int]:
+    """
+    Return a refined absolute line for a token by scanning the current top-level raw text and the full file raw text.
+    If not found, fall back to `fallback_line`.
+    """
+    try:
+        if token_text is None:
+            return fallback_line
+        # Prefer searching within the current top-level node raw text for precision.
+        if current_top_rawtext is not None and current_top_line_before is not None:
+            idx_top_rawtext = current_top_rawtext.find(token_text)
+            if idx_top_rawtext >= 0:
+                rel_lines = current_top_rawtext[:idx_top_rawtext].count("\n")
+                return current_top_line_before + 1 + rel_lines
+        # Fallback: search the entire file if not found in the current node.
+        if current_file_rawtext is not None:
+            idx_file_rawtext = current_file_rawtext.find(token_text)
+            if idx_file_rawtext >= 0:
+                return current_file_rawtext[:idx_file_rawtext].count("\n") + 1
+        return fallback_line
+    except Exception:
+        return fallback_line
+
+
+def refine_line_for_var(var_name: Optional[str], fallback_line: Optional[int]) -> Optional[int]:
+    """
+    Return a refined absolute line for a variable by scanning the current top-level raw text and the full file raw text.
+    If not found, fall back to `fallback_line`.
+    """
+    try:
+        if var_name is None:
+            return fallback_line
+        # Either `${var}` or `$var`.
+        candidates = [f"${{{var_name}}}", f"${var_name}"]
+        # Prefer searching within the current top-level node raw text for precision.
+        if current_top_rawtext is not None and current_top_line_before is not None:
+            positions_top_rawtext = [current_top_rawtext.find(c) for c in candidates]
+            positions = [p for p in positions_top_rawtext if p >= 0]
+            if positions:
+                idx = min(positions)
+                rel_lines = current_top_rawtext[:idx].count("\n")
+                return current_top_line_before + 1 + rel_lines
+        # Fallback: search the entire file if not found in the current node.
+        if current_file_rawtext is not None:
+            positions_file_rawtext = [current_file_rawtext.find(c) for c in candidates]
+            positions = [p for p in positions_file_rawtext if p >= 0]
+            if positions:
+                idx = min(positions)
+                return current_file_rawtext[:idx].count("\n") + 1
+        return fallback_line
+    except Exception:
+        return fallback_line
 
 trace_count = 1
 def collapse_traces_if_too_many(traces: Traces) -> Traces:
@@ -735,12 +799,15 @@ def trim_string_for_logging(s: str, max_len: int = 300) -> str:
     return s if len(s) <= max_len else s[:max_len] + "..."
 
 def symb_engine(nodes: list[AST_parse], config: InterpConfig) -> list[Trace]:
-    global context_line
+    global context_line, current_top_rawtext, current_top_line_before
     logging.debug(f"Running symb engine with {len(nodes)} raw nodes")
     traces = [Trace((starting_state(),))]
     for node in nodes:
         # For single-line nodes, set the context line to line_before + 1.
         context_line = node.line_before + 1
+        # Record top-level context for finer-grained line refinement.
+        current_top_rawtext = node.rawtext
+        current_top_line_before = node.line_before
         logging.debug(f"Interpreting next node (line {context_line}) {trim_string_for_logging(node.ast_node.pretty())}")
         traces = guarded_interp_node(traces, node.ast_node, config)
 
@@ -763,6 +830,13 @@ def symbexec_file(input_file: str,
 
 def main(file: str) -> dict:
     logging.info(f"Processing file {file}")
+    # Store the full-file raw text for fallback line refinement.
+    global current_file_rawtext
+    try:
+        with open(file, "r", errors="ignore") as _f:
+            current_file_rawtext = _f.read()
+    except Exception:
+        current_file_rawtext = None
     Reporter.initialize(file)
     try:
         symbexec_file(file)
