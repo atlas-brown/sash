@@ -1,0 +1,13 @@
+bugs:
+- line: 11
+  description: The output of mkdir is captured, but mkdir does not produce output
+
+sources:
+- https://stackoverflow.com/questions/73501167/issue-in-mkdir-output-to-variable
+
+ground_truth:
+  errors:
+  - line: 11
+    code: capturing_empty_output
+    shellcheck:
+      detects: false

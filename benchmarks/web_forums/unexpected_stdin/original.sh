@@ -15,7 +15,3 @@ else
         echo "File does not exist"
         exit $?
 fi
-
-# Argument semantics depend on word splitting
-# Argument roles/types are different depending on position and might change based on word splitting
-
