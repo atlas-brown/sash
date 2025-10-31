@@ -315,7 +315,8 @@ def expand_simple(stuff: list[AST.ArgChar],
                   config: InterpConfig) -> list[Field]:
     IFS = " \t\n"
 
-    def expand_inner(chars: list[AST.ArgChar], quoted: bool = False) -> list[Field]:
+    @dataclass
+    class Partial:
         ## Notes on what's happening here:
         # Need to build up fields with individual characters, and also SymStrs that we come across
         # Along the way, will see some CompletelyArbitrarys
@@ -324,83 +325,89 @@ def expand_simple(stuff: list[AST.ArgChar],
         # BUT -- we can preserve some info that will lead to better error messages:
         # if there's some SymStr that's being prepended or appended to an arbitrary thing, we can
         # record that the SymStr is a known prefix or suffix of the arbitrary thing
-        combined_fields_so_far: list[Field | None] = [] # None's mean a hard break due to IFS
-        field_so_far: list[str | SymVar] = []
+        quoted: bool
+        combined_fields_so_far: list[Field | None] = field(default_factory=list) # None's mean a hard break due to IFS
+        field_so_far: list[str | SymVar] = field(default_factory=list)
         field_so_far_words_min: int = 1
         field_so_far_words_max: int | float = 1
 
-        def add_a_field(one_field: Field) -> None:
-            nonlocal field_so_far, field_so_far_words_min, field_so_far_words_max, combined_fields_so_far
+        def add_a_field(self, one_field: Field) -> None:
             match one_field.content:
                 case CompletelyArbitrary():
-                    finish_field_so_far()
-                    combined_fields_so_far.append(one_field)
+                    self.finish_field_so_far()
+                    self.combined_fields_so_far.append(one_field)
                 case SymStr(parts):
-                    field_so_far.extend(parts)
+                    self.field_so_far.extend(parts)
                     if one_field.count.min > 1:
-                        field_so_far_words_min += one_field.count.min - 1
+                        self.field_so_far_words_min += one_field.count.min - 1
                     if one_field.count.max > 1:
-                        field_so_far_words_max += one_field.count.max - 1
+                        self.field_so_far_words_max += one_field.count.max - 1
 
-        def finish_field_so_far(IFS: bool = False) -> None:
-            nonlocal field_so_far, field_so_far_words_min, field_so_far_words_max, combined_fields_so_far
-            if field_so_far != []:
-                combined_fields_so_far.append(Field(SymStr(tuple(field_so_far)).simplify(),
-                                                    WordCount(field_so_far_words_min, field_so_far_words_max)))
+        def finish_field_so_far(self, IFS: bool = False) -> None:
+            if self.field_so_far != []:
+                self.combined_fields_so_far.append(Field(SymStr(tuple(self.field_so_far)).simplify(),
+                                                         WordCount(self.field_so_far_words_min, self.field_so_far_words_max)))
                 if IFS:
-                    combined_fields_so_far.append(None)
-                field_so_far = []
-                field_so_far_words_min = 1
-                field_so_far_words_max = 1
+                    self.combined_fields_so_far.append(None)
+                self.field_so_far = []
+                self.field_so_far_words_min = 1
+                self.field_so_far_words_max = 1
 
-        for argchar in chars:
+        def next(self, argchar: AST.ArgChar) -> None:
             match argchar:
                 # todo what about globs?
                 case AST.CArgChar() as c:
-                    if not quoted and c.pretty() in IFS:
-                        finish_field_so_far(True)
+                    if not self.quoted and c.pretty() in IFS:
+                        self.finish_field_so_far(True)
                     else:
-                        field_so_far.append(c.pretty(AST.QUOTED if quoted else AST.UNQUOTED))
+                        self.field_so_far.append(c.pretty(AST.QUOTED if self.quoted else AST.UNQUOTED))
                 case AST.EArgChar() as c:
-                    field_so_far.append(c.pretty(AST.QUOTED if quoted else AST.UNQUOTED))
+                    self.field_so_far.append(c.pretty(AST.QUOTED if self.quoted else AST.UNQUOTED))
                 case AST.QArgChar() as q:
                     inside = expand_inner(q.arg, True)
                     one_field = join_fields(inside).quote()
-                    add_a_field(one_field)
+                    self.add_a_field(one_field)
                 case AST.VArgChar() as var:
                     if (v := state.lookup(var.var)):
                         if var.fmt == "Normal":
-                            add_a_field(v.value)
+                            self.add_a_field(v.value)
                         else:
                             # TODO: a straightforward handling for default value expansion is to branch: in one case we treat the result as whatever the lookup gave (or arbitrary if unknown), and in the other case we use the default value
                             logging.info(f"expansion: treating var {var.pretty()} with unhandled fmt {var.fmt} as completely arbitrary field")
-                            add_a_field(arbitrary_field(var, ArbitraryType.APPROXIMATION, state))
+                            self.add_a_field(arbitrary_field(var, ArbitraryType.APPROXIMATION, state))
                     else:
                         # todo we should report path information
                         if not is_special_var(var.var):
                             error_code = reporter.UnboundIDSetU if state.opts.is_set(SetOptions.NOUNSET) else reporter.UnboundID
                             Reporter.add_error(error_code(var.pretty(), context_line))
-                        add_a_field(arbitrary_field(var,
-                                                    ArbitraryType.APPROXIMATION if is_special_var(var.var) else ArbitraryType.ENVIRONMENT,
-                                                    state))
+                        self.add_a_field(arbitrary_field(var,
+                                                         ArbitraryType.APPROXIMATION if is_special_var(var.var) else ArbitraryType.ENVIRONMENT,
+                                                         state))
                 case AST.BArgChar() as b:
                     logging.info(f"expansion: treating backquote argchar {b.pretty()} as completely arbitrary field")
-                    add_a_field(arbitrary_field(b, ArbitraryType.APPROXIMATION, state))
                     # todo use the trace
                     t = guarded_interp_node([Trace((state,))], b.node, config)
+                    self.add_a_field(arbitrary_field(b, ArbitraryType.APPROXIMATION, state))
                 case _:
                     # todo: if its a command substitution, need to go interp it
                     logging.error(f"argchar: {argchar} {type(argchar)}")
                     logging.info(f"expansion: treating unhandled argchar as completely arbitrary field: {argchar.pretty()}")
-                    add_a_field(arbitrary_field(argchar, ArbitraryType.APPROXIMATION, state))
+                    self.add_a_field(arbitrary_field(argchar, ArbitraryType.APPROXIMATION, state))
 
-        finish_field_so_far()
+        def finish(self) -> list[Field]:
+            self.finish_field_so_far()
+            # Join the combined fields so far, folding symstrs into arbitrary fields as prefixes and suffixes
+            split = split_at(self.combined_fields_so_far, None)
+            return [merge_partial_fields(part, None, state) for part in split if part != []]
 
-        # Join the combined fields so far, folding symstrs into arbitrary fields as prefixes and suffixes
-        split = split_at(combined_fields_so_far, None)
-        return [merge_partial_fields(part, None, state) for part in split if part != []]
+    def expand_inner(chars: list[AST.ArgChar], quoted: bool = False) -> list[Field]:
+        expansion = Partial(quoted)
+        for argchar in chars:
+            expansion.next(argchar)
+        return expansion.finish()
 
     return expand_inner(stuff)
+
 
 def expand_args_dumb(traces: Traces,
                      args: list[list[AST.ArgChar]],
