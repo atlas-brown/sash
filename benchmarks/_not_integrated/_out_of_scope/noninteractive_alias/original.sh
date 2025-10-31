@@ -1,5 +1,4 @@
 #! /usr/bin/bash
-# https://stackoverflow.com/questions/55731127/bash-script-to-identify-specific-alias-causing-a-bug
 [ -e aliases.txt ] && rm -f aliases.txt
 alias | sed 's/alias //' | cut -d "=" -f1 > aliases.txt # bug here: alias will output nothing in a noninteractive shell (unless sourced)
 printf "File aliases.txt created with %d lines.\n" \

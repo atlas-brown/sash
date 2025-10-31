@@ -14,7 +14,7 @@ echo "**********************************************************"
             GCC_OPT="-O3"
             OPT_FLAGS=$CF
 ###### do sth
-# unfortunately not the entire script is shown but the poster confirms that this was the problem
+
 
 
 tmp=$PWD

@@ -1,0 +1,10 @@
+bugs:
+- line: tbd
+  description: Wrong order of mktemp arguments prevents diectory creation
+
+note:
+- Very high granularity in mktemp modeling; oos for now
+
+sources:
+- https://git.zx2c4.com/password-store/commit/?id=f4a7d9ed71a8bc415be08bd709002b3ac0913654
+- https://git.zx2c4.com/password-store/tree/src/password-store.sh?id=072bbc617bdcbaa0cc643a67676916ac99116172

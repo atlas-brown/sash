@@ -1,0 +1,9 @@
+bugs:
+- line: tbd
+  description: The alias command is used in a non-interactive shell, making its output empty (unless the script is sourced)
+
+note:
+- This is not necessarily a bug (in this case it is)
+
+sources:
+- https://stackoverflow.com/questions/55731127/bash-script-to-identify-specific-alias-causing-a-bug

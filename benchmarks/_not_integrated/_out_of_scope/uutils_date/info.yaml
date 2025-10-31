@@ -1,0 +1,11 @@
+bugs:
+- line: tbd
+  description: Wrong implementation of date -r <file> would ignore reference date and output current date instead
+
+note:
+- I don't think we can detect this bug unfortunately, even with concretization, unless we specifically test for it (which does not make sense)
+
+sources:
+- https://lwn.net/Articles/1043103/
+- https://lists.ubuntu.com/archives/ubuntu-security-announce/2025-October/009890.html
+- https://www.apt-browse.org/browse/debian/stretch/main/amd64/apt/1.4.9/file/usr/lib/apt/apt.systemd.daily

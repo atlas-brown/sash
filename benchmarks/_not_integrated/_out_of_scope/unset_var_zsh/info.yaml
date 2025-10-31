@@ -2,12 +2,8 @@ bugs:
 - line: tbd
   description: An unset variable is used ($cwd)
 
+note:
+- This script makes heavy use of zsh features and is not worth the effort to port to sh
+
 sources:
 - https://github.com/ohmyzsh/ohmyzsh/commit/b5093859af472c04dfca33adfeba49bfbe417c9d
-
-ground_truth:
-  errors:
-  - line: tbd
-    code: unbound
-    shellcheck:
-      detects: false
