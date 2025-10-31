@@ -739,7 +739,8 @@ def symb_engine(nodes: list[AST_parse], config: InterpConfig) -> list[Trace]:
     logging.debug(f"Running symb engine with {len(nodes)} raw nodes")
     traces = [Trace((starting_state(),))]
     for node in nodes:
-        context_line = node.line_before
+        # For single-line nodes, set the context line to line_before + 1.
+        context_line = node.line_before + 1
         logging.debug(f"Interpreting next node (line {context_line}) {trim_string_for_logging(node.ast_node.pretty())}")
         traces = guarded_interp_node(traces, node.ast_node, config)
 
