@@ -171,6 +171,7 @@ def main():
 
         # Output to CSV
         benchmark_rel = os.path.relpath(benchmark, top)
+        print("benchmark,time,detected,expected,actual,shellcheck")  # Print to stdout (only) for clarity.
         print(f"{benchmark_rel},{time_elapsed},{1 if not missing else 0},{expected_codes},{actual_caught_codes},{shellcheck_codes}", file=output_file)
 
     output_file.close()

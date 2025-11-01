@@ -617,8 +617,11 @@ def refine_line_for_var(var_name: Optional[str], fallback_line: Optional[int]) -
     try:
         if var_name is None:
             return fallback_line
-        # Either `${var}` or `$var`.
-        candidates = [f"${{{var_name}}}", f"${var_name}"]
+        candidates = [
+            f"${{{var_name}}}",  # Exact match `${var}`.
+            f"${var_name}",      # Exact match `$var`.
+            f"${{{var_name}",    # prefix match to catch `${var-...}`, `${var:+...}`, etc.
+        ]
         # Prefer searching within the current top-level node raw text for precision.
         if current_top_rawtext is not None and current_top_line_before is not None:
             positions_top_rawtext = [current_top_rawtext.find(c) for c in candidates]
@@ -803,7 +806,7 @@ def symb_engine(nodes: list[AST_parse], config: InterpConfig) -> list[Trace]:
     logging.debug(f"Running symb engine with {len(nodes)} raw nodes")
     traces = [Trace((starting_state(),))]
     for node in nodes:
-        # For single-line nodes, set the context line to line_before + 1.
+        # Update context line before interpreting the node.
         context_line = node.line_before + 1
         # Record top-level context for finer-grained line refinement.
         current_top_rawtext = node.rawtext
