@@ -13,6 +13,8 @@ dist/
 wheels/
 *.egg-info
 .pytest_cache/
+# Hypothesis
+**/.hypothesis/
 
 # Virtual environments
 .venv/
