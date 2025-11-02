@@ -17,6 +17,6 @@ def create_fresh_varname(prefix:Optional[str] = None) -> str:
     return str(z3.FreshConst(z3.StringSort(),prefix))
 
 def create_fresh_var(prefix:Optional[str] = None) -> SymVar:
-    return SymbArgChar(create_fresh_varname(prefix))
+    return SymVar(create_fresh_varname(prefix))
 
 
