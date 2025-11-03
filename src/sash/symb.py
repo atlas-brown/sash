@@ -1,3 +1,4 @@
+from copy import copy
 from dataclasses import dataclass
 import json
 import logging
@@ -302,17 +303,16 @@ def expand(traces: Traces,
            config: InterpConfig) -> list[tuple[Trace, list[Field]]]:
     res = []
     for trace in traces:
-        res.append((trace, expand_simple(stuff, trace.latest_state, config)))
-        # if expanded := expand_simple(stuff, trace.latest_state):
-        #     res.append((trace, expanded))
-        # else:
-        #     res.append((trace, [arbitrary_field(stuff)]))
+        # expand_simple(stuff, trace.latest_state, config)
+        for expanded_fields, new_state in expand_simple(stuff, trace.latest_state, config):
+            new_trace = trace.extend(new_state)
+            res.append((new_trace, expanded_fields))
     return res
 
 # Different fields are definitely separated; things within a field *may be separated as well!*
 def expand_simple(stuff: list[AST.ArgChar],
                   state: State,
-                  config: InterpConfig) -> list[Field]:
+                  config: InterpConfig) -> list[tuple[list[Field], State]]:
     IFS = " \t\n"
 
     @dataclass
@@ -326,6 +326,7 @@ def expand_simple(stuff: list[AST.ArgChar],
         # if there's some SymStr that's being prepended or appended to an arbitrary thing, we can
         # record that the SymStr is a known prefix or suffix of the arbitrary thing
         quoted: bool
+        state: State
         combined_fields_so_far: list[Field | None] = field(default_factory=list) # None's mean a hard break due to IFS
         field_so_far: list[str | SymVar] = field(default_factory=list)
         field_so_far_words_min: int = 1
@@ -353,7 +354,16 @@ def expand_simple(stuff: list[AST.ArgChar],
                 self.field_so_far_words_min = 1
                 self.field_so_far_words_max = 1
 
-        def next(self, argchar: AST.ArgChar) -> None:
+        @classmethod
+        def add_the_default(cls, who: 'Partial', var: AST.VArgChar):
+            default_expansions = expand_inner(var.arg, Partial(False, who.state))
+            assert len(default_expansions) == 1, "default value expansion forking not implemented"
+            default_fields, default_state = default_expansions[0].finish()
+            assert default_state == who.state, "default value expansion should not change state"
+            for default_field in default_fields:
+                who.add_a_field(default_field)
+
+        def next(self, argchar: AST.ArgChar) -> list['Partial']:
             match argchar:
                 # todo what about globs?
                 case AST.CArgChar() as c:
@@ -364,17 +374,47 @@ def expand_simple(stuff: list[AST.ArgChar],
                 case AST.EArgChar() as c:
                     self.field_so_far.append(c.pretty(AST.QUOTED if self.quoted else AST.UNQUOTED))
                 case AST.QArgChar() as q:
-                    inside = expand_inner(q.arg, True)
-                    one_field = join_fields(inside).quote()
-                    self.add_a_field(one_field)
+                    partial_for_inside = Partial(True, self.state)
+                    res = []
+                    for inside_partial in expand_inner(q.arg, partial_for_inside):
+                        fields_inside, state_inside = inside_partial.finish()
+                        one_field = join_fields(fields_inside).quote()
+                        continuing_partial = self.fork_state(state_inside)
+                        continuing_partial.add_a_field(one_field)
+                        res.append(continuing_partial)
+                    return res
                 case AST.VArgChar() as var:
                     if (v := state.lookup(var.var)):
-                        if var.fmt == "Normal":
+                        if var.fmt == "Normal" or (var.fmt == "Minus" and not var.null):
+                            # explanation of the minus case: the POSIX spec says that for
+                            # ${VAR-default} the result is the value of $VAR as long as $VAR is set -- whether it's empty ("null") or not
+                            # ^^ this corresponds to the second part of the condition above (var.null false means no `:`)
                             self.add_a_field(v.value)
+                        elif var.fmt == "Minus" and var.null:
+                            # This is the case that it's ${VAR:-default}:
+                            # IF $VAR is empty, take the default
+                            # Otherwise, take the result is $VAR
+                            match v.value:
+                                case Field(_, WordCount(0, 0)):
+                                    # We know $VAR is empty
+                                    Partial.add_the_default(self, var)
+                                case Field(SymStr(stuff), _) if all(isinstance(thing, str) for thing in stuff):
+                                    # We know $VAR is NOT empty
+                                    self.add_a_field(v.value)
+                                case something_not_constant: # either a symbolic str or arbitrary
+                                    non_default, default = self.fork(f"{var.pretty()} takes the default value")
+                                    Partial.add_the_default(default, var)
+                                    non_default.add_a_field(arbitrary_field(var, ArbitraryType.APPROXIMATION, state))
+                                    return [non_default, default]
                         else:
-                            # TODO: a straightforward handling for default value expansion is to branch: in one case we treat the result as whatever the lookup gave (or arbitrary if unknown), and in the other case we use the default value
                             logging.info(f"expansion: treating var {var.pretty()} with unhandled fmt {var.fmt} as completely arbitrary field")
                             self.add_a_field(arbitrary_field(var, ArbitraryType.APPROXIMATION, state))
+                    elif var.fmt == "Minus":
+                        # This is the case that $VAR is unset: take the default
+                        non_default, default = self.fork(f"{var.pretty()} takes the default value")
+                        Partial.add_the_default(default, var)
+                        non_default.add_a_field(arbitrary_field(var, ArbitraryType.ENVIRONMENT, state))
+                        return [non_default, default]
                     else:
                         # todo we should report path information
                         if not is_special_var(var.var):
@@ -394,19 +434,34 @@ def expand_simple(stuff: list[AST.ArgChar],
                     logging.info(f"expansion: treating unhandled argchar as completely arbitrary field: {argchar.pretty()}")
                     self.add_a_field(arbitrary_field(argchar, ArbitraryType.APPROXIMATION, state))
 
-        def finish(self) -> list[Field]:
+            # Most cases fall through to here, no forking going on
+            return [self]
+
+        def finish(self) -> tuple[list[Field], State]:
             self.finish_field_so_far()
             # Join the combined fields so far, folding symstrs into arbitrary fields as prefixes and suffixes
             split = split_at(self.combined_fields_so_far, None)
-            return [merge_partial_fields(part, None, state) for part in split if part != []]
+            return ([merge_partial_fields(part, None, self.state) for part in split if part != []], self.state)
 
-    def expand_inner(chars: list[AST.ArgChar], quoted: bool = False) -> list[Field]:
-        expansion = Partial(quoted)
+        def fork(self, pathcond: Any) -> tuple['Partial', 'Partial']:
+            lhs = self.fork_state(self.state.add_pathcond(pathcond))
+            rhs = self.fork_state(self.state.add_pathcond("not " + pathcond))
+            return (lhs, rhs)
+
+        def fork_state(self, new_state: State) -> 'Partial':
+            return replace(self,
+                           state=new_state,
+                           combined_fields_so_far=copy(self.combined_fields_so_far),
+                           field_so_far=copy(self.field_so_far))
+
+    def expand_inner(chars: list[AST.ArgChar], partial: Partial) -> list[Partial]:
+        expansions = [partial]
         for argchar in chars:
-            expansion.next(argchar)
-        return expansion.finish()
+            expansions = [next_expansion for expansion in expansions for next_expansion in expansion.next(argchar)]
+        return expansions
 
-    return expand_inner(stuff)
+    partials = expand_inner(stuff, Partial(False, state))
+    return [partial.finish() for partial in partials]
 
 
 def expand_args_dumb(traces: Traces,
