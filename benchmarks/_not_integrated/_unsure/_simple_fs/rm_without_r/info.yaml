@@ -1,0 +1,13 @@
+bugs:
+- line: 17
+  description: Attempt to remove a directory using rm without the -r flag
+
+sources:
+- https://github.com/binpash/pash/commit/fd068837df31c5440f72f65eddcfd166e6a9fc8f
+
+ground_truth:
+  errors:
+  - line: 17
+    code: tbd
+    shellcheck:
+      detects: false

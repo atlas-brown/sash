@@ -1,5 +1,4 @@
-#!/bin/bash
-# https://github.com/binpash/pash/commit/fd068837df31c5440f72f65eddcfd166e6a9fc8f
+#!/bin/sh
 
 # tag: count_morphs
 # set -e
@@ -15,4 +14,4 @@ do
 done
 
 echo 'done';
-rm ${OUT} # OUT is a dir
+rm -r ${OUT}
