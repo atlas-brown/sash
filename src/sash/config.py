@@ -15,7 +15,9 @@ class Config:
     "DEBUG":True,
     "SCCHECK" : False,
     "CREATE_Z3" : False,
-    "PROTECTED_PATHS" : ["/", "/*", "/bin","/usr/bin","/usr","/etc","/sbin","/usr/sbin","/var","/lib","/lib64","/home"]
+    "PROTECTED_PATHS" : ["/", "/*",
+                         "/bin",
+                         "/etc","/sbin","/var","/lib","/lib64","/home"] + [usr_path + thing for usr_path in ["/usr", "/usr/local"] for thing in ["", "/bin","/sbin","/lib","/share", "/include"]],
     }
     __setters = ["DEBUG","CREATE_Z3"]
 

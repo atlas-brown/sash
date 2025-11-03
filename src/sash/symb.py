@@ -1,3 +1,4 @@
+from copy import copy
 from dataclasses import dataclass
 import json
 import logging
@@ -28,7 +29,11 @@ def handle_commandnode(traces: Traces,
     if expanded_args:
         match field_to_str(expanded_args[0]):
             case "rm":
-                handle_rm(expanded_args)
+                logging.debug("Exploring all possible expansions of rm args")
+                expansions = expand_args(traces, node.arguments, config)
+                simplified_expansions = collapse_equiv_trace_expansions(expansions)
+                for trace, arg_fields in simplified_expansions:
+                    handle_rm(arg_fields)
             case "set":
                 t1 = handle_set(expanded_args, t1)
             case "exit":
@@ -48,6 +53,7 @@ def handle_commandnode(traces: Traces,
     return t2
 
 def handle_rm(expanded_args: List[Field]) -> None:
+    logging.debug(f"Checking rm command with expansion possibility: {expanded_args}")
     def is_protected(path):
         return any(path in [p, p + "/", p + "/*"] for p in Config.get("PROTECTED_PATHS"))
     for arg_field in expanded_args[1:]:
@@ -263,7 +269,11 @@ def handle_if(traces: Traces, node: AST.IfNode, config: InterpConfig) -> Traces:
     t1 = guarded_interp_node(traces, node.cond, temp_config)
     logging.debug(f"collected test_cmds: {test_cmds}")
     logging.debug(f"Checking constant test cond")
-    test_result = interpret_test(test_cmds[-1])
+    if len(test_cmds) == 0:
+        logging.warning("Failed to collect any test commands? Giving up on constant condition check.")
+        test_result = None
+    else:
+        test_result = interpret_test(test_cmds[-1])
     if test_result is not None:
         Reporter.add_error(reporter.ConstantCondition(test_cmds, context_line))
         if test_result == True and node.else_b is not None:
@@ -299,23 +309,26 @@ def handle_exit(traces: Traces) -> Traces:
 
 def expand(traces: Traces,
            stuff: list[AST.ArgChar],
-           config: InterpConfig) -> list[tuple[Trace, list[Field]]]:
+           config: InterpConfig,
+           prefix: dict[int, list[Field]] = {}) -> list[tuple[Trace, list[Field]]]:
+    """If supplied, `prefix` specifies a prefix to prepend to each expansion produced by each trace (mapped by its id)."""
     res = []
     for trace in traces:
-        res.append((trace, expand_simple(stuff, trace.latest_state, config)))
-        # if expanded := expand_simple(stuff, trace.latest_state):
-        #     res.append((trace, expanded))
-        # else:
-        #     res.append((trace, [arbitrary_field(stuff)]))
+        prefix_fields = prefix.get(id(trace), [])
+        # expand_simple(stuff, trace.latest_state, config)
+        for expanded_fields, new_state in expand_simple(stuff, trace.latest_state, config):
+            new_trace = trace.extend(new_state)
+            res.append((new_trace, prefix_fields + expanded_fields))
     return res
 
 # Different fields are definitely separated; things within a field *may be separated as well!*
 def expand_simple(stuff: list[AST.ArgChar],
                   state: State,
-                  config: InterpConfig) -> list[Field]:
+                  config: InterpConfig) -> list[tuple[list[Field], State]]:
     IFS = " \t\n"
 
-    def expand_inner(chars: list[AST.ArgChar], quoted: bool = False) -> list[Field]:
+    @dataclass
+    class Partial:
         ## Notes on what's happening here:
         # Need to build up fields with individual characters, and also SymStrs that we come across
         # Along the way, will see some CompletelyArbitrarys
@@ -324,86 +337,147 @@ def expand_simple(stuff: list[AST.ArgChar],
         # BUT -- we can preserve some info that will lead to better error messages:
         # if there's some SymStr that's being prepended or appended to an arbitrary thing, we can
         # record that the SymStr is a known prefix or suffix of the arbitrary thing
-        combined_fields_so_far: list[Field | None] = [] # None's mean a hard break due to IFS
-        field_so_far: list[str | SymVar] = []
+        quoted: bool
+        state: State
+        combined_fields_so_far: list[Field | None] = field(default_factory=list) # None's mean a hard break due to IFS
+        field_so_far: list[str | SymVar] = field(default_factory=list)
         field_so_far_words_min: int = 1
         field_so_far_words_max: int | float = 1
 
-        def add_a_field(one_field: Field) -> None:
-            nonlocal field_so_far, field_so_far_words_min, field_so_far_words_max, combined_fields_so_far
+        def add_a_field(self, one_field: Field) -> None:
             match one_field.content:
                 case CompletelyArbitrary():
-                    finish_field_so_far()
-                    combined_fields_so_far.append(one_field)
+                    self.finish_field_so_far()
+                    self.combined_fields_so_far.append(one_field)
                 case SymStr(parts):
-                    field_so_far.extend(parts)
+                    self.field_so_far.extend(parts)
                     if one_field.count.min > 1:
-                        field_so_far_words_min += one_field.count.min - 1
+                        self.field_so_far_words_min += one_field.count.min - 1
                     if one_field.count.max > 1:
-                        field_so_far_words_max += one_field.count.max - 1
+                        self.field_so_far_words_max += one_field.count.max - 1
 
-        def finish_field_so_far(IFS: bool = False) -> None:
-            nonlocal field_so_far, field_so_far_words_min, field_so_far_words_max, combined_fields_so_far
-            if field_so_far != []:
-                combined_fields_so_far.append(Field(SymStr(tuple(field_so_far)).simplify(),
-                                                    WordCount(field_so_far_words_min, field_so_far_words_max)))
+        def finish_field_so_far(self, IFS: bool = False) -> None:
+            if self.field_so_far != []:
+                self.combined_fields_so_far.append(Field(SymStr(tuple(self.field_so_far)).simplify(),
+                                                         WordCount(self.field_so_far_words_min, self.field_so_far_words_max)))
                 if IFS:
-                    combined_fields_so_far.append(None)
-                field_so_far = []
-                field_so_far_words_min = 1
-                field_so_far_words_max = 1
+                    self.combined_fields_so_far.append(None)
+                self.field_so_far = []
+                self.field_so_far_words_min = 1
+                self.field_so_far_words_max = 1
 
-        for argchar in chars:
+        @classmethod
+        def add_the_default(cls, who: 'Partial', var: AST.VArgChar):
+            default_expansions = expand_inner(var.arg, Partial(False, who.state))
+            assert len(default_expansions) == 1, "default value expansion forking not implemented"
+            default_fields, default_state = default_expansions[0].finish()
+            assert default_state == who.state, "default value expansion should not change state"
+            for default_field in default_fields:
+                who.add_a_field(default_field)
+
+        def next(self, argchar: AST.ArgChar) -> list['Partial']:
             match argchar:
                 # todo what about globs?
                 case AST.CArgChar() as c:
-                    if not quoted and c.pretty() in IFS:
-                        finish_field_so_far(True)
+                    if not self.quoted and c.pretty() in IFS:
+                        self.finish_field_so_far(True)
                     else:
-                        field_so_far.append(c.pretty(AST.QUOTED if quoted else AST.UNQUOTED))
+                        self.field_so_far.append(c.pretty(AST.QUOTED if self.quoted else AST.UNQUOTED))
                 case AST.EArgChar() as c:
-                    field_so_far.append(c.pretty(AST.QUOTED if quoted else AST.UNQUOTED))
+                    self.field_so_far.append(c.pretty(AST.QUOTED if self.quoted else AST.UNQUOTED))
                 case AST.QArgChar() as q:
-                    inside = expand_inner(q.arg, True)
-                    one_field = join_fields(inside).quote()
-                    add_a_field(one_field)
+                    partial_for_inside = Partial(True, self.state)
+                    res = []
+                    for inside_partial in expand_inner(q.arg, partial_for_inside):
+                        fields_inside, state_inside = inside_partial.finish()
+                        one_field = join_fields(fields_inside).quote()
+                        continuing_partial = self.fork_state(state_inside)
+                        continuing_partial.add_a_field(one_field)
+                        res.append(continuing_partial)
+                    return res
                 case AST.VArgChar() as var:
                     if (v := state.lookup(var.var)):
-                        if var.fmt == "Normal":
-                            add_a_field(v.value)
+                        if var.fmt == "Normal" or (var.fmt == "Minus" and not var.null):
+                            # explanation of the minus case: the POSIX spec says that for
+                            # ${VAR-default} the result is the value of $VAR as long as $VAR is set -- whether it's empty ("null") or not
+                            # ^^ this corresponds to the second part of the condition above (var.null false means no `:`)
+                            self.add_a_field(v.value)
+                        elif var.fmt == "Minus" and var.null:
+                            # This is the case that it's ${VAR:-default}:
+                            # IF $VAR is empty, take the default
+                            # Otherwise, take the result is $VAR
+                            match v.value:
+                                case Field(_, WordCount(0, 0)):
+                                    # We know $VAR is empty
+                                    Partial.add_the_default(self, var)
+                                case Field(SymStr(stuff), _) if all(isinstance(thing, str) for thing in stuff):
+                                    # We know $VAR is NOT empty
+                                    self.add_a_field(v.value)
+                                case something_not_constant: # either a symbolic str or arbitrary
+                                    non_default, default = self.fork(f"{var.pretty()} takes the default value")
+                                    Partial.add_the_default(default, var)
+                                    non_default.add_a_field(arbitrary_field(var, ArbitraryType.APPROXIMATION, state))
+                                    return [non_default, default]
                         else:
-                            # TODO: a straightforward handling for default value expansion is to branch: in one case we treat the result as whatever the lookup gave (or arbitrary if unknown), and in the other case we use the default value
                             logging.info(f"expansion: treating var {var.pretty()} with unhandled fmt {var.fmt} as completely arbitrary field")
-                            add_a_field(arbitrary_field(var, ArbitraryType.APPROXIMATION, state))
+                            self.add_a_field(arbitrary_field(var, ArbitraryType.APPROXIMATION, state))
+                    elif var.fmt == "Minus":
+                        # This is the case that $VAR is unset: take the default
+                        non_default, default = self.fork(f"{var.pretty()} takes the default value")
+                        Partial.add_the_default(default, var)
+                        non_default.add_a_field(arbitrary_field(var, ArbitraryType.ENVIRONMENT, state))
+                        return [non_default, default]
                     else:
                         # todo we should report path information
                         if not is_special_var(var.var):
                             error_code = reporter.UnboundIDSetU if state.opts.is_set(SetOptions.NOUNSET) else reporter.UnboundID
-                            refined_line = refine_line_for_var(getattr(var, "var", None), context_line)
+                            refined_line = refine_line_for_var(var.var, context_line)
                             if refined_line == context_line:
                                 refined_line = refine_line_for_token(var.pretty(), context_line)
                             Reporter.add_error(error_code(var.pretty(), refined_line))
-                        add_a_field(arbitrary_field(var,
-                                                    ArbitraryType.APPROXIMATION if is_special_var(var.var) else ArbitraryType.ENVIRONMENT,
-                                                    state))
+                        self.add_a_field(arbitrary_field(var,
+                                                         ArbitraryType.APPROXIMATION if is_special_var(var.var) else ArbitraryType.ENVIRONMENT,
+                                                         state))
                 case AST.BArgChar() as b:
                     logging.info(f"expansion: treating backquote argchar {b.pretty()} as completely arbitrary field")
-                    add_a_field(arbitrary_field(b, ArbitraryType.APPROXIMATION, state))
                     # todo use the trace
                     t = guarded_interp_node([Trace((state,))], b.node, config)
+                    self.add_a_field(arbitrary_field(b, ArbitraryType.APPROXIMATION, state))
                 case _:
                     # todo: if its a command substitution, need to go interp it
                     logging.error(f"argchar: {argchar} {type(argchar)}")
                     logging.info(f"expansion: treating unhandled argchar as completely arbitrary field: {argchar.pretty()}")
-                    add_a_field(arbitrary_field(argchar, ArbitraryType.APPROXIMATION, state))
+                    self.add_a_field(arbitrary_field(argchar, ArbitraryType.APPROXIMATION, state))
 
-        finish_field_so_far()
+            # Most cases fall through to here, no forking going on
+            return [self]
 
-        # Join the combined fields so far, folding symstrs into arbitrary fields as prefixes and suffixes
-        split = split_at(combined_fields_so_far, None)
-        return [merge_partial_fields(part, None, state) for part in split if part != []]
+        def finish(self) -> tuple[list[Field], State]:
+            self.finish_field_so_far()
+            # Join the combined fields so far, folding symstrs into arbitrary fields as prefixes and suffixes
+            split = split_at(self.combined_fields_so_far, None)
+            return ([merge_partial_fields(part, None, self.state) for part in split if part != []], self.state)
 
-    return expand_inner(stuff)
+        def fork(self, pathcond: Any) -> tuple['Partial', 'Partial']:
+            lhs = self.fork_state(self.state.add_pathcond(pathcond))
+            rhs = self.fork_state(self.state.add_pathcond("not " + pathcond))
+            return (lhs, rhs)
+
+        def fork_state(self, new_state: State) -> 'Partial':
+            return replace(self,
+                           state=new_state,
+                           combined_fields_so_far=copy(self.combined_fields_so_far),
+                           field_so_far=copy(self.field_so_far))
+
+    def expand_inner(chars: list[AST.ArgChar], partial: Partial) -> list[Partial]:
+        expansions = [partial]
+        for argchar in chars:
+            expansions = [next_expansion for expansion in expansions for next_expansion in expansion.next(argchar)]
+        return expansions
+
+    partials = expand_inner(stuff, Partial(False, state))
+    return [partial.finish() for partial in partials]
+
 
 def expand_args_dumb(traces: Traces,
                      args: list[list[AST.ArgChar]],
@@ -429,10 +503,22 @@ def expand_args_dumb(traces: Traces,
         if all(field == expanded_fields[0] for field in expanded_fields):
             expanded_args.extend(expanded_fields[0])
         else:
-            # todo could be smarter about the ranges of word counts, but wont do unless needed
+            # todo could be smarter about the ranges of word counts and prefix/suffix preservation, but wont do unless needed
             expanded_args.append(arbitrary_field(arg, ArbitraryType.APPROXIMATION, None))
     return res_traces, expanded_args
 
+def expand_args(traces: Traces,
+                args: list[list[AST.ArgChar]],
+                config: InterpConfig) -> list[tuple[Trace, list[Field]]]:
+    prefixes = {id(trace): [] for trace in traces}
+    res_traces = traces
+    for arg in args:
+        expansions = expand(res_traces, arg, config, prefixes)
+        res_traces = [expansion[0] for expansion in expansions]
+        for res_trace, expanded_fields in expansions:
+            prefixes[id(res_trace)] = expanded_fields
+
+    return [(trace, prefixes[id(trace)]) for trace in res_traces]
 
 def expand_assuming_single_constant_word(traces: Traces,
                                          stuff: list[AST.ArgChar],
@@ -567,8 +653,16 @@ def merge_counts(c1: WordCount, c2: WordCount, sep: int = 0) -> WordCount:
     return WordCount(c1.min + max(c2.min - 1, 0) + sep,
                      c1.max + max(c2.max - 1, 0) + sep)
 
-
-
+def collapse_equiv_trace_expansions(expansions: list[tuple[Trace, list[Field]]]) -> list[tuple[Trace, list[Field]]]:
+    """Remove duplicate expansions from `expansions`, picking a representative trace for each unique expansion."""
+    seen = {}
+    result = []
+    for trace, fields in expansions:
+        key = tuple(fields)
+        if key not in seen:
+            seen[key] = trace
+            result.append((trace, fields))
+    return result
 
 
 # ============================================================
@@ -720,17 +814,22 @@ def interp_node(traces: Traces,
             t1, items = expand_args_dumb(t0, node.argument, config)
             if join_fields(items).count.max <= 1:
                 Reporter.add_error(reporter.LoopRunsOnce(node, context_line))
-            # Interpret the for loop body
-            t2 = [record_assignment(t, var_name, arbitrary_field(node.argument,
-                                                                 ArbitraryType.APPROXIMATION,
-                                                                 t.latest_state)) \
-                  for t in t1]
-            # TODO: Will want to interpret the body multiple times (up to max count of times).
-            # If the arguments are known statically we can even do every iteration.
-            # Otherwise, we should do it with a *fresh* arbitrary_field every time!
-            # (maybe need to add an extra distinguisher to CompletelyArbitrary for that?)
-            t3 = guarded_interp_node(t2, node.body, config)
-            return t3
+            # if all items are constant, we can unroll the loop
+            if all(symb_utils.is_constant(field) for field in items):
+                logging.debug(f"For loop over constant items, unrolling: {items}")
+                t2 = t1
+                for item_field in items:
+                    t2 = [record_assignment(t, var_name, item_field) for t in t2]
+                    t2 = guarded_interp_node(t2, node.body, config)
+                return t2
+            else:
+                t2 = [record_assignment(t, var_name, arbitrary_field(node.argument,
+                                                                    ArbitraryType.APPROXIMATION,
+                                                                    t.latest_state)) \
+                    for t in t1]
+                # TODO: Will want to interpret the body multiple times (up to max count of times).
+                t3 = guarded_interp_node(t2, node.body, config)
+                return t3
 
         case AST.FileRedirNode():
             res = []

@@ -16,7 +16,7 @@ def assert_expected_report(report, expected_errors: list[reporter.Report]):
     expected = [err.code for err in expected_errors]
     assert sorted(actual) == sorted(expected)
 
-def parse_script(script_content: str) -> AST.AstNode:
+def parse_script(script_content: str) -> list[AST.AstNode]:
     with tempfile.TemporaryDirectory() as tmp_path:
         p = write_script(Path(tmp_path), script_content)
         res = []
