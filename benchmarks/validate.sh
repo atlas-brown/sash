@@ -40,8 +40,13 @@ for dir in "$benchmarks_dir"/*; do
         # Verify existence of required files
         for file in original.sh posix.sh fixed.sh info.yaml; do
             if [ ! -f "$bench_dir/$file" ]; then
-                echo "Missing ${red}'$bench_dir/$file'${no_color}" 2>&1
-                err=1
+                if [ "$file" = "original.sh" ] && [ ! -f "$bench_dir/original.makefile" ]; then
+                    echo "Missing ${red}'$bench_dir/$file'${no_color}" 2>&1
+                    err=1
+                elif [ "$file" != "original.sh" ]; then
+                    echo "Missing ${red}'$bench_dir/$file'${no_color}" 2>&1
+                    err=1
+                fi
             fi
         done
 
