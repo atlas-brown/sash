@@ -1,0 +1,13 @@
+bugs:
+- line: 9
+  description: File is accidentally overwritten in every iteration of a loop
+
+sources:
+- https://stackoverflow.com/questions/49605847/file-copying-in-while-loop-is-executing-for-one-time-only
+
+ground_truth:
+  errors:
+  - line: 9
+    code: file_overwrite
+    shellcheck:
+      detects: false

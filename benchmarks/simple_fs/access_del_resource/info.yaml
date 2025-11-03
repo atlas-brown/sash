@@ -1,0 +1,13 @@
+bugs:
+- line: 9
+  description: On every iteration except the first, the source directory of the mv operation does not exist
+
+sources:
+- https://askubuntu.com/questions/1356169/bash-scripting-my-script-deletes-a-working-folder-prematurely-how-do-i-fix
+
+ground_truth:
+  errors:
+  - line: 9
+    code: access_del_resource
+    shellcheck:
+      detects: false

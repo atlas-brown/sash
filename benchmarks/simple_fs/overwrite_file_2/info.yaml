@@ -1,0 +1,19 @@
+bugs:
+- line: 8
+  description: File is accidentally overwritten in every iteration of a loop
+- line: 9
+  description: File is accidentally overwritten in every iteration of a loop
+
+sources:
+- https://stackoverflow.com/questions/65666474/how-can-i-stop-my-script-to-overwrite-existing-files
+
+ground_truth:
+  errors:
+  - line: 8
+    code: file_overwrite
+    shellcheck:
+      detects: false
+  - line: 9
+    code: file_overwrite
+    shellcheck:
+      detects: false

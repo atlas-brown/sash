@@ -1,0 +1,19 @@
+bugs:
+- line: 7
+  description: File is overwritten immediately after being created
+- line: 8
+  description: File is overwritten immediately after being created
+
+sources:
+- https://stackoverflow.com/questions/49138117/not-able-to-overwrite-the-file-properly-through-unix-script
+
+ground_truth:
+  errors:
+  - line: 7
+    code: file_overwrite
+    shellcheck:
+      detects: false
+  - line: 8
+    code: file_overwrite
+    shellcheck:
+      detects: false
