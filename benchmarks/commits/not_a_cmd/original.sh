@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
 
-# https://github.com/pi-hole/pi-hole/commit/cf01b5a00245e8cedd0fd702ac02dd665a77b070#diff-10518500d0c1be536ca43f3f9a5ac6e823ec8bf9448d942599d2680c66cc24fdL123
-
 # Pi-hole: A black hole for Internet advertisements
 # (c) 2015, 2016 by Jacob Salmela
 # Network-wide ad blocking via your Raspberry Pi
@@ -123,7 +121,7 @@ function ModifyHostFile(){
 	    #remove domains in  from hosts file
 	    if [[ -r $whitelist ]];then
         # Remove whitelist entries
-				numberOf=$($whitelist | sed '/^\s*$/d' | wc -l) # bug here: missing "cat"
+				numberOf=$($whitelist | sed '/^\s*$/d' | wc -l)
         plural=; [[ "$numberOf" != "1" ]] && plural=s
         echo ":::"
         echo -n "::: Modifying HOSTS file to whitelist $numberOf domain${plural}..."

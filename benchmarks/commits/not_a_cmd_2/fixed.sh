@@ -1,6 +1,4 @@
-#!/usr/bin/env bash
-
-# https://github.com/pi-hole/pi-hole/commit/e97755eb91533b120d43ecdba762cab13d81ec39
+#!/usr/bin/env sh
 
 # Pi-hole: A black hole for Internet advertisements
 # (c) 2015, 2016 by Jacob Salmela
@@ -13,7 +11,7 @@
 # the Free Software Foundation, either version 2 of the License, or
 # (at your option) any later version.
 
-if [[ $# = 0 ]]; then
+if [ $# = 0 ]; then
     echo "Immediately blacklists one or more domains in the hosts file"
     echo " "
     echo "Usage: blacklist.sh domain1 [domain2 ...]"
@@ -33,8 +31,8 @@ reload=true
 addmode=true
 force=false
 versbose=true
-domList=()
-domToRemoveList=()
+domList""
+domToRemoveList=""
 
 piholeIPv6file=/etc/pihole/.useIPv6
 
@@ -46,28 +44,28 @@ piholeIP=${piholeIPCIDR%/*}
 modifyHost=false
 
 
-if [[ -f $piholeIPv6file ]];then
+if [ -f "$piholeIPv6file" ];then
     # If the file exists, then the user previously chose to use IPv6 in the automated installer
     piholeIPv6=$(ip -6 route get 2001:4860:4860::8888 | awk -F " " '{ for(i=1;i<=NF;i++) if ($i == "src") print $(i+1) }')
 fi
 
 
-function HandleOther(){
+HandleOther(){
   #check validity of domain
 	validDomain=$(echo "$1" | perl -ne'print if /\b((?=[a-z0-9-]{1,63}\.)(xn--)?[a-z0-9]+(-[a-z0-9]+)*\.)+[a-z]{2,63}\b/')
 	if [ -z "$validDomain" ]; then
 		echo "$1" is not a valid argument or domain name
 	else
-	  domList=("${domList[@]}" $validDomain)
+	  domList="${domList} $validDomain"
 	fi
 }
 
-function PopBlacklistFile(){
+PopBlacklistFile(){
 	#check blacklist file exists, and if not, create it
-	if [[ ! -f $blacklist ]];then
+	if [ ! -f "$blacklist" ];then
   	  touch $blacklist
 	fi
-	for dom in "${domList[@]}"; do
+	for dom in ${domList}; do
 	  if "$addmode"; then
 	  	AddDomain "$dom"
 	  else
@@ -76,14 +74,14 @@ function PopBlacklistFile(){
 	done
 }
 
-function AddDomain(){
+AddDomain(){
 #| sed 's/\./\\./g'
 	bool=false
 	grep -Ex -q "$1" $blacklist || bool=true
 	if $bool; then
 	  #domain not found in the blacklist file, add it!
 	  if $versbose; then
-	  echo -n "::: Adding $1 to blacklist file..."
+	  echo "::: Adding $1 to blacklist file..."
 	  fi
 		echo "$1" >> $blacklist
 		modifyHost=true
@@ -95,7 +93,7 @@ function AddDomain(){
 	fi
 }
 
-function RemoveDomain(){
+RemoveDomain(){
 
   bool=false
   grep -Ex -q "$1" $blacklist || bool=true
@@ -109,49 +107,49 @@ function RemoveDomain(){
     if $versbose; then
     echo "::: Un-blacklisting $dom..."
     fi
-    domToRemoveList=("${domToRemoveList[@]}" $1)
+    domToRemoveList="${domToRemoveList} $1"
     modifyHost=true
   fi
 }
 
-function ModifyHostFile(){
+ModifyHostFile(){
 	 if $addmode; then
 	    #add domains to the hosts file
-	    if [[ -r $blacklist ]];then
+	    if [ -r "$blacklist" ];then
 	      numberOf=$(cat $blacklist | sed '/^\s*$/d' | wc -l)
-        plural=; [[ "$numberOf" != "1" ]] && plural=s
+        plural=; [ "$numberOf" != "1" ] && plural=s
         echo ":::"
-        echo -n "::: Modifying HOSTS file to blacklist $numberOf domain${plural}..."
-	    	if [[ -n $piholeIPv6 ]];then
-				$blacklist | awk -v ipv4addr="$piholeIP" -v ipv6addr="$piholeIPv6" '{sub(/\r$/,""); print ipv4addr" "$0"\n"ipv6addr" "$0}' >> $adList # bug here (1): missing "cat"
+        echo "::: Modifying HOSTS file to blacklist $numberOf domain${plural}..."
+	    	if [ -n "$piholeIPv6" ];then
+				cat $blacklist | awk -v ipv4addr="$piholeIP" -v ipv6addr="$piholeIPv6" '{sub(/\r$/,""); print ipv4addr" "$0"\n"ipv6addr" "$0}' >> $adList
 	      	else
-				$blacklist | awk -v ipv4addr="$piholeIP" '{sub(/\r$/,""); print ipv4addr" "$0}' >>$adList # bug here (2): missing "cat"
+				cat $blacklist | awk -v ipv4addr="$piholeIP" '{sub(/\r$/,""); print ipv4addr" "$0}' >>$adList
 	      	fi
 	  	fi
 	  else
 		echo ":::"
-	  	for dom in "${domToRemoveList[@]}"
+	  	for dom in ${domToRemoveList}
 		do
 	      #we need to remove the domains from the blacklist file and the host file
 			echo "::: $dom"
-			echo -n ":::    removing from HOSTS file..."
+			echo ":::    removing from HOSTS file..."
 	      	echo "$dom" | sed 's/\./\\./g' | xargs -I {} perl -i -ne'print unless /[^.]'{}'(?!.)/;' $adList
 	      	echo " done!"
-	      	echo -n ":::    removing from blackist.txt..."
+	      	echo ":::    removing from blackist.txt..."
 	      	echo "$dom" | sed 's/\./\\./g' | xargs -I {} perl -i -ne'print unless /'{}'(?!.)/;' $blacklist
 	      	echo " done!"
 		done
 	fi
 }
 
-function Reload() {
+Reload() {
 	# Reload hosts file
 	echo ":::"
-	echo -n "::: Refresh lists in dnsmasq..."
+	echo "::: Refresh lists in dnsmasq..."
 
 	dnsmasqPid=$(pidof dnsmasq)
 
-	if [[ $dnsmasqPid ]]; then
+	if [ "$dnsmasqPid" ]; then
 		# service already running - reload config
 		sudo kill -HUP "$dnsmasqPid"
 	else

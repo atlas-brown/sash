@@ -1,7 +1,5 @@
 #!/bin/bash
 
-# https://github.com/babun/babun/commit/4e49aebca73ff7d6ecb587a417945d21c4974a3f
-
 set -e -f -o pipefail
 source "/usr/local/etc/babun.instance"
 source "$babun_tools/script.sh"
@@ -37,7 +35,7 @@ gitmerge['mergetool.keepTemporaries']='false'
 
 function apply_git_config {
 	eval "declare -A configMap="${1#*=}
-	
+
 	for configKey in "${!configMap[@]}"
 	do
 		git config --list | grep -q "$configKey" # bug here: fails when grep does not matc anything due to set -e
