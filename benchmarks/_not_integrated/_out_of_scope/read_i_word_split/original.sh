@@ -1,5 +1,5 @@
 #!/bin/sh
-#https://stackoverflow.com/questions/21005323/shell-script-issue-in-prompting-for-user-input
+
 state="CA"
 city="Los Angeles"
 while true; do
@@ -11,5 +11,3 @@ while true; do
     echo "Your state: $state"
     echo "Your city: $city"
 done
-
-# Only issue: read -i is technically not posix
