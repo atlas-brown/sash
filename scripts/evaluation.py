@@ -151,7 +151,7 @@ def main():
         # Check that every expected code appears in the actual codes (actual may contain extras)
         missing = [e for e in expected_in_scope if e not in actual_codes]
         if missing:
-            print(f"FAIL", file=sys.stderr)
+            print(f"FAIL in {parsed_json.get('time', 'N/A')}", file=sys.stderr)
             print("Missing expected codes:", file=sys.stderr)
             for c in missing:
                 print(c)
@@ -159,7 +159,7 @@ def main():
             print(json.dumps(parsed_json.get("errors", []), indent=2), file=sys.stderr)
             failure += 1
         else:
-            print(f"PASS", file=sys.stderr)
+            print(f"PASS in {parsed_json.get('time', 'N/A')}", file=sys.stderr)
         total += 1
 
         shellcheck_results = load_shellcheck_results(gt_path)

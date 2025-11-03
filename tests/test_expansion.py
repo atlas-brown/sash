@@ -4,7 +4,7 @@ Tests for the simple symbolic expander.
 import pytest
 import sash
 import sash.reporter as reporter
-from sash.symb import expand_simple, expand_args_dumb, starting_state
+from sash.symb import expand_simple, expand_args_dumb, expand_args, starting_state
 from sash.state import *
 from sash.frozen import freeze, freeze_thing
 from sash.interpreter_config import InterpConfig
@@ -143,7 +143,7 @@ def test_expand_undefined_var():
                                                      ArbitraryType.ENVIRONMENT,
                                                      state),
                                  WordCount(0, float('inf')))]
-    
+
 def test_expand_undefined_var_default():
     script = parse_script("""${A:-default}""")
     assert len(script) == 1
@@ -256,3 +256,62 @@ rm -rf $UNBOUND/*
                                                     traces[0].latest_state,
                                                     suffix=SymStr(("/*",))),
                                  WordCount(0, float('inf')))
+
+def test_expand_args_dumb_multipath_bound():
+    script = parse_script("""
+rm -rf $A/*
+""")
+    assert len(script) == 1
+    assert isinstance(script[0], AST.CommandNode)
+
+    state = starting_state()
+    state1 = state.set_env("A", ShellVar(constant_field("value1")))
+    state2 = state.set_env("A", ShellVar(constant_field("value2")))
+    traces, expanded = expand_args_dumb([Trace((state1,)), Trace((state2,))],
+                                         script[0].arguments,
+                                         config)
+    assert len(traces) == 2
+    assert len(expanded) == 3
+    assert expanded[0] == constant_field("rm")
+    assert expanded[1] == constant_field("-rf")
+
+    match expanded[2]:
+        case Field(CompletelyArbitrary(source, kind, None, None, None), wc):
+            assert source == freeze_thing(script[0].arguments[2])
+            assert kind == ArbitraryType.APPROXIMATION
+            assert wc == WordCount(0, float('inf'))
+        case _:
+            assert expanded[2] == False, f"Unexpected expansion result"
+    # Want to write this, but CompletelyArbitrary equality with None producing_state is always false!
+    # assert expanded[2] == Field(CompletelyArbitrary(freeze_thing(script[0].arguments[2]),
+    #                                                 ArbitraryType.APPROXIMATION,
+    #                                                 None,
+    #                                                 # suffix=SymStr(("/*",)) # TODO: should preserve the common suffix!
+    #                                                 ),
+    #                              WordCount(0, float('inf')))
+
+def test_expand_args_multipath():
+    script = parse_script("""
+rm -rf $A/*
+""")
+    assert len(script) == 1
+    assert isinstance(script[0], AST.CommandNode)
+
+    state = starting_state()
+    state1 = state.set_env("A", ShellVar(constant_field("value1")))
+    state2 = state.set_env("A", ShellVar(constant_field("value2")))
+    expansions = expand_args([Trace((state1,)), Trace((state2,))],
+                             script[0].arguments,
+                             config)
+
+    assert len(expansions) == 2
+    v1_expansions = expansions[0][1]
+    v2_expansions = expansions[1][1]
+    assert len(v1_expansions) == 3
+    assert v1_expansions[0] == constant_field("rm")
+    assert v1_expansions[1] == constant_field("-rf")
+    assert v1_expansions[2] == constant_field("value1/*")
+    assert len(v2_expansions) == 3
+    assert v2_expansions[0] == constant_field("rm")
+    assert v2_expansions[1] == constant_field("-rf")
+    assert v2_expansions[2] == constant_field("value2/*")

@@ -29,7 +29,11 @@ def handle_commandnode(traces: Traces,
     if expanded_args:
         match field_to_str(expanded_args[0]):
             case "rm":
-                handle_rm(expanded_args)
+                logging.debug("Exploring all possible expansions of rm args")
+                expansions = expand_args(traces, node.arguments, config)
+                simplified_expansions = collapse_equiv_trace_expansions(expansions)
+                for trace, arg_fields in simplified_expansions:
+                    handle_rm(arg_fields)
             case "set":
                 t1 = handle_set(expanded_args, t1)
             case "exit":
@@ -49,6 +53,7 @@ def handle_commandnode(traces: Traces,
     return t2
 
 def handle_rm(expanded_args: List[Field]) -> None:
+    logging.debug(f"Checking rm command with expansion possibility: {expanded_args}")
     def is_protected(path):
         return any(path in [p, p + "/", p + "/*"] for p in Config.get("PROTECTED_PATHS"))
     for arg_field in expanded_args[1:]:
@@ -264,7 +269,11 @@ def handle_if(traces: Traces, node: AST.IfNode, config: InterpConfig) -> Traces:
     t1 = guarded_interp_node(traces, node.cond, temp_config)
     logging.debug(f"collected test_cmds: {test_cmds}")
     logging.debug(f"Checking constant test cond")
-    test_result = interpret_test(test_cmds[-1])
+    if len(test_cmds) == 0:
+        logging.warning("Failed to collect any test commands? Giving up on constant condition check.")
+        test_result = None
+    else:
+        test_result = interpret_test(test_cmds[-1])
     if test_result is not None:
         Reporter.add_error(reporter.ConstantCondition(test_cmds, context_line))
         if test_result == True and node.else_b is not None:
@@ -300,13 +309,16 @@ def handle_exit(traces: Traces) -> Traces:
 
 def expand(traces: Traces,
            stuff: list[AST.ArgChar],
-           config: InterpConfig) -> list[tuple[Trace, list[Field]]]:
+           config: InterpConfig,
+           prefix: dict[int, list[Field]] = {}) -> list[tuple[Trace, list[Field]]]:
+    """If supplied, `prefix` specifies a prefix to prepend to each expansion produced by each trace (mapped by its id)."""
     res = []
     for trace in traces:
+        prefix_fields = prefix.get(id(trace), [])
         # expand_simple(stuff, trace.latest_state, config)
         for expanded_fields, new_state in expand_simple(stuff, trace.latest_state, config):
             new_trace = trace.extend(new_state)
-            res.append((new_trace, expanded_fields))
+            res.append((new_trace, prefix_fields + expanded_fields))
     return res
 
 # Different fields are definitely separated; things within a field *may be separated as well!*
@@ -488,10 +500,22 @@ def expand_args_dumb(traces: Traces,
         if all(field == expanded_fields[0] for field in expanded_fields):
             expanded_args.extend(expanded_fields[0])
         else:
-            # todo could be smarter about the ranges of word counts, but wont do unless needed
+            # todo could be smarter about the ranges of word counts and prefix/suffix preservation, but wont do unless needed
             expanded_args.append(arbitrary_field(arg, ArbitraryType.APPROXIMATION, None))
     return res_traces, expanded_args
 
+def expand_args(traces: Traces,
+                args: list[list[AST.ArgChar]],
+                config: InterpConfig) -> list[tuple[Trace, list[Field]]]:
+    prefixes = {id(trace): [] for trace in traces}
+    res_traces = traces
+    for arg in args:
+        expansions = expand(res_traces, arg, config, prefixes)
+        res_traces = [expansion[0] for expansion in expansions]
+        for res_trace, expanded_fields in expansions:
+            prefixes[id(res_trace)] = expanded_fields
+
+    return [(trace, prefixes[id(trace)]) for trace in res_traces]
 
 def expand_assuming_single_constant_word(traces: Traces,
                                          stuff: list[AST.ArgChar],
@@ -626,8 +650,16 @@ def merge_counts(c1: WordCount, c2: WordCount, sep: int = 0) -> WordCount:
     return WordCount(c1.min + max(c2.min - 1, 0) + sep,
                      c1.max + max(c2.max - 1, 0) + sep)
 
-
-
+def collapse_equiv_trace_expansions(expansions: list[tuple[Trace, list[Field]]]) -> list[tuple[Trace, list[Field]]]:
+    """Remove duplicate expansions from `expansions`, picking a representative trace for each unique expansion."""
+    seen = {}
+    result = []
+    for trace, fields in expansions:
+        key = tuple(fields)
+        if key not in seen:
+            seen[key] = trace
+            result.append((trace, fields))
+    return result
 
 
 # ============================================================
@@ -715,17 +747,22 @@ def interp_node(traces: Traces,
             t1, items = expand_args_dumb(t0, node.argument, config)
             if join_fields(items).count.max <= 1:
                 Reporter.add_error(reporter.LoopRunsOnce(node, context_line))
-            # Interpret the for loop body
-            t2 = [record_assignment(t, var_name, arbitrary_field(node.argument,
-                                                                 ArbitraryType.APPROXIMATION,
-                                                                 t.latest_state)) \
-                  for t in t1]
-            # TODO: Will want to interpret the body multiple times (up to max count of times).
-            # If the arguments are known statically we can even do every iteration.
-            # Otherwise, we should do it with a *fresh* arbitrary_field every time!
-            # (maybe need to add an extra distinguisher to CompletelyArbitrary for that?)
-            t3 = guarded_interp_node(t2, node.body, config)
-            return t3
+            # if all items are constant, we can unroll the loop
+            if all(symb_utils.is_constant(field) for field in items):
+                logging.debug(f"For loop over constant items, unrolling: {items}")
+                t2 = t1
+                for item_field in items:
+                    t2 = [record_assignment(t, var_name, item_field) for t in t2]
+                    t2 = guarded_interp_node(t2, node.body, config)
+                return t2
+            else:
+                t2 = [record_assignment(t, var_name, arbitrary_field(node.argument,
+                                                                    ArbitraryType.APPROXIMATION,
+                                                                    t.latest_state)) \
+                    for t in t1]
+                # TODO: Will want to interpret the body multiple times (up to max count of times).
+                t3 = guarded_interp_node(t2, node.body, config)
+                return t3
 
         case AST.FileRedirNode():
             res = []
