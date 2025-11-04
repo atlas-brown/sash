@@ -11,6 +11,6 @@ sources:
 ground_truth:
   errors:
   - line: 707
-    code: TBD
+    code: could_del_sys_file
     shellcheck:
       detects: false
