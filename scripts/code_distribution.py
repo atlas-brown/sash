@@ -53,20 +53,57 @@ for benchmark in benchmarks:
 
 code_distribution = dict(sorted(code_distribution.items(), key=lambda item: item[1], reverse=True))
 
-# Plotting
-codes = list(code_distribution.keys())
-counts = list(code_distribution.values())
-plt.figure(figsize=(10, 5))
-plt.bar(codes, counts)
+# Calculate how many of each code are detected by shellcheck ("ground_truth.shellcheck.detects")
+code_distribution_sc = Counter()
+for benchmark in benchmarks:
+    errors = benchmark.get('ground_truth', {}).get('errors', [])
+    for error in errors:
+        code = error.get('code')
+        if code in out_of_scope_codes:
+            continue
+        for c in (code if isinstance(code, list) else [code]):
+            if error.get("shellcheck", {}).get("detects", False):
+                code_distribution_sc[c] += 1
 
+code_distribution_sc = dict(sorted(code_distribution_sc.items(), key=lambda item: item[1], reverse=True))
+
+# Plotting
+#codes = list(code_distribution.keys())
+#counts = list(code_distribution.values())
+#plt.figure(figsize=(10, 5))
+#plt.bar(codes, counts)
+
+# Plot numbers on top of bars
+#for i, count in enumerate(counts):
+#    plt.text(i, count + 0.5, str(count), ha='center')
+
+#plt.gca().spines['top'].set_visible(False)
+#plt.gca().spines['right'].set_visible(False)
+#plt.xlabel('Error code')
+#plt.ylabel('Frequency')
+#plt.xticks(rotation=80)
+#plt.tight_layout()
+#plt.show()
+
+# Plot the code_distribution first, and then overlay code_distribution_sc in a different color
+codes = list(code_distribution.keys())
+counts = [code_distribution.get(code, 0) for code in codes]
+counts_sc = [code_distribution_sc.get(code, 0) for code in codes]
+x = range(len(codes))
+plt.figure(figsize=(12, 6))
+bar_width = 0.4
+plt.bar(x, counts, width=bar_width, label='SaSh', color='skyblue')
+plt.bar([i + bar_width for i in x], counts_sc, width=bar_width, label='ShellCheck', color='orange')
 # Plot numbers on top of bars
 for i, count in enumerate(counts):
     plt.text(i, count + 0.5, str(count), ha='center')
-
+for i, count in enumerate(counts_sc):
+    plt.text(i + bar_width, count + 0.5, str(count), ha='center')
 plt.gca().spines['top'].set_visible(False)
 plt.gca().spines['right'].set_visible(False)
 plt.xlabel('Error code')
 plt.ylabel('Frequency')
-plt.xticks(rotation=80)
+plt.xticks([i + bar_width / 2 for i in x], codes, rotation=80)
+plt.legend()
 plt.tight_layout()
-plt.show()
+plt.savefig('code_distribution.png')
