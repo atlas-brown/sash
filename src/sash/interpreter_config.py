@@ -10,7 +10,7 @@ class InterpConfig:
     node_cbs: list[NodeCB] = field(default_factory=list)
     expanded_command_cbs: list[ExpandedCmdCB] = field(default_factory=list)
     trace_collapser: TraceCollapser = lambda ts: ts
-    info: ScriptInfo = ScriptInfo(None)
+    info: ScriptInfo = ScriptInfo()
 
     def add_node_callback(self, cb: NodeCB) -> 'InterpConfig':
         return replace(self, node_cbs=(self.node_cbs + [cb]))
@@ -20,6 +20,9 @@ class InterpConfig:
 
     def set_trace_collapser(self, f: TraceCollapser) -> 'InterpConfig':
         return replace(self, trace_collapser=f)
+
+    def set_info(self, info: ScriptInfo) -> 'InterpConfig':
+        return replace(self, info=info)
 
     def apply_node_cbs(self, traces: Traces, node: AST.AstNode) -> Traces:
         res = traces

@@ -90,8 +90,12 @@ def handle_unknown_command(name: str,
                            arg_fields: List[Field],
                            traces: Traces,
                            config: InterpConfig) -> Traces:
+    if (future_line := config.info.future_fundef_lines.get(name)) is not None and context_line < future_line:
+        Reporter.add_error(reporter.UndefinedFunction(name, context_line))
+
     if name.endswith("/") or any(name in t.latest_state.known_nonexistant_commands for t in traces):
         Reporter.add_error(reporter.NotACommand(name, context_line))
+
     logging.debug(f"Unknown command {name}, optimistically treating as no-op")
     return traces
 
@@ -837,11 +841,22 @@ def symb_engine(nodes: list[AST_parse], config: InterpConfig) -> list[Trace]:
     global context_line
     logging.debug(f"Running symb engine with {len(nodes)} raw nodes")
     traces = [Trace((starting_state(),))]
+
+    future_fundef_lines: dict[str, int] = {}
     for node in nodes:
-        # Update context line before interpreting the node.
+        if isinstance(node.ast_node, AST.DefunNode):
+            try:
+                _, func_name = expand_assuming_single_constant_word(traces, node.ast_node.name, config)
+                future_fundef_lines[func_name] = node.line_before + 1
+            except AssertionError:
+                # If the function name is not a single constant word, we may not be able to record its line number.
+                continue
+    updated_config = config.set_info(ScriptInfo(future_fundef_lines=FrozenDict(future_fundef_lines)))
+
+    for node in nodes:
         context_line = node.line_before + 1
         logging.debug(f"Interpreting next node (line {context_line}) {trim_string_for_logging(node.ast_node.pretty())}")
-        traces = guarded_interp_node(traces, node.ast_node, config)
+        traces = guarded_interp_node(traces, node.ast_node, updated_config)
 
     return traces
 
