@@ -283,6 +283,18 @@ foo=bar // this was not a command
     expected_error = reporter.NotACommand("//", 0)
     assert_expected_report(report, [expected_error])
 
+def test_fundef_after_call(tmp_path):
+    """Test that a function defined after its call is reported as "function_use_before_def"."""
+    script = write_script(tmp_path, """
+myfunc
+myfunc() {
+    echo hi
+}
+""")
+    report = symb.main(script)
+    expected_error = reporter.UndefinedFunction("myfunc", 0)
+    assert_expected_report(report, [expected_error])
+
 # def test_function_call_multipath(tmp_path):
 #     # A function that is called should not produce unbound variable errors for its parameters
 #     script = write_script(tmp_path, """
