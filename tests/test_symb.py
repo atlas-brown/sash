@@ -2,7 +2,7 @@
 Tests for static analysis of shell scripts using sash.symb.main.
 These tests run sample shell scripts and verify that expected errors or warnings are reported.
 """
-import sash.symb as symb
+import sash.main as symb
 import sash.reporter as reporter
 import shasta.ast_node as AST
 from util import *
