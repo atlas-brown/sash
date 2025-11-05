@@ -283,7 +283,7 @@ foo=bar // this was not a command
     expected_error = reporter.NotACommand("//", 0)
     assert_expected_report(report, [expected_error])
 
-def test_fundef_after_call(tmp_path):
+def test_fundef_after_call_1(tmp_path):
     """Test that a function defined after its call is reported as "function_use_before_def"."""
     script = write_script(tmp_path, """
 myfunc
@@ -294,6 +294,22 @@ myfunc() {
     report = symb.main(script)
     expected_error = reporter.UndefinedFunction("myfunc", 0)
     assert_expected_report(report, [expected_error])
+
+def test_fundef_after_call_2(tmp_path):
+    """Another test that a function defined after its call is reported as "function_use_before_def"."""
+    script = write_script(tmp_path, """
+f() {
+    g h
+}
+g() {
+    echo "$1"
+}
+f
+"""
+    )
+    report = symb.main(script)
+    not_expected_error = reporter.UndefinedFunction("g", 0)
+    assert_not_expected_report(report, [not_expected_error])
 
 def test_const_cond_triggered_by_exit_code_simple(tmp_path):
     """Test that a constant condition in an if statement based on exit code is detected."""

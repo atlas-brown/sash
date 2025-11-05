@@ -204,6 +204,6 @@ def collapse_traces(traces: Traces) -> Traces:
 
 @dataclass(frozen=True)
 class ScriptInfo:
-    # Dictionary mapping function names to the line number where they are defined (in the future).
-    future_fundef_lines: FrozenDict[str, int] = field(default_factory=FrozenDict)
-
+    # Set of function names where the corresponding function definitions
+    # are known to appear, perhaps later, in the script.
+    known_fundefs_names: frozenset[str] = field(default_factory=frozenset)

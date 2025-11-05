@@ -94,7 +94,7 @@ def handle_unknown_command(name: str,
                            arg_fields: list[Field],
                            traces: Traces,
                            config: InterpConfig) -> Traces:
-    if (future_line := config.info.future_fundef_lines.get(name)) is not None and context_line < future_line:
+    if name in config.info.known_fundefs_names:
         Reporter.add_error(reporter.UndefinedFunction(name, context_line))
 
     if name.endswith("/") or any(name in t.latest_state.known_nonexistant_commands for t in traces):
@@ -848,16 +848,16 @@ def symb_engine(nodes: list[WrappedAst], config: InterpConfig) -> list[Trace]:
     traces = [Trace((starting_state(),))]
 
     # TODO: also handle non-top-level function definitions (in practice it's rare to have these, but they are valid)
-    future_fundef_lines: dict[str, int] = {}
+    known_fundefs_names: set[str] = set()
     for node in nodes:
         if isinstance(node.ast_node, AST.DefunNode):
             try:
                 _, func_name = expand_assuming_single_constant_word(traces, node.ast_node.name, config)
-                future_fundef_lines[func_name] = node.line_before + 1
+                known_fundefs_names.add(func_name)
             except AssertionError:
                 # If the function name is not a single constant word, we may not be able to record its line number.
                 continue
-    updated_config = config.set_info(ScriptInfo(future_fundef_lines=FrozenDict(future_fundef_lines)))
+    updated_config = config.set_info(ScriptInfo(known_fundefs_names=frozenset(known_fundefs_names)))
 
     for node in nodes:
         context_line = node.line_before + 1

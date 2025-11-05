@@ -16,6 +16,13 @@ def assert_expected_report(report, expected_errors: list[reporter.Report]):
     expected = [err.code for err in expected_errors]
     assert sorted(actual) == sorted(expected)
 
+def assert_not_expected_report(report, not_expected_errors: list[reporter.Report]):
+    """Helper to ensure that certain errors are not (i.e., should not be expected) in the actual report."""
+    actual = [rep["code"] for rep in report["errors"]]
+    not_expected = [err.code for err in not_expected_errors]
+    for code in not_expected:
+        assert code not in actual
+
 def parse_script(script_content: str) -> list[AST.AstNode]:
     with tempfile.TemporaryDirectory() as tmp_path:
         p = write_script(Path(tmp_path), script_content)
