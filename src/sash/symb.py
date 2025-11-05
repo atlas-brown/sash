@@ -717,14 +717,20 @@ def interp_node(traces: Traces,
 
     logging.debug(f"Interpreting {trim_string_for_logging(node.pretty())} with {len(traces)} traces")
     match node:
-        case AST.CommandNode() if not (node.arguments == [] and node.assignments != []):
+        case AST.CommandNode():
+            if len(node.arguments) == 0:
+                # assignment (e.g. VAR=value)
+                # note: assignments get parsed into CommandNodes with empty arguments (unfortunately)
+                t = traces
+                for assign in node.assignments:
+                    assert isinstance(assign, AST.AssignNode)
+                    t = guarded_interp_node(t, assign, config)
+                return t
+
+            # command (e.g. echo hello)
+            # note: local assignments (e.g. LC_ALL=C sort file.txt) are ignored for now
+
             return handle_commandnode(traces, node, config)
-        case AST.CommandNode() if node.arguments == [] and node.assignments != []: # why is kind of parse possible??
-            # do the assignments inside
-            t = traces
-            for assign in node.assignments:
-                t = guarded_interp_node(t, assign, config)
-            return t
 
         case AST.IfNode():
             return handle_if(traces, node, config)
@@ -841,6 +847,7 @@ def symb_engine(nodes: list[WrappedAst], config: InterpConfig) -> list[Trace]:
     logging.debug(f"Running symb engine with {len(nodes)} raw nodes")
     traces = [Trace((starting_state(),))]
 
+    # TODO: also handle non-top-level function definitions (in practice it's rare to have these, but they are valid)
     future_fundef_lines: dict[str, int] = {}
     for node in nodes:
         if isinstance(node.ast_node, AST.DefunNode):
