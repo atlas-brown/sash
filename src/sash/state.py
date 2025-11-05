@@ -166,6 +166,9 @@ class State:
     def set_options(self, options: set[str]) -> 'State':
         return replace(self, opts=self.opts.set_options(options))
 
+    def set_last_exit_code(self, code: SymStr) -> 'State':
+        return replace(self, last_exit_code=code)
+
     def terminate(self) -> 'State':
         return replace(self, terminated=True)
 

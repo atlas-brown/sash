@@ -18,6 +18,10 @@ from sash.state import *
 from sash.util import *
 
 
+def set_exit_code_arbitrary(traces: Traces) -> Traces:
+    """Set the exit code to an arbitrary symbolic value to denote that it is unknown."""
+    return trace_map(traces, lambda s: s.set_last_exit_code(SymStr((SymVar("exit_code"),))))
+
 def handle_commandnode(traces: Traces,
                        node: AST.CommandNode,
                        config: InterpConfig) -> Traces:
@@ -43,7 +47,8 @@ def handle_commandnode(traces: Traces,
                 t1 = handle_function_call_or_unknown(some_name, expanded_args[1:], t1, config)
             case _:
                 logging.debug(f"Non-constant command invocation {expanded_args}, optimistically treating as no-op")
-    t2 = t1
+
+    t2 = set_exit_code_arbitrary(t1)
     for redir in node.redir_list:
         t2 = t2.extend(guarded_interp_node(t1, redir, config)) or t2
 
@@ -119,7 +124,7 @@ def handle_function_call(func_node: AST.DefunNode,
     return guarded_interp_node(t1, func_node.body, config)
 
 def record_assignment(trace: Trace, var: str, rhs: Field) -> Trace:
-    return trace.extend(lambda s: s.set_env(var, ShellVar(rhs)))
+    return trace.extend(lambda s: s.set_env(var, ShellVar(rhs)).set_last_exit_code(SymStr(("0",))))
 
 def handle_while(traces: Traces,
                  node: AST.WhileNode,
@@ -399,7 +404,9 @@ def expand_simple(stuff: list[AST.ArgChar],
                         res.append(continuing_partial)
                     return res
                 case AST.VArgChar() as var:
-                    if (v := state.lookup(var.var)):
+                    if var.var == "?":
+                        self.add_a_field(Field(state.last_exit_code, WordCount(1, 1)))
+                    elif (v := state.lookup(var.var)):
                         if var.fmt == "Normal" or (var.fmt == "Minus" and not var.null):
                             # explanation of the minus case: the POSIX spec says that for
                             # ${VAR-default} the result is the value of $VAR as long as $VAR is set -- whether it's empty ("null") or not
@@ -538,7 +545,7 @@ def field_to_str(field: Field) -> str | None:
             return None
 
 def is_special_var(name: str) -> bool:
-    return name.isdecimal() or name in ["@", "#"]
+    return name.isdecimal() or name in ["@", "#", "?"]
 
 # =====================
 #  Field manipulation

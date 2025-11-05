@@ -295,6 +295,37 @@ myfunc() {
     expected_error = reporter.UndefinedFunction("myfunc", 0)
     assert_expected_report(report, [expected_error])
 
+def test_const_cond_triggered_by_exit_code_simple(tmp_path):
+    """Test that a constant condition in an if statement based on exit code is detected."""
+    script = write_script(tmp_path, """
+echo "test" > /dev/null
+result="success"
+if [ $? -gt 0 ]; then
+    echo "This should never run"
+fi
+""")
+    report = symb.main(script)
+    expected_error1 = reporter.ConstantCondition(None, 0)
+    expected_error2 = reporter.DeadCode('echo "This should never run"', 0)
+    assert_expected_report(report, [expected_error1, expected_error2])
+
+
+def test_const_cond_triggered_by_exit_code_nested_if(tmp_path):
+    """Test that a constant condition in an if statement based on exit code is detected."""
+    script = write_script(tmp_path, """
+if [ -n "var" ]; then
+    command1 | command2
+    status="done"
+    if [ $? -gt 0 ]; then
+        echo "This should never run either"
+    fi
+fi
+""")
+    report = symb.main(script)
+    expected_error1 = reporter.ConstantCondition(None, 0)
+    expected_error2 = reporter.DeadCode('echo "This should never run"', 0)
+    assert_expected_report(report, [expected_error1, expected_error2])
+
 # def test_function_call_multipath(tmp_path):
 #     # A function that is called should not produce unbound variable errors for its parameters
 #     script = write_script(tmp_path, """
