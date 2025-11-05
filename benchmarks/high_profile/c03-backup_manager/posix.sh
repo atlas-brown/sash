@@ -1034,3 +1034,6 @@ backup_method_svn()
 #        index=$(($index + 1))
 #    done
 #}
+
+# The following is added to apply the function with the proper arguments.
+__exec_meta_command "some_cmd" "some_file" "gzip"
