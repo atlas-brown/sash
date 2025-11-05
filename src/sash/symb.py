@@ -1,23 +1,22 @@
+import logging
+import traceback
 from copy import copy
 from dataclasses import dataclass
-import json
-import logging
 from math import inf
-import os
-import sys
-import traceback
-from argparse import ArgumentParser
-from typing import Any, Dict, List, Optional, Set
-from sash.util import *
+from typing import Any
+
 import shasta.ast_node as AST
-from sash.frozen import FrozenAst, freeze, freeze_thing
-from sash.parser import *
-from sash.state import *
-from sash.config import Config
-from sash.reporter import Reporter
-from sash.interpreter_config import InterpConfig
+
 import sash.reporter as reporter
 import sash.symb_utils as symb_utils
+from sash.config import Config
+from sash.frozen import FrozenAst, freeze, freeze_thing
+from sash.interpreter_config import InterpConfig
+from sash.parser import *
+from sash.reporter import Reporter
+from sash.state import *
+from sash.util import *
+
 
 def handle_commandnode(traces: Traces,
                        node: AST.CommandNode,
@@ -52,7 +51,7 @@ def handle_commandnode(traces: Traces,
     logging.debug(f"Done with command {trim_string_for_logging(node.pretty())} after expanding its args to {expanded_args} (it had assignments: {node.assignments})")
     return t2
 
-def handle_rm(expanded_args: List[Field]) -> None:
+def handle_rm(expanded_args: list[Field]) -> None:
     logging.debug(f"Checking rm command with expansion possibility: {expanded_args}")
     def is_protected(path):
         return any(path in [p, p + "/", p + "/*"] for p in Config.get("PROTECTED_PATHS"))
@@ -70,7 +69,7 @@ def handle_rm(expanded_args: List[Field]) -> None:
                     Reporter.add_error(reporter.WordSplitCouldDeleteSystemFile(path, context_line))
 
 def handle_function_call_or_unknown(func_name: str,
-                                    arg_fields: List[Field],
+                                    arg_fields: list[Field],
                                     traces: Traces,
                                     config: InterpConfig) -> Traces:
     # is it a known function, and the same one across all traces?
@@ -87,7 +86,7 @@ def handle_function_call_or_unknown(func_name: str,
         return traces
 
 def handle_unknown_command(name: str,
-                           arg_fields: List[Field],
+                           arg_fields: list[Field],
                            traces: Traces,
                            config: InterpConfig) -> Traces:
     if (future_line := config.info.future_fundef_lines.get(name)) is not None and context_line < future_line:
@@ -100,7 +99,7 @@ def handle_unknown_command(name: str,
     return traces
 
 def handle_function_call(func_node: AST.DefunNode,
-                         arg_fields: List[Field],
+                         arg_fields: list[Field],
                          traces: Traces,
                          config: InterpConfig) -> Traces:
     logging.debug(f"Handling function call to {trim_string_for_logging(func_node.pretty())} with args {arg_fields}")
@@ -248,7 +247,7 @@ def interpret_test(cmd: list[Field]) -> bool | None:
 
     return None
 
-def handle_set(expanded_args: List[Field], traces: Traces) -> Traces:
+def handle_set(expanded_args: list[Field], traces: Traces) -> Traces:
     to_set = set()
     for arg in expanded_args[1:]:
         match arg:
@@ -483,7 +482,7 @@ def expand_simple(stuff: list[AST.ArgChar],
 def expand_args_dumb(traces: Traces,
                      args: list[list[AST.ArgChar]],
                      config: InterpConfig) -> tuple[Traces, list[Field]]:
-    expanded_args: List[Field] = []
+    expanded_args: list[Field] = []
     res_traces = traces
     for arg in args:
         expansions = expand(res_traces, arg, config)
@@ -531,7 +530,7 @@ def expand_assuming_single_constant_word(traces: Traces,
         case _:
             assert False, f"expected {stuff} to be a single constant word, but found something else after expansion: {fields}"
 
-def field_to_str(field: Field) -> Optional[str]:
+def field_to_str(field: Field) -> str | None:
     match field:
         case Field(SymStr(parts), _):
             return symb_utils.symbstr_to_str(parts)
@@ -545,7 +544,7 @@ def is_special_var(name: str) -> bool:
 #  Field manipulation
 # =====================
 
-def arbitrary_field(ast: AST.AstNode, kind: ArbitraryType, producing_state: Optional[State]) -> Field:
+def arbitrary_field(ast: AST.AstNode, kind: ArbitraryType, producing_state: State | None) -> Field:
     return Field(CompletelyArbitrary(freeze_thing(ast), kind, producing_state),
                  WordCount(0, inf))
 
@@ -553,7 +552,7 @@ def join_fields(fields: list[Field]) -> Field:
     """Join a list of fields into one field that approximates all of them."""
     return merge_partial_fields(fields, sep=" ", state=None)
 
-def merge_partial_fields(fields: list[Field], sep: Optional[str] = " ", state: Optional[State] = None) -> Field:
+def merge_partial_fields(fields: list[Field], sep: str | None = " ", state: State | None = None) -> Field:
     """Merge a list of partial fields into one field, merging SymStrs and folding them into CompletelyArbitrarys as prefixes or suffixes."""
 
     def merge_symstrs(symstrs: list[Field]) -> Field:
@@ -616,7 +615,7 @@ def merge_partial_fields(fields: list[Field], sep: Optional[str] = " ", state: O
         return arbitrary
 
 
-def collapse_fields(fields: List[Field], source: AST.AstNode | None = None) -> Field:
+def collapse_fields(fields: list[Field], source: AST.AstNode | None = None) -> Field:
     """Collapse alternative versions of a field into one field abstracting over all of them."""
     # if all alternatives are the same, return that
     if all(field == fields[0] for field in fields):
