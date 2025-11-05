@@ -9,7 +9,15 @@ from sash.config import Config
 from sash.reporter import Reporter
 
 
-def main(file: str) -> dict | None:
+def main(file: str, debug=False) -> dict:
+    if debug:
+        logging.basicConfig(
+            format="[%(filename)s:%(lineno)d] %(message)s", level=logging.DEBUG
+        )
+        Config.set("DEBUG", True)
+    else:
+        logging.basicConfig(level=logging.CRITICAL)
+
     logging.info(f"Processing file {file}")
     Reporter.initialize(file)
 
@@ -27,17 +35,7 @@ def main(file: str) -> dict | None:
 
 def cli_main():
     args = parse_cli()
-
-    if args.debug:
-        logging.basicConfig(
-            format="[%(filename)s:%(lineno)d] %(message)s", level=logging.DEBUG
-        )
-        Config.set("DEBUG", True)
-    else:
-        logging.basicConfig(level=logging.CRITICAL)
-
-    logging.debug(f"Received filename: {args.filename.resolve(strict=True)}")
-    report = main(args.filename.as_posix())
+    report = main(args.filename.resolve(strict=True).as_posix(), debug=args.debug)
     print(json.dumps(report, indent=2))
 
 
