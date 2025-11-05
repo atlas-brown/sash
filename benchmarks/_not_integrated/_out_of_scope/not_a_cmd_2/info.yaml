@@ -4,6 +4,9 @@ bugs:
 - line: 126
   description: Use of filename in pipeline as command (missing cat)
 
+note:
+- You cannot guarantee that the file pointed to by $blacklist is not a shell script, oos
+
 sources:
 - https://github.com/pi-hole/pi-hole/commit/e97755eb91533b120d43ecdba762cab13d81ec39
 
