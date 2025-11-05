@@ -1,7 +1,7 @@
 import tempfile
 from pathlib import Path
 import shasta.ast_node as AST
-import sash.shell_parser as parser
+import sash.parser as parser
 import sash.reporter as reporter
 
 def write_script(tmp_path, content: str) -> str:
@@ -20,7 +20,7 @@ def parse_script(script_content: str) -> list[AST.AstNode]:
     with tempfile.TemporaryDirectory() as tmp_path:
         p = write_script(Path(tmp_path), script_content)
         res = []
-        for top_level_info in parser.parse_shell_to_asts(p):
-            res.append(top_level_info[0])
+        for wrapped_ast in parser.parse_shell_script(p):
+            res.append(wrapped_ast.ast_node)
         return res
 

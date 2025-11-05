@@ -11,7 +11,7 @@ from typing import Any, Dict, List, Optional, Set
 from sash.util import *
 import shasta.ast_node as AST
 from sash.frozen import FrozenAst, freeze, freeze_thing
-from sash.shell_parser import *
+from sash.parser import *
 from sash.state import *
 from sash.config import Config
 from sash.reporter import Reporter
@@ -827,17 +827,10 @@ def starting_state() -> State:
     }
     return root.extend_env(starter_env)
 
-@dataclass(frozen=True)
-class AST_parse:
-    ast_node: AST.AstNode
-    rawtext: str
-    line_before: int
-    line_after: int  # relevant for mysterious shell reasons
-
 def trim_string_for_logging(s: str, max_len: int = 300) -> str:
     return s if len(s) <= max_len else s[:max_len] + "..."
 
-def symb_engine(nodes: list[AST_parse], config: InterpConfig) -> list[Trace]:
+def symb_engine(nodes: list[WrappedAst], config: InterpConfig) -> list[Trace]:
     global context_line
     logging.debug(f"Running symb engine with {len(nodes)} raw nodes")
     traces = [Trace((starting_state(),))]
@@ -861,16 +854,8 @@ def symb_engine(nodes: list[AST_parse], config: InterpConfig) -> list[Trace]:
     return traces
 
 
-def parse_script(filename) -> list[AST_parse]:
-    shasta_nodes = parse_shell_to_asts(filename)
-    logging.debug(f"Parsed script with {len(shasta_nodes)} nodes")
-    nodes = [AST_parse(*x) for x in shasta_nodes]
-    return nodes
-
-
 def symbexec_file(input_file: str,
                   config: InterpConfig = InterpConfig(trace_collapser = collapse_traces_if_too_many)) -> Traces:
-    nodes = parse_script(input_file)
+    nodes = parse_shell_script(input_file)
     # opt_store = parse_shebang_args(input_file)
     return symb_engine(nodes, config)
-

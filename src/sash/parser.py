@@ -1,10 +1,9 @@
-from dataclasses import dataclass
-from typing import Set, List, Dict
-from shasta.json_to_ast import to_ast_node
+import collections.abc
+import dataclasses
 import logging
+
 import libdash
-import os
-import traceback
+import shasta.ast_node as AST
 from pash_annotations.datatypes.BasicDatatypes import Flag, FlagOption, Operand, Option
 from pash_annotations.parser.parser import (
     are_all_individually_flags,
@@ -14,40 +13,49 @@ from pash_annotations.parser.parser import (
     get_set_of_all_options,
 )
 from pash_annotations.parser.util_parser import get_json_data
+from shasta.json_to_ast import to_ast_node
 
 
-INITIALIZE_LIBDASH = True
-## Parses straight a shell script to an AST
-## through python without calling it as an executable
-def parse_shell_to_asts(input_script_path : str):
-    global INITIALIZE_LIBDASH
-    logging.debug(f"Calling libdash parser initialization={INITIALIZE_LIBDASH} on {input_script_path}")
-    new_ast_objects = libdash.parser.parse(input_script_path,init=INITIALIZE_LIBDASH)
-    INITIALIZE_LIBDASH = False
-    logging.debug(f"Finished libdash parser on {input_script_path}")
-    ## Transform the untyped ast objects to typed ones
-    new_ast_objects = list(new_ast_objects)
-    logging.debug("Calling shasta")
-    typed_ast_objects = []
-    for (
-        untyped_ast,
-        original_text,
-        linno_before,
-        linno_after,
-    ) in new_ast_objects:
-        typed_ast = to_ast_node(untyped_ast)
-        typed_ast_objects.append(
-            (typed_ast, original_text, linno_before, linno_after)
-        )
-    logging.debug("Returning typed Shasta objects")
-    return typed_ast_objects
+@dataclasses.dataclass(frozen=True)
+class WrappedAst:
+    ast_node: AST.AstNode
+    rawtext: str
+    line_before: int
+    line_after: int  # relevant for mysterious shell reasons
 
-@dataclass(frozen=True)
+
+@dataclasses.dataclass(frozen=True)
 class ParsedCommand:
     name: str
     flag_options: list[FlagOption]
     operands: list[Operand]
     str_to_idx: list[int]
+
+
+# Parse a shell script to an AST straight
+# through python without calling an external executable
+LIBDASH_INITIALIZED = False
+def parse_shell_script(script_path: str) -> list[WrappedAst]:
+    global LIBDASH_INITIALIZED
+
+    logging.debug(f"Parsing {script_path}")
+    parsed_data: collections.abc.Iterator = libdash.parse(script_path, init=not LIBDASH_INITIALIZED)
+
+    LIBDASH_INITIALIZED = True
+
+    # Transform the untyped ast objects to typed ones
+    wrapped_nodes = []
+    for libdash_node, rawtext, linno_before, linno_after in parsed_data:
+        shasta_node = to_ast_node(libdash_node)
+        wrapped_node = WrappedAst(shasta_node, rawtext or "", linno_before, linno_after)
+        wrapped_nodes.append(wrapped_node)
+
+    logging.debug(
+        f"Finished parsing; script consists of {len(wrapped_nodes)} node{'' if len(wrapped_nodes) == 1 else 's'}"
+    )
+
+    return wrapped_nodes
+
 
 def annot_parser_wrapper(str_ls_args: list[str]) -> ParsedCommand:
     # split all terms (command, flags, options, arguments, operands)
@@ -57,16 +65,16 @@ def annot_parser_wrapper(str_ls_args: list[str]) -> ParsedCommand:
     json_data = get_json_data(cmd_name)
     # TODO: if there is an element "\n", we lose the quotation marks currently
 
-    set_of_all_flags: Set[str] = get_set_of_all_flags(json_data)
-    dict_flag_to_primary_repr: Dict[str, str] = get_dict_flag_to_primary_repr(json_data)
-    set_of_all_options: Set[str] = get_set_of_all_options(json_data)
-    dict_option_to_primary_repr: Dict[str, str] = get_dict_option_to_primary_repr(
+    set_of_all_flags: set[str] = get_set_of_all_flags(json_data)
+    dict_flag_to_primary_repr: dict[str, str] = get_dict_flag_to_primary_repr(json_data)
+    set_of_all_options: set[str] = get_set_of_all_options(json_data)
+    dict_option_to_primary_repr: dict[str, str] = get_dict_option_to_primary_repr(
         json_data
     )
-    # dict_option_to_class_for_arg: Dict[str, WhichClassForArg] = get_dict_option_to_class_for_arg(json_data)
+    # dict_option_to_class_for_arg: dict[str, WhichClassForArg] = get_dict_option_to_class_for_arg(json_data)
 
     # parse list of command invocation terms
-    flag_option_list: List[FlagOption] = []
+    flag_option_list: list[FlagOption] = []
     i = 1
     while i < len(parsed_elements_list):
         potential_flag_or_option = parsed_elements_list[i]
@@ -110,4 +118,3 @@ def annot_parser_wrapper(str_ls_args: list[str]) -> ParsedCommand:
                          flag_option_list,
                          operand_list,
                          idx_list)
-

@@ -1,4 +1,4 @@
-import sash.symb
+import sash.parser
 import pathlib
 import shasta.ast_node as shn
 import libdash.parser
@@ -7,7 +7,7 @@ import sys
 
 def main(script_path: pathlib.Path) -> None:
     try:
-        parsed_nodes = sash.symb.parse_script(script_path.as_posix())
+        parsed_nodes = sash.parser.parse_shell_script(script_path.as_posix())
     except libdash.parser.ParsingException as pe:
         print(f"{script_path} | Error parsing script: {pe}", file=sys.stderr)
         sys.exit(1)
