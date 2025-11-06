@@ -190,7 +190,9 @@ def interpret_test(cmd: list[Field]) -> bool | None:
         return None
 
     args = cmd[1:]
-    if not len(args) in {2, 3, 4}:
+    if cmd[-1].content == SymStr(("]",)):
+        args = args[:-1]
+    if not len(args) in {2, 3}:
         return None
 
     # Check if if all arguments are concrete
@@ -202,25 +204,20 @@ def interpret_test(cmd: list[Field]) -> bool | None:
         return None
 
     if len(args) == 2:
+        if args[0].content == SymStr(("!",)):
+            res = interpret_test(args[1:])
+            return not res if res is not None else None
         match (args[0].content, args[1].content):
-            case (SymStr([s1]), SymStr([s2])) if s1 in {"-f", "-d", "-e"} and s2 == "":
+            case (SymStr([op]), SymStr([s])) if op == "-n":
+                return s != ""
+            case (SymStr([op]), SymStr([s])) if op == "-z":
+                return s == ""
+            case (SymStr([op]), SymStr([s1])) if op in {"-f", "-d", "-e"} and s1 == "":
                 return False
             case _:
                 return None
 
     if len(args) == 3:
-        if args[0].content == SymStr(("!",)):
-            res = interpret_test(args[1:])
-            return not res if res is not None else None
-        match (args[0].content, args[1].content):
-            case (SymStr([s]), SymStr([op])) if op == "-n":
-                return s != ""
-            case (SymStr([s]), SymStr([op])) if op == "-z":
-                return s == ""
-            case _:
-                return None
-
-    if len(args) == 4:
         match (args[0].content, args[1].content, args[2].content):
             case (SymStr([s1]), SymStr([op]), SymStr([s2])) if op == "=":
                 return s1 == s2
