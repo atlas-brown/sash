@@ -1,3 +1,4 @@
+from collections import defaultdict
 import logging
 import traceback
 from copy import copy
@@ -694,16 +695,13 @@ def merge_counts(c1: WordCount, c2: WordCount, sep: int = 0) -> WordCount:
     return WordCount(c1.min + max(c2.min - 1, 0) + sep,
                      c1.max + max(c2.max - 1, 0) + sep)
 
-def collapse_equiv_trace_expansions(expansions: list[tuple[Trace, list[Field]]]) -> list[tuple[Trace, list[Field]]]:
-    """Remove duplicate expansions from `expansions`, picking a representative trace for each unique expansion."""
-    seen = {}
-    result = []
+def collapse_equiv_trace_expansions(expansions: list[tuple[Trace, list[Field]]]) -> dict[tuple[Field], list[Trace]]:
+    """Collect all originating traces for each unique expansion."""
+    seen = defaultdict(list)
     for trace, fields in expansions:
         key = tuple(fields)
-        if key not in seen:
-            seen[key] = trace
-            result.append((trace, fields))
-    return result
+        seen[key].append(trace)
+    return seen
 
 
 # ============================================================
