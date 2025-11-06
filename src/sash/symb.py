@@ -180,7 +180,6 @@ def is_constant_test(cmd1: list[Field], cmd2: list[Field]) -> bool:
 
 def interpret_test(cmd: list[Field]) -> bool | None:
     """Return true or false `cmd` is a test that always returns either of the two results. Return None if unknown."""
-    logging.debug(f"Checking if test command {cmd} is constant true/false")
     if len(cmd) < 1:
         return None
 
@@ -281,7 +280,9 @@ def handle_if(traces: Traces, node: AST.IfNode, config: InterpConfig) -> Traces:
         logging.warning("Failed to collect any test commands? Giving up on constant condition check.")
         test_result = None
     else:
+        logging.debug(f"Checking if test command {test_cmds[-1]} is constant true/false")
         test_result = interpret_test(test_cmds[-1])
+        logging.debug(f"Test command result: {test_result}")
     if test_result is not None:
         Reporter.add_error(reporter.ConstantCondition(test_cmds, context_line))
         if test_result == True and node.else_b is not None:
