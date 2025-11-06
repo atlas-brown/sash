@@ -1,4 +1,6 @@
 import tempfile
+import pytest
+from pprint import pformat
 from pathlib import Path
 import shasta.ast_node as AST
 import sash.parser as parser
@@ -14,7 +16,11 @@ def assert_expected_report(report, expected_errors: list[reporter.Report]):
     """Helper to compare actual report with expected errors."""
     actual = [rep["code"] for rep in report["errors"]]
     expected = [err.code for err in expected_errors]
-    assert sorted(actual) == sorted(expected)
+    if sorted(actual) != sorted(expected):
+        pytest.fail(
+            f"\nExpected errors:\n{pformat(sorted(expected))}\n"
+            f"Actual errors:\n{pformat(sorted(actual))}\n"
+        )
 
 def assert_not_expected_report(report, not_expected_errors: list[reporter.Report]):
     """Helper to ensure that certain errors are not (i.e., should not be expected) in the actual report."""
