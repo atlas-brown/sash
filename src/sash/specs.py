@@ -140,56 +140,36 @@ def rm_spec(cmd_: list[Field]) -> CmdSpec:
     )
 
 def mkdir_spec(cmd_: list[Field]) -> CmdSpec:
-    # https://man7.org/linux/man-pages/man1/mkdir.1.html
-    # mkdir [OPTION]... DIRECTORY...
+    # https://pubs.opengroup.org/onlinepubs/9799919799/
+    # mkdir [-p] [-m mode] dir...
     #
-    # Create the DIRECTORY(ies), if they do not already exist.
-    # Mandatory arguments to long options are mandatory for short options too.
+    # The mkdir utility shall create the directories specified by the operands, in the order specified.
     #
-    # -m, --mode=MODE
-    #       set file mode (as in chmod), not a=rwx - umask
-    # -p, --parents
-    #       no error if existing, make parent directories as needed,
-    #       with their file modes unaffected by any -m option
-    # -v, --verbose
-    #       print a message for each created directory
-    # -Z
-    #       set SELinux security context of each created directory to the default type
-    # --context[=CTX]
-    #       like -Z, or if CTX is specified then set the SELinux or SMACK security
-    #       context to CTX
-    # --help
-    #       display this help and exit
-    # --version
-    #       output version information and exit
+    # -m mode
+    #     Set the file mode (permissions) of the new directories to mode.
+    # -p
+    #     Create any missing intermediate pathname components.
+    #     Each dir operand that names an existing directory shall be ignored without error.
+
+    # Keep in mind:
+    #     The file system model is a flat map, there is no hierarchy of directories.
+    #     So `mkdir -p a/b` will not be assumed to fail if `a` is a file, even though in reality it would.
 
     cmd = parse_command(cmd_)
-    cmd = replace(cmd, flags={f for f in cmd.flags if f in {"-p", "--help", "--version"}})
     (name, flags, _, operands) = (cmd.cmd_name, cmd.flags, cmd.options, cmd.operands)
+    flags.discard("-m")  # ignore -m flag
 
     assert name == SymStr(("mkdir",)), "Expected mkdir command, got: {name}"
 
-    if flags <= set(["--help", "--version"]): # "is a subset of"
-        # precond: true
-        # z-postcond: true
-        # the invocation cannot fail
-        return CmdSpec(
-            precond=Empty(),
-            success_postcond=Empty(),
-            failure_postcond=Empty())
-    elif flags == set(["-p"]):
-        # precond: all operands are not files (mkdir -p doesn't error if directory exists)
+    if flags == set(["-p"]):
+        # precond: all operands are not files (mkdir -p doesn't error if directories exists)
         # z-postcond: all operands are directories
         # nz-postcond: none (maybe permission issue, etc.)
         return CmdSpec(
             precond=reduce(lambda acc, path: And(acc, Not(IsFile(path.content))), operands, Empty()),
             success_postcond=reduce(lambda acc, path: And(acc, IsDir(path.content)), operands, Empty()),
             failure_postcond=Empty())
-    else:
-        if len(flags) > 0:
-            # todo: remove once prototype is complete
-            # i do not expect this case to ever have any flags
-            logging.warning(f"Got mkdir invocation: {cmd}")
+    elif flags == set():
         # precond: all operands do not exist
         # z-postcond: all operands are directories
         # nz-postcond: none (maybe permission issue, etc.)
@@ -197,9 +177,17 @@ def mkdir_spec(cmd_: list[Field]) -> CmdSpec:
             precond=reduce(lambda acc, path: And(acc, Not(Or(IsFile(path.content), IsDir(path.content)))), operands, Empty()),
             success_postcond=reduce(lambda acc, path: And(acc, IsDir(path.content)), operands, Empty()),
             failure_postcond=Empty())
+    else:
+        logging.warning(f"Encountered unsupported mkdir invocation: {cmd_}")
+        # treat all other invocations as no-ops
+        return CmdSpec(
+            precond=Empty(),
+            success_postcond=Empty(),
+            failure_postcond=Empty())
 
 
 def cp_spec(cmd_: list[Field]) -> CmdSpec:
+
     raise NotImplementedError("cp spec not implemented yet")
 
 def mv_spec(cmd_: list[Field]) -> CmdSpec:
