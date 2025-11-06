@@ -2,15 +2,15 @@ from sash.state import *
 from sash.constraints import *
 from dataclasses import dataclass, replace
 import logging
-from pash_annotations.parser import parser
+from pash_annotations.parser import parser as pash_annot_parser
 from functools import reduce
 
 @dataclass(frozen=True)
-class CommandInvocation:
+class CmdInvocation:
     cmd_name: SymStr
-    flags: set[str]
-    options: dict[str, Field]
-    operands: list[Field]
+    flags: set[str] # -l, --long, etc.
+    options: dict[str, Field] # --option value
+    operands: list[Field] # positional arguments
 
     def __str__(self) -> str:
         arg_str = " ".join([str(arg) for arg in self.operands])
@@ -20,11 +20,11 @@ class CommandInvocation:
 @dataclass(frozen=True)
 class CmdSpec:
     precond: Constraint
-    success_postcond: Constraint
-    failure_postcond: Constraint
+    success_postcond: Constraint # post-condition if exit code is 0
+    failure_postcond: Constraint # post-condition if exit code is non-0
 
 # TODO: plug in annotations parsing code
-def parse_command(cmd_inv: list[Field]) -> CommandInvocation:
+def parse_command(cmd_inv: list[Field]) -> CmdInvocation:
     logging.debug(f"Parsing command from fields: {cmd_inv}")
 
     stringified_cmd = ""
@@ -44,7 +44,7 @@ def parse_command(cmd_inv: list[Field]) -> CommandInvocation:
             case _:
                 stringified_cmd += " $UNKNOWN"
 
-    cmd_parsed = parser.parse(stringified_cmd.strip())
+    cmd_parsed = pash_annot_parser.parse(stringified_cmd.strip())
     cmd_flags = set()
     cmd_options = dict()
     cmd_operands = []
@@ -57,15 +57,15 @@ def parse_command(cmd_inv: list[Field]) -> CommandInvocation:
 
     for flag_option in cmd_parsed.flag_option_list:
         match flag_option:
-            case parser.Flag():
+            case pash_annot_parser.Flag():
                 cmd_flags.add(flag_option.flag_name)
-            case parser.Option():
+            case pash_annot_parser.Option():
                 option_arg = get_corresponding_field(flag_option.option_arg)
                 cmd_options[flag_option.option_name] = option_arg
     for operand in cmd_parsed.operand_list:
         cmd_operands.append(get_corresponding_field(operand.name))
 
-    return CommandInvocation(
+    return CmdInvocation(
         cmd_name=SymStr((cmd_parsed.cmd_name,)),
         flags=cmd_flags,
         options=cmd_options,
@@ -86,33 +86,47 @@ def rm_spec(cmd_: list[Field]) -> CmdSpec:
     # rm -r $PATH
     # rm -r -f $PATH
     match cmd:
-        case CommandInvocation(SymStr(["rm"]), flags, {}, operands) if not flags:
+        # ? is Reads() useful in rm? we implicitly get the same information through IsDeleted()
+        case CmdInvocation(SymStr(["rm"]), flags, {}, operands) if not flags:
+            # ? should a precond (in all cases) also be Not(IsDeleted())?
+            # precond: all operands are files
+            # z-postcond: all operands are deleted
+            # nz-postcond: none (maybe all operands weren't files, maybe one operand wasn't a file, maybe it was a permission issue, etc.)
             return CmdSpec(
                 precond=reduce(lambda acc, path: And(acc, IsFile(path.content)), operands, Empty()),
                 success_postcond=reduce(lambda acc, path: And(acc, And(IsDeleted(path.content), Reads(path.content))), operands, Empty()),
-                failure_postcond=Empty()
-            )
-        case CommandInvocation(SymStr(["rm"]), flags, {}, operands) if flags == set(["-f"]):
+                failure_postcond=Empty())
+        case CmdInvocation(SymStr(["rm"]), flags, {}, operands) if flags == set(["-f"]):
+            # precond: all operands are not directories [and for bug-catching purposes: all operands are not deleted]
+            # z-postcond: all operands are deleted
+            # nz-postcond: none (maybe permission issue, etc.)
             return CmdSpec(
                 precond=reduce(lambda acc, path: And(acc, And(Not(IsDir(path.content)), Not(IsDeleted(path.content)))), operands, Empty()),
                 success_postcond=reduce(lambda acc, path: And(acc, And(IsDeleted(path.content), Reads(path.content))), operands, Empty()),
                 failure_postcond=Empty())
-        case CommandInvocation(SymStr(["rm"]), flags, {}, operands) if flags == set(["-r"]):
+        case CmdInvocation(SymStr(["rm"]), flags, {}, operands) if flags == set(["-r"]):
+            # precond: all operands are files or directories
+            # z-postcond: all operands are deleted
+            # nz-postcond: none (maybe permission issue, etc.)
             return CmdSpec(
                 precond=reduce(lambda acc, path: And(acc, Or(IsFile(path.content), IsDir(path.content))), operands, Empty()),
                 success_postcond=reduce(lambda acc, path: And(acc, And(IsDeleted(path.content), Reads(path.content))), operands, Empty()),
                 failure_postcond=Empty())
-        case CommandInvocation(SymStr(["rm"]), flags, {}, operands) if flags == set(["-r", "-f"]):
+        case CmdInvocation(SymStr(["rm"]), flags, {}, operands) if flags == set(["-r", "-f"]):
+            # precond: all operands are not deleted
+            # z-postcond: all operands are deleted
+            # nz-postcond: none (maybe permission issue, etc.)
             return CmdSpec(
                 precond=reduce(lambda acc, path: And(acc, Not(IsDeleted(path.content))), operands, Empty()),
                 success_postcond=reduce(lambda acc, path: And(acc, And(IsDeleted(path.content), Reads(path.content))), operands, Empty()),
                 failure_postcond=Empty())
-        case CommandInvocation(_, _, _, path):
+        case CmdInvocation(_, _, _, path):
+            # treat all other invocations as no-ops (that read the operands)
+            # ? what if we know that an operand doesn't exist? is it a good idea to have the Reads() postcond?
             return CmdSpec(
                 precond=Empty(),
                 success_postcond=reduce(lambda acc, p: And(acc, Reads(p.content)), path, Empty()),
-                failure_postcond=Empty()
-            )
+                failure_postcond=Empty())
 
     assert False, "unreachable"
     return CmdSpec(
