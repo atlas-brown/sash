@@ -1,19 +1,18 @@
-from sash.state import CompletelyArbitrary, Field, SymStr
+from sash.state import *
 from sash.constraints import *
-from typing import Callable, Optional
 from dataclasses import dataclass, replace
 import logging
 from pash_annotations.parser import parser
 
 @dataclass(frozen=True)
-class Cmd:
+class CommandInvocation:
     cmd_name: SymStr
     flags: set[str]
     options: dict[str, Field]
-    args: list[Field]
+    operands: list[Field]
 
     def __str__(self) -> str:
-        arg_str = " ".join([str(arg) for arg in self.args])
+        arg_str = " ".join([str(arg) for arg in self.operands])
         flag_str = " ".join(self.flags)
         return f"{self.cmd_name} {flag_str} {arg_str}"
 
@@ -24,45 +23,99 @@ class CmdSpec:
     failure_postcond: Constraint
 
 # TODO: plug in annotations parsing code
-def parse_command(cmd: list[Field]) -> Cmd:
-    logging.debug(f"Parsing command from fields: {cmd}")
-    # parser.parse()
+def parse_command(cmd_inv: list[Field]) -> CommandInvocation:
+    logging.debug(f"Parsing command from fields: {cmd_inv}")
+
+    stringified_cmd = ""
+    for field in cmd_inv:
+        match field.content:
+            case SymStr(parts):
+                part_strs = []
+                for part in parts:
+                    match part:
+                        case str(s):
+                            part_strs.append(s)
+                        case SymVar(name):
+                            part_strs.append(f"${{{name}}}__idx__{cmd_inv.index(field)}")
+                stringified_cmd += f" {' '.join(part_strs)}"
+            case CompletelyArbitrary():
+                stringified_cmd += f" $arbitrary__idx__{cmd_inv.index(field)}"
+            case _:
+                stringified_cmd += " $UNKNOWN"
+
+    cmd_parsed = parser.parse(stringified_cmd.strip())
+    cmd_flags = set()
+    cmd_options = dict()
+    cmd_operands = []
+
+    def get_corresponding_field(s: str) -> Field:
+        if "__idx__" in s:
+            idx = int(s.split("__idx__")[-1])
+            return cmd_inv[idx]
+        return Field(SymStr((s,)), WordCount(1,1))
+
+    for flag_option in cmd_parsed.flag_option_list:
+        match flag_option:
+            case parser.Flag():
+                cmd_flags.add(flag_option.flag_name)
+            case parser.Option():
+                option_arg = get_corresponding_field(flag_option.option_arg)
+                cmd_options[flag_option.option_name] = option_arg
+    for operand in cmd_parsed.operand_list:
+        cmd_operands.append(get_corresponding_field(operand.name))
+
+    return CommandInvocation(
+        cmd_name=SymStr((cmd_parsed.cmd_name,)),
+        flags=cmd_flags,
+        options=cmd_options,
+        operands=cmd_operands
+    )
+
 
 def rm_spec(cmd_: list[Field]) -> CmdSpec:
-    # rm $PATH
-    # rm -r $PATH
-    # rm -r -f $PATH
 
     cmd = parse_command(cmd_)
 
     logging.debug(f"Ignored irrelevant flags for rm: {cmd.flags - {'-r', '-f'}}")
     cmd = replace(cmd, flags={flag for flag in cmd.flags if flag in {"-r", "-f"}})
 
+    # Supported invocations:
+    # rm $PATH
+    # rm -f $PATH
+    # rm -r $PATH
+    # rm -r -f $PATH
     match cmd:
-        case Cmd(SymStr(["rm"]), set(), {}, path):
+        case CommandInvocation(SymStr(["rm"]), set(), {}, path):
             return CmdSpec(
                 precond=IsFile(path),
                 success_postcond=And(IsDeleted(path), ReadsPath(path)),
                 failure_postcond=Empty()
             )
-        case Cmd(SymStr(["rm"]), set(["-f"]), {}, path):
+        case CommandInvocation(SymStr(["rm"]), set(["-f"]), {}, path):
             return CmdSpec(
                 precond=And(Not(IsDir(path)), Not(IsDeleted(path))),
                 success_postcond=And(IsDeleted(path), ReadsPath(path)),
                 failure_postcond=Empty())
-        case Cmd(SymStr(["rm"]), set(["-r"]), {}, path):
+        case CommandInvocation(SymStr(["rm"]), set(["-r"]), {}, path):
             return CmdSpec(
                 precond=Or(IsFile(path), IsDir(path)),
                 success_postcond=And(IsDeleted(path), ReadsPath(path)),
                 failure_postcond=Empty())
-        case Cmd(SymStr(["rm"]), set(["-r", "-f"]), {}, path):
+        case CommandInvocation(SymStr(["rm"]), set(["-r", "-f"]), {}, path):
             return CmdSpec(
                 precond=Not(IsDeleted(path)),
                 success_postcond=And(IsDeleted(path), ReadsPath(path)),
                 failure_postcond=Empty())
-        case Cmd(_, _, _, path):
+        case CommandInvocation(_, _, _, path):
             return CmdSpec(
                 precond=Empty(),
                 success_postcond=ReadsPath(path),
                 failure_postcond=Empty()
             )
+
+    assert False, "unreachable"
+    return CmdSpec(
+        precond=Empty(),
+        success_postcond=Empty(),
+        failure_postcond=Empty()
+    )
