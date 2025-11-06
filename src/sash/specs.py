@@ -139,6 +139,7 @@ def rm_spec(cmd_: list[Field]) -> CmdSpec:
         failure_postcond=Empty()
     )
 
+
 def mkdir_spec(cmd_: list[Field]) -> CmdSpec:
     # https://pubs.opengroup.org/onlinepubs/9799919799/
     # mkdir [-p] [-m mode] dir...
@@ -157,6 +158,7 @@ def mkdir_spec(cmd_: list[Field]) -> CmdSpec:
 
     cmd = parse_command(cmd_)
     (name, flags, _, operands) = (cmd.cmd_name, cmd.flags, cmd.options, cmd.operands)
+    logging.debug(f"Ignored irrelevant flags for rm: {cmd.flags - {'-p'}}")
     flags.discard("-m")  # ignore -m flag
 
     assert name == SymStr(("mkdir",)), "Expected mkdir command, got: {name}"
@@ -179,6 +181,54 @@ def mkdir_spec(cmd_: list[Field]) -> CmdSpec:
             failure_postcond=Empty())
     else:
         logging.warning(f"Encountered unsupported mkdir invocation: {cmd_}")
+        # treat all other invocations as no-ops
+        return CmdSpec(
+            precond=Empty(),
+            success_postcond=Empty(),
+            failure_postcond=Empty())
+
+
+def cd_spec(cmd_: list[Field]) -> CmdSpec:
+    # https://pubs.opengroup.org/onlinepubs/9799919799/
+    # cd [-L] [directory]
+    # cd -P [-e] [directory]
+    #
+    # The cd utility shall change the working directory of the current shell execution environment
+    #
+    # -e
+    #     If the -P option is in effect, the current working directory is successfully changed, and the correct value of the PWD environment variable cannot be determined, exit with exit status 1.
+    # -L
+    #     Handle the operand dot-dot logically; symbolic link components shall not be resolved before dot-dot components are processed (see steps 8. and 9. in the DESCRIPTION).
+    # -P
+    #     Handle the operand dot-dot physically; symbolic link components shall be resolved before dot-dot components are processed (see step 7. in the DESCRIPTION).
+    #
+    # If both -L and -P options are specified, the last of these options shall be used and all others ignored. If neither -L nor -P is specified, the operand shall be handled dot-dot logically; see the DESCRIPTION.
+
+    # Note:
+    #     All flags determine how `..` is handled with respect to symlinks.
+    #     Since we do not model symlinks, we do not handle these flags either.
+    # Note:
+    #     Invocations with multiple operands should fail, but we treat them as no-ops here.
+
+    cmd = parse_command(cmd_)
+    (name, flags, _, operands) = (cmd.cmd_name, cmd.flags, cmd.options, cmd.operands)
+
+    assert name == SymStr(("cd",)), "Expected cd command, got: {name}"
+
+    # TODO?: handle case of zero operands (cd to home directory)
+    # ? cd also has many interactions with environment variables (PWD, HOME, OLDPWD, CDPATH)
+
+    if flags == set() and len(operands) == 1:
+        # TODO?: handle case of '-' operand (cd to previous directory)
+        # precond: operand is a directory
+        # z-postcond: operand is a directory
+        # nz-postcond: none (maybe operand not a directory, maybe permission issue, etc.)
+        return CmdSpec(
+            precond=IsDir(operands[0].content),
+            success_postcond=IsDir(operands[0].content),
+            failure_postcond=Empty())
+    else:
+        logging.warning(f"Encountered unsupported cd invocation: {cmd_}")
         # treat all other invocations as no-ops
         return CmdSpec(
             precond=Empty(),
