@@ -1,7 +1,5 @@
 from dataclasses import dataclass, field, replace, fields
-import sash.constraints
-import shasta.ast_node as AST
-import logging
+from sash.constraints import Constraint, FSModel
 from typing import Callable, Optional, Any
 from enum import Enum
 from sash.frozen import FrozenAst, FrozenDict
@@ -108,22 +106,24 @@ class SetOptions:
     def relevant(cls, option: str) -> bool:
         return option.strip("-") not in {"x"}
 
+# <assertion_constraint>: if true, then things are OK, if false then there's a bug
 class Assertion:
     producing_state: "State"
-    constraint: sash.constraints.Constraint
+    constraint: Constraint
 
 @dataclass(frozen=True)
 class State:
-    pathcond:                    tuple[sash.constraints.Constraint, ...] = field(default_factory=tuple)
-    env:                         FrozenDict[str, ShellVar]               = field(default_factory=FrozenDict)
-    localenv:                    FrozenDict[str, ShellVar]               = field(default_factory=FrozenDict)
-    fundefs:                     FrozenDict[str, FrozenAst]              = field(default_factory=FrozenDict)
-    last_exit_code:              SymStr                                  = SymStr(("0",))
-    last_cmd:                    Optional[FrozenAst]                     = None
-    opts:                        SetOptions                              = field(default_factory=SetOptions)
-    known_nonexistant_commands:  frozenset[str]                          = field(default_factory=frozenset)
-    terminated:                  bool                                    = False # by `exit` or similar
-    assertions:                  tuple[Assertion]                        = field(default_factory=tuple)
+    pathcond:                    tuple[Constraint, ...]      = field(default_factory=tuple)
+    env:                         FrozenDict[str, ShellVar]   = field(default_factory=FrozenDict)
+    localenv:                    FrozenDict[str, ShellVar]   = field(default_factory=FrozenDict)
+    fundefs:                     FrozenDict[str, FrozenAst]  = field(default_factory=FrozenDict)
+    last_exit_code:              SymStr                      = SymStr(("0",))
+    last_cmd:                    Optional[FrozenAst]         = None
+    opts:                        SetOptions                  = field(default_factory=SetOptions)
+    known_nonexistant_commands:  frozenset[str]              = field(default_factory=frozenset)
+    terminated:                  bool                        = False # by `exit` or similar
+    assertions:                  tuple[Assertion]            = field(default_factory=tuple)
+    fs_model:                    FSModel                     = field(default_factory=FSModel)
 
     external_data: Any = None # ASSUMPTION: must be hashable
 
@@ -144,11 +144,11 @@ class State:
     def extend_localenv(self, new_vars: dict[str, ShellVar]) -> 'State':
         return replace(self, localenv=(self.localenv | new_vars))
 
-    def add_pathcond(self, cond: sash.constraints.Constraint) -> 'State':
+    def add_pathcond(self, cond: Constraint) -> 'State':
         new_pathcond = self.pathcond + (cond,)
         return replace(self, pathcond=new_pathcond)
 
-    def add_assertion(self, assertion: sash.constraints.Constraint) -> 'State':
+    def add_assertion(self, assertion: Constraint) -> 'State':
         new_assertions = self.assertions + (assertion,)
         return replace(self, assertions=new_assertions)
 
@@ -174,6 +174,9 @@ class State:
 
     def set_options(self, options: set[str]) -> 'State':
         return replace(self, opts=self.opts.set_options(options))
+
+    def update_fs(self, constraints: Constraint) -> 'State':
+        return replace(self, fs_model=self.fs_model.apply_postcondition(constraints))
 
     def set_last_exit_code(self, code: SymStr) -> 'State':
         return replace(self, last_exit_code=code)
