@@ -3,6 +3,7 @@ from sash.constraints import *
 from dataclasses import dataclass, replace
 import logging
 from pash_annotations.parser import parser
+from functools import reduce
 
 @dataclass(frozen=True)
 class CommandInvocation:
@@ -85,31 +86,31 @@ def rm_spec(cmd_: list[Field]) -> CmdSpec:
     # rm -r $PATH
     # rm -r -f $PATH
     match cmd:
-        case CommandInvocation(SymStr(["rm"]), set(), {}, path):
+        case CommandInvocation(SymStr(["rm"]), flags, {}, operands) if not flags:
             return CmdSpec(
-                precond=IsFile(path),
-                success_postcond=And(IsDeleted(path), ReadsPath(path)),
+                precond=reduce(lambda acc, path: And(acc, IsFile(path.content)), operands, Empty()),
+                success_postcond=reduce(lambda acc, path: And(acc, And(IsDeleted(path.content), Reads(path.content))), operands, Empty()),
                 failure_postcond=Empty()
             )
-        case CommandInvocation(SymStr(["rm"]), set(["-f"]), {}, path):
+        case CommandInvocation(SymStr(["rm"]), flags, {}, operands) if flags == set(["-f"]):
             return CmdSpec(
-                precond=And(Not(IsDir(path)), Not(IsDeleted(path))),
-                success_postcond=And(IsDeleted(path), ReadsPath(path)),
+                precond=reduce(lambda acc, path: And(acc, And(Not(IsDir(path.content)), Not(IsDeleted(path.content)))), operands, Empty()),
+                success_postcond=reduce(lambda acc, path: And(acc, And(IsDeleted(path.content), Reads(path.content))), operands, Empty()),
                 failure_postcond=Empty())
-        case CommandInvocation(SymStr(["rm"]), set(["-r"]), {}, path):
+        case CommandInvocation(SymStr(["rm"]), flags, {}, operands) if flags == set(["-r"]):
             return CmdSpec(
-                precond=Or(IsFile(path), IsDir(path)),
-                success_postcond=And(IsDeleted(path), ReadsPath(path)),
+                precond=reduce(lambda acc, path: And(acc, Or(IsFile(path.content), IsDir(path.content))), operands, Empty()),
+                success_postcond=reduce(lambda acc, path: And(acc, And(IsDeleted(path.content), Reads(path.content))), operands, Empty()),
                 failure_postcond=Empty())
-        case CommandInvocation(SymStr(["rm"]), set(["-r", "-f"]), {}, path):
+        case CommandInvocation(SymStr(["rm"]), flags, {}, operands) if flags == set(["-r", "-f"]):
             return CmdSpec(
-                precond=Not(IsDeleted(path)),
-                success_postcond=And(IsDeleted(path), ReadsPath(path)),
+                precond=reduce(lambda acc, path: And(acc, Not(IsDeleted(path.content))), operands, Empty()),
+                success_postcond=reduce(lambda acc, path: And(acc, And(IsDeleted(path.content), Reads(path.content))), operands, Empty()),
                 failure_postcond=Empty())
         case CommandInvocation(_, _, _, path):
             return CmdSpec(
                 precond=Empty(),
-                success_postcond=ReadsPath(path),
+                success_postcond=reduce(lambda acc, p: And(acc, Reads(p.content)), path, Empty()),
                 failure_postcond=Empty()
             )
 
