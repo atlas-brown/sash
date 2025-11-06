@@ -270,6 +270,7 @@ def handle_if(traces: Traces, node: AST.IfNode, config: InterpConfig) -> Traces:
     def get_the_test(cmd_fields):
         test_cmds.append(cmd_fields)
     temp_config = config.add_expanded_command_callback(get_the_test)
+    temp_config = replace(temp_config, in_checked_position=True)
     t1 = guarded_interp_node(traces, node.cond, temp_config)
     logging.debug(f"collected test_cmds: {test_cmds}")
     logging.debug(f"Checking constant test cond")
@@ -282,28 +283,37 @@ def handle_if(traces: Traces, node: AST.IfNode, config: InterpConfig) -> Traces:
         logging.debug(f"Test command result: {test_result}")
     if test_result is not None:
         Reporter.add_error(reporter.ConstantCondition(test_cmds, context_line))
-        if test_result == True and node.else_b is not None:
+        if test_result == True and (node.else_b is not None and node.else_b.pretty()):
+                                                             # Hack because libdash sometimes gives empty else bodies
+            t1 = trace_map(t1, lambda s: s.set_last_exit_code(SymStr(("0",))))
+            logging.debug(f"Reporting dead code in else branch.")
             Reporter.add_error(reporter.DeadCode(node.else_b, context_line))
         elif test_result == False:
+            t1 = trace_map(t1, lambda s: s.set_last_exit_code(SymStr(("1",))))
+            logging.debug(f"Reporting dead code in then branch")
             Reporter.add_error(reporter.DeadCode(node.then_b, context_line))
     # Several possibilities here:
     # 1. Constant test true -- interpret then_b and return that
     # 2. Constant test false with no else -- just return t1
     # 3. Constant test false with else -- interpret else_b and return that
     # 4. Non-constant test -- interpret both branches and combine results
-    res = t1
+    t_success = [t for t in t1 if t.latest_state.last_exit_code == SymStr(("0",))]
+    t_failure = [t for t in t1 if t.latest_state.last_exit_code == SymStr(("1",))]
+    t_other   = [t for t in t1 if t.latest_state.last_exit_code not in {SymStr(("0",)), SymStr(("1",))}]
+    assert len(t_success) + len(t_failure) + len(t_other) == len(t1), f"Expected all traces to be either success or failure, got {len(t_success)} success and {len(t_failure)} failure out of {len(t1)} total"
     if test_result in {True, None}:
-        # todo: extend pathcond with actual condition true/false
-        res = guarded_interp_node(trace_map(t1, lambda s: s.add_pathcond(f"cond_L{context_line}:true")),
+        t_then = guarded_interp_node(t_success + t_other,
                                     node.then_b,
                                     config)
+        return t_then
+
     if node.else_b is not None and test_result in {False, None}:
-        t3 = guarded_interp_node(trace_map(t1, lambda s: s.add_pathcond(f"cond_L{context_line}:false")),
+        t_else = guarded_interp_node(t_failure + t_other,
                                     node.else_b,
                                     config)
-        return res + t3
-    else:
-        return res
+        return t_else
+
+    return t_other
 
 def handle_exit(traces: Traces) -> Traces:
     logging.debug(f"Handling exit command, terminating {len(traces)} traces")
