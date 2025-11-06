@@ -43,11 +43,11 @@ class IsDeleted(Constraint):
     path: SymStr
 
 @dataclass(frozen=True)
-class ReadsPath(Constraint):
+class Reads(Constraint):
     path: SymStr
 
 @dataclass(frozen=True)
-class WritesPath(Constraint):
+class Writes(Constraint):
     path: SymStr
 
 @dataclass(frozen=True)
