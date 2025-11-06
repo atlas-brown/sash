@@ -4,6 +4,7 @@ from copy import copy
 from dataclasses import dataclass
 from math import inf
 from typing import Any
+from sash.specs import *
 
 import shasta.ast_node as AST
 
@@ -35,12 +36,26 @@ def handle_commandnode(traces: Traces,
                 logging.debug("Exploring all possible expansions of rm args")
                 expansions = expand_args(traces, node.arguments, config)
                 simplified_expansions = collapse_equiv_trace_expansions(expansions)
-                for trace, arg_fields in simplified_expansions:
-                    handle_rm(arg_fields)
+                cmd_traces = []
+                for arg_fields, traces in simplified_expansions.items():
+                    for trace in traces:
+                        ts, tf = handle_rm(arg_fields, trace)
+                        cmd_traces.append(ts)
+                        if config.in_checked_position:
+                            cmd_traces.append(tf)
+                t1 = cmd_traces
             case "set":
                 t1 = handle_set(expanded_args, t1)
             case "exit":
                 t1 = handle_exit(t1)
+            # TODO: Unify rm with other commands
+            case cmd_name if spec := get_spec(cmd_name, tuple(expanded_args)):
+                t_precond = trace_map(t1, lambda s: s.add_assertion(spec.precond))
+                t_success = trace_map(t_precond, lambda s: s.add_pathcond(spec.success_postcond).update_fs(spec.success_postcond).set_last_exit_code(SymStr(("0",))))
+                t_failure = []
+                if config.in_checked_position:
+                    t_failure = trace_map(t_precond, lambda s: s.add_pathcond(spec.failure_postcond).update_fs(spec.failure_postcond).set_last_exit_code(SymStr(("1",))))
+                t1 = t_success + t_failure
             case some_name if isinstance(some_name, str):
                 # todo: we could actually not use `expand_args_dumb` here, and instead do trace-specific expansion, since the function body is handled trace-specifically anyway
                 # deferred for now until we actually need it (see test_function_call_multipath)
@@ -56,8 +71,13 @@ def handle_commandnode(traces: Traces,
     logging.debug(f"Done with command {trim_string_for_logging(node.pretty())} after expanding its args to {expanded_args} (it had assignments: {node.assignments})")
     return t2
 
-def handle_rm(expanded_args: list[Field]) -> None:
+def handle_rm(expanded_args: tuple[Field], trace: Trace) -> tuple[Trace, Trace]:
     logging.debug(f"Checking rm command with expansion possibility: {expanded_args}")
+    spec = rm_spec(expanded_args)
+
+    logging.debug(f"Adding rm precondition: {spec.precond}")
+    trace = trace.extend(lambda s: s.add_assertion(spec.precond))
+
     def is_protected(path):
         return any(path in [p, p + "/", p + "/*"] for p in Config.get("PROTECTED_PATHS"))
     for arg_field in expanded_args[1:]:
@@ -72,6 +92,12 @@ def handle_rm(expanded_args: list[Field]) -> None:
                     Reporter.add_error(reporter.WordSplitCouldDeleteSystemFile(path, context_line))
                 if suf is not None and (path := symb_utils.symbstr_to_str(suf.parts)) and is_protected(path):
                     Reporter.add_error(reporter.WordSplitCouldDeleteSystemFile(path, context_line))
+
+    return (
+        trace.extend(lambda s: s.add_pathcond(spec.success_postcond).update_fs(spec.success_postcond).set_last_exit_code(SymStr(("0",)))),
+        trace.extend(lambda s: s.add_pathcond(spec.failure_postcond).update_fs(spec.failure_postcond).set_last_exit_code(SymStr(("1",))))
+    )
+
 
 def handle_function_call_or_unknown(func_name: str,
                                     arg_fields: list[Field],
