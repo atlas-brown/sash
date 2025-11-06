@@ -25,6 +25,10 @@ class CmdSpec:
 
 # TODO: plug in annotations parsing code
 def parse_command(cmd_inv: list[Field]) -> CmdInvocation:
+    """
+    Parses a command invocation from a list of Fields into a CmdInvocation object.
+    The CmdInvocation only contains flags in their short form (e.g., '-l' instead of '--long').
+    """
     logging.debug(f"Parsing command from fields: {cmd_inv}")
 
     stringified_cmd = ""
@@ -134,3 +138,78 @@ def rm_spec(cmd_: list[Field]) -> CmdSpec:
         success_postcond=Empty(),
         failure_postcond=Empty()
     )
+
+def mkdir_spec(cmd_: list[Field]) -> CmdSpec:
+    # https://man7.org/linux/man-pages/man1/mkdir.1.html
+    # mkdir [OPTION]... DIRECTORY...
+    #
+    # Create the DIRECTORY(ies), if they do not already exist.
+    # Mandatory arguments to long options are mandatory for short options too.
+    #
+    # -m, --mode=MODE
+    #       set file mode (as in chmod), not a=rwx - umask
+    # -p, --parents
+    #       no error if existing, make parent directories as needed,
+    #       with their file modes unaffected by any -m option
+    # -v, --verbose
+    #       print a message for each created directory
+    # -Z
+    #       set SELinux security context of each created directory to the default type
+    # --context[=CTX]
+    #       like -Z, or if CTX is specified then set the SELinux or SMACK security
+    #       context to CTX
+    # --help
+    #       display this help and exit
+    # --version
+    #       output version information and exit
+
+    cmd = parse_command(cmd_)
+    cmd = replace(cmd, flags={f for f in cmd.flags if f in {"-p", "--help", "--version"}})
+    (name, flags, _, operands) = (cmd.cmd_name, cmd.flags, cmd.options, cmd.operands)
+
+    assert name == SymStr(("mkdir",)), "Expected mkdir command, got: {name}"
+
+    if flags <= set(["--help", "--version"]): # "is a subset of"
+        # precond: true
+        # z-postcond: true
+        # the invocation cannot fail
+        return CmdSpec(
+            precond=Empty(),
+            success_postcond=Empty(),
+            failure_postcond=Empty())
+    elif flags == set(["-p"]):
+        # precond: all operands are not files (mkdir -p doesn't error if directory exists)
+        # z-postcond: all operands are directories
+        # nz-postcond: none (maybe permission issue, etc.)
+        return CmdSpec(
+            precond=reduce(lambda acc, path: And(acc, Not(IsFile(path.content))), operands, Empty()),
+            success_postcond=reduce(lambda acc, path: And(acc, IsDir(path.content)), operands, Empty()),
+            failure_postcond=Empty())
+    else:
+        if len(flags) > 0:
+            # todo: remove once prototype is complete
+            # i do not expect this case to ever have any flags
+            logging.warning(f"Got mkdir invocation: {cmd}")
+        # precond: all operands do not exist
+        # z-postcond: all operands are directories
+        # nz-postcond: none (maybe permission issue, etc.)
+        return CmdSpec(
+            precond=reduce(lambda acc, path: And(acc, Not(Or(IsFile(path.content), IsDir(path.content)))), operands, Empty()),
+            success_postcond=reduce(lambda acc, path: And(acc, IsDir(path.content)), operands, Empty()),
+            failure_postcond=Empty())
+
+
+def cp_spec(cmd_: list[Field]) -> CmdSpec:
+    raise NotImplementedError("cp spec not implemented yet")
+
+def mv_spec(cmd_: list[Field]) -> CmdSpec:
+    raise NotImplementedError("mv spec not implemented yet")
+
+def grep_spec(cmd_: list[Field]) -> CmdSpec:
+    raise NotImplementedError("grep spec not implemented yet")
+
+def echo_spec(cmd_: list[Field]) -> CmdSpec:
+    raise NotImplementedError("echo spec not implemented yet")
+
+def command_spec(cmd_: list[Field]) -> CmdSpec:
+    raise NotImplementedError("command spec not implemented yet (the builtin)")
