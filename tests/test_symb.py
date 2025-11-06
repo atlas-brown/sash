@@ -329,7 +329,7 @@ fi
 def test_const_cond_triggered_by_exit_code_nested_if(tmp_path):
     """Test that a constant condition in an if statement based on exit code is detected."""
     script = write_script(tmp_path, """
-if [ -n "var" ]; then
+if [ -e "var" ]; then
     command1 | command2
     status="done"
     if [ $? -gt 0 ]; then
