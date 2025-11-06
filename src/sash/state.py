@@ -108,6 +108,10 @@ class SetOptions:
     def relevant(cls, option: str) -> bool:
         return option.strip("-") not in {"x"}
 
+class Assertion:
+    producing_state: "State"
+    constraint: sash.constraints.Constraint
+
 @dataclass(frozen=True)
 class State:
     pathcond:                    tuple[sash.constraints.Constraint, ...] = field(default_factory=tuple)
@@ -119,6 +123,7 @@ class State:
     opts:                        SetOptions                              = field(default_factory=SetOptions)
     known_nonexistant_commands:  frozenset[str]                          = field(default_factory=frozenset)
     terminated:                  bool                                    = False # by `exit` or similar
+    assertions:                  tuple[Assertion]                        = field(default_factory=tuple)
 
     external_data: Any = None # ASSUMPTION: must be hashable
 
@@ -142,6 +147,10 @@ class State:
     def add_pathcond(self, cond: sash.constraints.Constraint) -> 'State':
         new_pathcond = self.pathcond + (cond,)
         return replace(self, pathcond=new_pathcond)
+
+    def add_assertion(self, assertion: sash.constraints.Constraint) -> 'State':
+        new_assertions = self.assertions + (assertion,)
+        return replace(self, assertions=new_assertions)
 
     def lookup(self, var: str) -> Optional[ShellVar]:
         if var in self.localenv:
