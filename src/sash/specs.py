@@ -24,7 +24,7 @@ class CmdSpec:
     failure_postcond: Constraint # post-condition if exit code is non-0
 
 # TODO: plug in annotations parsing code
-def parse_command(cmd_inv: list[Field]) -> CmdInvocation:
+def parse_command(cmd_inv: tuple[Field]) -> CmdInvocation:
     """
     Parses a command invocation from a list of Fields into a CmdInvocation object.
     The CmdInvocation only contains flags in their short form (e.g., '-l' instead of '--long').
@@ -36,19 +36,22 @@ def parse_command(cmd_inv: list[Field]) -> CmdInvocation:
         match field.content:
             case SymStr(parts):
                 part_strs = []
+                assert all(isinstance(part, str) for part in parts), "SymStr with SymVars not supported in Z3 translation yet"
                 for part in parts:
                     match part:
                         case str(s):
                             part_strs.append(s)
                         case SymVar(name):
+                            # TODO: This might not work when we handle SymVars
                             part_strs.append(f"${{{name}}}__idx__{cmd_inv.index(field)}")
-                stringified_cmd += f" {' '.join(part_strs)}"
+                stringified_cmd += f" {''.join(part_strs)}"
             case CompletelyArbitrary():
                 stringified_cmd += f" $arbitrary__idx__{cmd_inv.index(field)}"
             case _:
                 stringified_cmd += " $UNKNOWN"
 
     cmd_parsed = pash_annot_parser.parse(stringified_cmd.strip())
+    logging.debug(f"Parsed command: {cmd_parsed}")
     cmd_flags = set()
     cmd_options = dict()
     cmd_operands = []
@@ -77,7 +80,16 @@ def parse_command(cmd_inv: list[Field]) -> CmdInvocation:
     )
 
 
-def rm_spec(cmd_: list[Field]) -> CmdSpec:
+def get_spec(cmd_name: str | None, cmd_: tuple[Field]) -> CmdSpec | None:
+    match cmd_name:
+        case "rm":
+            return rm_spec(cmd_)
+        case _:
+            logging.warning(f"No spec found for command '{cmd_name}', treating as no-op.")
+            return None
+
+
+def rm_spec(cmd_: tuple[Field]) -> CmdSpec:
 
     cmd = parse_command(cmd_)
 
@@ -98,7 +110,7 @@ def rm_spec(cmd_: list[Field]) -> CmdSpec:
             # nz-postcond: none (maybe all operands weren't files, maybe one operand wasn't a file, maybe it was a permission issue, etc.)
             return CmdSpec(
                 precond=reduce(lambda acc, path: And(acc, IsFile(path.content)), operands, Empty()),
-                success_postcond=reduce(lambda acc, path: And(acc, And(IsDeleted(path.content), Reads(path.content))), operands, Empty()),
+                success_postcond=reduce(lambda acc, path: And(acc, IsDeleted(path.content)), operands, Empty()),
                 failure_postcond=Empty())
         case CmdInvocation(SymStr(["rm"]), flags, {}, operands) if flags == set(["-f"]):
             # precond: all operands are not directories [and for bug-catching purposes: all operands are not deleted]
@@ -106,7 +118,7 @@ def rm_spec(cmd_: list[Field]) -> CmdSpec:
             # nz-postcond: none (maybe permission issue, etc.)
             return CmdSpec(
                 precond=reduce(lambda acc, path: And(acc, And(Not(IsDir(path.content)), Not(IsDeleted(path.content)))), operands, Empty()),
-                success_postcond=reduce(lambda acc, path: And(acc, And(IsDeleted(path.content), Reads(path.content))), operands, Empty()),
+                success_postcond=reduce(lambda acc, path: And(acc, IsDeleted(path.content)), operands, Empty()),
                 failure_postcond=Empty())
         case CmdInvocation(SymStr(["rm"]), flags, {}, operands) if flags == set(["-r"]):
             # precond: all operands are files or directories
@@ -114,7 +126,7 @@ def rm_spec(cmd_: list[Field]) -> CmdSpec:
             # nz-postcond: none (maybe permission issue, etc.)
             return CmdSpec(
                 precond=reduce(lambda acc, path: And(acc, Or(IsFile(path.content), IsDir(path.content))), operands, Empty()),
-                success_postcond=reduce(lambda acc, path: And(acc, And(IsDeleted(path.content), Reads(path.content))), operands, Empty()),
+                success_postcond=reduce(lambda acc, path: And(acc, IsDeleted(path.content)), operands, Empty()),
                 failure_postcond=Empty())
         case CmdInvocation(SymStr(["rm"]), flags, {}, operands) if flags == set(["-r", "-f"]):
             # precond: all operands are not deleted
@@ -122,11 +134,12 @@ def rm_spec(cmd_: list[Field]) -> CmdSpec:
             # nz-postcond: none (maybe permission issue, etc.)
             return CmdSpec(
                 precond=reduce(lambda acc, path: And(acc, Not(IsDeleted(path.content))), operands, Empty()),
-                success_postcond=reduce(lambda acc, path: And(acc, And(IsDeleted(path.content), Reads(path.content))), operands, Empty()),
+                success_postcond=reduce(lambda acc, path: And(acc, IsDeleted(path.content)), operands, Empty()),
                 failure_postcond=Empty())
         case CmdInvocation(_, _, _, path):
             # treat all other invocations as no-ops (that read the operands)
             # ? what if we know that an operand doesn't exist? is it a good idea to have the Reads() postcond?
+            assert False, f"Missing spec for rm invocation: {cmd_}"
             return CmdSpec(
                 precond=Empty(),
                 success_postcond=reduce(lambda acc, p: And(acc, Reads(p.content)), path, Empty()),
