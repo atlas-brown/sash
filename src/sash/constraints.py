@@ -1,7 +1,8 @@
 from __future__ import annotations  # for postponed evaluation of annotations
+from abc import ABC
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
-    from sash.state import SymStr
+    from sash.state import *
 
 from dataclasses import dataclass
 
@@ -27,37 +28,49 @@ class Or(Constraint):
 
 @dataclass(frozen=True)
 class StringEq(Constraint):
-    lhs: SymStr
-    rhs: SymStr
+    lhs: Field
+    rhs: Field
 
 @dataclass(frozen=True)
 class IsFile(Constraint):
-    path: SymStr
+    path: Field
 
 @dataclass(frozen=True)
 class IsDir(Constraint):
-    path: SymStr
+    path: Field
 
 @dataclass(frozen=True)
 class IsDeleted(Constraint):
-    path: SymStr
+    path: Field
+
+@dataclass(frozen=True)
+class IsUnread(Constraint):
+    path: Field
 
 @dataclass(frozen=True)
 class Reads(Constraint):
-    path: SymStr
+    path: Field
 
 @dataclass(frozen=True)
 class Writes(Constraint):
-    path: SymStr
+    path: Field
 
 @dataclass(frozen=True)
 class CommandExists(Constraint):
-    name: SymStr
+    name: Field
 
 @dataclass(frozen=True)
 class HasStdout(Constraint):
-    command: SymStr
+    command: Field
 
 @dataclass(frozen=True)
 class ExpectsStdin(Constraint):
-    command: SymStr
+    command: Field
+
+@dataclass(frozen=True)
+class FSModel(ABC):
+    def apply_postcondition(self, constraints: Constraint) -> FSModel:
+        return self
+
+class DumbFsModel(FSModel):
+    pass
