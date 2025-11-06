@@ -903,4 +903,5 @@ def symbexec_file(input_file: str,
                   config: InterpConfig = InterpConfig(trace_collapser = collapse_traces_if_too_many)) -> Traces:
     nodes = parse_shell_script(input_file)
     # opt_store = parse_shebang_args(input_file)
-    return symb_engine(nodes, config)
+    traces = symb_engine(nodes, config)
+    return traces
