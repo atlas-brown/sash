@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from sash.state import *
+import shasta.ast_node as AST
 
 NodeCB = Callable[[Traces, AST.AstNode], Optional[list[Any]]]
 ExpandedCmdCB = Callable[[list[Field]], None]
@@ -11,6 +12,7 @@ class InterpConfig:
     expanded_command_cbs: list[ExpandedCmdCB] = field(default_factory=list)
     trace_collapser: TraceCollapser = lambda ts: ts
     info: ScriptInfo = ScriptInfo()
+    in_checked_position: bool = False
 
     def add_node_callback(self, cb: NodeCB) -> 'InterpConfig':
         return replace(self, node_cbs=(self.node_cbs + [cb]))
