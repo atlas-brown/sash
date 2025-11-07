@@ -70,7 +70,7 @@ def assertion_to_z3(assertion: Assertion) -> tuple[z3.BoolRef, z3.ExprRef]:
     constraint_formula = constraint_to_z3(assertion.constraint, assertion.producing_state)
     state_formula = state_to_z3(assertion.producing_state)
 
-    assertion_formula = z3.And(state_formula, constraint_formula) # TODO: Ask Lukas
+    assertion_formula = z3.Implies(state_formula, constraint_formula)
 
     return assertion_var, assertion_formula
 
