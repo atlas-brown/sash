@@ -778,7 +778,15 @@ def interp_node(traces: Traces,
             return res
 
         case AST.AssignNode():
-            trace_expansion_pairs = expand(traces, node.val, config)
+            # The expand() function is used everywhere where expansion is needed.
+            # For that reason, if a quoted argument is passed in, the resulting Field will always contain a maximum word count of 1.
+            # If that weren't the case, the following command would be interpreted wrongly: cp "filename with spaces" dest.
+            # However, in the context of assignments, we want the resulting Field to have the correct word count, even if the argument is quoted.
+            # A simple way to achieve this is to unquote the argument before passing it to expand().
+
+            # "if the value of the node is a single quoted argument, remove the quotes"
+            val = node.val[0].arg if len(node.val) == 1 and isinstance(node.val[0], AST.QArgChar) else node.val
+            trace_expansion_pairs = expand(traces, val, config)
             return [record_assignment(t, node.var, join_fields(rhs)) for (t, rhs) in trace_expansion_pairs]
 
 
