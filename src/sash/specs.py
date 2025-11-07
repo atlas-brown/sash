@@ -90,67 +90,51 @@ def get_spec(cmd_name: str | None, cmd_: tuple[Field]) -> CmdSpec | None:
 
 
 def rm_spec(cmd_: tuple[Field]) -> CmdSpec:
+    # https://pubs.opengroup.org/onlinepubs/9799919799/utilities/rm.html
 
     cmd = parse_command(cmd_)
-
     logging.debug(f"Ignored irrelevant flags for rm: {cmd.flags - {'-r', '-f'}}")
+    (name, flags, options, operands) = (cmd.cmd_name, cmd.flags, cmd.options, cmd.operands)
     cmd = replace(cmd, flags={flag for flag in cmd.flags if flag in {"-r", "-f"}})
 
-    # Supported invocations:
-    # rm $PATH
-    # rm -f $PATH
-    # rm -r $PATH
-    # rm -r -f $PATH
-    match cmd:
-        # ? is Reads() useful in rm? we implicitly get the same information through IsDeleted()
-        case CmdInvocation(SymStr(["rm"]), flags, {}, operands) if not flags:
-            # ? should a precond (in all cases) also be Not(IsDeleted())?
-            # precond: all operands are files
-            # z-postcond: all operands are deleted
-            # nz-postcond: none (maybe all operands weren't files, maybe one operand wasn't a file, maybe it was a permission issue, etc.)
-            return CmdSpec(
-                precond=reduce(lambda acc, path: And(acc, IsFile(path)), operands, Empty()),
-                success_postcond=reduce(lambda acc, path: And(acc, IsDeleted(path)), operands, Empty()),
-                failure_postcond=Empty())
-        case CmdInvocation(SymStr(["rm"]), flags, {}, operands) if flags == set(["-f"]):
-            # precond: all operands are not directories [and for bug-catching purposes: all operands are not deleted]
-            # z-postcond: all operands are deleted
-            # nz-postcond: none (maybe permission issue, etc.)
-            return CmdSpec(
-                precond=reduce(lambda acc, path: And(acc, And(Not(IsDir(path)), Not(IsDeleted(path)))), operands, Empty()),
-                success_postcond=reduce(lambda acc, path: And(acc, IsDeleted(path)), operands, Empty()),
-                failure_postcond=Empty())
-        case CmdInvocation(SymStr(["rm"]), flags, {}, operands) if flags == set(["-r"]):
-            # precond: all operands are files or directories
-            # z-postcond: all operands are deleted
-            # nz-postcond: none (maybe permission issue, etc.)
-            return CmdSpec(
-                precond=reduce(lambda acc, path: And(acc, Or(IsFile(path), IsDir(path))), operands, Empty()),
-                success_postcond=reduce(lambda acc, path: And(acc, IsDeleted(path)), operands, Empty()),
-                failure_postcond=Empty())
-        case CmdInvocation(SymStr(["rm"]), flags, {}, operands) if flags == set(["-r", "-f"]):
-            # precond: all operands are not deleted
-            # z-postcond: all operands are deleted
-            # nz-postcond: none (maybe permission issue, etc.)
-            return CmdSpec(
-                precond=reduce(lambda acc, path: And(acc, Not(IsDeleted(path))), operands, Empty()),
-                success_postcond=reduce(lambda acc, path: And(acc, IsDeleted(path)), operands, Empty()),
-                failure_postcond=Empty())
-        case CmdInvocation(_, _, _, path):
-            # treat all other invocations as no-ops (that read the operands)
-            # ? what if we know that an operand doesn't exist? is it a good idea to have the Reads() postcond?
-            assert False, f"Missing spec for rm invocation: {cmd_}"
-            return CmdSpec(
-                precond=Empty(),
-                success_postcond=reduce(lambda acc, p: And(acc, Reads(p.content)), path, Empty()),
-                failure_postcond=Empty())
+    assert name == SymStr(("rm",)), f"Expected rm command, got:\nOriginal: {cmd_}\nPaSh: {cmd}"
+    assert len(options) == 0, f"Expected no options for rm, got:\nOriginal: {cmd_}\nPaSh: {cmd}"
 
-    assert False, "unreachable"
-    return CmdSpec(
-        precond=Empty(),
-        success_postcond=Empty(),
-        failure_postcond=Empty()
-    )
+    if flags == set(): # rm file...
+        # precond:      all operands are files
+        # z-postcond:   all operands are deleted
+        # nz-postcond:  none (maybe all operands weren't files, maybe one operand wasn't a file, maybe it was a permission issue, etc.)
+        return CmdSpec(
+            precond=reduce(lambda acc, path: And(acc, IsFile(path)), operands, Empty()),
+            success_postcond=reduce(lambda acc, path: And(acc, IsDeleted(path)), operands, Empty()),
+            failure_postcond=Empty())
+    elif flags == set(["-f"]): # rm -f file...
+        # precond:      all operands are not directories [and for bug-catching purposes: all operands are not deleted]
+        # z-postcond:   all operands are deleted
+        # nz-postcond:  none (maybe permission issue, etc.)
+        return CmdSpec(
+            precond=reduce(lambda acc, path: And(acc, And(Not(IsDir(path)), Not(IsDeleted(path)))), operands, Empty()),
+            success_postcond=reduce(lambda acc, path: And(acc, IsDeleted(path)), operands, Empty()),
+            failure_postcond=Empty())
+    elif flags == set(["-r"]): # rm -r file...
+        # precond:      all operands are files or directories
+        # z-postcond:   all operands are deleted
+        # nz-postcond:  none (maybe permission issue, etc.)
+        return CmdSpec(
+            precond=reduce(lambda acc, path: And(acc, Or(IsFile(path), IsDir(path))), operands, Empty()),
+            success_postcond=reduce(lambda acc, path: And(acc, IsDeleted(path)), operands, Empty()),
+            failure_postcond=Empty())
+    elif flags == set(["-r", "-f"]): # rm -r -f file...
+        # precond:      [for bug catching purposes: all operands are not deleted]
+        # z-postcond:   all operands are deleted
+        # nz-postcond:  none (maybe permission issue, etc.)
+        return CmdSpec(
+            precond=reduce(lambda acc, path: And(acc, Not(IsDeleted(path))), operands, Empty()),
+            success_postcond=reduce(lambda acc, path: And(acc, IsDeleted(path)), operands, Empty()),
+            failure_postcond=Empty())
+    else:
+        # TODO: implement a default case (need to look at every rm flag and derive the most detailed but correct spec)
+        raise NotImplementedError(f"Unhandled rm invocation:\n{cmd_}\n{cmd}")
 
 
 def mkdir_spec(cmd_: list[Field]) -> CmdSpec:
