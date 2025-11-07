@@ -22,13 +22,13 @@ def field_to_z3(field_content: SymStr | CompletelyArbitrary) -> z3.ExprRef:
             return z3_var
 
 def constraint_to_z3(constraint: Constraint, s: State):
-    logging.debug(f"Translating constraint to Z3: {constraint}")
     match constraint:
         case Empty() | HasStdout() | ExpectsStdin() | Reads() | Writes():
             return z3.BoolVal(True)
         case Not(c):
             return z3.Not(constraint_to_z3(c, s))
         case And(lhs, rhs):
+            assert not callable(lhs) and not callable(rhs), "Callable constraints not supported in Z3 translation yet"
             return z3.And(constraint_to_z3(lhs, s), constraint_to_z3(rhs, s))
         case Or(lhs, rhs):
             return z3.Or(constraint_to_z3(lhs, s), constraint_to_z3(rhs, s))
@@ -44,7 +44,7 @@ def constraint_to_z3(constraint: Constraint, s: State):
             raise NotImplementedError(f"Z3 translation not implemented for constraint type: {type(constraint)}")
 
 def state_to_z3(s: State) -> z3.ExprRef:
-    pathcond_formula = z3.And([constraint_to_z3(pc, s) for pc in s.pathcond])
+    pathcond_formula = z3.And([constraint_to_z3(pc, s) for pc in s.pathcond]) if s.pathcond else z3.BoolVal(True)
 
     env_formula = []
     for var, val in s.env.items():
