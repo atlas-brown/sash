@@ -109,32 +109,32 @@ def rm_spec(cmd_: tuple[Field]) -> CmdSpec:
             # z-postcond: all operands are deleted
             # nz-postcond: none (maybe all operands weren't files, maybe one operand wasn't a file, maybe it was a permission issue, etc.)
             return CmdSpec(
-                precond=reduce(lambda acc, path: And(acc, IsFile(path.content)), operands, Empty()),
-                success_postcond=reduce(lambda acc, path: And(acc, IsDeleted(path.content)), operands, Empty()),
+                precond=reduce(lambda acc, path: And(acc, IsFile(path)), operands, Empty()),
+                success_postcond=reduce(lambda acc, path: And(acc, IsDeleted(path)), operands, Empty()),
                 failure_postcond=Empty())
         case CmdInvocation(SymStr(["rm"]), flags, {}, operands) if flags == set(["-f"]):
             # precond: all operands are not directories [and for bug-catching purposes: all operands are not deleted]
             # z-postcond: all operands are deleted
             # nz-postcond: none (maybe permission issue, etc.)
             return CmdSpec(
-                precond=reduce(lambda acc, path: And(acc, And(Not(IsDir(path.content)), Not(IsDeleted(path.content)))), operands, Empty()),
-                success_postcond=reduce(lambda acc, path: And(acc, IsDeleted(path.content)), operands, Empty()),
+                precond=reduce(lambda acc, path: And(acc, And(Not(IsDir(path)), Not(IsDeleted(path)))), operands, Empty()),
+                success_postcond=reduce(lambda acc, path: And(acc, IsDeleted(path)), operands, Empty()),
                 failure_postcond=Empty())
         case CmdInvocation(SymStr(["rm"]), flags, {}, operands) if flags == set(["-r"]):
             # precond: all operands are files or directories
             # z-postcond: all operands are deleted
             # nz-postcond: none (maybe permission issue, etc.)
             return CmdSpec(
-                precond=reduce(lambda acc, path: And(acc, Or(IsFile(path.content), IsDir(path.content))), operands, Empty()),
-                success_postcond=reduce(lambda acc, path: And(acc, IsDeleted(path.content)), operands, Empty()),
+                precond=reduce(lambda acc, path: And(acc, Or(IsFile(path), IsDir(path))), operands, Empty()),
+                success_postcond=reduce(lambda acc, path: And(acc, IsDeleted(path)), operands, Empty()),
                 failure_postcond=Empty())
         case CmdInvocation(SymStr(["rm"]), flags, {}, operands) if flags == set(["-r", "-f"]):
             # precond: all operands are not deleted
             # z-postcond: all operands are deleted
             # nz-postcond: none (maybe permission issue, etc.)
             return CmdSpec(
-                precond=reduce(lambda acc, path: And(acc, Not(IsDeleted(path.content))), operands, Empty()),
-                success_postcond=reduce(lambda acc, path: And(acc, IsDeleted(path.content)), operands, Empty()),
+                precond=reduce(lambda acc, path: And(acc, Not(IsDeleted(path))), operands, Empty()),
+                success_postcond=reduce(lambda acc, path: And(acc, IsDeleted(path)), operands, Empty()),
                 failure_postcond=Empty())
         case CmdInvocation(_, _, _, path):
             # treat all other invocations as no-ops (that read the operands)
@@ -181,16 +181,16 @@ def mkdir_spec(cmd_: list[Field]) -> CmdSpec:
         # z-postcond: all operands are directories
         # nz-postcond: none (maybe permission issue, etc.)
         return CmdSpec(
-            precond=reduce(lambda acc, path: And(acc, Not(IsFile(path.content))), operands, Empty()),
-            success_postcond=reduce(lambda acc, path: And(acc, IsDir(path.content)), operands, Empty()),
+            precond=reduce(lambda acc, path: And(acc, Not(IsFile(path))), operands, Empty()),
+            success_postcond=reduce(lambda acc, path: And(acc, IsDir(path)), operands, Empty()),
             failure_postcond=Empty())
     elif flags == set():
         # precond: all operands do not exist
         # z-postcond: all operands are directories
         # nz-postcond: none (maybe permission issue, etc.)
         return CmdSpec(
-            precond=reduce(lambda acc, path: And(acc, Not(Or(IsFile(path.content), IsDir(path.content)))), operands, Empty()),
-            success_postcond=reduce(lambda acc, path: And(acc, IsDir(path.content)), operands, Empty()),
+            precond=reduce(lambda acc, path: And(acc, Not(Or(IsFile(path), IsDir(path)))), operands, Empty()),
+            success_postcond=reduce(lambda acc, path: And(acc, IsDir(path)), operands, Empty()),
             failure_postcond=Empty())
     else:
         logging.warning(f"Encountered unsupported mkdir invocation: {cmd_}")
