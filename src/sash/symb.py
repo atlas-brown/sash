@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from math import inf
 from typing import Any
 from sash.specs import *
+from sash.solver import run_solver
 
 import shasta.ast_node as AST
 
@@ -912,4 +913,5 @@ def symbexec_file(input_file: str,
     nodes = parse_shell_script(input_file)
     # opt_store = parse_shebang_args(input_file)
     traces = symb_engine(nodes, config)
+    run_solver(traces, config)
     return traces

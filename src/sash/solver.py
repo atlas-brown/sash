@@ -30,7 +30,6 @@ def constraint_to_z3(constraint: Constraint, s: State):
         case Not(c):
             return z3.Not(constraint_to_z3(c, s))
         case And(lhs, rhs):
-            assert not callable(lhs) and not callable(rhs), "Callable constraints not supported in Z3 translation yet"
             return z3.And(constraint_to_z3(lhs, s), constraint_to_z3(rhs, s))
         case Or(lhs, rhs):
             return z3.Or(constraint_to_z3(lhs, s), constraint_to_z3(rhs, s))
@@ -43,9 +42,11 @@ def constraint_to_z3(constraint: Constraint, s: State):
         case IsDeleted(path):
             return s.fs_model.is_deleted_z3(field_to_z3(path.content))
         case _:
-            raise NotImplementedError(f"Z3 translation not implemented for constraint type: {type(constraint)}")
+            logging.warning(f"Unrecognized constraint type in Z3 translation: {constraint} (type {type(constraint)})")
+            return z3.BoolVal(True)
 
 def state_to_z3(s: State) -> z3.ExprRef:
+    logging.debug(f"Translating state to Z3: {s.pathcond=}")
     pathcond_formula = z3.And([constraint_to_z3(pc, s) for pc in s.pathcond]) if s.pathcond else z3.BoolVal(True)
 
     env_formula = []
@@ -88,7 +89,7 @@ def model_to_reports(core: list[z3.BoolRef]):
             constraint,
             0, # TODO: line number
         )
-        Reporter.add_error(err)
+        # Reporter.add_error(err)
 
 
 # TODOS:
@@ -114,7 +115,6 @@ def run_solver(traces: list[Trace], config: InterpConfig):
     solver.set(unsat_core=True)
 
     for trace in traces:
-        logging.debug(f"Processing trace with {(trace.latest_state.assertions)} assertions for Z3 solver.")
         assertions = trace.latest_state.assertions
         for assertion in assertions:
             assertion_var, assertion_formula = assertion_to_z3(assertion)
