@@ -883,21 +883,37 @@ def starting_state() -> State:
 def trim_string_for_logging(s: str, max_len: int = 300) -> str:
     return s if len(s) <= max_len else s[:max_len] + "..."
 
+def find_func_defs(traces: Traces, nodes: list[WrappedAst], config: InterpConfig) -> set[str]:
+    # TODO: Write unit tests for function definitions being recorded correctly (low priority)
+    known_fundefs_names: set[str] = set()
+    for node in nodes:
+        if not isinstance(node.ast_node, AST.Command):
+            continue
+
+        # The functions defined in these nodes are not available at the top level
+        # Limitation: We only track top-level-visible function definitions for now
+        skip = [
+            AST.PipeNode,
+            AST.SubshellNode,
+            AST.WhileNode
+        ]
+        for n in symb_utils.iter_ast_commands(node.ast_node, skip=skip):
+            if isinstance(n, AST.DefunNode):
+                try:
+                    _, func_name = expand_assuming_single_constant_word(traces, n.name, config)
+                    known_fundefs_names.add(func_name)
+                except AssertionError:
+                    # Only statically-known function names are recorded
+                    continue
+
+    return known_fundefs_names
+
 def symb_engine(nodes: list[WrappedAst], config: InterpConfig) -> list[Trace]:
     global context_line
     logging.debug(f"Running symb engine with {len(nodes)} raw nodes")
     traces = [Trace((starting_state(),))]
 
-    # TODO: also handle non-top-level function definitions (in practice it's rare to have these, but they are valid)
-    known_fundefs_names: set[str] = set()
-    for node in nodes:
-        if isinstance(node.ast_node, AST.DefunNode):
-            try:
-                _, func_name = expand_assuming_single_constant_word(traces, node.ast_node.name, config)
-                known_fundefs_names.add(func_name)
-            except AssertionError:
-                # If the function name is not a single constant word, we may not be able to record its line number.
-                continue
+    known_fundefs_names = find_func_defs(traces, nodes, config)
     updated_config = config.set_info(ScriptInfo(known_fundefs_names=frozenset(known_fundefs_names)))
 
     for node in nodes:
