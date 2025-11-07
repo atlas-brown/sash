@@ -351,11 +351,30 @@ def handle_exit(traces: Traces) -> Traces:
 #                  Symbolic Expander
 # ============================================================
 
+# Symbolic expander design overview:
+#
+# - `expand` is the generic interface to expansion of a single "thing", which boils down to calling `expand_simple` for each active trace
+#
+# - `expand_simple` implements expansion for a single active trace
+#
+# - `expand_args` and `expand_args_dumb` provide higher level interfaces for expanding all of the "things" in a list of arguments,
+#   + `expand_args_dumb` collapses different expansions into a single one by approximating fields
+#   + `expand_args` does not do that
+#
+# - `expand_assuming_single_constant_word` is a convenience for "thing"s that should only ever be a single constant word
+
 def expand(traces: Traces,
            stuff: list[AST.ArgChar],
            config: InterpConfig,
            prefix: dict[int, list[Field]] = {}) -> list[tuple[Trace, list[Field]]]:
-    """If supplied, `prefix` specifies a prefix to prepend to each expansion produced by each trace (mapped by its id)."""
+    """
+    Return all possible expansions of `stuff` across all `traces`, using the state information in each trace.
+    Result is a list of trace and expansion pairs.
+
+    The result traces may be extensions of those in `traces`, and may include *more* traces than were provided (with `traces`) because expansion may introduce forking of traces -- for instance, to explore taking both the default and non-default value of `${VAR:-default}`.
+
+    If supplied, `prefix` specifies a prefix to prepend to each expansion produced by each trace (mapped by its id).
+    """
     res = []
     for trace in traces:
         prefix_fields = prefix.get(id(trace), [])
@@ -368,7 +387,11 @@ def expand(traces: Traces,
 # Different fields are definitely separated; things within a field *may be separated as well!*
 def expand_simple(stuff: list[AST.ArgChar],
                   state: State,
-                  config: InterpConfig) -> list[tuple[list[Field], State]]:
+                  config: InterpConfig) -> list[tuple[list[Field], State]]: # TODO why is this order swapped wrt `expand`?
+    """
+    Return all possible expansions of `stuff` for the given `state`.
+    Result is a list of pairs of: an expansion plus a new state associated with that expansion.
+    """
     IFS = " \t\n"
 
     @dataclass
@@ -483,11 +506,10 @@ def expand_simple(stuff: list[AST.ArgChar],
                                                          state))
                 case AST.BArgChar() as b:
                     logging.info(f"expansion: treating backquote argchar {b.pretty()} as completely arbitrary field")
-                    # todo use the trace
+                    # todo use the trace: this case suggests we should really generalize the interface of `expand_simple` to be from one trace to many, instead of one state to many
                     t = guarded_interp_node([Trace((state,))], b.node, config)
                     self.add_a_field(arbitrary_field(b, ArbitraryType.APPROXIMATION, state))
                 case _:
-                    # todo: if its a command substitution, need to go interp it
                     logging.error(f"argchar: {argchar} {type(argchar)}")
                     logging.info(f"expansion: treating unhandled argchar as completely arbitrary field: {argchar.pretty()}")
                     self.add_a_field(arbitrary_field(argchar, ArbitraryType.APPROXIMATION, state))
@@ -525,6 +547,13 @@ def expand_simple(stuff: list[AST.ArgChar],
 def expand_args_dumb(traces: Traces,
                      args: list[list[AST.ArgChar]],
                      config: InterpConfig) -> tuple[Traces, list[Field]]:
+    """
+    Expand `args` into a *single* list of fields, collapsing differences in the expansion of each arg between traces by approximating that arg with `CompletelyArbitrary`.
+    Result is a pair of: a new set of traces, and the expansion of `args`.
+
+    This function is a simplified interface to `expand`, which collapses the different expansion possibilities arising from different traces.
+    The simplification comes at the cost of approximation.
+    """
     expanded_args: list[Field] = []
     res_traces = traces
     for arg in args:
@@ -553,6 +582,10 @@ def expand_args_dumb(traces: Traces,
 def expand_args(traces: Traces,
                 args: list[list[AST.ArgChar]],
                 config: InterpConfig) -> list[tuple[Trace, list[Field]]]:
+    """
+    Return all possible expansions of `args`, across all `traces`.
+    Result is a list of pairs of: a trace, and an associated expansion of `args`.
+    """
     prefixes = {id(trace): [] for trace in traces}
     res_traces = traces
     for arg in args:
@@ -566,6 +599,12 @@ def expand_args(traces: Traces,
 def expand_assuming_single_constant_word(traces: Traces,
                                          stuff: list[AST.ArgChar],
                                          config: InterpConfig) -> tuple[Traces, str]:
+    """
+    Expand `stuff` into a string, under the assumption that it expands to a single constant word across all `traces`.
+    Result is a pair of: a new set of traces, and the string.
+
+    If the assumption is violated, raises an AssertionError.
+    """
     t0, fields = expand_args_dumb(traces, [stuff], config)
     match fields:
         case [Field(SymStr((one_word,)), WordCount(1, 1))] if isinstance(one_word, str):
