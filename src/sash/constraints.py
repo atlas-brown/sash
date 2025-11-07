@@ -1,9 +1,9 @@
 from __future__ import annotations  # for postponed evaluation of annotations
-from abc import ABC
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from sash.state import *
-
+from abc import ABC
+import z3
 from dataclasses import dataclass
 
 class Constraint:
@@ -68,9 +68,18 @@ class ExpectsStdin(Constraint):
     command: Field
 
 @dataclass(frozen=True)
-class FSModel(ABC):
+class FSModel():
     def apply_postcondition(self, constraints: Constraint) -> FSModel:
         return self
 
-class DumbFsModel(FSModel):
-    pass
+    def is_file_z3(self, path_z3) -> 'z3.ExprRef':
+        return z3.BoolVal(True)
+
+    def is_dir_z3(self, path_z3) -> 'z3.ExprRef':
+        return z3.BoolVal(True)
+
+    def is_deleted_z3(self, path_z3) -> 'z3.ExprRef':
+        return z3.BoolVal(True)
+
+    def state_to_z3(self) -> 'z3.ExprRef':
+        return z3.BoolVal(True)
