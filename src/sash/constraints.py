@@ -73,13 +73,13 @@ class FSModel():
         return self
 
     def is_file_z3(self, path_z3) -> 'z3.ExprRef':
-        return z3.BoolVal(True)
+        return z3.BoolVal(False)
 
     def is_dir_z3(self, path_z3) -> 'z3.ExprRef':
-        return z3.BoolVal(True)
+        return z3.BoolVal(False)
 
     def is_deleted_z3(self, path_z3) -> 'z3.ExprRef':
-        return z3.BoolVal(True)
+        return z3.BoolVal(False)
 
     def state_to_z3(self) -> 'z3.ExprRef':
-        return z3.BoolVal(True)
+        return z3.BoolVal(False)
