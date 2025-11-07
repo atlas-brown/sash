@@ -5,6 +5,7 @@ from sash.state import *
 import z3
 
 arbitrary_to_z3_var = {}
+tracked_assertions = {}
 
 def field_to_z3(field_content: SymStr | CompletelyArbitrary) -> z3.ExprRef:
     match field_content:
@@ -70,8 +71,25 @@ def assertion_to_z3(assertion: Assertion) -> tuple[z3.BoolRef, z3.ExprRef]:
     return assertion_var, assertion_formula
 
 
-def model_to_reports(model: z3.ModelRef) -> list[Report]:
-    pass
+def model_to_reports(core: list[z3.BoolRef]):
+    """
+    Convert an unsat core to structured reporter errors.
+    """
+    for tracked in core:
+        assertion = tracked_assertions.get(tracked)
+        if not assertion:
+            logging.warning(f"Unrecognized tracked var in core: {tracked}")
+            continue
+
+        constraint = assertion.constraint
+        state = assertion.producing_state
+
+        err = UnsatisfiedPrecondition(
+            constraint,
+            0, # TODO: line number
+        )
+        Reporter.add_error(err)
+
 
 # TODOS:
 # map assertions to error messages
@@ -91,7 +109,7 @@ def model_to_reports(model: z3.ModelRef) -> list[Report]:
 # assert <assertion_constraint>
 # --> if sat, then there's a model where the assertion succeeds
 # --> if unsat, then there's no model where the assertion succeeds (ie it can only fail)
-def run_solver(traces: list[Trace], config: InterpConfig) -> list[Report]:
+def run_solver(traces: list[Trace], config: InterpConfig):
     solver = z3.Solver()
     solver.set(unsat_core=True)
 
@@ -102,9 +120,12 @@ def run_solver(traces: list[Trace], config: InterpConfig) -> list[Report]:
             assertion_var, assertion_formula = assertion_to_z3(assertion)
             solver.assert_and_track(assertion_formula, assertion_var)
 
-    result = solver.check()
-    if result == z3.unsat:
-        core = solver.unsat_core()
-        return model_to_reports(core)
-    else:
-        return []
+        logging.debug(f"Current solver state: {solver}")
+        result = solver.check()
+        if result == z3.unsat:
+            core = solver.unsat_core()
+            logging.info(f"Unsat core: {core}")
+            model_to_reports(core)
+        else:
+            model = solver.model()
+            logging.info(f"SAT model: {model}")
