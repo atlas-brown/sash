@@ -117,6 +117,11 @@ class NotACommand(Error):
     def __init__(self, name: str, line):
         super().__init__(self.CODE, f"'{name}' is invoked as a command, but it cannot be one", line)
 
+class UnsatisfiedPrecondition(Error):
+    CODE = "unsat_precond"
+    def __init__(self, constraint, line):
+        super().__init__(self.CODE, f"precondition '{constraint}' might not hold", line)
+
 class Reporter:
     _filename = ""
     _errors: set[Report] = set()
