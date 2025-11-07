@@ -48,7 +48,7 @@ def state_to_z3(s: State) -> z3.ExprRef:
     env_formula = []
     for var, val in s.env.items():
         var_z3 = z3.String(var)
-        val_z3 = field_to_z3(val.content)
+        val_z3 = field_to_z3(val.value)
         eq_formula = (var_z3 == val_z3)
         env_formula.append(eq_formula)
     env_formula = z3.And(env_formula)
