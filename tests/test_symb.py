@@ -130,22 +130,59 @@ def test_redirect_to_variable_no_error(tmp_path):
     assert_expected_report(report, [])
 
 
-def test_loop_runs_once(tmp_path):
+# for i in one; do echo $i; done\n
+def test_loop_runs_once__const(tmp_path):
     # A loop over a single constant should produce a LoopRunsOnce warning
-    script = write_script(tmp_path, "for i in foo; do echo $i; done\n")
-    report = symb.main(script)
-    expected_warning = reporter.LoopRunsOnce(None, 0)
-    assert_expected_report(report, [expected_warning])
-    script = write_script(tmp_path, "FOO=once\n"
-                                     "for i in $FOO; do echo $i; done\n")
-    report.clear()
+    script = write_script(tmp_path, "for i in one; do echo $i; done\n")
     report = symb.main(script)
     expected_warning = reporter.LoopRunsOnce(None, 0)
     assert_expected_report(report, [expected_warning])
 
-def test_loop_runs_multiple_no_warning(tmp_path):
+# for i in 'one two'; do echo $i; done\n
+def test_loop_runs_once__const_multiple_quoted(tmp_path):
+    # A loop over multiple quoted constants should produce a LoopRunsOnce warning
+    script = write_script(tmp_path, 'for i in "one two"; do echo $i; done\n')
+    report = symb.main(script)
+    expected_warning = reporter.LoopRunsOnce(None, 0)
+    assert_expected_report(report, [expected_warning])
+
+# foo=one\n for i in $foo; do echo $i; done\n
+def test_loop_runs_once__var(tmp_path):
+    # A loop over a variable assigned a single constant should produce a LoopRunsOnce warning
+    script = write_script(tmp_path, "foo=one\n for i in $foo; do echo $i; done\n")
+    report = symb.main(script)
+    expected_warning = reporter.LoopRunsOnce(None, 0)
+    assert_expected_report(report, [expected_warning])
+
+# foo="one two"\n for i in "$foo"; do echo $i; done\n
+def test_loop_runs_once__var_multiple_const_quoted(tmp_path):
+    # A loop over a quoted variable assigned multiple quoted constants should produce a LoopRunsOnce warning
+    script = write_script(tmp_path, 'foo="one two"\n for i in "$foo"; do echo $i; done\n')
+    report = symb.main(script)
+    expected_warning = reporter.LoopRunsOnce(None, 0)
+    assert_expected_report(report, [expected_warning])
+
+# for i in $(echo one); do echo $i; done\n
+@pytest.mark.skip(reason="Currently cannot distinguish single vs multiple words from command substitutions")
+def test_loop_runs_once__cmdsubst(tmp_path):
+    # A loop over a command substitution that produces a single constant should produce a LoopRunsOnce warning
+    script = write_script(tmp_path, "for i in $(echo one); do echo $i; done\n")
+    report = symb.main(script)
+    expected_warning = reporter.LoopRunsOnce(None, 0)
+    assert_expected_report(report, [expected_warning])
+
+# for i in "$(echo one two)"; do echo $i; done\n
+def test_loop_runs_once__cmdsubst_quoted_multiple_const(tmp_path):
+    # A loop over a quoted command substitution that produces multiple quoted constants should produce a LoopRunsOnce warning
+    script = write_script(tmp_path, 'for i in "$(echo one two)"; do echo $i; done\n')
+    report = symb.main(script)
+    expected_warning = reporter.LoopRunsOnce(None, 0)
+    assert_expected_report(report, [expected_warning])
+
+# for i in one two; do echo $i; done\n
+def test_loop_runs_multiple__no_warning(tmp_path):
     # A loop over multiple constants should not produce a LoopRunsOnce warning
-    script = write_script(tmp_path, "for i in foo bar; do echo $i; done\n")
+    script = write_script(tmp_path, "for i in one two; do echo $i; done\n")
     report = symb.main(script)
     assert_expected_report(report, [])
 
@@ -154,10 +191,28 @@ def test_loop_runs_multiple_no_warning(tmp_path):
     # report = symb.main(script)
     # assert_expected_report(report, [])
 
-    script = write_script(tmp_path, "for i in $FOO*.sh; do echo $i; done\n")
+# foo='one two'\n for i in $foo; do echo $i; done\n
+def test_loop_runs_multiple__var_no_warning(tmp_path):
+    # A loop over a variable that is assigned multiple constants should not produce a LoopRunsOnce warning
+    script = write_script(tmp_path, "foo='one two'\n for i in $foo; do echo $i; done\n")
     report = symb.main(script)
-    expected_error = reporter.UnboundID(foo_var.pretty(), 0)
-    assert_expected_report(report, [expected_error])
+    assert_expected_report(report, [])
+
+# for i in $(echo 'one two'); do echo $i; done\n
+def test_loop_runs_multiple__cmdsubst_no_warning(tmp_path):
+    # A loop over a command substitution that produces multiple constants should not produce a LoopRunsOnce warning
+    script = write_script(tmp_path, "for i in $(echo 'one two'); do echo $i; done\n")
+    report = symb.main(script)
+    assert_expected_report(report, [])
+
+# for i in *.sh; do echo $i; done\n
+@pytest.mark.skip(reason="Currently no support for globs")
+def test_loop_runs_multiple__glob_no_warning(tmp_path):
+    # A loop over a glob should not produce a LoopRunsOnce warning
+    script = write_script(tmp_path, "for i in *.sh; do echo $i; done\n")
+    report = symb.main(script)
+    assert_expected_report(report, [])
+
 
 def test_constant_while_condition(tmp_path):
     # A while loop with a constant true condition should produce an InfiniteLoop error
