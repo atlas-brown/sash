@@ -5,6 +5,7 @@ from enum import Enum
 from sash.frozen import FrozenAst, FrozenDict
 
 
+
 @dataclass(frozen=True)
 class SymVar:
     name: str
@@ -107,6 +108,7 @@ class SetOptions:
         return option.strip("-") not in {"x"}
 
 # <assertion_constraint>: if true, then things are OK, if false then there's a bug
+@dataclass(frozen=True)
 class Assertion:
     producing_state: "State"
     constraint: Constraint
@@ -149,7 +151,7 @@ class State:
         return replace(self, pathcond=new_pathcond)
 
     def add_assertion(self, assertion: Constraint) -> 'State':
-        new_assertions = self.assertions + (assertion,)
+        new_assertions = self.assertions + (Assertion(producing_state=self, constraint=assertion),)
         return replace(self, assertions=new_assertions)
 
     def lookup(self, var: str) -> Optional[ShellVar]:
