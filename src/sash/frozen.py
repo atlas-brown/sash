@@ -63,10 +63,10 @@ class FrozenDict(Generic[K, V]):
         if self._hash is None:
             self._hash = hash(tuple((k, freeze_thing(self._d[k])) for k in sorted(self._d.keys())))
         return self._hash
-    
+
     def __eq__(self, other):
         return isinstance(other, FrozenDict) and self._d == other._d
-    
+
     def __repr__(self):
         return f"FrozenDict({self._d})"
 
@@ -88,3 +88,6 @@ class FrozenDict(Generic[K, V]):
 
     def __bool__(self):
         return bool(self._d)
+
+    def items(self):
+        return self._d.items()
