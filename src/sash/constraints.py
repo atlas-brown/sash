@@ -68,6 +68,10 @@ class ExpectsStdin(Constraint):
     command: Field
 
 @dataclass(frozen=True)
+class Description(Constraint):
+    text: str
+
+@dataclass(frozen=True)
 class FSModel():
     def apply_postcondition(self, constraints: Constraint) -> FSModel:
         return self

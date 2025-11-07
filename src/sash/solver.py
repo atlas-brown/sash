@@ -25,7 +25,7 @@ def field_to_z3(field_content: SymStr | CompletelyArbitrary) -> z3.ExprRef:
 
 def constraint_to_z3(constraint: Constraint, s: State):
     match constraint:
-        case Empty() | HasStdout() | ExpectsStdin() | Reads() | Writes():
+        case Empty() | HasStdout() | ExpectsStdin() | Reads() | Writes() | Description():
             return z3.BoolVal(True)
         case Not(c):
             return z3.Not(constraint_to_z3(c, s))
@@ -41,6 +41,9 @@ def constraint_to_z3(constraint: Constraint, s: State):
             return s.fs_model.is_dir_z3(field_to_z3(path.content))
         case IsDeleted(path):
             return s.fs_model.is_deleted_z3(field_to_z3(path.content))
+        case Description(text):
+            # Create a no-op constraint with a message attached to it
+            return z3.FreshBool(f"description: {text}")
         case _:
             logging.warning(f"Unrecognized constraint type in Z3 translation: {constraint} (type {type(constraint)})")
             return z3.BoolVal(True)

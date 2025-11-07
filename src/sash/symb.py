@@ -492,7 +492,7 @@ def expand_simple(stuff: list[AST.ArgChar],
                             self.add_a_field(arbitrary_field(var, ArbitraryType.APPROXIMATION, state))
                     elif var.fmt == "Minus":
                         # This is the case that $VAR is unset: take the default
-                        non_default, default = self.fork(f"{var.pretty()} takes the default value")
+                        non_default, default = self.fork(Description(f"{var.var} takes the default value {constant_field(shasta_pretty(var.arg))}"))
                         Partial.add_the_default(default, var)
                         non_default.add_a_field(arbitrary_field(var, ArbitraryType.ENVIRONMENT, state))
                         return [non_default, default]
@@ -523,9 +523,9 @@ def expand_simple(stuff: list[AST.ArgChar],
             split = split_at(self.combined_fields_so_far, None)
             return ([merge_partial_fields(part, None, self.state) for part in split if part != []], self.state)
 
-        def fork(self, pathcond: Any) -> tuple['Partial', 'Partial']:
+        def fork(self, pathcond: Constraint) -> tuple['Partial', 'Partial']:
             lhs = self.fork_state(self.state.add_pathcond(pathcond))
-            rhs = self.fork_state(self.state.add_pathcond("not " + pathcond))
+            rhs = self.fork_state(self.state.add_pathcond(Not(pathcond)))
             return (lhs, rhs)
 
         def fork_state(self, new_state: State) -> 'Partial':
@@ -812,7 +812,7 @@ def interp_node(traces: Traces,
             res = []
             for case in node.cases:
                 # todo handle patterns; this is like a conditional, we could learn something about pathcond here
-                res.extend(guarded_interp_node(trace_map(t1, lambda s: s.add_pathcond(f"case_L{context_line}_pattern_{case['cpattern']}:matched")),
+                res.extend(guarded_interp_node(trace_map(t1, lambda s: s.add_pathcond(Description(f"case_L{context_line}_pattern_{case['cpattern']}:matched"))),
                                                case["cbody"],
                                                config))
             return res
@@ -892,10 +892,10 @@ def interp_node(traces: Traces,
 
         case AST.AndNode() | AST.OrNode():
             t1 = guarded_interp_node(traces, node.left_operand, config)
-            t2 = guarded_interp_node(trace_map(t1, lambda s: s.add_pathcond(f"{node.NodeName}_L{context_line}:{'true' if isinstance(node, AST.AndNode) else 'false'}")),
+            t2 = guarded_interp_node(trace_map(t1, lambda s: s.add_pathcond(Description(f"{node.NodeName}_L{context_line}:{'true' if isinstance(node, AST.AndNode) else 'false'}"))),
                                                node.right_operand,
                                                config)
-            t3 = trace_map(t1, lambda s: s.add_pathcond(f"{node.NodeName}_L{context_line}:{'false' if isinstance(node, AST.AndNode) else 'true'}"))
+            t3 = trace_map(t1, lambda s: s.add_pathcond(Description(f"{node.NodeName}_L{context_line}:{'false' if isinstance(node, AST.AndNode) else 'true'}")))
             return t2 + t3
 
         # todo bring other cases as needed
