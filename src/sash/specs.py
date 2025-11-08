@@ -274,6 +274,18 @@ def echo_spec(cmd_: tuple[Field]) -> CmdSpec:
 
     raise NotImplementedError("echo spec not implemented yet")
 
+def sudo_spec(cmd_: tuple[Field]) -> CmdSpec | None:
+
+    cmd = parse_command(cmd_)
+    operands = cmd.operands
+
+    # Return the spec of the underlying command
+    # TODO: A lot of interesting things can be modeled about sudo itself (e.g., permission denied, env vars, etc.)
+    assert len(operands) >= 1, f"Expected at least one operand for sudo, got: {operands} for command {cmd_}"
+    assert isinstance(operands[0].content, SymStr), f"Expected first operand of sudo to be a command string, got: {operands[0].content}"
+    return get_spec(operands[0].content.parts[0], tuple(operands[1:]))
+
+
 def command_spec(cmd_: tuple[Field]) -> CmdSpec:
     # https://pubs.opengroup.org/onlinepubs/9799919799/utilities/command.html
 
