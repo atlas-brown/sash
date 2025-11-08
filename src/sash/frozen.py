@@ -71,7 +71,7 @@ class FrozenDict(Generic[K, V]):
         return f"FrozenDict({self._d})"
 
     def set(self, k, v):
-        return FrozenDict(**(self._d | {k: v}))
+        return FrozenDict(self._d | {k: v})
 
     def get(self, k, default=None):
         return self._d.get(k, default)
