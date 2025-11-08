@@ -911,11 +911,12 @@ def starting_state() -> State:
     # for defaultvar in ["HOME", "PWD", "OLDPWD", "PATH"]:
     #     env[defaultvar] = ShellVar(symb_utils.create_fresh_var(f"default_{defaultvar}"))
     root = State((), FrozenDict(), FrozenDict(), FrozenDict(), SymStr(("0",)), None, SetOptions())
+    make_ast = lambda var: AST.VArgChar("Normal", False, var, [])
     starter_env = {
-        "HOME": ShellVar(arbitrary_field(None, ArbitraryType.ENVIRONMENT, root)),
-        "PWD": ShellVar(arbitrary_field(None, ArbitraryType.ENVIRONMENT, root)),
-        "OLDPWD": ShellVar(arbitrary_field(None, ArbitraryType.ENVIRONMENT, root)),
-        "PATH": ShellVar(arbitrary_field(None, ArbitraryType.ENVIRONMENT, root))
+        "HOME": ShellVar(arbitrary_field(make_ast("HOME"), ArbitraryType.ENVIRONMENT, root)),
+        "PWD": ShellVar(arbitrary_field(make_ast("PWD"), ArbitraryType.ENVIRONMENT, root)),
+        "OLDPWD": ShellVar(arbitrary_field(make_ast("OLDPWD"), ArbitraryType.ENVIRONMENT, root)),
+        "PATH": ShellVar(arbitrary_field(make_ast("PATH"), ArbitraryType.ENVIRONMENT, root))
     }
     return root.extend_env(starter_env)
 

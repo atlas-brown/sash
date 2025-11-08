@@ -15,11 +15,12 @@ def field_to_z3(field_content: SymStr | CompletelyArbitrary) -> z3.ExprRef:
         case CompletelyArbitrary() as arbitrary:
             arbitrary_no_pfx_sfx = replace(arbitrary, prefix=None, suffix=None)
             if arbitrary_no_pfx_sfx not in arbitrary_to_z3_var:
-                arbitrary_to_z3_var[arbitrary_no_pfx_sfx] = z3.FreshConst(z3.StringSort(), "arbitrary")
+                arbitrary_to_z3_var[arbitrary_no_pfx_sfx] = z3.FreshConst(z3.StringSort(), arbitrary.source.pretty())
             z3_var = arbitrary_to_z3_var[arbitrary_no_pfx_sfx]
-            z3_var = z3.Concat(field_to_z3(arbitrary.prefix) if arbitrary.prefix else z3.StringVal(""),
-                               z3_var,
-                               field_to_z3(arbitrary.suffix) if arbitrary.suffix else z3.StringVal(""))
+            if arbitrary.prefix:
+                z3_var = z3.Concat(field_to_z3(arbitrary.prefix), z3_var)
+            if arbitrary.suffix:
+                z3_var = z3.Concat(z3_var, field_to_z3(arbitrary.suffix))
             return z3_var
     assert False, f"Expected field content, got {field_content}"
 
