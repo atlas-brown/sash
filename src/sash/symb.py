@@ -964,9 +964,8 @@ def symb_engine(nodes: list[WrappedAst], config: InterpConfig) -> list[Trace]:
 
 
 def symbexec_file(input_file: str,
-                  config: InterpConfig = InterpConfig(trace_collapser = collapse_traces_if_too_many)) -> Traces:
+                  config: InterpConfig) -> Traces:
     nodes = parse_shell_script(input_file)
     # opt_store = parse_shebang_args(input_file)
     traces = symb_engine(nodes, config)
-    run_solver(traces, config)
     return traces

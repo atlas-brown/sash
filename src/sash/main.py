@@ -7,9 +7,11 @@ import traceback
 import sash.symb
 from sash.config import Config
 from sash.reporter import Reporter
+from sash.solver import run_solver
+from sash.interpreter_config import InterpConfig
 
 
-def main(file: str, debug=False) -> dict:
+def main(file: str, debug=False, solver=False) -> dict:
     if debug:
         logging.basicConfig(
             format="[%(filename)s:%(lineno)d] %(message)s", level=logging.DEBUG
@@ -20,9 +22,12 @@ def main(file: str, debug=False) -> dict:
 
     logging.info(f"Processing file {file}")
     Reporter.initialize(file)
+    config = InterpConfig(trace_collapser = sash.symb.collapse_traces_if_too_many)
 
     try:
-        sash.symb.symbexec_file(file)
+        traces = sash.symb.symbexec_file(file, config)
+        if solver:
+            run_solver(traces, config)
         report_dict = Reporter.get_report()
         logging.info("Symbolic execution completed successfully")
         logging.info(f"Time taken: {str(report_dict['time'])}")
@@ -35,7 +40,7 @@ def main(file: str, debug=False) -> dict:
 
 def cli_main():
     args = parse_cli()
-    report = main(args.filename.resolve(strict=True).as_posix(), debug=args.debug)
+    report = main(args.filename.resolve(strict=True).as_posix(), debug=args.debug, solver=args.solver)
     print(json.dumps(report, indent=2))
 
 
@@ -56,6 +61,13 @@ def parse_cli():
         action="store_true",
         help="Enable debug logging",
     )
+
+    parser.add_argument(
+        "--solver",
+        action="store_true",
+        help="Enable the solver and get additional reports",
+    )
+
 
     return parser.parse_args()
 
