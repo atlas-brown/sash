@@ -235,18 +235,47 @@ def cd_spec(cmd_: tuple[Field]) -> CmdSpec:
         raise NotImplementedError(f"Unhandled cd invocation:\n{cmd_}\n{cmd}")
 
 
-def cp_spec(cmd_: list[Field]) -> CmdSpec:
+def cp_spec(cmd_: tuple[Field]) -> CmdSpec:
+    # https://pubs.opengroup.org/onlinepubs/9799919799/utilities/cp.html
+
+    cmd = parse_command(cmd_)
+    (name, flags, _, operands) = (cmd.cmd_name, cmd.flags, cmd.options, cmd.operands)
 
     raise NotImplementedError("cp spec not implemented yet")
 
-def mv_spec(cmd_: list[Field]) -> CmdSpec:
+
+def mv_spec(cmd_: tuple[Field]) -> CmdSpec:
+    # https://pubs.opengroup.org/onlinepubs/9799919799/utilities/mv.html
+
+    cmd = parse_command(cmd_)
+    (name, flags, _, operands) = (cmd.cmd_name, cmd.flags, cmd.options, cmd.operands)
+
     raise NotImplementedError("mv spec not implemented yet")
 
-def grep_spec(cmd_: list[Field]) -> CmdSpec:
+def grep_spec(cmd_: tuple[Field]) -> CmdSpec:
+    # https://pubs.opengroup.org/onlinepubs/9799919799/utilities/grep.html
+
+    cmd = parse_command(cmd_)
+    (name, flags, _, operands) = (cmd.cmd_name, cmd.flags, cmd.operands, cmd.options)
+
     raise NotImplementedError("grep spec not implemented yet")
 
-def echo_spec(cmd_: list[Field]) -> CmdSpec:
+def echo_spec(cmd_: tuple[Field]) -> CmdSpec:
+    # https://pubs.opengroup.org/onlinepubs/9799919799/utilities/echo.html
+
+    cmd = parse_command(cmd_)
+    (name, flags, _, operands) = (cmd.cmd_name, cmd.flags, cmd.operands, cmd.options)
+
     raise NotImplementedError("echo spec not implemented yet")
 
-def command_spec(cmd_: list[Field]) -> CmdSpec:
+def command_spec(cmd_: tuple[Field]) -> CmdSpec:
+    # https://pubs.opengroup.org/onlinepubs/9799919799/utilities/command.html
+
+    cmd = parse_command(cmd_)
+    (name, flags, _, operands) = (cmd.cmd_name, cmd.flags, cmd.operands, cmd.options)
+
     raise NotImplementedError("command spec not implemented yet (the builtin)")
+
+# NOTE: in the postconds add env vars that change (e.g. PWD, OLDPWD, etc.)
+# generally any information that can be conveyed through the constraints should be added here
+# TODO: comments with explanations for the default cases (why are they needed, what can go wrong otherwise?)
