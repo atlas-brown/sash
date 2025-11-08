@@ -49,6 +49,7 @@ def constraint_to_z3(constraint: Constraint, s: State):
             logging.error(f"Unrecognized constraint type in Z3 translation: {constraint} (type {type(constraint)})")
             return z3.BoolVal(True)
 
+
 def state_to_z3(s: State) -> z3.ExprRef:
     logging.debug(f"Translating state to Z3: {s.pathcond=}")
     pathcond_formula = z3.And([constraint_to_z3(pc, s) for pc in s.pathcond]) if s.pathcond else z3.BoolVal(True)
@@ -61,7 +62,8 @@ def state_to_z3(s: State) -> z3.ExprRef:
         env_formula.append(eq_formula)
     env_formula = z3.And(env_formula)
 
-    fs_state_formula = s.fs_model.state_to_z3()
+    fs_state_formula = s.fs_model.state_to_z3(field_to_z3)
+    logging.debug(f"FS state: {s.fs_model.state}")
 
     return z3.And(fs_state_formula, pathcond_formula, env_formula)
 
@@ -71,7 +73,7 @@ def assertion_to_z3(assertion: Assertion) -> tuple[z3.BoolRef, z3.ExprRef]:
     constraint_formula = constraint_to_z3(assertion.constraint, assertion.producing_state)
     state_formula = state_to_z3(assertion.producing_state)
 
-    assertion_formula = z3.Implies(state_formula, constraint_formula)
+    assertion_formula = z3.And(state_formula, constraint_formula)
 
     return assertion_var, assertion_formula
 

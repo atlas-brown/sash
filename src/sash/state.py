@@ -1,10 +1,8 @@
 from dataclasses import dataclass, field, replace, fields
-from sash.constraints import Constraint, FSModel
+from sash.constraints import Constraint, FSModelSimple
 from typing import Callable, Optional, Any
 from enum import Enum
 from sash.frozen import FrozenAst, FrozenDict
-
-
 
 @dataclass(frozen=True)
 class SymVar:
@@ -125,7 +123,7 @@ class State:
     known_nonexistant_commands:  frozenset[str]              = field(default_factory=frozenset)
     terminated:                  bool                        = False # by `exit` or similar
     assertions:                  tuple[Assertion]            = field(default_factory=tuple)
-    fs_model:                    FSModel                     = field(default_factory=FSModel)
+    fs_model:                    FSModelSimple               = field(default_factory=FSModelSimple)
 
     external_data: Any = None # ASSUMPTION: must be hashable
 
