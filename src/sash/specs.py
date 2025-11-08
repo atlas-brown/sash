@@ -23,7 +23,6 @@ class CmdSpec:
     success_postcond: Constraint # post-condition if exit code is 0
     failure_postcond: Constraint # post-condition if exit code is non-0
 
-# TODO: plug in annotations parsing code
 def parse_command(cmd_inv: tuple[Field]) -> CmdInvocation:
     """
     Parses a command invocation from a list of Fields into a CmdInvocation object.
