@@ -135,6 +135,19 @@ def rm_spec(cmd_: tuple[Field]) -> CmdSpec:
         # TODO: implement a default case (need to look at every rm flag and derive the most detailed but correct spec)
         raise NotImplementedError(f"Unhandled rm invocation:\n{cmd_}\n{cmd}")
 
+def touch_spec(cmd_: tuple[Field]) -> CmdSpec:
+
+    cmd = parse_command(cmd_)
+    (name, flags, _, operands) = (cmd.cmd_name, cmd.flags, cmd.options, cmd.operands)
+    logging.debug(f"Ignored irrelevant flags for touch: {cmd.flags}")
+
+    if flags == set(): # touch file...
+        return CmdSpec(
+            precond=Empty(),
+            success_postcond=reduce(lambda acc, path: And(acc, IsFile(path)), operands, Empty()),
+            failure_postcond=Empty())
+    else:
+        assert False, f"Unhandled touch invocation:\n{cmd_}\n{cmd}"
 
 def mkdir_spec(cmd_: tuple[Field]) -> CmdSpec:
     # https://pubs.opengroup.org/onlinepubs/9799919799/utilities/mkdir.html
