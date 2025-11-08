@@ -61,7 +61,10 @@ class FrozenDict(Generic[K, V]):
 
     def __hash__(self):
         if self._hash is None:
-            self._hash = hash(tuple((k, freeze_thing(self._d[k])) for k in sorted(self._d.keys())))
+            # Hash each key-value pair after converting the value to an immutable structure,
+            # then sort the per-item hashes to make the result deterministic regardless of insertion order.
+            item_hashes = tuple(sorted((hash((k, freeze_thing(v))) for k, v in self._d.items())))
+            self._hash = hash(item_hashes)
         return self._hash
 
     def __eq__(self, other):
