@@ -325,6 +325,7 @@ def handle_if(traces: Traces, node: AST.IfNode, config: InterpConfig) -> Traces:
     # 2. Constant test false with no else -- just return t1
     # 3. Constant test false with else -- interpret else_b and return that
     # 4. Non-constant test -- interpret both branches and combine results
+    # TODO: Do the same for AND and OR
     t_success = [t for t in t1 if t.latest_state.last_exit_code == SymStr(("0",))]
     t_failure = [t for t in t1 if t.latest_state.last_exit_code == SymStr(("1",))]
     t_other   = [t for t in t1 if t.latest_state.last_exit_code not in {SymStr(("0",)), SymStr(("1",))}]
@@ -483,7 +484,7 @@ def expand_simple(stuff: list[AST.ArgChar],
                                     # We know $VAR is NOT empty
                                     self.add_a_field(v.value)
                                 case something_not_constant: # either a symbolic str or arbitrary
-                                    non_default, default = self.fork(f"{var.pretty()} takes the default value")
+                                    non_default, default = self.fork(Description(f"{var.pretty()} takes the default value"))
                                     Partial.add_the_default(default, var)
                                     non_default.add_a_field(arbitrary_field(var, ArbitraryType.APPROXIMATION, state))
                                     return [non_default, default]

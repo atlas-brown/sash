@@ -43,10 +43,10 @@ def constraint_to_z3(constraint: Constraint, s: State):
         case IsDeleted(path):
             return s.fs_model.is_deleted_z3(field_to_z3(path.content))
         case Description(text):
-            # Create a no-op constraint with a message attached to it
+            # A no-op constraint with a message attached to it
             return z3.FreshBool(f"description: {text}")
         case _:
-            logging.warning(f"Unrecognized constraint type in Z3 translation: {constraint} (type {type(constraint)})")
+            logging.error(f"Unrecognized constraint type in Z3 translation: {constraint} (type {type(constraint)})")
             return z3.BoolVal(True)
 
 def state_to_z3(s: State) -> z3.ExprRef:
@@ -97,9 +97,6 @@ def model_to_reports(core: list[z3.BoolRef]):
 
 
 # TODOS:
-# map assertions to error messages
-# turn model into reports
-# first create an always true fs model
 # write unit tests
 # update michael's interface
 # plug in michael's fs model
