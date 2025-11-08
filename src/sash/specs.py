@@ -262,7 +262,7 @@ def grep_spec(cmd_: tuple[Field]) -> CmdSpec:
     # https://pubs.opengroup.org/onlinepubs/9799919799/utilities/grep.html
 
     cmd = parse_command(cmd_)
-    (name, flags, _, operands) = (cmd.cmd_name, cmd.flags, cmd.operands, cmd.options)
+    (name, flags, _, operands) = (cmd.cmd_name, cmd.flags, cmd.options, cmd.operands)
 
     raise NotImplementedError("grep spec not implemented yet")
 
