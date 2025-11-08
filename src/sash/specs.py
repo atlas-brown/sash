@@ -185,27 +185,54 @@ def cd_spec(cmd_: tuple[Field]) -> CmdSpec:
     cmd = parse_command(cmd_)
     (name, flags, _, operands) = (cmd.cmd_name, cmd.flags, cmd.options, cmd.operands)
 
-    assert name == SymStr(("cd",)), "Expected cd command, got: {name}"
+    assert name == SymStr(("cd",)), f"Expected cd command, got: {name}"
 
-    # TODO?: handle case of zero operands (cd to home directory)
-    # ? cd also has many interactions with environment variables (PWD, HOME, OLDPWD, CDPATH)
+    # NOTE: we might want to ignore the postconditions, i suspect they might overcomplicate things
+    # NOTE: cd also interacts with CDPATH sometimes, do we care?
 
-    if flags == set() and len(operands) == 1:
-        # TODO?: handle case of '-' operand (cd to previous directory)
-        # precond: operand is a directory
-        # z-postcond: operand is a directory
-        # nz-postcond: none (maybe operand not a directory, maybe permission issue, etc.)
+    if flags == set() and len(operands) == 0: # cd
+        # precond:      $HOME is a directory
+        # z-postcond:   $HOME is a directory, $PWD is $HOME, $OLDPWD is previous $PWD
+        # nz-postcond:  none (maybe $HOME not set, maybe $HOME not a directory, maybe permission issue, etc.)
+        return CmdSpec( # ? is this correct?
+            precond=IsDir(Field(SymStr(("HOME",)), WordCount(1,1))),
+            success_postcond=And(
+                IsDir(Field(SymStr(("HOME",)), WordCount(1,1))),
+                And(
+                    StringEq(
+                        Field(SymStr(("OLDPWD",)), WordCount(1,1)), Field(SymStr(("PWD",)), WordCount(1,1))),
+                    StringEq(
+                        Field(SymStr(("PWD",)), WordCount(1,1)), Field(SymStr(("HOME",)), WordCount(1,1)))
+                )
+            ),
+            failure_postcond=Empty())
+    elif flags == set() and len(operands) == 1 and operands[0] == Field(SymStr(("-",)), WordCount(1,1)): # cd -
+        # precond:      $OLDPWD is a directory
+        # z-postcond:   $OLDPWD is a directory, $PWD is $OLDPWD, $OLDPWD is previous $PWD
+        # nz-postcond:  none (maybe $OLDPWD not set, maybe $OLDPWD not a directory, maybe permission issue, etc.)
+        return CmdSpec( # ? is this correct?
+            precond=IsDir(Field(SymStr(("OLDPWD",)), WordCount(1,1))),
+            success_postcond=And(
+                IsDir(Field(SymStr(("OLDPWD",)), WordCount(1,1))),
+                And(
+                    StringEq(
+                        Field(SymStr(("OLDPWD",)), WordCount(1,1)), Field(SymStr(("PWD",)), WordCount(1,1))),
+                    StringEq(
+                        Field(SymStr(("PWD",)), WordCount(1,1)), Field(SymStr(("OLDPWD",)), WordCount(1,1)))
+                )
+            ),
+            failure_postcond=Empty())
+    elif flags == set() and len(operands) == 1: # cd dir
+        # precond:      operand is a directory
+        # z-postcond:   operand is a directory
+        # nz-postcond:  none (maybe operand not a directory, maybe permission issue, etc.)
         return CmdSpec(
-            precond=IsDir(operands[0].content),
-            success_postcond=IsDir(operands[0].content),
+            precond=IsDir(operands[0]),
+            success_postcond=IsDir(operands[0]),
             failure_postcond=Empty())
     else:
-        logging.warning(f"Encountered unsupported cd invocation: {cmd_}")
-        # treat all other invocations as no-ops
-        return CmdSpec(
-            precond=Empty(),
-            success_postcond=Empty(),
-            failure_postcond=Empty())
+        # TODO: implement a default case (need to look at every cd flag and derive the most detailed but correct spec)
+        raise NotImplementedError(f"Unhandled cd invocation:\n{cmd_}\n{cmd}")
 
 
 def cp_spec(cmd_: list[Field]) -> CmdSpec:
