@@ -52,7 +52,10 @@ def constraint_to_z3(constraint: Constraint, s: State):
 
 def state_to_z3(s: State) -> z3.ExprRef:
     logging.debug(f"Translating state to Z3: {s.pathcond=}")
-    pathcond_formula = z3.And([constraint_to_z3(pc, s) for pc in s.pathcond]) if s.pathcond else z3.BoolVal(True)
+    # TODO: The pathcondition formula is not properly converted to constraints updates to the fs should be modeled as z3.Store operations, probably
+    # pathcond_formula = z3.And([constraint_to_z3(pc, s) for pc in s.pathcond]) if s.pathcond else z3.BoolVal(True)
+    # logging.debug(f"Path condition formula: {pathcond_formula}")
+    pathcond_formula = z3.BoolVal(True)
 
     env_formula = []
     for var, val in s.env.items():
@@ -114,21 +117,21 @@ def model_to_reports(core: list[z3.BoolRef]):
 # --> if sat, then there's a model where the assertion succeeds
 # --> if unsat, then there's no model where the assertion succeeds (ie it can only fail)
 def run_solver(traces: list[Trace], config: InterpConfig):
-    solver = z3.Solver()
-    solver.set(unsat_core=True)
 
     for trace in traces:
         assertions = trace.latest_state.assertions
         for assertion in assertions:
+            solver = z3.Solver()
+            solver.set(unsat_core=True)
             assertion_var, assertion_formula = assertion_to_z3(assertion)
             solver.assert_and_track(assertion_formula, assertion_var)
 
-        logging.debug(f"Current solver state: {solver}")
-        result = solver.check()
-        if result == z3.unsat:
-            core = solver.unsat_core()
-            logging.info(f"Unsat core: {core}")
-            model_to_reports(core)
-        else:
-            model = solver.model()
-            logging.info(f"SAT model: {model}")
+            logging.debug(f"Current solver state: {solver}")
+            result = solver.check()
+            if result == z3.unsat:
+                core = solver.unsat_core()
+                logging.info(f"Unsat core: {core}")
+                model_to_reports(core)
+            else:
+                model = solver.model()
+                logging.info(f"SAT model: {model}")
