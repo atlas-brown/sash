@@ -137,73 +137,48 @@ def rm_spec(cmd_: tuple[Field]) -> CmdSpec:
         raise NotImplementedError(f"Unhandled rm invocation:\n{cmd_}\n{cmd}")
 
 
-def mkdir_spec(cmd_: list[Field]) -> CmdSpec:
-    # https://pubs.opengroup.org/onlinepubs/9799919799/
-    # mkdir [-p] [-m mode] dir...
-    #
-    # The mkdir utility shall create the directories specified by the operands, in the order specified.
-    #
-    # -m mode
-    #     Set the file mode (permissions) of the new directories to mode.
-    # -p
-    #     Create any missing intermediate pathname components.
-    #     Each dir operand that names an existing directory shall be ignored without error.
+def mkdir_spec(cmd_: tuple[Field]) -> CmdSpec:
+    # https://pubs.opengroup.org/onlinepubs/9799919799/utilities/mkdir.html
 
-    # Keep in mind:
+    # Note:
     #     The file system model is a flat map, there is no hierarchy of directories.
     #     So `mkdir -p a/b` will not be assumed to fail if `a` is a file, even though in reality it would.
 
     cmd = parse_command(cmd_)
     (name, flags, _, operands) = (cmd.cmd_name, cmd.flags, cmd.options, cmd.operands)
     logging.debug(f"Ignored irrelevant flags for rm: {cmd.flags - {'-p'}}")
-    flags.discard("-m")  # ignore -m flag
+    flags.discard("-m") # ignore -m flag
 
-    assert name == SymStr(("mkdir",)), "Expected mkdir command, got: {name}"
+    assert name == SymStr(("mkdir",)), f"Expected mkdir command, got: {name}"
 
-    if flags == set(["-p"]):
-        # precond: all operands are not files (mkdir -p doesn't error if directories exists)
-        # z-postcond: all operands are directories
-        # nz-postcond: none (maybe permission issue, etc.)
+    if flags == set(["-p"]): # mkdir -p dir...
+        # precond:      all operands are not files (mkdir -p doesn't error if directories exists)
+        # z-postcond:   all operands are directories
+        # nz-postcond:  none (maybe permission issue, etc.)
         return CmdSpec(
             precond=reduce(lambda acc, path: And(acc, Not(IsFile(path))), operands, Empty()),
             success_postcond=reduce(lambda acc, path: And(acc, IsDir(path)), operands, Empty()),
             failure_postcond=Empty())
-    elif flags == set():
-        # precond: all operands do not exist
-        # z-postcond: all operands are directories
-        # nz-postcond: none (maybe permission issue, etc.)
+    elif flags == set(): # mkdir dir...
+        # precond:      all operands do not exist
+        # z-postcond:   all operands are directories
+        # nz-postcond:  none (maybe permission issue, etc.)
         return CmdSpec(
             precond=reduce(lambda acc, path: And(acc, Not(Or(IsFile(path), IsDir(path)))), operands, Empty()),
             success_postcond=reduce(lambda acc, path: And(acc, IsDir(path)), operands, Empty()),
             failure_postcond=Empty())
     else:
-        logging.warning(f"Encountered unsupported mkdir invocation: {cmd_}")
-        # treat all other invocations as no-ops
-        return CmdSpec(
-            precond=Empty(),
-            success_postcond=Empty(),
-            failure_postcond=Empty())
+        # TODO: implement a default case (need to look at every mkdir flag and derive the most detailed but correct spec)
+        assert False, f"Unhandled mkdir invocation:\n{cmd_}\n{cmd}"
 
 
-def cd_spec(cmd_: list[Field]) -> CmdSpec:
-    # https://pubs.opengroup.org/onlinepubs/9799919799/
-    # cd [-L] [directory]
-    # cd -P [-e] [directory]
-    #
-    # The cd utility shall change the working directory of the current shell execution environment
-    #
-    # -e
-    #     If the -P option is in effect, the current working directory is successfully changed, and the correct value of the PWD environment variable cannot be determined, exit with exit status 1.
-    # -L
-    #     Handle the operand dot-dot logically; symbolic link components shall not be resolved before dot-dot components are processed (see steps 8. and 9. in the DESCRIPTION).
-    # -P
-    #     Handle the operand dot-dot physically; symbolic link components shall be resolved before dot-dot components are processed (see step 7. in the DESCRIPTION).
-    #
-    # If both -L and -P options are specified, the last of these options shall be used and all others ignored. If neither -L nor -P is specified, the operand shall be handled dot-dot logically; see the DESCRIPTION.
+def cd_spec(cmd_: tuple[Field]) -> CmdSpec:
+    # https://pubs.opengroup.org/onlinepubs/9799919799/utilities/cd.html
 
     # Note:
     #     All flags determine how `..` is handled with respect to symlinks.
     #     Since we do not model symlinks, we do not handle these flags either.
+
     # Note:
     #     Invocations with multiple operands should fail, but we treat them as no-ops here.
 
