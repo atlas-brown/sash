@@ -4,6 +4,8 @@ from dataclasses import dataclass, replace
 import logging
 from pash_annotations.parser import parser as pash_annot_parser
 from functools import reduce
+import sys
+import inspect
 
 @dataclass(frozen=True)
 class CmdInvocation:
@@ -78,14 +80,6 @@ def parse_command(cmd_inv: tuple[Field]) -> CmdInvocation:
         operands=cmd_operands
     )
 
-
-def get_spec(cmd_name: str | None, cmd_: tuple[Field]) -> CmdSpec | None:
-    match cmd_name:
-        case "rm":
-            return rm_spec(cmd_)
-        case _:
-            logging.warning(f"No spec found for command '{cmd_name}', treating as no-op.")
-            return None
 
 
 def rm_spec(cmd_: tuple[Field]) -> CmdSpec:
@@ -287,6 +281,26 @@ def command_spec(cmd_: tuple[Field]) -> CmdSpec:
     (name, flags, _, operands) = (cmd.cmd_name, cmd.flags, cmd.operands, cmd.options)
 
     raise NotImplementedError("command spec not implemented yet (the builtin)")
+
+# Note: Do not define specs below this line, they will not be registered.
+current_module = sys.modules[__name__]
+CMD_SPECS: dict[str, Callable] = {}
+
+for name, func in inspect.getmembers(current_module, inspect.isfunction):
+    if name.endswith("_spec") and not name.startswith("get_"):
+        # derive command name by removing the "_spec" suffix
+        cmd_name = name.removesuffix("_spec")
+        CMD_SPECS[cmd_name] = func
+
+def get_spec(cmd_name: str | None, cmd_: tuple[Field]) -> CmdSpec | None:
+    if cmd_name in CMD_SPECS:
+        return CMD_SPECS[cmd_name](cmd_)
+    logging.info(f"Specs are {CMD_SPECS}")
+    logging.warning(f"No spec found for command '{cmd_name}', treating as no-op.")
+    assert False, f"No spec found for command '{cmd_name}'"
+    return None
+
+
 
 # NOTE: in the postconds add env vars that change (e.g. PWD, OLDPWD, etc.)
 # generally any information that can be conveyed through the constraints should be added here
