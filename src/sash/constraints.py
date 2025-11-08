@@ -9,9 +9,11 @@ from enum import Enum
 from sash.frozen import FrozenDict
 import logging
 
+@dataclass(frozen=True)
 class Constraint:
     pass
 
+@dataclass(frozen=True)
 class Empty(Constraint):
     pass
 
