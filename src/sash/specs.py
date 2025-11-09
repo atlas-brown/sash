@@ -263,7 +263,28 @@ def grep_spec(cmd_: tuple[Field]) -> CmdSpec:
     cmd = parse_command(cmd_)
     (name, flags, _, operands) = (cmd.cmd_name, cmd.flags, cmd.options, cmd.operands)
 
-    raise NotImplementedError("grep spec not implemented yet")
+    assert name == SymStr(("grep",)), f"Expected grep command, got: {name}"
+
+    if flags == set() and len(operands) == 0:
+        # TODO: how to encode that this case reads from stdin?
+        # precond:      none
+        # z-postcond:   none
+        # nz-postcond:  none
+        return CmdSpec(
+            precond=Empty(),
+            success_postcond=Empty(),
+            failure_postcond=Empty())
+    elif flags == set() and len(operands) >= 1: # grep pattern file...
+        # precond:      all operands are files
+        # z-postcond:   all operands are files
+        # nz-postcond:  none (maybe permission issue, etc.)
+        files = operands[1:]
+        return CmdSpec(
+            precond=And.from_field_iter(files, IsFile),
+            success_postcond=And.from_field_iter(files, IsFile),
+            failure_postcond=Empty())
+    else:
+        assert False, f"Unhandled grep invocation:\n{cmd_}\n{cmd}"
 
 
 def mkdir_spec(cmd_: tuple[Field]) -> CmdSpec:
