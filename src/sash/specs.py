@@ -420,15 +420,20 @@ def sudo_spec(cmd_: tuple[Field]) -> CmdSpec | None:
 
 
 def touch_spec(cmd_: tuple[Field]) -> CmdSpec:
+    # https://pubs.opengroup.org/onlinepubs/9799919799/utilities/touch.html
 
     cmd = parse_command(cmd_)
     (name, flags, _, operands) = (cmd.cmd_name, cmd.flags, cmd.options, cmd.operands)
     logging.debug(f"Ignored irrelevant flags for touch: {cmd.flags}")
 
     if flags == set(): # touch file...
+        # NOTE: Touch does not create unread files since they are empty upon creation
+        # precond:      none
+        # z-postcond:   all operands are files or directories
+        # nz-postcond:  none (maybe permission issue, etc.)
         return CmdSpec(
             precond=Empty(),
-            success_postcond=reduce(lambda acc, path: And(acc, IsFile(path)), operands, Empty()),
+            success_postcond=And.from_field_iter(operands, lambda p: IsFile(p) | IsDir(p)),
             failure_postcond=Empty())
     else:
         assert False, f"Unhandled touch invocation:\n{cmd_}\n{cmd}"
