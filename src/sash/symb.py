@@ -52,7 +52,7 @@ def handle_commandnode(traces: Traces,
                 t1 = handle_exit(t1)
             # TODO: Unify rm with other commands
             case cmd_name if spec := get_spec(cmd_name, tuple(expanded_args)):
-                t_precond = trace_map(t1, lambda s: s.add_assertion(spec.precond))
+                t_precond = trace_map(t1, lambda s: s.add_assertion(spec.check))
                 t_success = trace_map(t_precond, lambda s: s.add_pathcond(spec.success_postcond).update_fs(spec.success_postcond).set_last_exit_code(SymStr(("0",))))
                 t_failure = []
                 if config.in_checked_position:
@@ -77,8 +77,8 @@ def handle_rm(expanded_args: tuple[Field], trace: Trace) -> tuple[Trace, Trace]:
     logging.debug(f"Checking rm command with expansion possibility: {expanded_args}")
     spec = rm_spec(expanded_args)
 
-    logging.debug(f"Adding rm precondition: {spec.precond}")
-    trace = trace.extend(lambda s: s.add_assertion(spec.precond))
+    logging.debug(f"Adding rm precondition: {spec.check}")
+    trace = trace.extend(lambda s: s.add_assertion(spec.check))
 
     def is_protected(path):
         return any(path in [p, p + "/", p + "/*"] for p in Config.get("PROTECTED_PATHS"))
