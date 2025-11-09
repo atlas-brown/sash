@@ -85,103 +85,7 @@ def parse_command(cmd_inv: tuple[Field]) -> CmdInvocation:
         operands=cmd_operands
     )
 
-
-
-def rm_spec(cmd_: tuple[Field]) -> CmdSpec:
-    # https://pubs.opengroup.org/onlinepubs/9799919799/utilities/rm.html
-
-    cmd = parse_command(cmd_)
-    logging.debug(f"Ignored irrelevant flags for rm: {cmd.flags - {'-r', '-f'}}")
-    (name, flags, options, operands) = (cmd.cmd_name, cmd.flags, cmd.options, cmd.operands)
-    cmd = replace(cmd, flags={flag for flag in cmd.flags if flag in {"-r", "-f"}})
-
-    assert name == SymStr(("rm",)), f"Expected rm command, got:\nOriginal: {cmd_}\nPaSh: {cmd}"
-    assert len(options) == 0, f"Expected no options for rm, got:\nOriginal: {cmd_}\nPaSh: {cmd}"
-
-    if flags == set(): # rm file...
-        # precond:      all operands are files
-        # z-postcond:   all operands are deleted
-        # nz-postcond:  none (maybe all operands weren't files, maybe one operand wasn't a file, maybe it was a permission issue, etc.)
-        return CmdSpec(
-            precond=reduce(lambda acc, path: And(acc, IsFile(path)), operands, Empty()),
-            success_postcond=reduce(lambda acc, path: And(acc, IsDeleted(path)), operands, Empty()),
-            failure_postcond=Empty())
-    elif flags == set(["-f"]): # rm -f file...
-        # precond:      all operands are not directories [and for bug-catching purposes: all operands are not deleted]
-        # z-postcond:   all operands are deleted
-        # nz-postcond:  none (maybe permission issue, etc.)
-        return CmdSpec(
-            precond=reduce(lambda acc, path: And(acc, And(Not(IsDir(path)), Not(IsDeleted(path)))), operands, Empty()),
-            success_postcond=reduce(lambda acc, path: And(acc, IsDeleted(path)), operands, Empty()),
-            failure_postcond=Empty())
-    elif flags == set(["-r"]): # rm -r file...
-        # precond:      all operands are files or directories
-        # z-postcond:   all operands are deleted
-        # nz-postcond:  none (maybe permission issue, etc.)
-        return CmdSpec(
-            precond=reduce(lambda acc, path: And(acc, Or(IsFile(path), IsDir(path))), operands, Empty()),
-            success_postcond=reduce(lambda acc, path: And(acc, IsDeleted(path)), operands, Empty()),
-            failure_postcond=Empty())
-    elif flags == set(["-r", "-f"]): # rm -r -f file...
-        # precond:      [for bug catching purposes: all operands are not deleted]
-        # z-postcond:   all operands are deleted
-        # nz-postcond:  none (maybe permission issue, etc.)
-        return CmdSpec(
-            precond=reduce(lambda acc, path: And(acc, Not(IsDeleted(path))), operands, Empty()),
-            success_postcond=reduce(lambda acc, path: And(acc, IsDeleted(path)), operands, Empty()),
-            failure_postcond=Empty())
-    else:
-        # TODO: implement a default case (need to look at every rm flag and derive the most detailed but correct spec)
-        raise NotImplementedError(f"Unhandled rm invocation:\n{cmd_}\n{cmd}")
-
-def touch_spec(cmd_: tuple[Field]) -> CmdSpec:
-
-    cmd = parse_command(cmd_)
-    (name, flags, _, operands) = (cmd.cmd_name, cmd.flags, cmd.options, cmd.operands)
-    logging.debug(f"Ignored irrelevant flags for touch: {cmd.flags}")
-
-    if flags == set(): # touch file...
-        return CmdSpec(
-            precond=Empty(),
-            success_postcond=reduce(lambda acc, path: And(acc, IsFile(path)), operands, Empty()),
-            failure_postcond=Empty())
-    else:
-        assert False, f"Unhandled touch invocation:\n{cmd_}\n{cmd}"
-
-def mkdir_spec(cmd_: tuple[Field]) -> CmdSpec:
-    # https://pubs.opengroup.org/onlinepubs/9799919799/utilities/mkdir.html
-
-    # Note:
-    #     The file system model is a flat map, there is no hierarchy of directories.
-    #     So `mkdir -p a/b` will not be assumed to fail if `a` is a file, even though in reality it would.
-
-    cmd = parse_command(cmd_)
-    (name, flags, _, operands) = (cmd.cmd_name, cmd.flags, cmd.options, cmd.operands)
-    logging.debug(f"Ignored irrelevant flags for rm: {cmd.flags - {'-p'}}")
-    flags.discard("-m") # ignore -m flag
-
-    assert name == SymStr(("mkdir",)), f"Expected mkdir command, got: {name}"
-
-    if flags == set(["-p"]): # mkdir -p dir...
-        # precond:      all operands are not files (mkdir -p doesn't error if directories exists)
-        # z-postcond:   all operands are directories
-        # nz-postcond:  none (maybe permission issue, etc.)
-        return CmdSpec(
-            precond=reduce(lambda acc, path: And(acc, Not(IsFile(path))), operands, Empty()),
-            success_postcond=reduce(lambda acc, path: And(acc, IsDir(path)), operands, Empty()),
-            failure_postcond=Empty())
-    elif flags == set(): # mkdir dir...
-        # precond:      all operands do not exist
-        # z-postcond:   all operands are directories
-        # nz-postcond:  none (maybe permission issue, etc.)
-        return CmdSpec(
-            precond=reduce(lambda acc, path: And(acc, Not(Or(IsFile(path), IsDir(path)))), operands, Empty()),
-            success_postcond=reduce(lambda acc, path: And(acc, IsDir(path)), operands, Empty()),
-            failure_postcond=Empty())
-    else:
-        # TODO: implement a default case (need to look at every mkdir flag and derive the most detailed but correct spec)
-        assert False, f"Unhandled mkdir invocation:\n{cmd_}\n{cmd}"
-
+# -- Specs start here --
 
 def cd_spec(cmd_: tuple[Field]) -> CmdSpec:
     # https://pubs.opengroup.org/onlinepubs/9799919799/utilities/cd.html
@@ -331,9 +235,57 @@ def cp_spec(cmd_: tuple[Field]) -> CmdSpec:
         assert False, f"Unhandled cp invocation:\n{cmd_}\n{cmd}"
 
 
+def echo_spec(cmd_: tuple[Field]) -> CmdSpec:
+    # https://pubs.opengroup.org/onlinepubs/9799919799/utilities/echo.html
+
+    cmd = parse_command(cmd_)
+    (name, flags, _, operands) = (cmd.cmd_name, cmd.flags, cmd.operands, cmd.options)
+
+    raise NotImplementedError("echo spec not implemented yet")
 
 
-    raise NotImplementedError("cp spec not implemented yet")
+def grep_spec(cmd_: tuple[Field]) -> CmdSpec:
+    # https://pubs.opengroup.org/onlinepubs/9799919799/utilities/grep.html
+
+    cmd = parse_command(cmd_)
+    (name, flags, _, operands) = (cmd.cmd_name, cmd.flags, cmd.options, cmd.operands)
+
+    raise NotImplementedError("grep spec not implemented yet")
+
+
+def mkdir_spec(cmd_: tuple[Field]) -> CmdSpec:
+    # https://pubs.opengroup.org/onlinepubs/9799919799/utilities/mkdir.html
+
+    # Note:
+    #     The file system model is a flat map, there is no hierarchy of directories.
+    #     So `mkdir -p a/b` will not be assumed to fail if `a` is a file, even though in reality it would.
+
+    cmd = parse_command(cmd_)
+    (name, flags, _, operands) = (cmd.cmd_name, cmd.flags, cmd.options, cmd.operands)
+    logging.debug(f"Ignored irrelevant flags for rm: {cmd.flags - {'-p'}}")
+    flags.discard("-m") # ignore -m flag
+
+    assert name == SymStr(("mkdir",)), f"Expected mkdir command, got: {name}"
+
+    if flags == set(["-p"]): # mkdir -p dir...
+        # precond:      all operands are not files (mkdir -p doesn't error if directories exists)
+        # z-postcond:   all operands are directories
+        # nz-postcond:  none (maybe permission issue, etc.)
+        return CmdSpec(
+            precond=reduce(lambda acc, path: And(acc, Not(IsFile(path))), operands, Empty()),
+            success_postcond=reduce(lambda acc, path: And(acc, IsDir(path)), operands, Empty()),
+            failure_postcond=Empty())
+    elif flags == set(): # mkdir dir...
+        # precond:      all operands do not exist
+        # z-postcond:   all operands are directories
+        # nz-postcond:  none (maybe permission issue, etc.)
+        return CmdSpec(
+            precond=reduce(lambda acc, path: And(acc, Not(Or(IsFile(path), IsDir(path)))), operands, Empty()),
+            success_postcond=reduce(lambda acc, path: And(acc, IsDir(path)), operands, Empty()),
+            failure_postcond=Empty())
+    else:
+        # TODO: implement a default case (need to look at every mkdir flag and derive the most detailed but correct spec)
+        assert False, f"Unhandled mkdir invocation:\n{cmd_}\n{cmd}"
 
 
 def mv_spec(cmd_: tuple[Field]) -> CmdSpec:
@@ -344,21 +296,54 @@ def mv_spec(cmd_: tuple[Field]) -> CmdSpec:
 
     raise NotImplementedError("mv spec not implemented yet")
 
-def grep_spec(cmd_: tuple[Field]) -> CmdSpec:
-    # https://pubs.opengroup.org/onlinepubs/9799919799/utilities/grep.html
+
+def rm_spec(cmd_: tuple[Field]) -> CmdSpec:
+    # https://pubs.opengroup.org/onlinepubs/9799919799/utilities/rm.html
 
     cmd = parse_command(cmd_)
-    (name, flags, _, operands) = (cmd.cmd_name, cmd.flags, cmd.options, cmd.operands)
+    logging.debug(f"Ignored irrelevant flags for rm: {cmd.flags - {'-r', '-f'}}")
+    (name, flags, options, operands) = (cmd.cmd_name, cmd.flags, cmd.options, cmd.operands)
+    cmd = replace(cmd, flags={flag for flag in cmd.flags if flag in {"-r", "-f"}})
 
-    raise NotImplementedError("grep spec not implemented yet")
+    assert name == SymStr(("rm",)), f"Expected rm command, got:\nOriginal: {cmd_}\nPaSh: {cmd}"
+    assert len(options) == 0, f"Expected no options for rm, got:\nOriginal: {cmd_}\nPaSh: {cmd}"
 
-def echo_spec(cmd_: tuple[Field]) -> CmdSpec:
-    # https://pubs.opengroup.org/onlinepubs/9799919799/utilities/echo.html
+    if flags == set(): # rm file...
+        # precond:      all operands are files
+        # z-postcond:   all operands are deleted
+        # nz-postcond:  none (maybe all operands weren't files, maybe one operand wasn't a file, maybe it was a permission issue, etc.)
+        return CmdSpec(
+            precond=reduce(lambda acc, path: And(acc, IsFile(path)), operands, Empty()),
+            success_postcond=reduce(lambda acc, path: And(acc, IsDeleted(path)), operands, Empty()),
+            failure_postcond=Empty())
+    elif flags == set(["-f"]): # rm -f file...
+        # precond:      all operands are not directories [and for bug-catching purposes: all operands are not deleted]
+        # z-postcond:   all operands are deleted
+        # nz-postcond:  none (maybe permission issue, etc.)
+        return CmdSpec(
+            precond=reduce(lambda acc, path: And(acc, And(Not(IsDir(path)), Not(IsDeleted(path)))), operands, Empty()),
+            success_postcond=reduce(lambda acc, path: And(acc, IsDeleted(path)), operands, Empty()),
+            failure_postcond=Empty())
+    elif flags == set(["-r"]): # rm -r file...
+        # precond:      all operands are files or directories
+        # z-postcond:   all operands are deleted
+        # nz-postcond:  none (maybe permission issue, etc.)
+        return CmdSpec(
+            precond=reduce(lambda acc, path: And(acc, Or(IsFile(path), IsDir(path))), operands, Empty()),
+            success_postcond=reduce(lambda acc, path: And(acc, IsDeleted(path)), operands, Empty()),
+            failure_postcond=Empty())
+    elif flags == set(["-r", "-f"]): # rm -r -f file...
+        # precond:      [for bug catching purposes: all operands are not deleted]
+        # z-postcond:   all operands are deleted
+        # nz-postcond:  none (maybe permission issue, etc.)
+        return CmdSpec(
+            precond=reduce(lambda acc, path: And(acc, Not(IsDeleted(path))), operands, Empty()),
+            success_postcond=reduce(lambda acc, path: And(acc, IsDeleted(path)), operands, Empty()),
+            failure_postcond=Empty())
+    else:
+        # TODO: implement a default case (need to look at every rm flag and derive the most detailed but correct spec)
+        raise NotImplementedError(f"Unhandled rm invocation:\n{cmd_}\n{cmd}")
 
-    cmd = parse_command(cmd_)
-    (name, flags, _, operands) = (cmd.cmd_name, cmd.flags, cmd.operands, cmd.options)
-
-    raise NotImplementedError("echo spec not implemented yet")
 
 def sudo_spec(cmd_: tuple[Field]) -> CmdSpec | None:
 
@@ -372,15 +357,23 @@ def sudo_spec(cmd_: tuple[Field]) -> CmdSpec | None:
     return get_spec(operands[0].content.parts[0], tuple(operands[1:]))
 
 
-def command_spec(cmd_: tuple[Field]) -> CmdSpec:
-    # https://pubs.opengroup.org/onlinepubs/9799919799/utilities/command.html
+def touch_spec(cmd_: tuple[Field]) -> CmdSpec:
 
     cmd = parse_command(cmd_)
-    (name, flags, _, operands) = (cmd.cmd_name, cmd.flags, cmd.operands, cmd.options)
+    (name, flags, _, operands) = (cmd.cmd_name, cmd.flags, cmd.options, cmd.operands)
+    logging.debug(f"Ignored irrelevant flags for touch: {cmd.flags}")
 
-    raise NotImplementedError("command spec not implemented yet (the builtin)")
+    if flags == set(): # touch file...
+        return CmdSpec(
+            precond=Empty(),
+            success_postcond=reduce(lambda acc, path: And(acc, IsFile(path)), operands, Empty()),
+            failure_postcond=Empty())
+    else:
+        assert False, f"Unhandled touch invocation:\n{cmd_}\n{cmd}"
 
-# Note: Do not define specs below this line, they will not be registered.
+# -- Specs end here --
+# Do not define specs below this line, they will not be registered!
+
 current_module = sys.modules[__name__]
 CMD_SPECS: dict[str, Callable] = {}
 
@@ -390,6 +383,7 @@ for name, func in inspect.getmembers(current_module, inspect.isfunction):
         cmd_name = name.removesuffix("_spec")
         CMD_SPECS[cmd_name] = func
 
+
 def get_spec(cmd_name: str | None, cmd_: tuple[Field]) -> CmdSpec | None:
     if cmd_name in CMD_SPECS:
         return CMD_SPECS[cmd_name](cmd_)
@@ -397,7 +391,6 @@ def get_spec(cmd_name: str | None, cmd_: tuple[Field]) -> CmdSpec | None:
     logging.warning(f"No spec found for command '{cmd_name}', treating as no-op.")
     assert False, f"No spec found for command '{cmd_name}'"
     return None
-
 
 
 # NOTE: in the postconds add env vars that change (e.g. PWD, OLDPWD, etc.)
