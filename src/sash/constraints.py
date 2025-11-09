@@ -3,11 +3,13 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from sash.state import *
 from abc import ABC
+from collections.abc import Iterable
 import z3
 from dataclasses import dataclass, field, replace
 from enum import Enum
 from sash.frozen import FrozenDict
 import logging
+import functools
 
 @dataclass(frozen=True)
 class Constraint:
@@ -41,10 +43,36 @@ class And(Constraint):
     lhs: Constraint
     rhs: Constraint
 
+    @staticmethod
+    def from_iter(cons: Iterable[Constraint]) -> Constraint:
+        it = iter(cons)
+        try:
+            first = next(it)
+        except StopIteration:
+            return Empty()  # iterable is empty
+        return functools.reduce(And, it, first) # returns first if only one element, othwise reduces with And
+
+    @staticmethod
+    def from_field_iter(cons: Iterable[Field], tfm: Callable[[Field], Constraint]) -> Constraint:
+        return And.from_iter((tfm(c) for c in cons))
+
 @dataclass(frozen=True)
 class Or(Constraint):
     lhs: Constraint
     rhs: Constraint
+
+    @staticmethod
+    def from_iter(cons: Iterable[Constraint]) -> Constraint:
+        it = iter(cons)
+        try:
+            first = next(it)
+        except StopIteration:
+            return Empty()  # iterable is empty
+        return functools.reduce(Or, it, first) # returns first if only one element, othwise reduces with Or
+
+    @staticmethod
+    def from_field_iter(cons: Iterable[Field], tfm: Callable[[Field], Constraint]) -> Constraint:
+        return Or.from_iter((tfm(c) for c in cons))
 
 @dataclass(frozen=True)
 class StringEq(Constraint):
