@@ -327,8 +327,36 @@ def mv_spec(cmd_: tuple[Field]) -> CmdSpec:
 
     cmd = parse_command(cmd_)
     (name, flags, _, operands) = (cmd.cmd_name, cmd.flags, cmd.options, cmd.operands)
+    flags.discard("-f") # ignore -f flag, i think it does not affect preconds/postconds
 
-    raise NotImplementedError("mv spec not implemented yet")
+    assert name == SymStr(("mv",)), f"Expected mv command, got: {name}"
+
+    if flags == set() and len(operands) == 2: # mv src dst
+        # NOTE: `mv file nonexistent_dir/` fails (notice the trailing slash)
+        # precond:      src must not be deleted, dst must not be an unread file
+        # z-postcond:   too much to write here
+        # nz-postcond:  none (maybe permission issue, etc.)
+        src, dst = operands[0], operands[1]
+        return CmdSpec(
+            precond=~IsDeleted(src) & # src must exist
+                    (IsDir(src) >> ~IsFile(dst)) & # if src is a dir, dst must not be a file
+                    (IsFile(dst) >> ~IsUnread(dst)), # if dst is a file, it must not be unread
+            success_postcond=~StringEq(src, dst) >> (IsDeleted(src) & (IsFile(dst) | IsDir(dst))) # if src != dst, src is deleted, dst is a file or dir
+                            & (StringEq(src, dst) >> (IsFile(dst) | IsDir(dst))) # if src == dst, nothing gets deleted, dst is a file or dir
+                            & ((IsUnread(src) & ~IsDir(dst)) >> IsUnread(dst)), # if src was unread and dst wasn't a dir, dst is unread
+                            # TODO: similar to cp, this postcond does not encode the new files created in the dir
+            failure_postcond=Empty())
+    if flags == set() and len(operands) > 2: # mv src... dst
+        # precond:      all src must not be deleted, dst must be dir
+        # z-postcond:   all src are deleted (unless dir moved to self...?)
+        # nz-postcond:  none (maybe permission issue, etc.)
+        srcs, dst = operands[:-1], operands[-1]
+        return CmdSpec(
+            precond=And.from_field_iter(srcs, lambda path: ~IsDeleted(path)) & IsDir(dst),
+            success_postcond=And.from_field_iter(srcs, IsDeleted), # TODO: similar to cp, this postcond does not encode the new files created in the dir
+            failure_postcond=Empty())
+    else:
+        assert False, f"Unhandled mv invocation:\n{cmd_}\n{cmd}"
 
 
 def rm_spec(cmd_: tuple[Field]) -> CmdSpec:
