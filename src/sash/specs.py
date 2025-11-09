@@ -1,11 +1,14 @@
-from sash.state import *
-from sash.constraints import *
-from dataclasses import dataclass, replace
-import logging
-from pash_annotations.parser import parser as pash_annot_parser
-from functools import reduce
-import sys
 import inspect
+import logging
+import sys
+from dataclasses import dataclass, replace
+from functools import reduce
+
+from pash_annotations.parser import parser as pash_annot_parser
+
+from sash.constraints import *
+from sash.state import *
+
 
 @dataclass(frozen=True)
 class CmdInvocation:
@@ -19,11 +22,13 @@ class CmdInvocation:
         flag_str = " ".join(self.flags)
         return f"{self.cmd_name} {flag_str} {arg_str}"
 
+
 @dataclass(frozen=True)
 class CmdSpec:
     precond: Constraint
     success_postcond: Constraint # post-condition if exit code is 0
     failure_postcond: Constraint # post-condition if exit code is non-0
+
 
 def parse_command(cmd_inv: tuple[Field]) -> CmdInvocation:
     """
@@ -239,6 +244,59 @@ def cd_spec(cmd_: tuple[Field]) -> CmdSpec:
     else:
         # TODO: implement a default case (need to look at every cd flag and derive the most detailed but correct spec)
         raise NotImplementedError(f"Unhandled cd invocation:\n{cmd_}\n{cmd}")
+
+
+def command_spec(cmd_: tuple[Field]) -> CmdSpec:
+    # https://pubs.opengroup.org/onlinepubs/9799919799/utilities/command.html
+
+    # A note on 'command -v/-V cmd':
+    # - Currently, we only care about the failure case, which informs us that a command does not exist
+    # - This works because our default assumption for unknown commands is that they exist
+    # - If at any point we decide to change this default assumption, we might need to revisit this spec
+    #
+    # Issue when modeling the success case:
+    # - 'command -v/-V cmd' identifies commands, built-ins, aliases, functions, *and reserved words*
+    # - The first four are covered by a simple CommandExists(cmd) constraint, but reserved words are tricky
+    #
+    # Consider the following example:
+    # ```
+    # if ! command -v if; then # output: "if", exit code: 0
+    #     exit 1
+    # fi
+    # \if # error: "if: command not found", exit code: non-0
+    # ```
+    #
+    # - The previously mentioned success spec would make this code seem not buggy, even though it is
+    # - Realistically this will never be an issue, however it is still technically incorrect
+    # - In order to model this correctly we would need to have a way to check if cmd is a shell reserved word
+    #   - But what if a CompletelyArbitrary is passed as cmd?
+    #
+    # - Another idea (which would probably be useless in practice) is to have the precondition that cmd cannot be a reserved word,
+    #   with the "intuition" being that the command turns to a no-op (at best) or to a const cond (at worst)
+
+    cmd = parse_command(cmd_)
+    (name, flags, _, operands) = (cmd.cmd_name, cmd.flags, cmd.options, cmd.operands)
+
+    assert name == SymStr(("command",)), f"Expected command command, got: {name}"
+
+    # TODO: Model `alias` to create CommandExists constraints for aliases
+    # Otherwise the following (plausible) code would be marked as buggy:
+    # ```
+    # if ! command -v my_alias; then
+    #     alias my_alias='ls -l'
+    # fi
+    # my_alias
+
+    if flags == set(["-v"]) and len(operands) == 1: # command -v cmd
+        # precond:      none
+        # z-postcond:   none (cmd might be a reserved word, see note above)
+        # nz-postcond:  cmd is not a command
+        return CmdSpec(
+            precond=Empty(),
+            success_postcond=Empty(),
+            failure_postcond=Not(CommandExists(operands[0])))
+    else:
+        assert False, f"Unhandled command invocation:\n{cmd_}\n{cmd}"
 
 
 def cp_spec(cmd_: tuple[Field]) -> CmdSpec:
