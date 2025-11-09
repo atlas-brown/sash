@@ -305,6 +305,34 @@ def cp_spec(cmd_: tuple[Field]) -> CmdSpec:
     cmd = parse_command(cmd_)
     (name, flags, _, operands) = (cmd.cmd_name, cmd.flags, cmd.options, cmd.operands)
 
+    assert name == SymStr(("cp",)), f"Expected cp command, got: {name}"
+
+    if flags == set() and len(operands) == 2: # cp src dst
+        # precond:      src is a file, dst is not a directory or an unread file
+        # z-postcond:   src is a file, dst is an unread file
+        # nz-postcond:  none (maybe permission issue)
+        src, dst = operands[0], operands[1]
+        return CmdSpec(
+            precond=IsFile(src) & (~IsDir(dst) & (IsFile(dst) >> ~IsUnread(dst))),
+            success_postcond=IsFile(src) & (IsFile(dst) & IsUnread(dst)),
+            failure_postcond=Empty())
+    elif flags == set() and len(operands) >= 2: # cp src... dst
+        # precond:      all src are files, dst is a directory
+        # z-postcond:   all src are files, dst is a directory, all src are copied as unread files into dst
+        # nz-postcond:  none (maybe permission issue)
+        srcs, dst = operands[:-1], operands[-1]
+        return CmdSpec(
+            precond=And.from_field_iter(srcs, IsFile) & IsDir(dst),
+            success_postcond=And.from_field_iter(srcs, IsFile) & IsDir(dst),
+                # TODO: how to do that? should we do that?
+                # & And.from_field_iter(srcs, lambda path: IsUnread(ConcatPath(dst, path))),
+            failure_postcond=Empty())
+    else:
+        assert False, f"Unhandled cp invocation:\n{cmd_}\n{cmd}"
+
+
+
+
     raise NotImplementedError("cp spec not implemented yet")
 
 
