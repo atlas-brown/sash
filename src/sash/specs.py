@@ -238,10 +238,23 @@ def cp_spec(cmd_: tuple[Field]) -> CmdSpec:
 def echo_spec(cmd_: tuple[Field]) -> CmdSpec:
     # https://pubs.opengroup.org/onlinepubs/9799919799/utilities/echo.html
 
-    cmd = parse_command(cmd_)
-    (name, flags, _, operands) = (cmd.cmd_name, cmd.flags, cmd.operands, cmd.options)
+    # TODO: if HasStdout() is not handled here somehow, this spec is useless
 
-    raise NotImplementedError("echo spec not implemented yet")
+    cmd = parse_command(cmd_)
+    (name, flags, _, operands) = (cmd.cmd_name, cmd.flags, cmd.options, cmd.operands)
+
+    assert name == SymStr(("echo",)), f"Expected echo command, got: {name}"
+
+    if flags == set(): # echo arg...
+        # precond:      none
+        # z-postcond:   none
+        # nz-postcond:  none
+        return CmdSpec(
+            precond=Empty(),
+            success_postcond=Empty(),
+            failure_postcond=Empty())
+    else: # POSIX actually does not define any flags for echo
+        assert False, f"Unhandled echo invocation:\n{cmd_}\n{cmd}"
 
 
 def grep_spec(cmd_: tuple[Field]) -> CmdSpec:
