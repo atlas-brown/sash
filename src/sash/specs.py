@@ -25,7 +25,7 @@ class CmdInvocation:
 
 @dataclass(frozen=True)
 class CmdSpec:
-    precond: Constraint
+    check: Constraint # condition to check before executing the command to detect possible bugs
     success_postcond: Constraint # post-condition if exit code is 0
     failure_postcond: Constraint # post-condition if exit code is non-0
 
@@ -110,7 +110,7 @@ def cd_spec(cmd_: tuple[Field]) -> CmdSpec:
         # z-postcond:   $HOME is a directory, $PWD is $HOME, $OLDPWD is previous $PWD
         # nz-postcond:  none (maybe $HOME not set, maybe $HOME not a directory, maybe permission issue, etc.)
         return CmdSpec( # ? is this correct?
-            precond=IsDir(Field(SymStr(("HOME",)), WordCount(1,1))),
+            check=IsDir(Field(SymStr(("HOME",)), WordCount(1,1))),
             success_postcond=And(
                 IsDir(Field(SymStr(("HOME",)), WordCount(1,1))),
                 And(
@@ -126,7 +126,7 @@ def cd_spec(cmd_: tuple[Field]) -> CmdSpec:
         # z-postcond:   $OLDPWD is a directory, $PWD is $OLDPWD, $OLDPWD is previous $PWD
         # nz-postcond:  none (maybe $OLDPWD not set, maybe $OLDPWD not a directory, maybe permission issue, etc.)
         return CmdSpec( # ? is this correct?
-            precond=IsDir(Field(SymStr(("OLDPWD",)), WordCount(1,1))),
+            check=IsDir(Field(SymStr(("OLDPWD",)), WordCount(1,1))),
             success_postcond=And(
                 IsDir(Field(SymStr(("OLDPWD",)), WordCount(1,1))),
                 And(
@@ -142,7 +142,7 @@ def cd_spec(cmd_: tuple[Field]) -> CmdSpec:
         # z-postcond:   operand is a directory
         # nz-postcond:  none (maybe operand not a directory, maybe permission issue, etc.)
         return CmdSpec(
-            precond=IsDir(operands[0]),
+            check=IsDir(operands[0]),
             success_postcond=IsDir(operands[0]),
             failure_postcond=Empty())
     else:
@@ -196,7 +196,7 @@ def command_spec(cmd_: tuple[Field]) -> CmdSpec:
         # z-postcond:   none (cmd might be a reserved word, see note above)
         # nz-postcond:  cmd is not a command
         return CmdSpec(
-            precond=Empty(),
+            check=Empty(),
             success_postcond=Empty(),
             failure_postcond=Not(CommandExists(operands[0])))
     else:
@@ -217,7 +217,7 @@ def cp_spec(cmd_: tuple[Field]) -> CmdSpec:
         # nz-postcond:  none (maybe permission issue)
         src, dst = operands[0], operands[1]
         return CmdSpec(
-            precond=IsFile(src) & (~IsDir(dst) & (IsFile(dst) >> ~IsUnread(dst))),
+            check=IsFile(src) & (~IsDir(dst) & (IsFile(dst) >> ~IsUnread(dst))),
             success_postcond=IsFile(src) & (IsFile(dst) & IsUnread(dst)),
             failure_postcond=Empty())
     elif flags == set() and len(operands) >= 2: # cp src... dst
@@ -226,7 +226,7 @@ def cp_spec(cmd_: tuple[Field]) -> CmdSpec:
         # nz-postcond:  none (maybe permission issue)
         srcs, dst = operands[:-1], operands[-1]
         return CmdSpec(
-            precond=And.from_field_iter(srcs, IsFile) & IsDir(dst),
+            check=And.from_field_iter(srcs, IsFile) & IsDir(dst),
             success_postcond=And.from_field_iter(srcs, IsFile) & IsDir(dst),
                 # TODO: how to do that? should we do that?
                 # & And.from_field_iter(srcs, lambda path: IsUnread(ConcatPath(dst, path))),
@@ -250,7 +250,7 @@ def echo_spec(cmd_: tuple[Field]) -> CmdSpec:
         # z-postcond:   none
         # nz-postcond:  none
         return CmdSpec(
-            precond=Empty(),
+            check=Empty(),
             success_postcond=Empty(),
             failure_postcond=Empty())
     else: # POSIX actually does not define any flags for echo
@@ -271,7 +271,7 @@ def grep_spec(cmd_: tuple[Field]) -> CmdSpec:
         # z-postcond:   none
         # nz-postcond:  none
         return CmdSpec(
-            precond=Empty(),
+            check=Empty(),
             success_postcond=Empty(),
             failure_postcond=Empty())
     elif flags == set() and len(operands) >= 1: # grep pattern file...
@@ -280,7 +280,7 @@ def grep_spec(cmd_: tuple[Field]) -> CmdSpec:
         # nz-postcond:  none (maybe permission issue, etc.)
         files = operands[1:]
         return CmdSpec(
-            precond=And.from_field_iter(files, IsFile),
+            check=And.from_field_iter(files, IsFile),
             success_postcond=And.from_field_iter(files, IsFile),
             failure_postcond=Empty())
     else:
@@ -306,7 +306,7 @@ def mkdir_spec(cmd_: tuple[Field]) -> CmdSpec:
         # z-postcond:   all operands are directories
         # nz-postcond:  none (maybe permission issue, etc.)
         return CmdSpec(
-            precond=reduce(lambda acc, path: And(acc, Not(IsFile(path))), operands, Empty()),
+            check=reduce(lambda acc, path: And(acc, Not(IsFile(path))), operands, Empty()),
             success_postcond=reduce(lambda acc, path: And(acc, IsDir(path)), operands, Empty()),
             failure_postcond=Empty())
     elif flags == set(): # mkdir dir...
@@ -314,7 +314,7 @@ def mkdir_spec(cmd_: tuple[Field]) -> CmdSpec:
         # z-postcond:   all operands are directories
         # nz-postcond:  none (maybe permission issue, etc.)
         return CmdSpec(
-            precond=reduce(lambda acc, path: And(acc, Not(Or(IsFile(path), IsDir(path)))), operands, Empty()),
+            check=reduce(lambda acc, path: And(acc, Not(Or(IsFile(path), IsDir(path)))), operands, Empty()),
             success_postcond=reduce(lambda acc, path: And(acc, IsDir(path)), operands, Empty()),
             failure_postcond=Empty())
     else:
@@ -338,7 +338,7 @@ def mv_spec(cmd_: tuple[Field]) -> CmdSpec:
         # nz-postcond:  none (maybe permission issue, etc.)
         src, dst = operands[0], operands[1]
         return CmdSpec(
-            precond=~IsDeleted(src) & # src must exist
+            check=~IsDeleted(src) & # src must exist
                     (IsDir(src) >> ~IsFile(dst)) & # if src is a dir, dst must not be a file
                     (IsFile(dst) >> ~IsUnread(dst)), # if dst is a file, it must not be unread
             success_postcond=~StringEq(src, dst) >> (IsDeleted(src) & (IsFile(dst) | IsDir(dst))) # if src != dst, src is deleted, dst is a file or dir
@@ -352,7 +352,7 @@ def mv_spec(cmd_: tuple[Field]) -> CmdSpec:
         # nz-postcond:  none (maybe permission issue, etc.)
         srcs, dst = operands[:-1], operands[-1]
         return CmdSpec(
-            precond=And.from_field_iter(srcs, lambda path: ~IsDeleted(path)) & IsDir(dst),
+            check=And.from_field_iter(srcs, lambda path: ~IsDeleted(path)) & IsDir(dst),
             success_postcond=And.from_field_iter(srcs, IsDeleted), # TODO: similar to cp, this postcond does not encode the new files created in the dir
             failure_postcond=Empty())
     else:
@@ -375,7 +375,7 @@ def rm_spec(cmd_: tuple[Field]) -> CmdSpec:
         # z-postcond:   all operands are deleted
         # nz-postcond:  none (maybe all operands weren't files, maybe one operand wasn't a file, maybe it was a permission issue, etc.)
         return CmdSpec(
-            precond=reduce(lambda acc, path: And(acc, IsFile(path)), operands, Empty()),
+            check=reduce(lambda acc, path: And(acc, IsFile(path)), operands, Empty()),
             success_postcond=reduce(lambda acc, path: And(acc, IsDeleted(path)), operands, Empty()),
             failure_postcond=Empty())
     elif flags == set(["-f"]): # rm -f file...
@@ -383,7 +383,7 @@ def rm_spec(cmd_: tuple[Field]) -> CmdSpec:
         # z-postcond:   all operands are deleted
         # nz-postcond:  none (maybe permission issue, etc.)
         return CmdSpec(
-            precond=reduce(lambda acc, path: And(acc, And(Not(IsDir(path)), Not(IsDeleted(path)))), operands, Empty()),
+            check=reduce(lambda acc, path: And(acc, And(Not(IsDir(path)), Not(IsDeleted(path)))), operands, Empty()),
             success_postcond=reduce(lambda acc, path: And(acc, IsDeleted(path)), operands, Empty()),
             failure_postcond=Empty())
     elif flags == set(["-r"]): # rm -r file...
@@ -391,7 +391,7 @@ def rm_spec(cmd_: tuple[Field]) -> CmdSpec:
         # z-postcond:   all operands are deleted
         # nz-postcond:  none (maybe permission issue, etc.)
         return CmdSpec(
-            precond=reduce(lambda acc, path: And(acc, Or(IsFile(path), IsDir(path))), operands, Empty()),
+            check=reduce(lambda acc, path: And(acc, Or(IsFile(path), IsDir(path))), operands, Empty()),
             success_postcond=reduce(lambda acc, path: And(acc, IsDeleted(path)), operands, Empty()),
             failure_postcond=Empty())
     elif flags == set(["-r", "-f"]): # rm -r -f file...
@@ -399,7 +399,7 @@ def rm_spec(cmd_: tuple[Field]) -> CmdSpec:
         # z-postcond:   all operands are deleted
         # nz-postcond:  none (maybe permission issue, etc.)
         return CmdSpec(
-            precond=reduce(lambda acc, path: And(acc, Not(IsDeleted(path))), operands, Empty()),
+            check=reduce(lambda acc, path: And(acc, Not(IsDeleted(path))), operands, Empty()),
             success_postcond=reduce(lambda acc, path: And(acc, IsDeleted(path)), operands, Empty()),
             failure_postcond=Empty())
     else:
@@ -432,7 +432,7 @@ def touch_spec(cmd_: tuple[Field]) -> CmdSpec:
         # z-postcond:   all operands are files or directories
         # nz-postcond:  none (maybe permission issue, etc.)
         return CmdSpec(
-            precond=Empty(),
+            check=Empty(),
             success_postcond=And.from_field_iter(operands, lambda p: IsFile(p) | IsDir(p)),
             failure_postcond=Empty())
     else:
@@ -460,6 +460,9 @@ def get_spec(cmd_name: str | None, cmd_: tuple[Field]) -> CmdSpec | None:
     return None
 
 
+# TODO: in the postconds add env vars that change (e.g. PWD, OLDPWD, etc.)
+# TODO: add default cases
+# TODO: add comments with explanations for the default cases (why are they needed, what can go wrong otherwise?)
 # NOTE: in the postconds add env vars that change (e.g. PWD, OLDPWD, etc.)
 # generally any information that can be conveyed through the constraints should be added here
 # TODO: comments with explanations for the default cases (why are they needed, what can go wrong otherwise?)
