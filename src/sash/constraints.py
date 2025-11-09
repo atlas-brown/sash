@@ -11,7 +11,22 @@ import logging
 
 @dataclass(frozen=True)
 class Constraint:
-    pass
+
+    # A & B (and)
+    def __and__(self, other: Constraint) -> And:
+        return And(self, other)
+
+    # A | B (or)
+    def __or__(self, other: Constraint) -> Or:
+        return Or(self, other)
+
+    # ~A (not)
+    def __invert__(self) -> Not:
+        return Not(self)
+
+    # A >> B (implies)
+    def __rshift__(self, other: Constraint) -> Or:
+        return (~self) | other
 
 @dataclass(frozen=True)
 class Empty(Constraint):
