@@ -305,6 +305,8 @@ def cp_spec(cmd_: tuple[Field]) -> CmdSpec:
         failure_postcond = Empty()
 
     else:
+        logging.critical(f"Unhandled cp invocation:\n{cmd_}\n{cmd}")
+
         if len(operands) < 2:
             raise NotImplementedError("invalid cp handling (< 2 operands) has not been implemented yet")
 
@@ -317,23 +319,20 @@ def cp_spec(cmd_: tuple[Field]) -> CmdSpec:
 def echo_spec(cmd_: tuple[Field]) -> CmdSpec:
     # https://pubs.opengroup.org/onlinepubs/9799919799/utilities/echo.html
 
-    # TODO: if HasStdout() is not handled here somehow, this spec is useless
-
     cmd = parse_command(cmd_)
-    (name, flags, _, operands) = (cmd.cmd_name, cmd.flags, cmd.options, cmd.operands)
+    (name, flags, _, _) = (cmd.cmd_name, cmd.flags, cmd.options, cmd.operands)
 
     assert name == SymStr(("echo",)), f"Expected echo command, got: {name}"
 
-    if flags == set(): # echo arg...
-        # precond:      none
-        # z-postcond:   none
-        # nz-postcond:  none
-        return CmdSpec(
-            check=Empty(),
-            success_postcond=Empty(),
-            failure_postcond=Empty())
-    else: # POSIX actually does not define any flags for echo
-        assert False, f"Unhandled echo invocation:\n{cmd_}\n{cmd}"
+    if flags != set(): # POSIX does not define any flags for echo
+        logging.critical(f"Unhandled echo invocation:\n{cmd_}\n{cmd}")
+        raise NotImplementedError(f"non-POSIX echo handling has not been implemented yet")
+
+    # check:        none
+    # z-postcond:   none
+    # nz-postcond:  none
+
+    return CmdSpec(Empty(), Empty(), Empty(), IOType.STDOUT)
 
 
 def grep_spec(cmd_: tuple[Field]) -> CmdSpec:
