@@ -91,65 +91,105 @@ def parse_command(cmd_inv: tuple[Field]) -> CmdInvocation:
 def cd_spec(cmd_: tuple[Field]) -> CmdSpec:
     # https://pubs.opengroup.org/onlinepubs/9799919799/utilities/cd.html
 
-    # Note:
-    #     All flags determine how `..` is handled with respect to symlinks.
-    #     Since we do not model symlinks, we do not handle these flags either.
+    # NOTE:
+    #   All flags determine how `..` is handled with respect to symlinks.
+    #   Since we do not model symlinks, we do not handle these flags either.
 
-    # Note:
-    #     Invocations with multiple operands should fail, but we treat them as no-ops here.
+    # NOTE:
+    #   Invocations with multiple operands should fail, but we treat them as no-ops here.
 
     cmd = parse_command(cmd_)
     (name, flags, _, operands) = (cmd.cmd_name, cmd.flags, cmd.options, cmd.operands)
+    io = IOType.NONE
 
     assert name == SymStr(("cd",)), f"Expected cd command, got: {name}"
 
     # NOTE: we might want to ignore the postconditions, i suspect they might overcomplicate things
-    # NOTE: cd also interacts with CDPATH sometimes, do we care?
+    # NOTE: cd also interacts with CDPATH, do we care? the interaction is quite complex
+
+    home_var = Field(SymStr(("HOME",)), WordCount(1,1))
+    pwd_var = Field(SymStr(("PWD",)), WordCount(1,1))
+    oldpwd_var = Field(SymStr(("OLDPWD",)), WordCount(1,1))
+    dash = Field(SymStr(("-",)), WordCount(1, 1))
 
     if flags == set() and len(operands) == 0: # cd
-        # precond:      $HOME is a directory
-        # z-postcond:   $HOME is a directory, $PWD is $HOME, $OLDPWD is previous $PWD
-        # nz-postcond:  none (maybe $HOME not set, maybe $HOME not a directory, maybe permission issue, etc.)
-        return CmdSpec( # ? is this correct?
-            check=IsDir(Field(SymStr(("HOME",)), WordCount(1,1))),
-            success_postcond=And(
-                IsDir(Field(SymStr(("HOME",)), WordCount(1,1))),
-                And(
-                    StringEq(
-                        Field(SymStr(("OLDPWD",)), WordCount(1,1)), Field(SymStr(("PWD",)), WordCount(1,1))),
-                    StringEq(
-                        Field(SymStr(("PWD",)), WordCount(1,1)), Field(SymStr(("HOME",)), WordCount(1,1)))
-                )
-            ),
-            failure_postcond=Empty())
-    elif flags == set() and len(operands) == 1 and operands[0] == Field(SymStr(("-",)), WordCount(1,1)): # cd -
-        # precond:      $OLDPWD is a directory
-        # z-postcond:   $OLDPWD is a directory, $PWD is $OLDPWD, $OLDPWD is previous $PWD
-        # nz-postcond:  none (maybe $OLDPWD not set, maybe $OLDPWD not a directory, maybe permission issue, etc.)
-        return CmdSpec( # ? is this correct?
-            check=IsDir(Field(SymStr(("OLDPWD",)), WordCount(1,1))),
-            success_postcond=And(
-                IsDir(Field(SymStr(("OLDPWD",)), WordCount(1,1))),
-                And(
-                    StringEq(
-                        Field(SymStr(("OLDPWD",)), WordCount(1,1)), Field(SymStr(("PWD",)), WordCount(1,1))),
-                    StringEq(
-                        Field(SymStr(("PWD",)), WordCount(1,1)), Field(SymStr(("OLDPWD",)), WordCount(1,1)))
-                )
-            ),
-            failure_postcond=Empty())
-    elif flags == set() and len(operands) == 1: # cd dir
-        # precond:      operand is a directory
-        # z-postcond:   operand is a directory
-        # nz-postcond:  none (maybe operand not a directory, maybe permission issue, etc.)
-        return CmdSpec(
-            check=IsDir(operands[0]),
-            success_postcond=IsDir(operands[0]),
-            failure_postcond=Empty())
-    else:
-        # TODO: implement a default case (need to look at every cd flag and derive the most detailed but correct spec)
-        raise NotImplementedError(f"Unhandled cd invocation:\n{cmd_}\n{cmd}")
+        # check:
+        #   (1) HOME must be a directory [undefined behavior / bug]
+        # z-postcond:
+        #   (1) HOME is a directory
+        #   (2) PWD is equal to HOME
+        #   (3) PWD is a directory [follows from (1), (2)]
+        #   (4) OLDPWD is equal to previous PWD (how do I denote this?)
+        # nz-postcond:
+        #   (1) none (maybe HOME not set, maybe HOME not a directory, maybe permission issue, etc.)
 
+        # ASSUMPTION:
+        #   if HOME is not set behavior is undefined
+        #   the spec assumes that if HOME is not set the command fails
+        #   technically that might not be the case
+
+        check = IsDir(home_var) # (1)
+        success_postcond = (
+            IsDir(home_var) &               # (1)
+            StringEq(pwd_var, home_var))    # (2)
+            # StringEq(oldpwd_var, Prev(pwd_var)) # (4)
+        failure_postcond = Empty() # (1)
+
+    elif flags == set() and len(operands) == 1 and operands[0] == dash: # cd -
+        # check:
+        #   (1) OLDPWD is a directory
+        # z-postcond:
+        #   (1) PWD is a directory
+        #   (2) PWD is equal to the previous OLDPWD (how do I denote this?)
+        #   (3) OLDPWD is equal to the previous PWD (how do I denote this?)
+        # nz-postcond:
+        #   (1) none (maybe OLDPWD not set, maybe OLDPWD not a directory, maybe permission issue, etc.)
+
+        check = IsDir(oldpwd_var)
+        success_postcond = (
+            IsDir(pwd_var)) # (1)
+            #StringEq(pwd_var, Prev(oldpwd_var)) &
+            #StringEq(oldpwd_var, Prev(pwd_var)))
+        failure_postcond = Empty()
+        io = IOType.add_stdout(io)
+
+    elif flags == set() and len(operands) == 1: # cd dir
+        # precond:
+        #   (1) operand is a directory
+        # z-postcond:
+        #   (1) operand is a directory
+        #   (2) PWD is equal to the operand
+        #   (3) PWD is a directory [follows from (1), (2)]
+        #   (4) OLDPWD is equal to the previous PWD (how do I denote this?)
+        # nz-postcond:
+        #   (1) none (maybe operand not a directory, maybe permission issue, etc.)
+
+        d = operands[0]
+        check = IsDir(d) # (1)
+        success_postcond = (
+            IsDir(d) &            # (1)
+            StringEq(pwd_var, d)) # (2)
+            # StringEq(oldpwd_var, Prev(pwd_var)) # (4)
+        failure_postcond=Empty() # (1)
+
+    else:
+        # check:
+        #   (1): none
+        # z-postcond:
+        #   (1) PWD is a directory
+        #   (2) OLWDPWD is equal to the previous PWD
+        # nz-postcond:
+        #   (1) none
+
+        logging.critical(f"Unhandled cd invocation:\n{cmd_}\n{cmd}")
+
+        check = Empty() # (1)
+        success_postcond = (
+            IsDir(pwd_var)) # (1)
+            # StringEq(oldpwd_var, Prev(pwd_var))) # (2)
+        failure_postcond = Empty()
+
+    return CmdSpec(check, success_postcond, failure_postcond, io)
 
 def command_spec(cmd_: tuple[Field]) -> CmdSpec:
     # https://pubs.opengroup.org/onlinepubs/9799919799/utilities/command.html
