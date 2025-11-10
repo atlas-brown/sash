@@ -28,7 +28,7 @@ class CmdSpec:
     check: Constraint # condition to check before executing the command to detect possible bugs
     success_postcond: Constraint # post-condition if exit code is 0
     failure_postcond: Constraint # post-condition if exit code is non-0
-    io: IOType = IOType.NONE # whether the command does IO on stdin/stdout
+    io: IOType = IOType.UNKNOWN # whether the command does IO on stdin/stdout
 
 
 def parse_command(cmd_inv: tuple[Field]) -> CmdInvocation:

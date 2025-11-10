@@ -112,6 +112,27 @@ class IOType(Enum):
     STDIN = auto()
     STDOUT = auto()
     BOTH = auto()
+    UNKNOWN = auto()
+
+    @staticmethod
+    def add_stdin(io: IOType) -> "IOType":
+        match io:
+            case IOType.NONE | IOType.UNKNOWN:
+                return IOType.STDIN
+            case IOType.STDOUT:
+                return IOType.BOTH
+            case IOType.STDIN | IOType.BOTH:
+                return io
+
+    @staticmethod
+    def add_stdout(io: IOType) -> "IOType":
+        match io:
+            case IOType.NONE | IOType.UNKNOWN:
+                return IOType.STDOUT
+            case IOType.STDIN:
+                return IOType.BOTH
+            case IOType.STDOUT | IOType.BOTH:
+                return io
 
 @dataclass(frozen=True)
 class HasStdout(Constraint):
