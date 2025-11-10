@@ -2,7 +2,6 @@ from __future__ import annotations  # for postponed evaluation of annotations
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from sash.state import *
-from abc import ABC
 from collections.abc import Iterable
 import z3
 from dataclasses import dataclass, field, replace
@@ -10,6 +9,7 @@ from enum import Enum
 from sash.frozen import FrozenDict
 import logging
 import functools
+from enum import Enum, auto
 
 @dataclass(frozen=True)
 class Constraint:
@@ -106,6 +106,12 @@ class Writes(Constraint):
 @dataclass(frozen=True)
 class CommandExists(Constraint):
     name: Field
+
+class IOType(Enum):
+    NONE = auto()
+    STDIN = auto()
+    STDOUT = auto()
+    BOTH = auto()
 
 @dataclass(frozen=True)
 class HasStdout(Constraint):

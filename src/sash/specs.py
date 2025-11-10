@@ -28,6 +28,7 @@ class CmdSpec:
     check: Constraint # condition to check before executing the command to detect possible bugs
     success_postcond: Constraint # post-condition if exit code is 0
     failure_postcond: Constraint # post-condition if exit code is non-0
+    io: IOType = IOType.NONE # whether the command does IO on stdin/stdout
 
 
 def parse_command(cmd_inv: tuple[Field]) -> CmdInvocation:
@@ -206,33 +207,111 @@ def command_spec(cmd_: tuple[Field]) -> CmdSpec:
 def cp_spec(cmd_: tuple[Field]) -> CmdSpec:
     # https://pubs.opengroup.org/onlinepubs/9799919799/utilities/cp.html
 
+    # NOTE:
+    #   cp follows symbolic links by default, unless -P is present
+    #   cp prompts before overwriting non-writable files, unless -f is present
+    #   the current spec is modeled as if -P and -f are present on every call
+
     cmd = parse_command(cmd_)
     (name, flags, _, operands) = (cmd.cmd_name, cmd.flags, cmd.options, cmd.operands)
 
+    flags.discard("-p") # -p is used to control metadata of the created files
+    flags.discard("-P") # -P specifies that all actions be done on symbolic links themselves instead of their targets, see note above
+    flags.discard("-f") # -f makes the command silently overwrite non-writable files, without asking for confirmation, see note above
+    io = IOType.STDIN if "-i" in flags else IOType.NONE
+    flags.discard("-i")
+
     assert name == SymStr(("cp",)), f"Expected cp command, got: {name}"
 
-    if flags == set() and len(operands) == 2: # cp src dst
-        # precond:      src is a file, dst is not a directory or an unread file
-        # z-postcond:   src is a file, dst is an unread file
-        # nz-postcond:  none (maybe permission issue)
-        src, dst = operands[0], operands[1]
-        return CmdSpec(
-            check=IsFile(src) & (~IsDir(dst) & (IsFile(dst) >> ~IsUnread(dst))),
-            success_postcond=IsFile(src) & (IsFile(dst) & IsUnread(dst)),
-            failure_postcond=Empty())
-    elif flags == set() and len(operands) >= 2: # cp src... dst
-        # precond:      all src are files, dst is a directory
-        # z-postcond:   all src are files, dst is a directory, all src are copied as unread files into dst
-        # nz-postcond:  none (maybe permission issue)
-        srcs, dst = operands[:-1], operands[-1]
-        return CmdSpec(
-            check=And.from_field_iter(srcs, IsFile) & IsDir(dst),
-            success_postcond=And.from_field_iter(srcs, IsFile) & IsDir(dst),
-                # TODO: how to do that? should we do that?
-                # & And.from_field_iter(srcs, lambda path: IsUnread(ConcatPath(dst, path))),
-            failure_postcond=Empty())
+    if flags == set() and len(operands) == 2: # cp [-Pfip] source target
+        # check:
+        #   (1) source must be a file [command fails / bug]
+        #   (2) source must not be target [command fails] (could be removed from the check)
+        #   (3) (if target is a file then target must not be unread) and (if target is a directory then target/source must not be unread) [bug]
+        # z-postcond:
+        #   (1) source is a file
+        #   (2) source is not target
+        #   (3) (target is an unread file) or (target is a directory and target/source is an unread file)
+        # nz-postcond:
+        #   (1) none (command can fail due to reasons we don't model, such as permissions)
+
+        s, t = operands[0], operands[1]
+        check = (
+            IsFile(s) &                  # (1)
+            ~StringEq(s, t) &            # (2)
+            (IsFile(t) >> ~IsUnread(t))) # (3)
+                                        # TODO: how to denote created files like this?
+                                        # & (IsDir(t) >> ~IsUnread(ConcatPath(t, s))),
+        success_postcond = (
+            # TODO: decide whether target should be considered unread by default or inherit from source
+            IsFile(s) &                             # (1)
+            ~StringEq(s, t) &                       # (2)
+            ((IsFile(t) & IsUnread(t)) | IsDir(t))) # (3)
+                                                # & IsFile(ConcatPath(t, s)) & IsUnread(ConcatPath(t, s))
+        failure_postcond = Empty()
+
+    elif flags == set() and len(operands) >= 2: # cp [-Pfip] source... target
+        # check:
+        #   (1) all sources must be files [command fails / bug]
+        #   (2) no sources must be target [command fails] (redundant? could be removed from the check)
+        #   (3) target must be a directory [command fails / bug]
+        #   (4) if target/sources are files then they must not be unread [bug]
+        # z-postcond:
+        #   (1) all sources are files
+        #   (2) no sources are target (redundant?)
+        #   (3) target is a directory
+        #   (4) target/sources are unread files
+        # nz-postcond:
+        #   (1) none (command can fail due to reasons we don't model, such as permissions)
+
+        ss, t = operands[:-1], operands[-1]
+        check = (
+            And.from_field_iter(ss, IsFile) &                    # (1)
+            And.from_field_iter(ss, lambda s: ~StringEq(s, t)) & # (2)
+            IsDir(t))                                            # (3)
+            # & And.from_field_iter(ss, lambda s: IsFile(ConcatPath(t, s) >> ~IsUnread(ConcatPath(t, s))) # (4)
+        success_postcond = (
+            And.from_field_iter(ss, IsFile) &                    # (1)
+            And.from_field_iter(ss, lambda s: ~StringEq(s, t)) & # (2)
+            IsDir(t))                                            # (3)
+            # & And.from_field_iter(ss, lambda path: IsFile(ConcatPath(t, s)) & IsUnread(ConcatPath(t, s))), (4)
+        failure_postcond = Empty()
+
+    elif "-R" in flags and len(operands) >= 2: # cp -R [-H|-L|-P] [-fip] source... target
+        # check:
+        #   (1) all sources must not be deleted [command fails / bug]
+        #   (2) target must be a directory [command fails / bug]
+        #   (3) if target/sources are files then they must not be unread
+        # z-postcond:
+        #   (1) all sources are not deleted
+        #   (2) target is a directory
+        #   (3) (if souces are files then target/sources are files) and (if sources are firectories then target/sources are directories)
+        #   (4) if target/sources are files then they are unread
+        # nz-postcond:
+        #   (1) none (command can fail due to reasons we don't model, such as permissions)
+
+        logging.critical(f"Unhandled cp invocation:\n{cmd_}\n{cmd}; falling back to default case")
+
+        ss, t = operands[:-1], operands[-1]
+        check = (
+            And.from_field_iter(ss, lambda s: ~IsDeleted(s)) & # (1)
+            IsDir(t))                                          # (2)
+            # & And.from_field_iter(ss, lambda s: IsFile(ConcatPath(t, s) >> ~IsUnread(ConcatPath(t, s))) # (3)
+        success_postcond = (
+            And.from_field_iter(ss, lambda s: ~IsDeleted(s)) & # (1)
+            IsDir(t))                                          # (2)
+            # & And.from_field_iters(ss, lambda s: (IsFile(s) >> IsFile(ConcatPath(t, s)) & (IsDir(s) >> IsDir(ConcatPath(t, s))))) # (3)
+            # & And.from_field_iter(ss, lambda s: IsFile(ConcatPath(t, s) >> ~IsUnread(ConcatPath(t, s))) # (4)
+        failure_postcond = Empty()
+
     else:
-        assert False, f"Unhandled cp invocation:\n{cmd_}\n{cmd}"
+        if len(operands) < 2:
+            raise NotImplementedError("invalid cp handling (< 2 operands) has not been implemented yet")
+
+        # TODO: handle malformed cp calls (non-POSIX flags)
+        raise NotImplementedError("non-POSIX cp handling has not been implemented yet")
+
+    return CmdSpec(check, success_postcond, failure_postcond, io)
 
 
 def echo_spec(cmd_: tuple[Field]) -> CmdSpec:
@@ -463,6 +542,4 @@ def get_spec(cmd_name: str | None, cmd_: tuple[Field]) -> CmdSpec | None:
 # TODO: in the postconds add env vars that change (e.g. PWD, OLDPWD, etc.)
 # TODO: add default cases
 # TODO: add comments with explanations for the default cases (why are they needed, what can go wrong otherwise?)
-# NOTE: in the postconds add env vars that change (e.g. PWD, OLDPWD, etc.)
-# generally any information that can be conveyed through the constraints should be added here
-# TODO: comments with explanations for the default cases (why are they needed, what can go wrong otherwise?)
+# TODO: add io information for each invocation (DoesIO constraints)
