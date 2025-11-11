@@ -1,8 +1,7 @@
 import inspect
 import logging
 import sys
-from dataclasses import dataclass, replace
-from functools import reduce
+from dataclasses import dataclass
 
 from pash_annotations.parser import parser as pash_annot_parser
 
@@ -729,7 +728,22 @@ def get_spec(cmd_name: str | None, cmd_: tuple[Field, ...]) -> CmdSpec | None:
     logging.critical(f"No spec found for '{cmd_name}'")
 
 
-# TODO: in the postconds add env vars that change (e.g. PWD, OLDPWD, etc.)
-# TODO: add default cases
-# TODO: add comments with explanations for the default cases (why are they needed, what can go wrong otherwise?)
-# TODO: add io information for each invocation (DoesIO constraints)
+def log_crit_unhandled_inv(cmd_: tuple[Field, ...]) -> None:
+    import json
+
+    cmd = parse_command(cmd_)
+    cmd_json = {
+        "original" : [field for field in cmd_],
+        "pash_parsed" : {
+            "cmd_name": cmd.cmd_name,
+            "flags": list(cmd.flags),
+            "options": {k: v for k, v in cmd.options.items()},
+            "operands": [op for op in cmd.operands]
+        }
+    }
+
+    logging.critical(f"Unhandled invocation for command '{cmd.cmd_name}':\n{json.dumps(cmd_json, indent=2, default=str)}")
+
+def handle_non_posix(cmd_name: str) -> CmdSpec:
+    logging.warning(f"Non-POSIX '{cmd_name}' handling is not supported; treating as no-op")
+    return CmdSpec(Empty(), Empty(), Empty(), IOType.UNKNOWN) # no-op spec
