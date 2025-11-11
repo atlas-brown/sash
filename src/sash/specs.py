@@ -524,7 +524,6 @@ def rm_spec(cmd_: tuple[Field, ...]) -> CmdSpec:
     # https://pubs.opengroup.org/onlinepubs/9799919799/utilities/rm.html
 
     cmd = parse_command(cmd_)
-    logging.debug(f"Ignored irrelevant flags for rm: {cmd.flags - {'-r', '-f'}}")
     (name, flags, options, operands) = (cmd.cmd_name, cmd.flags, cmd.options, cmd.operands)
     io = IOType.STDIN if "-i" in flags else IOType.NONE
     io = IOType.add_stdout(io) if "-v" in flags else io
@@ -614,19 +613,41 @@ def touch_spec(cmd_: tuple[Field, ...]) -> CmdSpec:
 
     cmd = parse_command(cmd_)
     (name, flags, _, operands) = (cmd.cmd_name, cmd.flags, cmd.options, cmd.operands)
-    logging.debug(f"Ignored irrelevant flags for touch: {cmd.flags}")
+    io = IOType.NONE
+    flags.discard("-a") # -a changes access time, which we do not model
+    flags.discard("-d") # -d changes time to a specific date, which we do not model
+    flags.discard("-m") # -m changes modification time, which we do not model
+    flags.discard("-r") # -r changes time to that of a reference file, which we do not model
+    flags.discard("-t") # -t changes time to a specific time, which we do not model
+
+    assert name == SymStr(("touch",)), f"Expected touch command, got: {name}"
 
     if flags == set(): # touch file...
         # NOTE: Touch does not create unread files since they are empty upon creation
-        # precond:      none
-        # z-postcond:   all operands are files or directories
-        # nz-postcond:  none (maybe permission issue, etc.)
-        return CmdSpec(
-            check=Empty(),
-            success_postcond=And.from_field_iter(operands, lambda p: IsFile(p) | IsDir(p)),
-            failure_postcond=Empty())
+        # check:
+        #   (1) none
+        # z-postcond:
+        #   (1) all operands are files or directories
+        # nz-postcond:
+        #   (1) none (maybe permission issue, etc.)
+
+        check = Empty()
+        success_postcond = And.from_field_iter(operands, lambda p: IsFile(p) | IsDir(p))
+        failure_postcond = Empty()
+
+    elif flags == set(["-c"]): # touch -c file...
+        # -c tells touch to not create files if they do not exist, turning it essentially into a no-op for us
+
+        check = Empty()
+        success_postcond = Empty()
+        failure_postcond = Empty()
+
     else:
-        assert False, f"Unhandled touch invocation:\n{cmd_}\n{cmd}"
+        logging.critical(f"Unhandled touch invocation:\n{cmd_}\n{cmd}")
+
+        raise NotImplementedError("non-POSIX touch handling has not been implemented yet")
+
+    return CmdSpec(check, success_postcond, failure_postcond, io)
 
 # -- Specs end here --
 # Do not define specs below this line, they will not be registered!
