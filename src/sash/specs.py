@@ -609,8 +609,7 @@ def get_spec(cmd_name: str | None, cmd_: tuple[Field, ...]) -> CmdSpec | None:
         return CMD_SPECS[cmd_name](cmd_)
     logging.info(f"Specs are {CMD_SPECS}")
     logging.warning(f"No spec found for command '{cmd_name}', treating as no-op.")
-    assert False, f"No spec found for command '{cmd_name}'"
-    return None
+    logging.critical(f"No spec found for '{cmd_name}'")
 
 
 # TODO: in the postconds add env vars that change (e.g. PWD, OLDPWD, etc.)
