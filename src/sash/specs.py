@@ -750,3 +750,20 @@ def handle_non_posix(cmd_: tuple[Field, ...]) -> CmdSpec:
 
     #logging.warning(f"Non-POSIX '{cmd_name}' handling is not supported; treating as no-op")
     return CmdSpec(Empty(), Empty(), Empty(), IOType.UNKNOWN) # no-op spec
+
+# TODO: this code is very diffcult to maintain, consider refactoring it to use classes (should have done from the start...)
+# outline of a handle() method:
+#def handle_invocation(self, cmd: tuple[Field, ...]) -> CmdSpec:
+#    cmd_parsed = parse_command(cmd)
+#    (name, flags, options, operands) = (cmd_parsed.cmd_name, cmd_parsed.flags, cmd_parsed.options, cmd_parsed.operands)
+#
+#    if flags >= self.posix_flags:
+#        spec = self.handle_non_posix(cmd)
+#
+#    elif flags >= self.supported_flags:
+#        spec = self.handle_non_supported(cmd)
+#
+#    else:
+#        spec = self.handle_supported(cmd)
+#
+#    return spec
