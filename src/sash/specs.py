@@ -88,6 +88,65 @@ def parse_command(cmd_inv: tuple[Field, ...]) -> CmdInvocation:
 
 # -- Specs start here --
 
+def alias_spec(cmd_: tuple[Field, ...]) -> CmdSpec:
+    # https://pubs.opengroup.org/onlinepubs/9799919799/utilities/alias.html
+
+    cmd = parse_command(cmd_)
+    (name, flags, _, operands) = (cmd.cmd_name, cmd.flags, cmd.options, cmd.operands)
+    io = IOType.NONE
+
+    # NOTE:
+    #   'alias name=newcmd' gets parsed as an operand with content SymStr(("name=newcmd",))
+    #   'alias name=newcmd cmdflags...' gets parsed as more than one operand with content SymStr(("name=newcmd",)), SymStr(("cmdflags",)), SymStr(("...",))
+
+    assert name == SymStr(("alias",)), f"Expected alias command, got: {name}"
+
+    if flags == set() and len(operands) == 0: # alias (print all aliases)
+        # check:        none
+        # z-postcond:   none
+        # nz-postcond:  none
+
+        check = Empty()
+        success_postcond = Empty()
+        failure_postcond = Empty()
+        io = IOType.STDOUT
+
+    elif flags == set() and len(operands) >= 1 and isinstance(operands[0].content, SymStr) and isinstance(operands[0].content.parts[0], str): # alias name[=value [cmdflags...]]
+        if '=' in operands[0].content.parts[0]:
+            # alias name=value ... (this should be the most common case)
+
+            # check:        none
+            # z-postcond:   none
+            # nz-postcond:  none
+
+            name, _ = operands[0].content.parts[0].split('=', 1)
+
+            check = Empty()
+            success_postcond = CommandExists(Field(SymStr((name,)), WordCount(1,1)))
+            failure_postcond = Empty()
+
+        else:
+            # alias name...
+
+            # check:        none
+            # z-postcond:   none
+            # nz-postcond:  none
+
+            check = Empty()
+            success_postcond = Empty()
+            failure_postcond = Empty()
+            io = IOType.STDOUT
+
+    else:
+        logging.critical(f"Unhandled alias invocation:\n{cmd_}\n{cmd}; treating as no-op")
+
+        check = Empty()
+        success_postcond = Empty()
+        failure_postcond = Empty()
+
+    return CmdSpec(check, success_postcond, failure_postcond, io)
+
+
 def cd_spec(cmd_: tuple[Field, ...]) -> CmdSpec:
     # https://pubs.opengroup.org/onlinepubs/9799919799/utilities/cd.html
 
