@@ -526,46 +526,71 @@ def rm_spec(cmd_: tuple[Field, ...]) -> CmdSpec:
     cmd = parse_command(cmd_)
     logging.debug(f"Ignored irrelevant flags for rm: {cmd.flags - {'-r', '-f'}}")
     (name, flags, options, operands) = (cmd.cmd_name, cmd.flags, cmd.options, cmd.operands)
-    cmd = replace(cmd, flags={flag for flag in cmd.flags if flag in {"-r", "-f"}})
+    io = IOType.STDIN if "-i" in flags else IOType.NONE
+    io = IOType.add_stdout(io) if "-v" in flags else io
+    io = IOType.remove_stdin(io) if "-f" in flags else io # 'rm -if ...' would not prompt
+                                                          # 'rm -fi ...' would prompt, but we assume '-if' order as it is more dangerous
+    flags.discard("-i")
+    flags.discard("-v")
+    if "-R" in flags or "-d" in flags:
+        flags.discard("-R") # -R is equivalent to -r
+        flags.discard("-d") # -d allows deletion of empty directories (which we cannot reason about)
+        flags.add("-r") # same postconditions as -d
 
     assert name == SymStr(("rm",)), f"Expected rm command, got:\nOriginal: {cmd_}\nPaSh: {cmd}"
     assert len(options) == 0, f"Expected no options for rm, got:\nOriginal: {cmd_}\nPaSh: {cmd}"
 
-    if flags == set(): # rm file...
-        # precond:      all operands are files
-        # z-postcond:   all operands are deleted
-        # nz-postcond:  none (maybe all operands weren't files, maybe one operand wasn't a file, maybe it was a permission issue, etc.)
-        return CmdSpec(
-            check=reduce(lambda acc, path: And(acc, IsFile(path)), operands, Empty()),
-            success_postcond=reduce(lambda acc, path: And(acc, IsDeleted(path)), operands, Empty()),
-            failure_postcond=Empty())
-    elif flags == set(["-f"]): # rm -f file...
-        # precond:      all operands are not directories [and for bug-catching purposes: all operands are not deleted]
-        # z-postcond:   all operands are deleted
-        # nz-postcond:  none (maybe permission issue, etc.)
-        return CmdSpec(
-            check=reduce(lambda acc, path: And(acc, And(Not(IsDir(path)), Not(IsDeleted(path)))), operands, Empty()),
-            success_postcond=reduce(lambda acc, path: And(acc, IsDeleted(path)), operands, Empty()),
-            failure_postcond=Empty())
-    elif flags == set(["-r"]): # rm -r file...
-        # precond:      all operands are files or directories
+    if flags == set(): # rm [-iv] file...
+        # check:
+        #   (1) all operands are files
+        # z-postcond:
+        #   (1) all operands are deleted
+        # nz-postcond:
+        #   (1) none (maybe all operands weren't files, maybe one operand wasn't a file, maybe it was a permission issue, etc.)
+
+        check = And.from_field_iter(operands, IsFile)
+        success_postcond = And.from_field_iter(operands, IsDeleted)
+        failure_postcond = Empty()
+
+    elif flags == set(["-f"]): # rm [-iv] -f file...
+        # check:
+        #   (1) all operands are not directories [and for bug-catching purposes: all operands are not deleted]
         # z-postcond:   all operands are deleted
         # nz-postcond:  none (maybe permission issue, etc.)
-        return CmdSpec(
-            check=reduce(lambda acc, path: And(acc, Or(IsFile(path), IsDir(path))), operands, Empty()),
-            success_postcond=reduce(lambda acc, path: And(acc, IsDeleted(path)), operands, Empty()),
-            failure_postcond=Empty())
-    elif flags == set(["-r", "-f"]): # rm -r -f file...
-        # precond:      [for bug catching purposes: all operands are not deleted]
-        # z-postcond:   all operands are deleted
-        # nz-postcond:  none (maybe permission issue, etc.)
-        return CmdSpec(
-            check=reduce(lambda acc, path: And(acc, Not(IsDeleted(path))), operands, Empty()),
-            success_postcond=reduce(lambda acc, path: And(acc, IsDeleted(path)), operands, Empty()),
-            failure_postcond=Empty())
+        check = And.from_field_iter(operands, lambda op: ~IsDir(op) & ~IsDeleted(op))
+        success_postcond = And.from_field_iter(operands, IsDeleted)
+        failure_postcond = Empty()
+
+    elif flags == set(["-r"]): # rm [-iv] -d/-r/-R file...
+        # check:
+        #   (1) all operands are files or directories
+        # z-postcond:
+        #   (1) all operands are deleted
+        # nz-postcond:
+        #   (1) none (maybe permission issue, etc.)
+        check = And.from_field_iter(operands, lambda op: IsFile(op) | IsDir(op))
+        success_postcond = And.from_field_iter(operands, IsDeleted)
+        failure_postcond = Empty()
+
+    elif flags == set(["-r", "-f"]): # rm [-iv] -d/-r/-R -f file...
+        # check:
+        #   (1) [for bug catching purposes: all operands are not deleted]
+        # z-postcond:
+        #   (1) all operands are deleted
+        # nz-postcond:
+        #   (1) none (maybe permission issue, etc.)
+
+        check = And.from_field_iter(operands, lambda op: ~IsDeleted(op))
+        success_postcond = And.from_field_iter(operands, IsDeleted)
+        failure_postcond = Empty()
+
     else:
-        # TODO: implement a default case (need to look at every rm flag and derive the most detailed but correct spec)
-        raise NotImplementedError(f"Unhandled rm invocation:\n{cmd_}\n{cmd}")
+        logging.critical(f"Unhandled mkdir invocation:\n{cmd_}\n{cmd}")
+
+        # TODO: handle malformed rm calls (non-POSIX flags)
+        raise NotImplementedError("non-POSIX rm handling has not been implemented yet")
+
+    return CmdSpec(check, success_postcond, failure_postcond, io)
 
 
 def sudo_spec(cmd_: tuple[Field, ...]) -> CmdSpec | None:
