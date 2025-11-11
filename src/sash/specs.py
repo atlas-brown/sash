@@ -222,6 +222,8 @@ def command_spec(cmd_: tuple[Field, ...]) -> CmdSpec:
 
     cmd = parse_command(cmd_)
     (name, flags, _, operands) = (cmd.cmd_name, cmd.flags, cmd.options, cmd.operands)
+    flags.discard("-p") # -p tells command to use a default value for PATH, guaranteed to find all standard utilities
+    io = IOType.NONE
 
     assert name == SymStr(("command",)), f"Expected command command, got: {name}"
 
@@ -233,19 +235,36 @@ def command_spec(cmd_: tuple[Field, ...]) -> CmdSpec:
     # fi
     # my_alias
 
-    if flags == set(["-v"]) and len(operands) == 1: # command -v cmd
-        # precond:      none
-        # z-postcond:   none (cmd might be a reserved word, see note above)
-        # nz-postcond:  cmd is not a command
-        return CmdSpec(
-            check=Empty(),
-            success_postcond=Empty(),
-            failure_postcond=Not(CommandExists(operands[0])))
-    else:
-        assert False, f"Unhandled command invocation:\n{cmd_}\n{cmd}"
+    if flags == set(["-v"]) or flags == set(["-V"]) and len(operands) == 1: # command -v/-V cmd
+        # check:
+        #   (1) none
+        # z-postcond:
+        #   (1) none (cmd might be a reserved word, see note above)
+        # nz-postcond:
+        #   (1) cmd is not a command
+        cmd = operands[0]
+        check = Empty()
+        success_postcond = Empty()
+        failure_postcond = ~CommandExists(cmd)
+        io = IOType.add_stdout(io)
+
+    else: # command cmd args...
+        logging.critical(f"Unhandled command invocation:\n{cmd_}\n{cmd}; falling back to default case")
+
+        cmd = operands[0]
+        cmd_name = parse_command((cmd,)).cmd_name.parts[0] # hack to get the command name
+        if isinstance(cmd_name, str):
+            spec = get_spec(cmd_name, tuple(operands))
+            if spec:
+                return spec
+
+        check = Empty()
+        success_postcond = Empty()
+        failure_postcond = Empty()
+
+    return CmdSpec(check, success_postcond, failure_postcond, io)
 
 
-def cp_spec(cmd_: tuple[Field]) -> CmdSpec:
 def cp_spec(cmd_: tuple[Field, ...]) -> CmdSpec:
     # https://pubs.opengroup.org/onlinepubs/9799919799/utilities/cp.html
 
