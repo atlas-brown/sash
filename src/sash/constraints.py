@@ -134,6 +134,26 @@ class IOType(Enum):
             case IOType.STDOUT | IOType.BOTH:
                 return io
 
+    @staticmethod
+    def remove_stdin(io: IOType) -> "IOType":
+        match io:
+            case IOType.STDIN:
+                return IOType.NONE
+            case IOType.BOTH:
+                return IOType.STDOUT
+            case IOType.STDOUT | IOType.NONE | IOType.UNKNOWN:
+                return io
+
+    @staticmethod
+    def remove_stdout(io: IOType) -> "IOType":
+        match io:
+            case IOType.STDOUT:
+                return IOType.NONE
+            case IOType.BOTH:
+                return IOType.STDIN
+            case IOType.STDIN | IOType.NONE | IOType.UNKNOWN:
+                return io
+
 @dataclass(frozen=True)
 class HasStdout(Constraint):
     command: Field
