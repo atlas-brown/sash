@@ -31,7 +31,7 @@ class CmdSpec:
     io: IOType = IOType.UNKNOWN # whether the command does IO on stdin/stdout
 
 
-def parse_command(cmd_inv: tuple[Field]) -> CmdInvocation:
+def parse_command(cmd_inv: tuple[Field, ...]) -> CmdInvocation:
     """
     Parses a command invocation from a list of Fields into a CmdInvocation object.
     The CmdInvocation only contains flags in their short form (e.g., '-l' instead of '--long').
@@ -88,7 +88,7 @@ def parse_command(cmd_inv: tuple[Field]) -> CmdInvocation:
 
 # -- Specs start here --
 
-def cd_spec(cmd_: tuple[Field]) -> CmdSpec:
+def cd_spec(cmd_: tuple[Field, ...]) -> CmdSpec:
     # https://pubs.opengroup.org/onlinepubs/9799919799/utilities/cd.html
 
     # NOTE:
@@ -191,7 +191,8 @@ def cd_spec(cmd_: tuple[Field]) -> CmdSpec:
 
     return CmdSpec(check, success_postcond, failure_postcond, io)
 
-def command_spec(cmd_: tuple[Field]) -> CmdSpec:
+
+def command_spec(cmd_: tuple[Field, ...]) -> CmdSpec:
     # https://pubs.opengroup.org/onlinepubs/9799919799/utilities/command.html
 
     # A note on 'command -v/-V cmd':
@@ -245,6 +246,7 @@ def command_spec(cmd_: tuple[Field]) -> CmdSpec:
 
 
 def cp_spec(cmd_: tuple[Field]) -> CmdSpec:
+def cp_spec(cmd_: tuple[Field, ...]) -> CmdSpec:
     # https://pubs.opengroup.org/onlinepubs/9799919799/utilities/cp.html
 
     # NOTE:
@@ -356,7 +358,7 @@ def cp_spec(cmd_: tuple[Field]) -> CmdSpec:
     return CmdSpec(check, success_postcond, failure_postcond, io)
 
 
-def echo_spec(cmd_: tuple[Field]) -> CmdSpec:
+def echo_spec(cmd_: tuple[Field, ...]) -> CmdSpec:
     # https://pubs.opengroup.org/onlinepubs/9799919799/utilities/echo.html
 
     cmd = parse_command(cmd_)
@@ -375,7 +377,7 @@ def echo_spec(cmd_: tuple[Field]) -> CmdSpec:
     return CmdSpec(Empty(), Empty(), Empty(), IOType.STDOUT)
 
 
-def grep_spec(cmd_: tuple[Field]) -> CmdSpec:
+def grep_spec(cmd_: tuple[Field, ...]) -> CmdSpec:
     # https://pubs.opengroup.org/onlinepubs/9799919799/utilities/grep.html
 
     cmd = parse_command(cmd_)
@@ -415,7 +417,7 @@ def grep_spec(cmd_: tuple[Field]) -> CmdSpec:
     return CmdSpec(check, success_postcond, failure_postcond, io)
 
 
-def mkdir_spec(cmd_: tuple[Field]) -> CmdSpec:
+def mkdir_spec(cmd_: tuple[Field, ...]) -> CmdSpec:
     # https://pubs.opengroup.org/onlinepubs/9799919799/utilities/mkdir.html
 
     # Note:
@@ -450,7 +452,7 @@ def mkdir_spec(cmd_: tuple[Field]) -> CmdSpec:
         assert False, f"Unhandled mkdir invocation:\n{cmd_}\n{cmd}"
 
 
-def mv_spec(cmd_: tuple[Field]) -> CmdSpec:
+def mv_spec(cmd_: tuple[Field, ...]) -> CmdSpec:
     # https://pubs.opengroup.org/onlinepubs/9799919799/utilities/mv.html
 
     cmd = parse_command(cmd_)
@@ -487,7 +489,7 @@ def mv_spec(cmd_: tuple[Field]) -> CmdSpec:
         assert False, f"Unhandled mv invocation:\n{cmd_}\n{cmd}"
 
 
-def rm_spec(cmd_: tuple[Field]) -> CmdSpec:
+def rm_spec(cmd_: tuple[Field, ...]) -> CmdSpec:
     # https://pubs.opengroup.org/onlinepubs/9799919799/utilities/rm.html
 
     cmd = parse_command(cmd_)
@@ -535,7 +537,7 @@ def rm_spec(cmd_: tuple[Field]) -> CmdSpec:
         raise NotImplementedError(f"Unhandled rm invocation:\n{cmd_}\n{cmd}")
 
 
-def sudo_spec(cmd_: tuple[Field]) -> CmdSpec | None:
+def sudo_spec(cmd_: tuple[Field, ...]) -> CmdSpec | None:
 
     cmd = parse_command(cmd_)
     operands = cmd.operands
@@ -547,7 +549,7 @@ def sudo_spec(cmd_: tuple[Field]) -> CmdSpec | None:
     return get_spec(operands[0].content.parts[0], tuple(operands[1:]))
 
 
-def touch_spec(cmd_: tuple[Field]) -> CmdSpec:
+def touch_spec(cmd_: tuple[Field, ...]) -> CmdSpec:
     # https://pubs.opengroup.org/onlinepubs/9799919799/utilities/touch.html
 
     cmd = parse_command(cmd_)
@@ -579,7 +581,7 @@ for name, func in inspect.getmembers(current_module, inspect.isfunction):
         CMD_SPECS[cmd_name] = func
 
 
-def get_spec(cmd_name: str | None, cmd_: tuple[Field]) -> CmdSpec | None:
+def get_spec(cmd_name: str | None, cmd_: tuple[Field, ...]) -> CmdSpec | None:
     if cmd_name in CMD_SPECS:
         return CMD_SPECS[cmd_name](cmd_)
     logging.info(f"Specs are {CMD_SPECS}")
