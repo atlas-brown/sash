@@ -134,7 +134,7 @@ def alias_spec(cmd_: tuple[Field, ...]) -> CmdSpec:
 
     else: # non-POSIX
         log_crit_unhandled_inv(cmd_)
-        return handle_non_posix("alias")
+        return handle_non_posix(cmd_)
 
     return CmdSpec(check, success_postcond, failure_postcond, io)
 
@@ -221,7 +221,7 @@ def cd_spec(cmd_: tuple[Field, ...]) -> CmdSpec:
             IsDir(d) &            # (1)
             StringEq(pwd_var, d)) # (2)
             # StringEq(oldpwd_var, Prev(pwd_var)) # (4)
-        failure_postcond=Empty() # (1)
+        failure_postcond = Empty() # (1)
 
     else:
         # check:
@@ -232,7 +232,7 @@ def cd_spec(cmd_: tuple[Field, ...]) -> CmdSpec:
         # nz-postcond:
         #   (1) none
 
-        logging.critical(f"Unhandled cd invocation:\n{cmd_}\n{cmd}")
+        log_crit_unhandled_inv(cmd_)
 
         check = Empty() # (1)
         success_postcond = (
@@ -299,7 +299,7 @@ def command_spec(cmd_: tuple[Field, ...]) -> CmdSpec:
         io = IOType.add_stdout(io)
 
     else: # command cmd args...
-        logging.critical(f"Unhandled command invocation:\n{cmd_}\n{cmd}; falling back to default case")
+        log_crit_unhandled_inv(cmd_)
 
         cmd = operands[0]
         cmd_name = parse_command((cmd,)).cmd_name.parts[0] # hack to get the command name
@@ -401,7 +401,7 @@ def cp_spec(cmd_: tuple[Field, ...]) -> CmdSpec:
         # nz-postcond:
         #   (1) none (command can fail due to reasons we don't model, such as permissions)
 
-        logging.critical(f"Unhandled cp invocation:\n{cmd_}\n{cmd}; falling back to default case")
+        log_crit_unhandled_inv(cmd_)
 
         ss, t = operands[:-1], operands[-1]
         check = (
@@ -416,13 +416,15 @@ def cp_spec(cmd_: tuple[Field, ...]) -> CmdSpec:
         failure_postcond = Empty()
 
     else:
-        logging.critical(f"Unhandled cp invocation:\n{cmd_}\n{cmd}")
-
         if len(operands) < 2:
-            raise NotImplementedError("invalid cp handling (< 2 operands) has not been implemented yet")
+            logging.error("cp command with less than 2 operands is invalid; treating as no-op")
+        else:
+            return handle_non_posix(cmd_)
 
-        # TODO: handle malformed cp calls (non-POSIX flags)
-        raise NotImplementedError("non-POSIX cp handling has not been implemented yet")
+        check = Empty()
+        success_postcond = Empty()
+        failure_postcond = Empty()
+        io = IOType.UNKNOWN
 
     return CmdSpec(check, success_postcond, failure_postcond, io)
 
@@ -432,18 +434,18 @@ def echo_spec(cmd_: tuple[Field, ...]) -> CmdSpec:
 
     cmd = parse_command(cmd_)
     (name, flags, _, _) = (cmd.cmd_name, cmd.flags, cmd.options, cmd.operands)
+    io = IOType.STDOUT
 
     assert name == SymStr(("echo",)), f"Expected echo command, got: {name}"
 
     if flags != set(): # POSIX does not define any flags for echo
-        logging.critical(f"Unhandled echo invocation:\n{cmd_}\n{cmd}")
-        raise NotImplementedError(f"non-POSIX echo handling has not been implemented yet")
+        return handle_non_posix(cmd_)
 
     # check:        none
     # z-postcond:   none
     # nz-postcond:  none
 
-    return CmdSpec(Empty(), Empty(), Empty(), IOType.STDOUT)
+    return CmdSpec(Empty(), Empty(), Empty(), io)
 
 
 def grep_spec(cmd_: tuple[Field, ...]) -> CmdSpec:
@@ -477,11 +479,12 @@ def grep_spec(cmd_: tuple[Field, ...]) -> CmdSpec:
         failure_postcond = Empty()
 
     else:
-        logging.critical(f"Unhandled grep invocation:\n{cmd_}\n{cmd}; falling back to default case")
+        log_crit_unhandled_inv(cmd_)
 
         check = Empty()
         success_postcond = Empty()
         failure_postcond = Empty()
+        io = IOType.UNKNOWN
 
     return CmdSpec(check, success_postcond, failure_postcond, io)
 
@@ -525,10 +528,7 @@ def mkdir_spec(cmd_: tuple[Field, ...]) -> CmdSpec:
         failure_postcond = Empty()
 
     else:
-        logging.critical(f"Unhandled mkdir invocation:\n{cmd_}\n{cmd}")
-
-        # TODO: handle malformed mkdir calls (non-POSIX flags)
-        raise NotImplementedError("non-POSIX mkdir handling has not been implemented yet")
+        return handle_non_posix(cmd_)
 
     return CmdSpec(check, success_postcond, failure_postcond, io)
 
@@ -567,7 +567,8 @@ def mv_spec(cmd_: tuple[Field, ...]) -> CmdSpec:
             success_postcond=And.from_field_iter(srcs, IsDeleted), # TODO: similar to cp, this postcond does not encode the new files created in the dir
             failure_postcond=Empty())
     else:
-        assert False, f"Unhandled mv invocation:\n{cmd_}\n{cmd}"
+        log_crit_unhandled_inv(cmd_)
+        return CmdSpec(Empty(), Empty(), Empty(), IOType.UNKNOWN)
 
 
 def rm_spec(cmd_: tuple[Field, ...]) -> CmdSpec:
@@ -634,10 +635,7 @@ def rm_spec(cmd_: tuple[Field, ...]) -> CmdSpec:
         failure_postcond = Empty()
 
     else:
-        logging.critical(f"Unhandled mkdir invocation:\n{cmd_}\n{cmd}")
-
-        # TODO: handle malformed rm calls (non-POSIX flags)
-        raise NotImplementedError("non-POSIX rm handling has not been implemented yet")
+        return handle_non_posix(cmd_)
 
     return CmdSpec(check, success_postcond, failure_postcond, io)
 
@@ -693,9 +691,7 @@ def touch_spec(cmd_: tuple[Field, ...]) -> CmdSpec:
         failure_postcond = Empty()
 
     else:
-        logging.critical(f"Unhandled touch invocation:\n{cmd_}\n{cmd}")
-
-        raise NotImplementedError("non-POSIX touch handling has not been implemented yet")
+        return handle_non_posix(cmd_)
 
     return CmdSpec(check, success_postcond, failure_postcond, io)
 
@@ -736,6 +732,21 @@ def log_crit_unhandled_inv(cmd_: tuple[Field, ...]) -> None:
 
     logging.critical(f"Unhandled invocation for command '{cmd.cmd_name}':\n{json.dumps(cmd_json, indent=2, default=str)}")
 
-def handle_non_posix(cmd_name: str) -> CmdSpec:
-    logging.warning(f"Non-POSIX '{cmd_name}' handling is not supported; treating as no-op")
+def handle_non_posix(cmd_: tuple[Field, ...]) -> CmdSpec:
+    import json
+
+    cmd = parse_command(cmd_)
+    cmd_json = {
+        "original" : [field for field in cmd_],
+        "pash_parsed" : {
+            "cmd_name": cmd.cmd_name,
+            "flags": list(cmd.flags),
+            "options": {k: v for k, v in cmd.options.items()},
+            "operands": [op for op in cmd.operands]
+        }
+    }
+
+    logging.critical(f"Unsupported inv:\n{json.dumps(cmd_json, indent=2, default=str)}")
+
+    #logging.warning(f"Non-POSIX '{cmd_name}' handling is not supported; treating as no-op")
     return CmdSpec(Empty(), Empty(), Empty(), IOType.UNKNOWN) # no-op spec
