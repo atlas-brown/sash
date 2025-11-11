@@ -565,7 +565,11 @@ def sudo_spec(cmd_: tuple[Field, ...]) -> CmdSpec | None:
     # TODO: A lot of interesting things can be modeled about sudo itself (e.g., permission denied, env vars, etc.)
     assert len(operands) >= 1, f"Expected at least one operand for sudo, got: {operands} for command {cmd_}"
     assert isinstance(operands[0].content, SymStr), f"Expected first operand of sudo to be a command string, got: {operands[0].content}"
-    return get_spec(operands[0].content.parts[0], tuple(operands[1:]))
+    if isinstance(operands[0].content.parts[0], str):
+        return get_spec(operands[0].content.parts[0], tuple(operands[1:]))
+    else:
+        logging.critical(f"Got non-str command name in sudo:{cmd_}\n{cmd}")
+        return CmdSpec(Empty(), Empty(), Empty())
 
 
 def touch_spec(cmd_: tuple[Field, ...]) -> CmdSpec:
