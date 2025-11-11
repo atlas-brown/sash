@@ -100,7 +100,9 @@ def alias_spec(cmd_: tuple[Field, ...]) -> CmdSpec:
 
     assert name == SymStr(("alias",)), f"Expected alias command, got: {name}"
 
-    if flags == set() and len(operands) == 0: # alias (print all aliases)
+    if flags == set() and len(operands) == 0: # alias
+        # prints all aliases to stdout
+
         # check:        none
         # z-postcond:   none
         # nz-postcond:  none
@@ -108,40 +110,31 @@ def alias_spec(cmd_: tuple[Field, ...]) -> CmdSpec:
         check = Empty()
         success_postcond = Empty()
         failure_postcond = Empty()
-        io = IOType.STDOUT
+        io = IOType.add_stdout(io)
 
-    elif flags == set() and len(operands) >= 1 and isinstance(operands[0].content, SymStr) and isinstance(operands[0].content.parts[0], str): # alias name[=value [cmdflags...]]
-        if '=' in operands[0].content.parts[0]:
-            # alias name=value ... (this should be the most common case)
+    elif flags == set() and len(operands) >= 1: # alias name[=value] ...
+        # defines aliases
 
-            # check:        none
-            # z-postcond:   none
-            # nz-postcond:  none
-
-            name, _ = operands[0].content.parts[0].split('=', 1)
-
-            check = Empty()
-            success_postcond = CommandExists(Field(SymStr((name,)), WordCount(1,1)))
-            failure_postcond = Empty()
-
-        else:
-            # alias name...
-
-            # check:        none
-            # z-postcond:   none
-            # nz-postcond:  none
-
-            check = Empty()
-            success_postcond = Empty()
-            failure_postcond = Empty()
-            io = IOType.STDOUT
-
-    else:
-        logging.critical(f"Unhandled alias invocation:\n{cmd_}\n{cmd}; treating as no-op")
+        # check:        none
+        # z-postcond:   for each operand of the form name[=value], name is a command
+        # nz-postcond:  none
 
         check = Empty()
         success_postcond = Empty()
         failure_postcond = Empty()
+
+        for op in operands:
+            if isinstance(op.content, SymStr) and isinstance(op.content.parts[0], str):
+                if '=' in op.content.parts[0]: # alias name=value ...
+                    name, _ = op.content.parts[0].split('=', 1)
+                    success_postcond = success_postcond & CommandExists(Field(SymStr((name,)), WordCount(1,1)))
+                else: # alias name ...
+                    io = IOType.add_stdout(io)
+            # TODO: unclear whether (and when) the previous 'if' case can be false
+
+    else: # non-POSIX
+        log_crit_unhandled_inv(cmd_)
+        return handle_non_posix("alias")
 
     return CmdSpec(check, success_postcond, failure_postcond, io)
 
@@ -285,7 +278,6 @@ def command_spec(cmd_: tuple[Field, ...]) -> CmdSpec:
 
     assert name == SymStr(("command",)), f"Expected command command, got: {name}"
 
-    # TODO: Model `alias` to create CommandExists constraints for aliases
     # Otherwise the following (plausible) code would be marked as buggy:
     # ```
     # if ! command -v my_alias; then
