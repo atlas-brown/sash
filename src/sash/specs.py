@@ -440,35 +440,47 @@ def mkdir_spec(cmd_: tuple[Field, ...]) -> CmdSpec:
     # https://pubs.opengroup.org/onlinepubs/9799919799/utilities/mkdir.html
 
     # Note:
-    #     The file system model is a flat map, there is no hierarchy of directories.
-    #     So `mkdir -p a/b` will not be assumed to fail if `a` is a file, even though in reality it would.
+    #   The file system model is a flat map, there is no hierarchy of directories
+    #   So `mkdir -p a/b` will not be assumed to fail if `a` is a file, even though in reality it would
 
     cmd = parse_command(cmd_)
     (name, flags, _, operands) = (cmd.cmd_name, cmd.flags, cmd.options, cmd.operands)
-    logging.debug(f"Ignored irrelevant flags for rm: {cmd.flags - {'-p'}}")
-    flags.discard("-m") # ignore -m flag
+    flags.discard("-m") # -m is used to control permissions, which we do not model
+    io = IOType.NONE
 
     assert name == SymStr(("mkdir",)), f"Expected mkdir command, got: {name}"
 
-    if flags == set(["-p"]): # mkdir -p dir...
-        # precond:      all operands are not files (mkdir -p doesn't error if directories exists)
-        # z-postcond:   all operands are directories
-        # nz-postcond:  none (maybe permission issue, etc.)
-        return CmdSpec(
-            check=reduce(lambda acc, path: And(acc, Not(IsFile(path))), operands, Empty()),
-            success_postcond=reduce(lambda acc, path: And(acc, IsDir(path)), operands, Empty()),
-            failure_postcond=Empty())
-    elif flags == set(): # mkdir dir...
-        # precond:      all operands do not exist
-        # z-postcond:   all operands are directories
-        # nz-postcond:  none (maybe permission issue, etc.)
-        return CmdSpec(
-            check=reduce(lambda acc, path: And(acc, Not(Or(IsFile(path), IsDir(path)))), operands, Empty()),
-            success_postcond=reduce(lambda acc, path: And(acc, IsDir(path)), operands, Empty()),
-            failure_postcond=Empty())
+    if flags == set(["-p"]): # mkdir [-m mode] -p dir...
+        # check:
+        #   (1) all operands must not be files (mkdir -p doesn't error if directories exist)
+        # z-postcond:
+        #   (1) all operands are directories
+        # nz-postcond:
+        #   (1) none (maybe permission issue, etc.)
+
+        check = And.from_field_iter(operands, lambda op: ~IsFile(op))
+        success_postcond = And.from_field_iter(operands, IsDir)
+        failure_postcond = Empty()
+
+    elif flags == set(): # mkdir [-m mode] dir...
+        # check:
+        #   (1) all operands must not be files or directories
+        # z-postcond:
+        #   (1) all operands are directories
+        # nz-postcond:
+        #   (1) none (maybe permission issue, etc.)
+
+        check = And.from_field_iter(operands, lambda op: ~(IsFile(op) | IsDir(op)))
+        success_postcond = And.from_field_iter(operands, IsDir)
+        failure_postcond = Empty()
+
     else:
-        # TODO: implement a default case (need to look at every mkdir flag and derive the most detailed but correct spec)
-        assert False, f"Unhandled mkdir invocation:\n{cmd_}\n{cmd}"
+        logging.critical(f"Unhandled mkdir invocation:\n{cmd_}\n{cmd}")
+
+        # TODO: handle malformed mkdir calls (non-POSIX flags)
+        raise NotImplementedError("non-POSIX mkdir handling has not been implemented yet")
+
+    return CmdSpec(check, success_postcond, failure_postcond, io)
 
 
 def mv_spec(cmd_: tuple[Field, ...]) -> CmdSpec:
