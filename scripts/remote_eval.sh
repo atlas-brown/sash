@@ -9,6 +9,7 @@ usage() {
     echo "  -i <identity_file>   SSH identity file (default: from .env or EVAL_IDENTITY_FILE)"
     echo "  -e <env-file>        Path to .env file (default: <repo-root>/.env)"
     echo "  -f <eval_file>       Output evaluation file, relative to the repo root (default: eval.out)"
+    echo "  -t <timeout>         Per-script timeout in seconds (default: 60)"
     exit 1
 }
 
@@ -16,13 +17,14 @@ usage() {
 [ "$1" = "--help" ] && usage
 
 # Read command-line arguments
-while getopts "u:h:i:e:f:" opt; do
+while getopts "u:h:i:e:f:t:" opt; do
     case $opt in
         u) user="$OPTARG" ;;
         h) host="$OPTARG" ;;
         i) identity_file="$OPTARG" ;;
         e) env_file="$OPTARG" ;;
         f) eval_file="$OPTARG" ;;
+        t) eval_timeout_sec="$OPTARG" ;;
         *) usage ;;
     esac
 done
@@ -50,7 +52,7 @@ fi
 
 # Evaluation parameters
 eval_file="${eval_file:-"eval.out"}"
-eval_timeout_sec="15"
+eval_timeout_sec="${eval_timeout_sec:-"60"}"
 
 # shellcheck disable=SC2139
 alias ssh="ssh -i \"$identity_file\" \"$user@$host\""
