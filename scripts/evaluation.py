@@ -66,13 +66,13 @@ def load_shellcheck_results(gt_path):
     return results
 
 
-def extract_codes_from_output(output):
+def extract_codes_from_output(output) -> tuple[set[str], dict] | None:
     try:
         data = json.loads(output)
         codes = [e.get("code") for e in data.get("errors", [])]
         return set(codes), data
     except Exception:
-        return None, None
+        return None
 
 def get_all_reporter_codes():
     return sash.reporter.Report.all_codes()
@@ -80,7 +80,7 @@ def get_all_reporter_codes():
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--timeout', type=float, default=None, help='Timeout in seconds for each benchmark (default: no timeout)')
-    parser.add_argument('--benchmarks', type=str, default=None, help='Path to the benchmarks directory (default: top-level "benchmarks")')
+    parser.add_argument('--benchmarks', type=str, default=None, help='Path to the benchmarks directory (default: <git_root>/benchmarks)')
     parser.add_argument('--only', type=str, default=None, help='Regex to filter benchmarks to run (default: run all)')
     parser.add_argument('--output', type=str, default=None, help='File to write output to (default: stdout)')
     args = parser.parse_args()
@@ -134,9 +134,9 @@ def main():
         for code in unknown_codes:
             print(f"Ground truth contains unknown error code: {code}", file=sys.stderr)
 
-        actual_codes, parsed_json = extract_codes_from_output(output)
+        data = extract_codes_from_output(output)
 
-        if actual_codes is None:
+        if data is None:
             # Couldn't parse output as JSON; treat as failure
             print("FAIL", file=sys.stderr)
             print("Expected:", file=sys.stderr)
@@ -147,6 +147,8 @@ def main():
             failure += 1
             total += 1
             continue
+
+        actual_codes, parsed_json = data
 
         # Check that every expected code appears in the actual codes (actual may contain extras)
         missing = [e for e in expected_in_scope if e not in actual_codes]
