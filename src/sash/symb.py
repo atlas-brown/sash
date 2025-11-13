@@ -1,11 +1,11 @@
-from collections import defaultdict
 import logging
 import traceback
+from collections import defaultdict
 from copy import copy
 from dataclasses import dataclass
 from math import inf
-from sash.specs import *
-from sash.solver import run_solver
+from threading import Event
+from typing import NamedTuple
 
 import shasta.ast_node as AST
 
@@ -16,6 +16,7 @@ from sash.frozen import FrozenAst, freeze, freeze_thing
 from sash.interpreter_config import InterpConfig
 from sash.parser import *
 from sash.reporter import Reporter
+from sash.specs import *
 from sash.state import *
 from sash.util import *
 
@@ -948,7 +949,19 @@ def find_func_defs(traces: Traces, nodes: list[WrappedAst], config: InterpConfig
 
     return known_fundefs_names
 
-def symb_engine(nodes: list[WrappedAst], config: InterpConfig) -> list[Trace]:
+
+class SymbexecStatus(Enum):
+    COMPLETED = "completed"
+    INTERRUPTED = "interrupted"
+    FAILED = "failed"
+
+
+class SymbexecResult(NamedTuple):
+    status: SymbexecStatus
+    traces: Traces
+
+
+def symb_engine(nodes: list[WrappedAst], config: InterpConfig, stop: Event | None) -> SymbexecResult:
     global context_line
     logging.debug(f"Running symb engine with {len(nodes)} raw nodes")
     traces = [Trace((starting_state(),))]
@@ -957,16 +970,19 @@ def symb_engine(nodes: list[WrappedAst], config: InterpConfig) -> list[Trace]:
     updated_config = config.set_info(ScriptInfo(known_fundefs_names=frozenset(known_fundefs_names)))
 
     for node in nodes:
+        if stop and stop.is_set():
+            logging.info("Symbolic execution interrupted by stop event")
+            return SymbexecResult(status=SymbexecStatus.INTERRUPTED, traces=traces)
+
         context_line = node.line_before + 1
         logging.debug(f"Interpreting next node (line {context_line}) {trim_string_for_logging(node.ast_node.pretty())}")
         traces = guarded_interp_node(traces, node.ast_node, updated_config)
 
-    return traces
-
+    return SymbexecResult(status=SymbexecStatus.COMPLETED, traces=traces)
 
 def symbexec_file(input_file: str,
-                  config: InterpConfig) -> Traces:
+                  config: InterpConfig,
+                  stop: Event | None) -> SymbexecResult:
     nodes = parse_shell_script(input_file)
     # opt_store = parse_shebang_args(input_file)
-    traces = symb_engine(nodes, config)
-    return traces
+    return symb_engine(nodes, config, stop)
