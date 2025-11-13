@@ -6,12 +6,12 @@ import traceback
 
 import sash.symb
 from sash.config import Config
-from sash.reporter import Reporter
+from sash.reporter import Reporter, Report
 from sash.solver import run_solver
 from sash.interpreter_config import InterpConfig
 
 
-def main(file: str, debug=False, solver=False) -> dict:
+def main(file: str, debug=False, solver=False) -> Report:
     if debug:
         logging.basicConfig(
             format="[%(filename)s:%(lineno)d] %(message)s", level=logging.DEBUG
@@ -28,10 +28,10 @@ def main(file: str, debug=False, solver=False) -> dict:
         traces = sash.symb.symbexec_file(file, config)
         if solver:
             run_solver(traces, config)
-        report_dict = Reporter.get_report()
+        report = Reporter.get_report()
         logging.info("Symbolic execution completed successfully")
-        logging.info(f"Time taken: {str(report_dict['time'])}")
-        return report_dict
+        logging.info(f"Time taken: {str(report.time)}")
+        return report
     except Exception:
         logging.error("Symbolic execution failed")
         logging.error(f"{traceback.format_exc()}")

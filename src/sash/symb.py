@@ -4,7 +4,6 @@ import traceback
 from copy import copy
 from dataclasses import dataclass
 from math import inf
-from typing import Any
 from sash.specs import *
 from sash.solver import run_solver
 
@@ -84,16 +83,16 @@ def handle_rm(expanded_args: tuple[Field], trace: Trace) -> tuple[Trace, Trace]:
         return any(path in [p, p + "/", p + "/*"] for p in Config.get("PROTECTED_PATHS"))
     for arg_field in expanded_args[1:]:
         if (path := field_to_str(arg_field)) and is_protected(path):
-            Reporter.add_error(reporter.DeleteSystemFile(path, context_line))
+            Reporter.add_issue(reporter.DeleteSystemFile(path, context_line))
         match arg_field:
             case Field(CompletelyArbitrary(source=source), WordCount(max=m)) if m > 1:
-                Reporter.add_error(reporter.DangerousWordSplit(source, context_line))
+                Reporter.add_issue(reporter.DangerousWordSplit(source, context_line))
         match arg_field:
             case Field(CompletelyArbitrary(prefix=pre, suffix=suf), WordCount(min, max)) if min == 0 or max > 1:
                 if pre is not None and (path := symb_utils.symbstr_to_str(pre.parts)) and is_protected(path):
-                    Reporter.add_error(reporter.WordSplitCouldDeleteSystemFile(path, context_line))
+                    Reporter.add_issue(reporter.WordSplitCouldDeleteSystemFile(path, context_line))
                 if suf is not None and (path := symb_utils.symbstr_to_str(suf.parts)) and is_protected(path):
-                    Reporter.add_error(reporter.WordSplitCouldDeleteSystemFile(path, context_line))
+                    Reporter.add_issue(reporter.WordSplitCouldDeleteSystemFile(path, context_line))
 
     return (
         trace.extend(lambda s: s.add_pathcond(spec.success_postcond).update_fs(spec.success_postcond).set_last_exit_code(SymStr(("0",)))),
@@ -123,10 +122,10 @@ def handle_unknown_command(name: str,
                            traces: Traces,
                            config: InterpConfig) -> Traces:
     if name in config.info.known_fundefs_names:
-        Reporter.add_error(reporter.UndefinedFunction(name, context_line))
+        Reporter.add_issue(reporter.UndefinedFunction(name, context_line))
 
     if name.endswith("/") or any(name in t.latest_state.known_nonexistant_commands for t in traces):
-        Reporter.add_error(reporter.NotACommand(name, context_line))
+        Reporter.add_issue(reporter.NotACommand(name, context_line))
 
     logging.debug(f"Unknown command {name}, optimistically treating as no-op")
     return traces
@@ -187,7 +186,7 @@ def handle_while(traces: Traces,
     logging.debug(f"Checking constant test cond")
     assert len(test_cmds) == 3
     if is_constant_test(test_cmds[2], test_cmds[1]):
-        Reporter.add_error(reporter.InfiniteLoop(node, context_line))
+        Reporter.add_issue(reporter.InfiniteLoop(node, context_line))
 
     return t5
 
@@ -310,16 +309,16 @@ def handle_if(traces: Traces, node: AST.IfNode, config: InterpConfig) -> Traces:
         test_result = interpret_test(test_cmds[-1])
         logging.debug(f"Test command result: {test_result}")
     if test_result is not None:
-        Reporter.add_error(reporter.ConstantCondition(test_cmds, context_line))
+        Reporter.add_issue(reporter.ConstantCondition(test_cmds, context_line))
         if test_result == True and (node.else_b is not None and node.else_b.pretty()):
                                                              # Hack because libdash sometimes gives empty else bodies
             t1 = trace_map(t1, lambda s: s.set_last_exit_code(SymStr(("0",))))
             logging.debug(f"Reporting dead code in else branch.")
-            Reporter.add_error(reporter.DeadCode(node.else_b, context_line))
+            Reporter.add_issue(reporter.DeadCode(node.else_b, context_line))
         elif test_result == False:
             t1 = trace_map(t1, lambda s: s.set_last_exit_code(SymStr(("1",))))
             logging.debug(f"Reporting dead code in then branch")
-            Reporter.add_error(reporter.DeadCode(node.then_b, context_line))
+            Reporter.add_issue(reporter.DeadCode(node.then_b, context_line))
     # Several possibilities here:
     # 1. Constant test true -- interpret then_b and return that
     # 2. Constant test false with no else -- just return t1
@@ -501,7 +500,7 @@ def expand_simple(stuff: list[AST.ArgChar],
                         # todo we should report path information
                         if not is_special_var(var.var):
                             error_code = reporter.UnboundIDSetU if state.opts.is_set(SetOptions.NOUNSET) else reporter.UnboundID
-                            Reporter.add_error(error_code(var.pretty(), context_line))
+                            Reporter.add_issue(error_code(var.pretty(), context_line))
                         self.add_a_field(arbitrary_field(var,
                                                          ArbitraryType.APPROXIMATION if is_special_var(var.var) else ArbitraryType.ENVIRONMENT,
                                                          state))
@@ -785,7 +784,7 @@ def interp_node(traces: Traces,
     traces = config.apply_node_cbs(traces, node)
     if not traces:
         logging.debug(f"No active traces when interpreting {trim_string_for_logging(node.pretty())}, reporting dead code and returning early")
-        Reporter.add_error(reporter.DeadCode(node, context_line))
+        Reporter.add_issue(reporter.DeadCode(node, context_line))
         return traces
 
     logging.debug(f"Interpreting {trim_string_for_logging(node.pretty())} with {len(traces)} traces")
@@ -843,7 +842,7 @@ def interp_node(traces: Traces,
             t0, var_name = expand_assuming_single_constant_word(traces, node.variable, config)
             t1, items = expand_args_dumb(t0, node.argument, config)
             if join_fields(items).count.max <= 1:
-                Reporter.add_error(reporter.LoopRunsOnce(node, context_line))
+                Reporter.add_issue(reporter.LoopRunsOnce(node, context_line))
             # if all items are constant, we can unroll the loop
             if all(symb_utils.is_constant(field) for field in items):
                 logging.debug(f"For loop over constant items, unrolling: {items}")
@@ -869,7 +868,7 @@ def interp_node(traces: Traces,
                     case [Field(SymStr([something]), WordCount(1, 1))]:
                         if isinstance(something, str) and something in t.latest_state.fundefs:
                             # TODO: Associate the warning with the trace that caused it
-                            Reporter.add_error(reporter.RedirectToFunction(something, context_line))
+                            Reporter.add_issue(reporter.RedirectToFunction(something, context_line))
                     case [Field(CompletelyArbitrary(), _)]:
                         pass
                     case _:

@@ -98,7 +98,7 @@ def model_to_reports(core: list[z3.BoolRef]):
             constraint,
             0, # TODO: line number
         )
-        Reporter.add_error(err)
+        Reporter.add_issue(err)
 
 
 # TODOS:
