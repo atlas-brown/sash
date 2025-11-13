@@ -63,7 +63,7 @@ def cli_main():
         timeout=args.timeout,
     )
 
-    print(json.dumps(report, indent=2))
+    print(json.dumps(report.to_dict(), indent=2))
 
 
 def parse_cli():

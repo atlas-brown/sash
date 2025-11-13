@@ -48,7 +48,8 @@ class Issue(ABC):
     def to_dict(self) -> dict:
         return {
             "line": self.source_line,
-            "code": self.code,
+            "code": self.code.value,
+            "severity": self.severity.value,
             "message": self.message
         }
 
@@ -144,6 +145,14 @@ class Report(NamedTuple):
     issues: list[Issue]
     time: float
     solver_time: float
+
+    def to_dict(self) -> dict:
+        return {
+            "filename": self.filename,
+            "issues": [issue.to_dict() for issue in self.issues],
+            "time": self.time,
+            "solver_time": self.solver_time,
+        }
 
 
 class Reporter:
