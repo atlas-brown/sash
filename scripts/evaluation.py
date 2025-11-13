@@ -79,10 +79,10 @@ def get_all_reporter_codes():
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--timeout', type=float, default=None, help='Timeout in seconds for each benchmark (default: no timeout)')
-    parser.add_argument('--benchmarks', type=str, default=None, help='Path to the benchmarks directory (default: <git_root>/benchmarks)')
-    parser.add_argument('--only', type=str, default=None, help='Regex to filter benchmarks to run (default: run all)')
-    parser.add_argument('--output', type=str, default=None, help='File to write output to (default: stdout)')
+    parser.add_argument('-t', '--timeout', type=float, default=None, help='Timeout in seconds for each benchmark (default: no timeout)')
+    parser.add_argument('-b', '--benchmarks', type=str, default=None, help='Path to the benchmarks directory (default: <git_root>/benchmarks)')
+    parser.add_argument('-O', '--only', type=str, default=None, help='Regex to filter benchmarks to run (default: run all)')
+    parser.add_argument('-o', '--output', type=str, default=None, help='File to write output to (default: stdout)')
     args = parser.parse_args()
 
     output_file = open(args.output, "w") if args.output else sys.stdout
