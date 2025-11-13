@@ -27,16 +27,12 @@ class Constraint:
         return Not(self)
 
     # A >> B (implies)
-    def __rshift__(self, other: Constraint) -> Or:
-        return (~self) | other
+    def __rshift__(self, other: Constraint) -> Implies:
+        return Implies(self, other)
 
 @dataclass(frozen=True)
 class Empty(Constraint):
     pass
-
-@dataclass(frozen=True)
-class Not(Constraint):
-    constraint: Constraint
 
 @dataclass(frozen=True)
 class And(Constraint):
@@ -73,6 +69,15 @@ class Or(Constraint):
     @staticmethod
     def from_field_iter(cons: Iterable[Field], tfm: Callable[[Field], Constraint]) -> Constraint:
         return Or.from_iter((tfm(c) for c in cons))
+
+@dataclass(frozen=True)
+class Not(Constraint):
+    constraint: Constraint
+
+@dataclass(frozen=True)
+class Implies(Constraint):
+    premise: Constraint
+    conclusion: Constraint
 
 @dataclass(frozen=True)
 class StringEq(Constraint):
