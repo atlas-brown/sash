@@ -46,6 +46,9 @@ def parse_command(cmd_inv: tuple[Field, ...]) -> CmdInvocation:
                 for part in parts:
                     match part:
                         case str(s):
+                            if " " in s:
+                                # If an part contains spaces, that means it was quoted in the original command (TODO: verify this assumption)
+                                s = f'"{s}"'
                             part_strs.append(s)
                         case SymVar(name):
                             # TODO: This might not work when we handle SymVars
