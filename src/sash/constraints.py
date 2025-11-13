@@ -245,15 +245,38 @@ class FSModelSimple(FSModel):
                 return fs_after_lhs.apply_postcondition(rhs)
             case Or(lhs, rhs):
                 fs_after_lhs = self.apply_postcondition(lhs)
-            case IsDeleted(path):
-                return self._delete(path)
+                # TODO: is rhs ignored on purpose?
+            case Not(IsDeleted(path)):
+                return self.apply_postcondition(IsFile(path) | IsDir(path))
+            case Not(IsFile(path)):
+                return self.apply_postcondition(IsDeleted(path) | IsDir(path))
+            case Not(IsDir(path)):
+                return self.apply_postcondition(IsDeleted(path) | IsFile(path))
+            case Not(constraint):
+                # TODO: handle other negations (implies?)
+                return self
+            case Implies(premise, conclusion):
+                # TODO: handle implications
+                return self
             case IsFile(path):
                 return self._create_file(path)
             case IsDir(path):
                 return self._create_dir(path)
+            case IsDeleted(path):
+                return self._delete(path)
+            case IsUnread(path):
+                current_state = self._get(path)
+                if current_state.exists:
+                    new_state = FSModelSimple.PathState(path_type=current_state.path_type, is_read=False)
+                    return self._set(path, new_state)
+                # TODO: isn't this an error otherwise?
+                return self
             case Writes(path):
                 # For simplicity, assume writing creates a file
                 return self._create_file(path)
+            case StringEq(_) | Reads(_) | CommandExists(_) | HasStdout(_) | ExpectsStdin(_) | Description(_):
+                # These constraints do not affect the FS model
+                return self
             case _:
                 assert False, f"Unhandled FS postcondition: {constraints}"
         return self
