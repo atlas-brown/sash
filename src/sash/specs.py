@@ -3,10 +3,12 @@ import logging
 import sys
 from dataclasses import dataclass
 
+import shasta.ast_node as AST
 from pash_annotations.parser import parser as pash_annot_parser
 
 from sash.constraints import *
 from sash.state import *
+from sash.symb import arbitrary_field
 
 
 @dataclass(frozen=True)
@@ -161,9 +163,10 @@ def cd_spec(cmd_: tuple[Field, ...]) -> CmdSpec:
     # NOTE: we might want to ignore the postconditions, i suspect they might overcomplicate things
     # NOTE: cd also interacts with CDPATH, do we care? the interaction is quite complex
 
-    home_var = Field(SymStr(("HOME",)), WordCount(1,1))
-    pwd_var = Field(SymStr(("PWD",)), WordCount(1,1))
-    oldpwd_var = Field(SymStr(("OLDPWD",)), WordCount(1,1))
+    make_ast = lambda var: AST.VArgChar("Normal", False, var, [])
+    home_var = arbitrary_field(make_ast("HOME"), ArbitraryType.ENVIRONMENT, None)
+    pwd_var = arbitrary_field(make_ast("PWD"), ArbitraryType.ENVIRONMENT, None)
+    oldpwd_var = arbitrary_field(make_ast("OLDPWD"), ArbitraryType.ENVIRONMENT, None)
     dash = Field(SymStr(("-",)), WordCount(1, 1))
 
     if flags == set() and len(operands) == 0: # cd
