@@ -11,12 +11,12 @@ sources:
 ground_truth:
   errors:
   - line: 78
-    code: could_del_sys_file
+    code: word_split_del_sys_file
     shellcheck:
       detects: true
       code: SC2115
   - line: 83
-    code: could_del_sys_file
+    code: word_split_del_sys_file
     shellcheck:
       detects: true
       code: SC2115

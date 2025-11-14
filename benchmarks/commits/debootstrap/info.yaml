@@ -16,10 +16,10 @@ sources:
 ground_truth:
   errors:
   - line: 47
-    code: unused_loop_var/const_loop_body
+    code: unused_loop_var
     shellcheck:
       detects: true
   - line: 490
-    code: could_del_sys_file
+    code: word_split_del_sys_file
     shellcheck:
       detects: false

@@ -11,6 +11,6 @@ sources:
 ground_truth:
   errors:
   - line: 707
-    code: could_del_sys_file
+    code: word_split_del_sys_file
     shellcheck:
       detects: false
