@@ -781,6 +781,12 @@ def drop_terminated_traces(traces: Traces) -> Traces:
 def guarded_interp_node(traces: Traces,
                         node: AST.AstNode,
                         config: InterpConfig) -> Traces:
+    global stop_event
+    if stop_event and stop_event.is_set():
+        logging.info("Symbolic execution interrupted by stop event")
+        return traces # same behavior as if the rest of the script is not implemented
+        # todo is this sound?
+
     try:
         return interp_node(traces, node, config)
     except NotImplementedError as e:
@@ -972,7 +978,7 @@ class SymbexecResult(NamedTuple):
     traces: Traces
 
 
-def symb_engine(nodes: list[WrappedAst], config: InterpConfig, stop: Event | None) -> SymbexecResult:
+def symb_engine(nodes: list[WrappedAst], config: InterpConfig) -> Traces:
     global context_line
     logging.debug(f"Running symb engine with {len(nodes)} raw nodes")
     traces = [Trace((starting_state(),))]
@@ -981,19 +987,28 @@ def symb_engine(nodes: list[WrappedAst], config: InterpConfig, stop: Event | Non
     updated_config = config.set_info(ScriptInfo(known_fundefs_names=frozenset(known_fundefs_names)))
 
     for node in nodes:
-        if stop and stop.is_set():
-            logging.info("Symbolic execution interrupted by stop event")
-            return SymbexecResult(status=SymbexecStatus.INTERRUPTED, traces=traces)
-
         context_line = node.line_before + 1
         logging.debug(f"Interpreting next node (line {context_line}) {trim_string_for_logging(node.ast_node.pretty())}")
         traces = guarded_interp_node(traces, node.ast_node, updated_config)
 
-    return SymbexecResult(status=SymbexecStatus.COMPLETED, traces=traces)
+    return traces
 
 def symbexec_file(input_file: str,
                   config: InterpConfig,
                   stop: Event | None) -> SymbexecResult:
-    nodes = parse_shell_script(input_file)
-    # opt_store = parse_shebang_args(input_file)
-    return symb_engine(nodes, config, stop)
+    global stop_event
+    stop_event = stop
+
+    try:
+        nodes = parse_shell_script(input_file)
+        # opt_store = parse_shebang_args(input_file)
+        traces = symb_engine(nodes, config)
+        if stop_event and stop_event.is_set():
+            return SymbexecResult(SymbexecStatus.INTERRUPTED, traces)
+        return SymbexecResult(SymbexecStatus.COMPLETED, traces)
+    except Exception as e:
+        logging.error(f"Symbolic execution failed:")
+        logging.error(traceback.format_exc())
+        return SymbexecResult(SymbexecStatus.FAILED, [])
+
+stop_event: Event | None = None
