@@ -172,7 +172,12 @@ def handle_while(traces: Traces,
     # todo extend path condition
     t2 = guarded_interp_node(t1, node.body, config)
     logging.debug(f"Interpreting second iteration")
+    # If all traces happen to terminate in the body, t3 will be empty after the next line
+    # Additionally, test_cmds will not have a second entry
     t3 = guarded_interp_node(t2, node.test, temp_config)
+    if len(t3) == 0:
+        logging.debug(f"All traces terminated on first iter of while body")
+        return t3
     # Special case: only one iteration
     if interpret_test(test_cmds[1]) == False:
         logging.debug(f"While loop only runs once")
@@ -182,6 +187,11 @@ def handle_while(traces: Traces,
     t4 = guarded_interp_node(t3, node.body, config)
     logging.debug(f"Interpreting third test")
     t5 = guarded_interp_node(t4, node.test, temp_config)
+    # If all traces happen to terminate on the second iteration, t5 will be empty
+    # Additionally, test_cmds will not have a third entry
+    if len(t5) == 0:
+        logging.debug(f"All traces terminated on second iter of while body")
+        return t5
     logging.debug(f"collected test_cmds: {test_cmds}")
 
     logging.debug(f"Checking constant test cond")
@@ -207,7 +217,7 @@ def is_constant_test(cmd1: list[Field], cmd2: list[Field]) -> bool:
             return False
 
 def interpret_test(cmd: list[Field]) -> bool | None:
-    """Return true or false `cmd` is a test that always returns either of the two results. Return None if unknown."""
+    """Return true or false if `cmd` is a test that always returns either of the two results. Return None if unknown."""
     if len(cmd) < 1:
         return None
 
@@ -331,6 +341,7 @@ def handle_if(traces: Traces, node: AST.IfNode, config: InterpConfig) -> Traces:
     t_other   = [t for t in t1 if t.latest_state.last_exit_code not in {SymStr(("0",)), SymStr(("1",))}]
     assert len(t_success) + len(t_failure) + len(t_other) == len(t1), f"Expected all traces to be either success or failure, got {len(t_success)} success and {len(t_failure)} failure out of {len(t1)} total"
     if test_result in {True, None}:
+        # Always take the 'then' branch, unless test condition is known to always be false
         t_then = guarded_interp_node(t_success + trace_map(t_other, lambda s: s.set_last_exit_code(SymStr(("0",)))),
                                     node.then_b,
                                     config)
