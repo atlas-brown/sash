@@ -12,14 +12,18 @@ from sash.solver import run_solver
 from sash.interpreter_config import InterpConfig
 
 
-def main(file: str, debug=False, solver=False, timeout: float | None = None) -> Report:
-    if debug:
-        logging.basicConfig(
-            format="[%(filename)s:%(lineno)d] %(message)s", level=logging.DEBUG
-        )
-        Config.set("DEBUG", True)
-    else:
-        logging.basicConfig(level=logging.CRITICAL)
+def main(file: str,
+         debug=False,
+         log_file: pathlib.Path | None=None,
+         solver=False,
+         timeout: float | None = None) -> Report:
+
+    Config.set("DEBUG", debug)
+    logging.basicConfig(
+        format="[%(filename)s:%(lineno)d] %(message)s",
+        level=logging.DEBUG if debug else logging.WARNING,
+        filename=log_file
+    )
 
     logging.info(f"Processing file {file}")
     Reporter.initialize(file)
@@ -39,8 +43,10 @@ def main(file: str, debug=False, solver=False, timeout: float | None = None) -> 
             logging.warning("Symbolic execution timed out; running solver with partial results")
         else:
             logging.info("Symbolic execution completed")
+
         if solver:
             run_solver(result.traces, config)
+
         return Reporter.get_report()
 
     except Exception:
@@ -59,6 +65,7 @@ def cli_main():
     report = main(
         args.filename.resolve(strict=True).as_posix(),
         debug=args.debug,
+        log_file=args.log_file.resolve().as_posix() if args.log_file else None,
         solver=args.solver,
         timeout=args.timeout,
     )
@@ -82,6 +89,14 @@ def parse_cli():
         "--debug",
         action="store_true",
         help="Enable debug logging",
+    )
+
+    parser.add_argument(
+        "-l",
+        "--log-file",
+        type=pathlib.Path,
+        default=None,
+        help="Path to a file to write logs to (default: stdout)",
     )
 
     parser.add_argument(
