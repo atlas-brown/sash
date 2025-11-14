@@ -3,3 +3,4 @@
 - ignored_cmd_result
 - conc_const_cond
 - conc_dead_code
+- unused_loop_var
