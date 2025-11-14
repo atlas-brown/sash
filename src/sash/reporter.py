@@ -145,7 +145,7 @@ class Report(NamedTuple):
     issues: list[Issue]
     time: float
     solver_time: float
-    timed_out: bool = False
+    timed_out: bool
 
     def to_dict(self) -> dict:
         return {
@@ -153,15 +153,16 @@ class Report(NamedTuple):
             "issues": [issue.to_dict() for issue in self.issues],
             "time": self.time,
             "solver_time": self.solver_time,
+            "timed_out": self.timed_out,
         }
 
 
 class Reporter:
-    _filename: str = ""
-    _issues: set[Issue] = set()
-    _start_time: float = time.perf_counter()
-    _solver_time: float = 0
-    _timed_out: bool = False
+    _filename: str
+    _issues: set[Issue]
+    _start_time: float
+    _solver_time: float
+    _timed_out: bool
 
     @classmethod
     def initialize(cls, filename:str):
@@ -169,6 +170,7 @@ class Reporter:
         cls._issues = set()
         cls._start_time = time.perf_counter()
         cls._solver_time : float = 0
+        cls._timed_out = False
 
     @classmethod
     def add_issue(cls, issue: Issue):
@@ -183,6 +185,10 @@ class Reporter:
         cls._timed_out = timed_out
 
     @classmethod
+    def get_timed_out(cls) -> bool:
+        return cls._timed_out
+
+    @classmethod
     def get_report(cls) -> Report:
         end_time = time.perf_counter()
         time_elapsed = end_time - cls._start_time
@@ -191,4 +197,5 @@ class Reporter:
             issues=list(cls._issues),
             time=time_elapsed,
             solver_time=cls._solver_time,
+            timed_out=cls._timed_out,
         )
