@@ -925,11 +925,11 @@ def interp_node(traces: Traces,
                     node
                 )
 
-def starting_state() -> State:
+def starting_state(fs_model: Optional[FSModel] = None) -> State:
     # env["IFS"] = ShellVar(" \t\n")
     # for defaultvar in ["HOME", "PWD", "OLDPWD", "PATH"]:
     #     env[defaultvar] = ShellVar(symb_utils.create_fresh_var(f"default_{defaultvar}"))
-    root = State((), FrozenDict(), FrozenDict(), FrozenDict(), SymStr(("0",)), None, SetOptions())
+    root = State() if fs_model is None else State(fs_model = fs_model)
     make_ast = lambda var: AST.VArgChar("Normal", False, var, [])
     starter_env = {
         "HOME": ShellVar(arbitrary_field(make_ast("HOME"), ArbitraryType.ENVIRONMENT, root)),
@@ -979,6 +979,7 @@ class SymbexecResult(NamedTuple):
     traces: Traces
 
 
+# TODO: make the FS model selection configurable via the `InterpConfig`
 def symb_engine(nodes: list[WrappedAst], config: InterpConfig) -> Traces:
     global context_line
     logging.debug(f"Running symb engine with {len(nodes)} raw nodes")

@@ -2,10 +2,15 @@ from sash.constraints import *
 from sash.reporter import *
 from sash.interpreter_config import InterpConfig
 from sash.state import *
+from sash.util import shasta_pretty
 import z3
 
 arbitrary_to_z3_var = {}
 tracked_assertions = {}
+
+def reset_z3cache():
+    global arbitrary_to_z3_var, tracked_assertions
+    arbitrary_to_z3_var, tracked_assertions = {}, {}
 
 def field_to_z3(field_content: SymStr | CompletelyArbitrary) -> z3.ExprRef:
     match field_content:
@@ -15,7 +20,7 @@ def field_to_z3(field_content: SymStr | CompletelyArbitrary) -> z3.ExprRef:
         case CompletelyArbitrary() as arbitrary:
             arbitrary_no_pfx_sfx = replace(arbitrary, prefix=None, suffix=None)
             if arbitrary_no_pfx_sfx not in arbitrary_to_z3_var:
-                arbitrary_to_z3_var[arbitrary_no_pfx_sfx] = z3.FreshConst(z3.StringSort(), arbitrary.source.pretty())
+                arbitrary_to_z3_var[arbitrary_no_pfx_sfx] = z3.FreshConst(z3.StringSort(), 'arb-' + shasta_pretty(arbitrary.source))
             z3_var = arbitrary_to_z3_var[arbitrary_no_pfx_sfx]
             if arbitrary.prefix:
                 z3_var = z3.Concat(field_to_z3(arbitrary.prefix), z3_var)
@@ -51,14 +56,12 @@ def constraint_to_z3(constraint: Constraint, s: State):
 
 
 def state_to_z3(s: State) -> z3.ExprRef:
-    logging.debug(f"Translating state to Z3: {s.pathcond=}")
     # TODO: The pathcondition formula is not properly converted to constraints updates to the fs should be modeled as z3.Store operations, probably
-    # pathcond_formula = z3.And([constraint_to_z3(pc, s) for pc in s.pathcond]) if s.pathcond else z3.BoolVal(True)
-    # logging.debug(f"Path condition formula: {pathcond_formula}")
-    pathcond_formula = z3.BoolVal(True)
+    pathcond_formula = z3.And([constraint_to_z3(pc, s) for pc in s.pathcond]) if s.pathcond else z3.BoolVal(True)
+    logging.debug(f"Path condition formula: {pathcond_formula}")
 
     env_formula = []
-    for var, val in s.env.items():
+    for var, val in (s.env | s.localenv).items():
         var_z3 = z3.String(var)
         val_z3 = field_to_z3(val.value.content)
         eq_formula = (var_z3 == val_z3)
@@ -66,7 +69,7 @@ def state_to_z3(s: State) -> z3.ExprRef:
     env_formula = z3.And(env_formula)
 
     fs_state_formula = s.fs_model.state_to_z3(field_to_z3)
-    logging.debug(f"FS state: {s.fs_model.state}")
+    logging.debug(f"FS state: {s.fs_model}")
 
     return z3.And(fs_state_formula, pathcond_formula, env_formula)
 
