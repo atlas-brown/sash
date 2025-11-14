@@ -145,6 +145,7 @@ class Report(NamedTuple):
     issues: list[Issue]
     time: float
     solver_time: float
+    timed_out: bool = False
 
     def to_dict(self) -> dict:
         return {
@@ -160,6 +161,7 @@ class Reporter:
     _issues: set[Issue] = set()
     _start_time: float = time.perf_counter()
     _solver_time: float = 0
+    _timed_out: bool = False
 
     @classmethod
     def initialize(cls, filename:str):
@@ -175,6 +177,10 @@ class Reporter:
     @classmethod
     def set_solver_time(cls, time:float):
         cls._solver_time = time
+
+    @classmethod
+    def set_timed_out(cls, timed_out: bool):
+        cls._timed_out = timed_out
 
     @classmethod
     def get_report(cls) -> Report:

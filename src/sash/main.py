@@ -41,6 +41,7 @@ def main(file: str,
         result = sash.symb.symbexec_file(file, config, stop=stop_event)
         if result.status == sash.symb.SymbexecStatus.INTERRUPTED:
             logging.warning("Symbolic execution timed out; running solver with partial results")
+            Reporter.set_timed_out(True)
         else:
             logging.info("Symbolic execution completed")
 
