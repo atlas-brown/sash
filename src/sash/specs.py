@@ -653,7 +653,7 @@ def sudo_spec(cmd_: tuple[Field, ...]) -> CmdSpec | None:
     assert len(operands) >= 1, f"Expected at least one operand for sudo, got: {operands} for command {cmd_}"
     assert isinstance(operands[0].content, SymStr), f"Expected first operand of sudo to be a command string, got: {operands[0].content}"
     if isinstance(operands[0].content.parts[0], str):
-        return get_spec(operands[0].content.parts[0], tuple(operands[1:]))
+        return get_spec(operands[0].content.parts[0], tuple(operands))
     else:
         logging.critical(f"Got non-str command name in sudo:{cmd_}\n{cmd}")
         return CmdSpec(Empty(), Empty(), Empty())
