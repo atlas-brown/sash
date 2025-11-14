@@ -2,14 +2,13 @@ import argparse
 import json
 import logging
 import pathlib
-import traceback
 import threading
 
 import sash.symb
 from sash.config import Config
-from sash.reporter import Reporter, Report
-from sash.solver import run_solver
 from sash.interpreter_config import InterpConfig
+from sash.reporter import Report, Reporter
+from sash.solver import run_solver
 
 
 def main(file: str,
@@ -37,27 +36,26 @@ def main(file: str,
         timer.daemon = True
         timer.start()
 
-    try:
-        result = sash.symb.symbexec_file(file, config, stop=stop_event)
-        if result.status == sash.symb.SymbexecStatus.INTERRUPTED:
+    result = sash.symb.symbexec_file(file, config, stop=stop_event)
+    match result.status:
+        case sash.symb.SymbexecStatus.COMPLETED:
+            logging.info("Symbolic execution completed")
+        case sash.symb.SymbexecStatus.INTERRUPTED:
             logging.warning("Symbolic execution timed out; running solver with partial results")
             Reporter.set_timed_out(True)
-        else:
-            logging.info("Symbolic execution completed")
+        case sash.symb.SymbexecStatus.FAILED:
+            logging.error("Symbolic execution failed")
+            raise SystemExit(1)
+        case _:
+            assert False, "unreachable"
 
-        if solver:
-            run_solver(result.traces, config)
+    if solver:
+        run_solver(result.traces, config)
 
-        return Reporter.get_report()
+    if timer is not None:
+        timer.cancel()
 
-    except Exception:
-        logging.error("Symbolic execution failed")
-        logging.error(f"{traceback.format_exc()}")
-        raise SystemExit(1)
-
-    finally:
-        if timer is not None:
-            timer.cancel()
+    return Reporter.get_report()
 
 
 def cli_main():
