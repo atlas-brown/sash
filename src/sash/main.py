@@ -42,7 +42,6 @@ def main(file: str,
             logging.info("Symbolic execution completed")
         case sash.symb.SymbexecStatus.INTERRUPTED:
             logging.warning("Symbolic execution timed out; running solver with partial results")
-            Reporter.set_timed_out(True)
         case sash.symb.SymbexecStatus.FAILED:
             logging.error("Symbolic execution failed")
             raise SystemExit(1)

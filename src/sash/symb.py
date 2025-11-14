@@ -784,6 +784,7 @@ def guarded_interp_node(traces: Traces,
     global stop_event
     if stop_event and stop_event.is_set():
         logging.info("Symbolic execution interrupted by stop event")
+        Reporter.set_timed_out(True)
         return traces # same behavior as if the rest of the script is not implemented
         # todo is this sound?
 
@@ -1003,7 +1004,7 @@ def symbexec_file(input_file: str,
         nodes = parse_shell_script(input_file)
         # opt_store = parse_shebang_args(input_file)
         traces = symb_engine(nodes, config)
-        if stop_event and stop_event.is_set():
+        if Reporter.get_timed_out():
             return SymbexecResult(SymbexecStatus.INTERRUPTED, traces)
         return SymbexecResult(SymbexecStatus.COMPLETED, traces)
     except Exception as e:
