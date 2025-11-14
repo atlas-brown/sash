@@ -522,7 +522,7 @@ def expand_simple(stuff: list[AST.ArgChar],
                     t = guarded_interp_node([Trace((state,))], b.node, config)
                     self.add_a_field(arbitrary_field(b, ArbitraryType.APPROXIMATION, state))
                 case _:
-                    logging.error(f"argchar: {argchar} {type(argchar)}")
+                    logging.error(f"argchar: {argchar.pretty()} {type(argchar)}")
                     logging.info(f"expansion: treating unhandled argchar as completely arbitrary field: {argchar.pretty()}")
                     self.add_a_field(arbitrary_field(argchar, ArbitraryType.APPROXIMATION, state))
 
