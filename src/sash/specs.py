@@ -1,5 +1,6 @@
 import inspect
 import logging
+from math import inf
 import sys
 from dataclasses import dataclass
 
@@ -8,7 +9,7 @@ from pash_annotations.parser import parser as pash_annot_parser
 
 from sash.constraints import *
 from sash.state import *
-from sash.symb import arbitrary_field
+from sash.frozen import freeze_thing
 
 
 @dataclass(frozen=True)
@@ -164,9 +165,21 @@ def cd_spec(cmd_: tuple[Field, ...]) -> CmdSpec:
     # NOTE: cd also interacts with CDPATH, do we care? the interaction is quite complex
 
     make_ast = lambda var: AST.VArgChar("Normal", False, var, [])
-    home_var = arbitrary_field(make_ast("HOME"), ArbitraryType.ENVIRONMENT, None)
-    pwd_var = arbitrary_field(make_ast("PWD"), ArbitraryType.ENVIRONMENT, None)
-    oldpwd_var = arbitrary_field(make_ast("OLDPWD"), ArbitraryType.ENVIRONMENT, None)
+    home_var = Field(
+        CompletelyArbitrary(freeze_thing(make_ast("HOME")),
+                            ArbitraryType.ENVIRONMENT,
+                            None),
+                 WordCount(0, inf))
+    pwd_var = Field(
+        CompletelyArbitrary(freeze_thing(make_ast("PWD")),
+                            ArbitraryType.ENVIRONMENT,
+                            None),
+                 WordCount(0, inf))
+    oldpwd_var = Field(
+        CompletelyArbitrary(freeze_thing(make_ast("OLDPWD")),
+                            ArbitraryType.ENVIRONMENT,
+                            None),
+                 WordCount(0, inf))
     dash = Field(SymStr(("-",)), WordCount(1, 1))
 
     if flags == set() and len(operands) == 0: # cd
