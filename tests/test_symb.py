@@ -7,6 +7,7 @@ import sash.reporter as reporter
 import shasta.ast_node as AST
 from util import *
 
+reporter.Reporter.initialize("<test>")
 foo_var = AST.VArgChar(fmt="Normal", null=False, var="FOO", arg=[])
 
 def test_unbound_variable(tmp_path):

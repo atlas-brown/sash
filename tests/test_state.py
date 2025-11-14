@@ -8,6 +8,8 @@ from sash.state import *
 import shasta.ast_node as AST
 from util import *
 
+reporter.Reporter.initialize("<test>")
+
 def test_collapse_traces():
     assert len(collapse_traces([Trace([starting_state()])])) == 1
     assert len(collapse_traces([Trace([starting_state()]),

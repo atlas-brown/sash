@@ -12,6 +12,7 @@ import shasta.ast_node as AST
 from util import *
 from unittest.mock import Mock, MagicMock
 
+reporter.Reporter.initialize("<test>")
 config = InterpConfig()
 
 def constant_field(string: str, words: int = 1) -> Field:
