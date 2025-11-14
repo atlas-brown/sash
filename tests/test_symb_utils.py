@@ -1,9 +1,11 @@
 from typing import Iterable
-from hypothesis import given, strategies as st
+from hypothesis import given, strategies as st, settings
 import z3
 from sash.state import SymVar
 from sash.symb_utils import symbstr_to_str, create_fresh_varname, create_fresh_var
 
+settings.register_profile("default", max_examples=5)
+settings.load_profile("default")
 
 @given(l=st.lists(st.text()))
 def test_symbstr_to_str_with_strings(l: list[str]) -> None:

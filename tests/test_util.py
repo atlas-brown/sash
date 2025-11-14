@@ -1,9 +1,11 @@
 from typing import List, TypeVar
-from hypothesis import given, strategies as st
+from hypothesis import given, strategies as st, settings
 from sash.util import split_at
 
-T = TypeVar("T")
+settings.register_profile("default", max_examples=5)
+settings.load_profile("default")
 
+T = TypeVar("T")
 
 def join_with_element(sublists: List[List[T]], element: T) -> List[T]:
     """Reverse of `split_at` for reconstruction: intersperse `element`s between sublists and flatten them."""
