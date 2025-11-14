@@ -188,52 +188,79 @@ class FSModel():
     def state_to_z3(self, field_to_z3: Callable) -> 'z3.ExprRef':
         return z3.BoolVal(True)
 
+
+
+
+
+
+StateSort, (File, Dir, Del, Unknown) = z3.EnumSort(
+    "State", ["File", "Dir", "Del", "Unknown"]
+)
+ReadStatus, (Read, Unread) = z3.EnumSort(
+    "ReadStatus", ["Read", "Unread"]
+)
+
+# 2. Define the "pair" Datatype
+# This creates a new sort called 'FileInfo'
+FileInfo = z3.Datatype('FileInfo')
+
+# Add one 'constructor' called 'mk_pair'
+# It takes two 'fields': 'state' and 'status'
+FileInfo.declare(
+    'mk_pair',
+    ('state', StateSort),    # Accessor 'state' returns a StateSort
+    ('status', ReadStatus)  # Accessor 'status' returns a ReadStatus
+)
+
+# Finalize the Datatype creation
+FileInfo = FileInfo.create()
+
+# z3_is_file = z3.Function('is_file', z3.ArraySort(z3.StringSort(), FileInfo), z3.StringSort(), z3.BoolSort())
+# fs = z3.Const('fs', z3.ArraySort(z3.StringSort(), FileInfo))
+# path = z3.Const('path', z3.StringSort())
+# z3_is_file_axiom_body = z3.ForAll([fs, path],
+#     z3_is_file(fs, path) == \
+#     (fs.select(path).state == File) | (fs.select(path).state == Unknown)
+# )
+
+# z3_is_dir = z3.Function('is_dir', z3.ArraySort(z3.StringSort(), FileInfo), z3.StringSort(), z3.BoolSort())
+# z3_is_dir_axiom_body = z3.ForAll([fs, path],
+#     z3_is_dir(fs, path) == \
+#     (fs.select(path).state == Dir) | (fs.select(path).state == Unknown)
+# )
+
+# z3_is_deleted = z3.Function('is_deleted', z3.ArraySort(z3.StringSort(), FileInfo), z3.StringSort(), z3.BoolSort())
+# # important, is_deleted is only true if state is Del, not Unknown
+# z3_is_deleted_axiom_body = z3.ForAll([fs, path],
+#     z3_is_deleted(fs, path) == fs.select(path).state == Del)
+
 @dataclass(frozen=True)
 class FSModelSimple(FSModel):
     """A file system model mapping paths (`Field`s) to path states (`PathState`s)."""
+    field_to_z3: Callable[[Field], 'z3.ExprRef'] = field(repr=False, compare=False, hash=False)
 
-    class PathType(Enum):
-        FILE = 1
-        DIR = 2
-        DELETED = 3
+    id: int  = 0
+    # history: (z3var for FS at time step `id`, z3 array representing FS at time step `id`)
+    history: tuple[tuple[z3.ExprRef, z3.ExprRef]] = field(default_factory=lambda: ((z3.Array('fs0', z3.StringSort(), FileInfo),
+                                                                                    z3.K(z3.StringSort(), FileInfo.mk_pair(Unknown, Unread))),)
 
-    @dataclass(frozen=True)
-    class PathState():
-        path_type: FSModelSimple.PathType
-        is_read: bool = False
-
-        @property
-        def exists(self):
-            return self.path_type != FSModelSimple.PathType.DELETED
-
-    state: FrozenDict[Field, PathState] = field(default_factory=FrozenDict)
-    state_z3: z3.ArrayRef = field(default_factory=lambda: z3.Array('fs', z3.StringSort(), z3.IntSort()))
+    def _next_state(self, z3array: z3.ExprRef) -> FSModelSimple:
+        return replace(self, id=self.id + 1, history=self.history + ((z3.Array(f'fs{self.id + 1}', z3.StringSort(), FileInfo), z3array),))
+    def _set(self, path: Field, state: z3.ExprRef, status: Optional[z3.ExprRef] = Unread) -> FSModelSimple:
+        """Return a new abstract file system with the given path set to the given state."""
+        return self._next_state(z3.Store(self.history[-1][1], self.field_to_z3(path), FileInfo.mk_pair(state, status)))
 
     def _delete(self, path: Field) -> FSModelSimple:
         """Return a new abstract file system after removing the given path."""
-        return self._set(path, FSModelSimple.PathState(FSModelSimple.PathType.DELETED))
+        return self._set(path, Del, Unread)
 
-    def _create_file(self, path: Field) -> FSModelSimple:
+    def _create_file(self, path: Field, status: Optional[z3.ExprRef] = Unread) -> FSModelSimple:
         """Return a new abstract file system after writing to the given path."""
-        new_state = FSModelSimple.PathState(path_type=FSModelSimple.PathType.FILE)
-        return self._set(path, new_state)
+        return self._set(path, File, status)
 
-    def _create_dir(self, path: Field) -> FSModelSimple:
+    def _create_dir(self, path: Field, status: Optional[z3.ExprRef] = Unread) -> FSModelSimple:
         """Return a new abstract file system after writing to the given path."""
-        new_state = FSModelSimple.PathState(path_type=FSModelSimple.PathType.DIR)
-        return self._set(path, new_state)
-
-    def _get(self, path: Field) -> PathState:
-        """Get the abstract state for a given path, or None if not present."""
-        try:
-            return self.state[path]
-        except KeyError:
-            return FSModelSimple.PathState(FSModelSimple.PathType.DELETED)
-
-    def _set(self, path: Field, state: PathState) -> FSModelSimple:
-        """Return a new abstract file system with the given path set to the given state."""
-        new_entries = self.state.set(path, state)
-        return replace(self, state=new_entries)
+        return self._set(path, Dir, status)
 
     def apply_postcondition(self, constraints: Constraint) -> FSModelSimple:
         logging.debug(f"Applying FS postcondition: {constraints}")
@@ -245,31 +272,30 @@ class FSModelSimple(FSModel):
                 return fs_after_lhs.apply_postcondition(rhs)
             case Or(lhs, rhs):
                 fs_after_lhs = self.apply_postcondition(lhs)
-                # TODO: is rhs ignored on purpose?
+                fs_after_rhs = self.apply_postcondition(rhs)
+                new_state = z3.If(z3.FreshBool("postcond_or"), fs_after_lhs, fs_after_rhs)
+                return self._next_state(new_state) # type: ignore
             case Not(IsDeleted(path)):
                 return self.apply_postcondition(IsFile(path) | IsDir(path))
             case Not(IsFile(path)):
                 return self.apply_postcondition(IsDeleted(path) | IsDir(path))
             case Not(IsDir(path)):
                 return self.apply_postcondition(IsDeleted(path) | IsFile(path))
-            case Not(constraint):
-                # TODO: handle other negations (implies?)
-                return self
             case Implies(premise, conclusion):
-                # TODO: handle implications
-                return self
+                fs_after_conclusion = self.apply_postcondition(conclusion)
+                new_state = z3.If(z3.FreshBool("postcond_implies"), fs_after_conclusion, self.history[-1])
+                return self._next_state(new_state) # type: ignore
             case IsFile(path):
                 return self._create_file(path)
             case IsDir(path):
                 return self._create_dir(path)
             case IsDeleted(path):
                 return self._delete(path)
+            case Not(constraint):
+                assert False, f"Unclear what Not means in postcond: {constraints}"
+                return self
             case IsUnread(path):
-                current_state = self._get(path)
-                if current_state.exists:
-                    new_state = FSModelSimple.PathState(path_type=current_state.path_type, is_read=False)
-                    return self._set(path, new_state)
-                # TODO: isn't this an error otherwise?
+                assert False, f"Unclear what `IsUnread` means in postconds: {constraints}"
                 return self
             case Writes(path):
                 # For simplicity, assume writing creates a file
@@ -282,22 +308,15 @@ class FSModelSimple(FSModel):
         return self
 
     def is_file_z3(self, path_z3) -> 'z3.ExprRef':
-        logging.debug(f"Checking is_file_z3 for path: {path_z3}")
-        return self.state_z3[path_z3] == z3.IntVal(FSModelSimple.PathType.FILE.value)
+        return self.history[-1][0].select(path_z3).state == File | self.history[-1][0].select(path_z3).state == Unknown
 
     def is_dir_z3(self, path_z3) -> 'z3.ExprRef':
-        logging.debug(f"Checking is_dir_z3 for path: {path_z3}")
-        return self.state_z3[path_z3] == z3.IntVal(FSModelSimple.PathType.DIR.value)
+        return self.history[-1][0].select(path_z3).state == Dir | self.history[-1][0].select(path_z3).state == Unknown
 
     def is_deleted_z3(self, path_z3) -> 'z3.ExprRef':
-        logging.debug(f"Checking is_deleted_z3 for path: {path_z3}")
-        return self.state_z3[path_z3] == z3.IntVal(FSModelSimple.PathType.DELETED.value)
+        return self.history[-1][0].select(path_z3).state == Del
 
     def state_to_z3(self, field_to_z3: Callable) -> 'z3.ExprRef':
-        logging.debug(f"FS state: {self.state}")
-        logging.debug(f"Z3 FS state: {self.state_z3}")
-        constraints = []
-        for path, st in self.state.items():
-            path_z3 = field_to_z3(path.content)
-            constraints.append(self.state_z3[path_z3] == z3.IntVal(st.path_type.value))
-        return z3.And(constraints) if constraints else z3.BoolVal(True)
+        # TODO: Reify the whole sequence of FS states as equalities between each variable name and the corresponding array
+        
+        
