@@ -102,6 +102,62 @@ def test_rm_spec__failure_postcond_is_empty():
         assert s.failure_postcond == Empty(), f"Expected failure postcondition to be Empty, but got:\n{pformat(s.failure_postcond)}"
 
 
+def test_test_spec__check_is_always_empty():
+    cmd_name = create_symstr("test")
+    op_1 = create_field("op1")
+    op_2 = create_field("op2")
+
+    negation_field = create_field("!")
+    flag_fields = [create_field(s) for s in ["-d", "-f", "-e", "-n", "-z", "-r", "-w", "-x"]]
+    binop_fields = [create_field(s) for s in ["=", "!=", "-eq", "-ne", "-gt", "-lt", "-ge", "-le"]]
+
+    invocations: list[specs.CmdInvocation] = []
+    # single operand (with optional negation)
+    for flag in flag_fields:
+        invocations.append(create_cmd_inv(cmd_name, set(), {}, [flag]))
+        invocations.append(create_cmd_inv(cmd_name, set(), {}, [negation_field, flag]))
+
+    # binary operands (with optional negation)
+    for binop in binop_fields:
+        invocations.append(create_cmd_inv(cmd_name, set(), {}, [op_1, binop, op_2]))
+        invocations.append(create_cmd_inv(cmd_name, set(), {}, [negation_field, op_1, binop, op_2]))
+
+    generated_specs = [specs.test_spec(inv) for inv in invocations]
+    for s in generated_specs:
+        assert s.check == Empty(), f"Expected check to be Empty, but got:\n{pformat(s.check)}"
+
+
+def test_test_spec__postconds_are_negations_of_each_other():
+    cmd_name = create_symstr("test")
+    op_1 = create_field("op1")
+    op_2 = create_field("op2")
+
+    negation_field = create_field("!")
+    flag_fields = [create_field(s) for s in ["-d", "-f", "-e", "-n", "-z", "-r", "-w", "-x"]]
+    binop_fields = [create_field(s) for s in ["=", "!=", "-eq", "-ne", "-gt", "-lt", "-ge", "-le"]]
+
+    invocations: list[specs.CmdInvocation] = []
+    # single operand (with optional negation)
+    for flag in flag_fields:
+        invocations.append(create_cmd_inv(cmd_name, set(), {}, [flag]))
+        invocations.append(create_cmd_inv(cmd_name, set(), {}, [negation_field, flag]))
+
+    # binary operands (with optional negation)
+    for binop in binop_fields:
+        invocations.append(create_cmd_inv(cmd_name, set(), {}, [op_1, binop, op_2]))
+        invocations.append(create_cmd_inv(cmd_name, set(), {}, [negation_field, op_1, binop, op_2]))
+
+    generated_specs = [specs.test_spec(inv) for inv in invocations]
+    for s in generated_specs:
+        assert (s.success_postcond, s.failure_postcond) != (Empty(), Empty()), "Both postconds empty even though supported, correct invocations"
+        if (s.success_postcond == Empty() or s.failure_postcond == Empty()):
+            continue
+
+        assert (
+            s.success_postcond == ~s.failure_postcond or s.failure_postcond == ~s.success_postcond
+        ), f"Postconds must be negations of each other, but got:\nSuccess:\n{pformat(s.success_postcond)}\nFailure:\n{pformat(s.failure_postcond)}"
+
+
 def create_symstr(val: str) -> symb.SymStr:
     return symb.SymStr((val,))
 
