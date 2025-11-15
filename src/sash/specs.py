@@ -930,24 +930,6 @@ def handle_non_posix(cmd: CmdInvocation) -> CmdSpec:
     return CmdSpec(Empty(), Empty(), Empty(), IOType.UNKNOWN) # no-op spec
 
 
-# TODO: this code is very diffcult to maintain, consider refactoring it to use classes (should have done from the start...)
-# outline of a handle() method:
-#def handle_invocation(self, cmd: tuple[Field, ...]) -> CmdSpec:
-#    cmd_parsed = parse_command(cmd)
-#    (name, flags, options, operands) = (cmd_parsed.cmd_name, cmd_parsed.flags, cmd_parsed.options, cmd_parsed.operands)
-#
-#    if flags - self.posix_flags != set():
-#        spec = self.handle_non_posix(cmd)
-#
-#    elif flags - self.supported_flags != set():
-#        spec = self.handle_non_supported(cmd)
-#
-#    else:
-#        spec = self.handle_supported(cmd)
-#
-#    return spec
-
-
 class Cmd(ABC):
     name: str
     posix_flags: set[str]
@@ -994,19 +976,11 @@ class Cmd(ABC):
 
 
 class Rm(Cmd):
+    # https://pubs.opengroup.org/onlinepubs/9799919799/utilities/rm.html
+
     name = "rm"
     posix_flags     = {"-d", "-f", "-i", "-R", "-r", "-v"}
     supported_flags = {"-d", "-f", "-i", "-R", "-r", "-v"}
-
-    @classmethod
-    def _handle_non_posix(cls, cmd: CmdInvocation) -> CmdSpec:
-        log_crit_unhandled_inv(cmd)
-        return CmdSpec(Empty(), Empty(), Empty(), IOType.UNKNOWN)
-
-    @classmethod
-    def _handle_non_supported(cls, cmd: CmdInvocation) -> CmdSpec:
-        log_crit_unhandled_inv(cmd)
-        return CmdSpec(Empty(), Empty(), Empty(), IOType.UNKNOWN)
 
     @classmethod
     def _handle_supported(cls, cmd: CmdInvocation) -> CmdSpec:
