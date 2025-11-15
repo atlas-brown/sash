@@ -608,232 +608,7 @@ def sudo_spec(cmd: CmdInvocation) -> CmdSpec | None:
 def test_spec(cmd: CmdInvocation) -> CmdSpec:
     # https://pubs.opengroup.org/onlinepubs/9799919799/utilities/test.html
 
-    # NOTE: We do not support arithmetic expressions so we only reason about numbers as strings,
-    #       and all the information we get about them is whether they are equal or not to other strings
-    #       e.g.: 'test 5 < 3' will have the z-postcond that '5' is not equal to '3' and no nz-postcond
-
-    (name, flags, options, operands) = (cmd.cmd_name, cmd.flags, cmd.options, cmd.operands)
-    success_postcond = None
-    failure_postcond = None
-    io = IOType.NONE
-
-    assert name == SymStr(("test",)) or name == SymStr(("[",)), f"Expected test command, got: {name}"
-    assert len(flags) == 0 and len(options) == 0, f"The current implementation does not produce flags/options for test; something changed?"
-
-    print(f"{name}_spec:\n  flags='{flags}'\n  options='{cmd.options}'\n  operands='{operands}'", file=sys.stderr)
-
-    if name == SymStr(("[" ,)):
-        if len(operands) == 0 or operands[-1] != Field(SymStr(("]",)), WordCount(1,1)):
-            # TODO: malformed command, will produce error
-            return handle_non_posix(cmd) # missing closing ']'
-        operands = operands[:-1] # remove closing ']'
-
-    negated = False
-    if len(operands) > 0 and operands[0] == Field(SymStr(("!",)), WordCount(1,1)):
-        negated = True
-        operands = operands[1:]
-
-    if len(operands) == 0: # test
-        # NOTE: 'test' with no operands always returns false, 'test !' with no operands always returns true (not modeled here)
-
-        # check:        none
-        # z-postcond:   none
-        # nz-postcond:  none
-
-        check = Empty()
-        success_postcond = Empty()
-        failure_postcond = Empty()
-
-    elif len(operands) == 1: # test string
-        s = operands[0]
-        # check:        #   (1) none
-        # z-postcond:   #   (1) s is non-empty
-        # nz-postcond:  #   (1) s is empty
-
-        check = Empty()
-        # z-postcond is the negation of nz-postcond
-        failure_postcond = StringEq(s, Field(SymStr(("",)), WordCount(1,1)))
-
-    elif operands[0] == Field(SymStr(("-d",)), WordCount(1,1)) and len(operands) == 2: # test -d dir
-        d = operands[1]
-        # check:        #   (1) none
-        # z-postcond:   #   (1) d is a directory
-        # nz-postcond:  #   (1) d is not a directory
-
-        check = Empty()
-        success_postcond = IsDir(d)
-        # nz-postcond is the negation of z-postcond
-
-    elif operands[0] == Field(SymStr(("-f",)), WordCount(1,1)) and len(operands) == 2: # test -f file
-        f = operands[1]
-        # check:        #   (1) none
-        # z-postcond:   #   (1) f is a file
-        # nz-postcond:  #   (1) f is not a file
-
-        check = Empty()
-        success_postcond = IsFile(f)
-        # nz-postcond is the negation of z-postcond
-
-    elif operands[0] == Field(SymStr(("-e",)), WordCount(1,1)) and len(operands) == 2: # test -e path
-        p = operands[1]
-        # check:        #   (1) none
-        # z-postcond:   #   (1) p is a file or directory
-        # nz-postcond:  #   (1) p is neither a file nor a directory
-
-        check = Empty()
-        success_postcond = IsFile(p) | IsDir(p)
-        # nz-postcond is the negation of z-postcond
-
-    elif operands[0] == Field(SymStr(("-n",)), WordCount(1,1)) and len(operands) == 2: # test -n string
-        s = operands[1]
-        # check:        #   (1) none
-        # z-postcond:   #   (1) s is non-empty
-        # nz-postcond:  #   (1) s is empty
-
-        check = Empty()
-        # z-postcond is the negation of nz-postcond
-        failure_postcond = StringEq(s, Field(SymStr(("",)), WordCount(0,0)))
-
-    elif operands[0] == Field(SymStr(("-r",)), WordCount(1,1)) and len(operands) == 2: # test -r file
-        f = operands[1]
-        # check:        #   (1) none
-        # z-postcond:   #   (1) f is a file or directory
-        # nz-postcond:  #   (1) none (maybe f is not readable, etc.)
-
-        check = Empty()
-        success_postcond = IsFile(f) | IsDir(f)
-        failure_postcond = Empty()
-
-    elif operands[0] == Field(SymStr(("-w",)), WordCount(1,1)) and len(operands) == 2: # test -w file
-        f = operands[1]
-        # check:        #   (1) none
-        # z-postcond:   #   (1) f is a file or directory
-        # nz-postcond:  #   (1) none (maybe f is not writable, etc.)
-
-        check = Empty()
-        success_postcond = IsFile(f) | IsDir(f)
-        failure_postcond = Empty()
-
-    elif operands[0] == Field(SymStr(("-x",)), WordCount(1,1)) and len(operands) == 2: # test -x file
-        f = operands[1]
-        # check:        #   (1) none
-        # z-postcond:   #   (1) f is a file or directory
-        # nz-postcond:  #   (1) none (maybe f is not executable, etc.)
-
-        check = Empty()
-        success_postcond = IsFile(f) | IsDir(f)
-        failure_postcond = Empty()
-
-    elif operands[0] == Field(SymStr(("-z",)), WordCount(1,1)) and len(operands) == 2: # test -z string
-        s = operands[1]
-        # check:        #   (1) none
-        # z-postcond:   #   (1) s is empty
-        # nz-postcond:  #   (1) s is non-empty
-
-        check = Empty()
-        success_postcond = StringEq(s, Field(SymStr(("",)), WordCount(0,0)))
-        # nz-postcond is the negation of z-postcond
-
-    elif len(operands) == 3 and operands[1] == Field(SymStr(("=",)), WordCount(1,1)): # test string1 = string2
-        s1, s2 = operands[0], operands[2]
-        # check:        #   (1) none
-        # z-postcond:   #   (1) s1 equals s2
-        # nz-postcond:  #   (1) s1 does not equal s2
-
-        check = Empty()
-        success_postcond = StringEq(s1, s2)
-        # nz-postcond is the negation of z-postcond
-
-    elif len(operands) == 3 and operands[1] == Field(SymStr(("!=",)), WordCount(1,1)): # test string1 != string2
-        s1, s2 = operands[0], operands[2]
-        # check:        #   (1) none
-        # z-postcond:   #   (1) s1 does not equal s2
-        # nz-postcond:  #   (1) s1 equals s2
-
-        check = Empty()
-        # z-postcond is the negation of nz-postcond
-        failure_postcond = StringEq(s1, s2)
-
-    elif len(operands) == 3 and operands[1] == Field(SymStr(("-eq",)), WordCount(1,1)): # test int1 -eq int2
-        int1, int2 = operands[0], operands[2]
-        # check:        #   (1) none
-        # z-postcond:   #   (1) none (consider: 'test 05 -eq 5' succeeds)
-        # nz-postcond:  #   (1) int1 does not equal int2
-
-        check = Empty()
-        success_postcond = Empty()
-        failure_postcond = ~StringEq(int1, int2)
-
-    elif len(operands) == 3 and operands[1] == Field(SymStr(("-ne",)), WordCount(1,1)): # test int1 -ne int2
-        int1, int2 = operands[0], operands[2]
-        # check:        #   (1) none
-        # z-postcond:   #   (1) int1 does not equal int2
-        # nz-postcond:  #   (1) none (consider: 'test 05 -ne 5' fails)
-
-        check = Empty()
-        success_postcond = ~StringEq(int1, int2)
-        failure_postcond = Empty()
-
-    elif len(operands) == 3 and operands[1] == Field(SymStr(("-gt",)), WordCount(1,1)): # test int1 -gt int2
-        int1, int2 = operands[0], operands[2]
-        # check:        #   (1) none
-        # z-postcond:   #   (1) int1 greater than int2
-        # nz-postcond:  #   (1) int1 not greater than int2 (could be equal, so no information gained)
-
-        check = Empty()
-        success_postcond = ~StringEq(int1, int2)
-        failure_postcond = Empty()
-
-    elif len(operands) == 3 and operands[1] == Field(SymStr(("-lt",)), WordCount(1,1)): # test int1 -lt int2
-        int1, int2 = operands[0], operands[2]
-        # check:        #   (1) none
-        # z-postcond:   #   (1) int1 less than int2
-        # nz-postcond:  #   (1) int1 not less than int2 (could be equal, so no information gained)
-
-        check = Empty()
-        success_postcond = ~StringEq(int1, int2)
-        failure_postcond = Empty()
-
-    elif len(operands) == 3 and operands[1] == Field(SymStr(("-ge",)), WordCount(1,1)): # test int1 -ge int2
-        int1, int2 = operands[0], operands[2]
-        # check:        #   (1) none
-        # z-postcond:   #   (1) int1 greater than or equal to int2 (could be equal, so no information gained)
-        # nz-postcond:  #   (1) int1 less than int2
-
-        check = Empty()
-        success_postcond = Empty()
-        failure_postcond = ~StringEq(int1, int2)
-
-    elif len(operands) == 3 and operands[1] == Field(SymStr(("-le",)), WordCount(1,1)): # test int1 -le int2
-        int1, int2 = operands[0], operands[2]
-        # check:        #   (1) none
-        # z-postcond:   #   (1) int1 less than or equal to int2 (could be equal, so no information gained)
-        # nz-postcond:  #   (1) int1 greater than int2
-
-        check = Empty()
-        success_postcond = Empty()
-        failure_postcond = ~StringEq(int1, int2)
-
-    else: # default case
-        log_crit_unhandled_inv(cmd)
-
-        check = Empty()
-        success_postcond = Empty()
-        failure_postcond = Empty()
-
-    # In most cases the postconditions are negations of each other, so use this pattern to reduce code duplication (and possible mistakes)
-    match success_postcond, failure_postcond:
-        case None, None:
-            assert False, "unreachable"
-        case None, _:
-            success_postcond = ~failure_postcond
-        case _, None:
-            failure_postcond = ~success_postcond
-
-    if negated:
-        (success_postcond, failure_postcond) = (failure_postcond, success_postcond)
-
-    return CmdSpec(check, success_postcond, failure_postcond, io)
+    return Test.handle_invocation(cmd)
 
 
 def touch_spec(cmd: CmdInvocation) -> CmdSpec:
@@ -1015,5 +790,123 @@ class Rm(Cmd):
             check = And.from_field_iter(operands, lambda op: (IsFile(op) >> ~IsUnread(op)) & ~IsDeleted(op))
         else:
             assert False, f"unreachable; received flags: {flags}"
+
+        return CmdSpec(check, success_postcond, failure_postcond, io)
+
+
+class Test(Cmd):
+    # https://pubs.opengroup.org/onlinepubs/9799919799/utilities/test.html
+
+    # NOTE: The current parsing function does not produce flags/options for test, and instead encodes everything in operands
+    # NOTE: Arithmetic expressions are not supported, so the only information we can get when encountering numeric comparisons
+    #       is whether the strings are NOT equal (because '05' and '5' are different as strings, but the same as numbers)
+
+    name = "test"
+    posix_flags     = set()
+    supported_flags = set()
+
+    @classmethod
+    def _handle_supported(cls, cmd: CmdInvocation) -> CmdSpec:
+        (name, flags, options, operands) = (cmd.cmd_name, cmd.flags, cmd.options, cmd.operands)
+
+        assert name == SymStr((cls.name,)) or name == SymStr(("[",)), f"Expected test command, got: {cmd}"
+        assert len(flags) == 0 and len(options) == 0, f"The current parsing function does not produce flags/options for test; something changed?"
+
+        check = Empty()
+        success_postcond = None
+        failure_postcond = None
+        io = IOType.NONE
+
+        if name == SymStr(("[" ,)):
+            if len(operands) == 0 or operands[-1] != Field(SymStr(("]",)), WordCount(1,1)):
+                # TODO: malformed command; will produce error
+                logging.debug("Malformed test command with missing closing ']'; treating it as properly closed")
+            else:
+                operands = operands[:-1] # remove closing ']'
+
+        negated = False
+        if len(operands) > 0 and operands[0] == Field(SymStr(("!",)), WordCount(1,1)):
+            negated = True
+            operands = operands[1:]
+
+        match len(operands):
+            case 0: # test
+                success_postcond = Empty()
+                failure_postcond = Empty()
+            case 1: # test string
+                op = operands[0]
+                # z-postcond is the negation of nz-postcond
+                failure_postcond = StringEq(op, Field(SymStr(("",)), WordCount(1,1)))
+            case 2: # test -flag operand
+                op = operands[1]
+                flag = operands[0].content.parts[0] if isinstance(operands[0].content, SymStr) else None
+                empty_str_var = Field(SymStr(("",)), WordCount(0,0))
+
+                match flag:
+                    case "-d":
+                        success_postcond = IsDir(op)
+                        # nz-postcond is the negation of z-postcond
+                    case "-f":
+                        success_postcond = IsFile(op)
+                        # nz-postcond is the negation of z-postcond
+                    case "-e":
+                        success_postcond = IsFile(op) | IsDir(op)
+                        # nz-postcond is the negation of z-postcond
+                    case "-n":
+                        # z-postcond is the negation of nz-postcond
+                        failure_postcond = StringEq(op, empty_str_var)
+                    case "-r" | "-w" | "-x":
+                        success_postcond = IsFile(op) | IsDir(op)
+                        failure_postcond = Empty()
+                    case "-z":
+                        success_postcond = StringEq(op, empty_str_var)
+                        # nz-postcond is the negation of z-postcond
+                    case _:
+                        logging.debug(f"Unhandled test invocation: {cmd}; treating as no-op")
+                        success_postcond = Empty()
+                        failure_postcond = Empty()
+            case 3: # test operand1 operator operand2
+                op1 = operands[0]
+                operator = operands[1].content.parts[0] if isinstance(operands[1].content, SymStr) else None
+                op2 = operands[2]
+
+                match operator:
+                    case "=":
+                        success_postcond = StringEq(op1, op2)
+                        # nz-postcond is the negation of z-postcond
+                    case "!=":
+                        # z-postcond is the negation of nz-postcond
+                        failure_postcond = StringEq(op1, op2)
+                    case "-eq" | "-ge" | "-le":
+                        success_postcond = Empty() # no info gained about string equality
+                                                   # -eq: 'test 05 -eq 5' and 'test 5 -eq 5' both succeed, but strings are not necessarily equal
+                                                   # -ge/-le: 'test 5 -ge/-le 5' and 'test 05 -ge/-le 5' both succeed, but strings are not necessarily equal
+                        failure_postcond = ~StringEq(op1, op2)
+                    case "-ne" | "-gt" | "-lt":
+                        success_postcond = ~StringEq(op1, op2)
+                        failure_postcond = Empty() # no info gained about string equality
+                                                   # -ne: 'test 05 -ne 5' and 'test 5 -ne 5' both fail, but strings are not necessarily equal
+                                                   # -gt/-lt: 'test 5 -gt/-lt 5' and 'test 05 -gt/-lt 5' both fail, but strings are not necessarily equal
+                    case _:
+                        logging.debug(f"Unhandled test invocation: {cmd}; treating as no-op")
+                        success_postcond = Empty()
+                        failure_postcond = Empty()
+            case _:
+                # NOTE: According to POSIX, in this case "the results are unspecified"
+                logging.warning(f"{cls.name} invocation with more than 4 operands is unspecified: {cmd}; treating as no-op")
+                success_postcond = Empty()
+                failure_postcond = Empty()
+
+        # In most cases the postconditions are negations of each other, so use this pattern to reduce code and possible mistakes
+        match success_postcond, failure_postcond:
+            case None, None:
+                assert False, f"Unreachable, yet reached with invocation: {cmd}"
+            case None, _:
+                success_postcond = ~failure_postcond
+            case _, None:
+                failure_postcond = ~success_postcond
+
+        if negated:
+            (success_postcond, failure_postcond) = (failure_postcond, success_postcond)
 
         return CmdSpec(check, success_postcond, failure_postcond, io)
