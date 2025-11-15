@@ -1,3 +1,4 @@
+from abc import ABC, abstractmethod
 import inspect
 import logging
 from math import inf
@@ -586,75 +587,9 @@ def mv_spec(cmd: CmdInvocation) -> CmdSpec:
 def rm_spec(cmd: CmdInvocation) -> CmdSpec:
     # https://pubs.opengroup.org/onlinepubs/9799919799/utilities/rm.html
 
-    cmd = parse_command(cmd_)
-    (name, flags, options, operands) = (cmd.cmd_name, cmd.flags, cmd.options, cmd.operands)
-    io = IOType.STDIN if "-i" in flags else IOType.NONE
-    io = IOType.add_stdout(io) if "-v" in flags else io
-    io = IOType.remove_stdin(io) if "-f" in flags else io # 'rm -if ...' would not prompt
-                                                          # 'rm -fi ...' would prompt, but we assume '-if' order as it is more dangerous
-    flags.discard("-i")
-    flags.discard("-v")
-    if "-R" in flags or "-d" in flags:
-        flags.discard("-R") # -R is equivalent to -r
-        flags.discard("-d") # -d allows deletion of empty directories (which we cannot reason about)
-        flags.add("-r") # same postconditions as -d
-
-    assert name == SymStr(("rm",)), f"Expected rm command, got:\nOriginal: {cmd_}\nPaSh: {cmd}"
-    assert len(options) == 0, f"Expected no options for rm, got:\nOriginal: {cmd_}\nPaSh: {cmd}"
-
-    if flags == set(): # rm [-iv] file...
-        # check:
-        #   (1) all operands are files
-        # z-postcond:
-        #   (1) all operands are deleted
-        # nz-postcond:
-        #   (1) none (maybe all operands weren't files, maybe one operand wasn't a file, maybe it was a permission issue, etc.)
-
-        check = And.from_field_iter(operands, IsFile)
-        success_postcond = And.from_field_iter(operands, IsDeleted)
-        failure_postcond = Empty()
-
-    elif flags == set(["-f"]): # rm [-iv] -f file...
-        # check:
-        #   (1) all operands are not directories [and for bug-catching purposes: all operands are not deleted]
-        # z-postcond:   all operands are deleted
-        # nz-postcond:  none (maybe permission issue, etc.)
-        check = And.from_field_iter(operands, lambda op: ~IsDir(op) & ~IsDeleted(op))
-        success_postcond = And.from_field_iter(operands, IsDeleted)
-        failure_postcond = Empty()
-
-    elif flags == set(["-r"]): # rm [-iv] -d/-r/-R file...
-        # check:
-        #   (1) all operands are files or directories
-        # z-postcond:
-        #   (1) all operands are deleted
-        # nz-postcond:
-        #   (1) none (maybe permission issue, etc.)
-        check = And.from_field_iter(operands, lambda op: IsFile(op) | IsDir(op))
-        success_postcond = And.from_field_iter(operands, IsDeleted)
-        failure_postcond = Empty()
-
-    elif flags == set(["-r", "-f"]): # rm [-iv] -d/-r/-R -f file...
-        # check:
-        #   (1) [for bug catching purposes: all operands are not deleted]
-        # z-postcond:
-        #   (1) all operands are deleted
-        # nz-postcond:
-        #   (1) none (maybe permission issue, etc.)
-
-        check = And.from_field_iter(operands, lambda op: ~IsDeleted(op))
-        success_postcond = And.from_field_iter(operands, IsDeleted)
-        failure_postcond = Empty()
-
-    else:
-        return handle_non_posix(cmd_)
-
-    return CmdSpec(check, success_postcond, failure_postcond, io)
+    return Rm.handle_invocation(cmd)
 
 
-def sudo_spec(cmd_: tuple[Field, ...]) -> CmdSpec | None:
-
-    cmd = parse_command(cmd_)
 def sudo_spec(cmd: CmdInvocation) -> CmdSpec | None:
 
     operands = cmd.operands
@@ -1011,3 +946,100 @@ def handle_non_posix(cmd: CmdInvocation) -> CmdSpec:
 #        spec = self.handle_supported(cmd)
 #
 #    return spec
+
+
+class Cmd(ABC):
+    name: str
+    posix_flags: set[str]
+    supported_flags: set[str]
+
+    @classmethod
+    def handle_invocation(cls, cmd: CmdInvocation) -> CmdSpec:
+        if cmd.flags - cls.posix_flags != set():
+            # At least one flag is non-POSIX
+            spec = cls._handle_non_posix(cmd)
+        elif cmd.flags - cls.supported_flags != set():
+            # At least one flag is non-supported
+            spec = cls._handle_non_supported(cmd)
+        else:
+            # All flags are supported
+            spec = cls._handle_supported(cmd)
+        return spec
+
+    @classmethod
+    def _handle_non_posix(cls, cmd: CmdInvocation) -> CmdSpec:
+        logging.warning(f"Non-POSIX handling for command '{cmd.cmd_name}' is not supported; treating as no-op")
+        return cls._handle_non_supported(cmd)
+
+    @classmethod
+    def _handle_non_supported(cls, cmd: CmdInvocation) -> CmdSpec:
+        import json
+
+        cmd_json = {
+            "cmd_invocation" : {
+                "cmd_name": cmd.cmd_name,
+                "flags": list(cmd.flags),
+                "options": {k: v for k, v in cmd.options.items()},
+                "operands": [op for op in cmd.operands]
+            }
+        }
+
+        logging.critical(f"Unhandled invocation for command '{cmd.cmd_name}':\n{json.dumps(cmd_json, indent=2, default=str)}; treating as no-op")
+        return CmdSpec(Empty(), Empty(), Empty(), IOType.UNKNOWN)
+
+    @classmethod
+    @abstractmethod
+    def _handle_supported(cls, cmd: CmdInvocation) -> CmdSpec:
+        pass
+
+
+class Rm(Cmd):
+    name = "rm"
+    posix_flags     = {"-d", "-f", "-i", "-R", "-r", "-v"}
+    supported_flags = {"-d", "-f", "-i", "-R", "-r", "-v"}
+
+    @classmethod
+    def _handle_non_posix(cls, cmd: CmdInvocation) -> CmdSpec:
+        log_crit_unhandled_inv(cmd)
+        return CmdSpec(Empty(), Empty(), Empty(), IOType.UNKNOWN)
+
+    @classmethod
+    def _handle_non_supported(cls, cmd: CmdInvocation) -> CmdSpec:
+        log_crit_unhandled_inv(cmd)
+        return CmdSpec(Empty(), Empty(), Empty(), IOType.UNKNOWN)
+
+    @classmethod
+    def _handle_supported(cls, cmd: CmdInvocation) -> CmdSpec:
+        (name, flags, options, operands) = (cmd.cmd_name, cmd.flags, cmd.options, cmd.operands)
+
+        assert name == SymStr((cls.name,)), f"Expected rm command, got: {cmd}"
+        assert len(options) == 0, f"Expected no options for rm, got: {cmd}"
+
+        io = IOType.NONE
+        io = IOType.add_stdin(io) if "-i" in flags else io
+        io = IOType.add_stdout(io) if "-v" in flags else io
+        io = IOType.remove_stdin(io) if "-f" in flags else io # 'rm -if ...' would not prompt
+                                                              # 'rm -fi ...' would prompt, but we assume '-if' order as it is more dangerous
+
+        flags.discard("-i")
+        flags.discard("-v")
+        if "-R" in flags or "-d" in flags:
+            flags.discard("-R") # -R is equivalent to -r
+            flags.discard("-d") # -d allows deletion of empty directories
+            flags.add("-r") # same postconditions as -d (since we cannot reason about emptiness)
+
+        success_postcond = And.from_field_iter(operands, IsDeleted)
+        failure_postcond = Empty() # due to not modeling permissions, we never gain info on failure
+
+        if flags == set([]):
+            check = And.from_field_iter(operands, lambda op: IsFile(op) & ~IsUnread(op))
+        elif flags == set(["-f"]):
+            check = And.from_field_iter(operands, lambda op: (IsFile(op) >> ~IsUnread(op)) & ~IsDir(op) & ~IsDeleted(op))
+        elif flags == set(["-r"]):
+            check = And.from_field_iter(operands, lambda op: (IsFile(op) & ~IsUnread(op)) | IsDir(op))
+        elif flags == set(["-f", "-r"]):
+            check = And.from_field_iter(operands, lambda op: (IsFile(op) >> ~IsUnread(op)) & ~IsDeleted(op))
+        else:
+            assert False, f"unreachable; received flags: {flags}"
+
+        return CmdSpec(check, success_postcond, failure_postcond, io)
