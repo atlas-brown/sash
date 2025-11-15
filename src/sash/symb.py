@@ -16,7 +16,7 @@ from sash.frozen import FrozenAst, freeze, freeze_thing
 from sash.interpreter_config import InterpConfig
 from sash.parser import *
 from sash.reporter import Reporter
-from sash.specs import *
+from sash.specs import get_spec, Description, Not
 from sash.state import *
 from sash.util import *
 
@@ -75,7 +75,9 @@ def handle_commandnode(traces: Traces,
 
 def handle_rm(expanded_args: tuple[Field], trace: Trace) -> tuple[Trace, Trace]:
     logging.debug(f"Checking rm command with expansion possibility: {expanded_args}")
-    spec = rm_spec(expanded_args)
+    spec = get_spec("rm", expanded_args)
+
+    assert spec is not None, "Expected rm spec to always be found"
 
     logging.debug(f"Adding rm precondition: {spec.check}")
     trace = trace.extend(lambda s: s.add_assertion(spec.check))

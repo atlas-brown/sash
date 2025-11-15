@@ -93,10 +93,10 @@ def parse_command(cmd_inv: tuple[Field, ...]) -> CmdInvocation:
 
 # -- Specs start here --
 
-def alias_spec(cmd_: tuple[Field, ...]) -> CmdSpec:
+
+def alias_spec(cmd: CmdInvocation) -> CmdSpec:
     # https://pubs.opengroup.org/onlinepubs/9799919799/utilities/alias.html
 
-    cmd = parse_command(cmd_)
     (name, flags, _, operands) = (cmd.cmd_name, cmd.flags, cmd.options, cmd.operands)
     io = IOType.NONE
 
@@ -139,13 +139,13 @@ def alias_spec(cmd_: tuple[Field, ...]) -> CmdSpec:
             # TODO: unclear whether (and when) the previous 'if' case can be false
 
     else: # non-POSIX
-        log_crit_unhandled_inv(cmd_)
-        return handle_non_posix(cmd_)
+        log_crit_unhandled_inv(cmd)
+        return handle_non_posix(cmd)
 
     return CmdSpec(check, success_postcond, failure_postcond, io)
 
 
-def cd_spec(cmd_: tuple[Field, ...]) -> CmdSpec:
+def cd_spec(cmd: CmdInvocation) -> CmdSpec:
     # https://pubs.opengroup.org/onlinepubs/9799919799/utilities/cd.html
 
     # NOTE:
@@ -155,7 +155,6 @@ def cd_spec(cmd_: tuple[Field, ...]) -> CmdSpec:
     # NOTE:
     #   Invocations with multiple operands should fail, but we treat them as no-ops here.
 
-    cmd = parse_command(cmd_)
     (name, flags, _, operands) = (cmd.cmd_name, cmd.flags, cmd.options, cmd.operands)
     io = IOType.NONE
 
@@ -251,7 +250,7 @@ def cd_spec(cmd_: tuple[Field, ...]) -> CmdSpec:
         # nz-postcond:
         #   (1) none
 
-        log_crit_unhandled_inv(cmd_)
+        log_crit_unhandled_inv(cmd)
 
         check = Empty() # (1)
         success_postcond = (
@@ -262,7 +261,7 @@ def cd_spec(cmd_: tuple[Field, ...]) -> CmdSpec:
     return CmdSpec(check, success_postcond, failure_postcond, io)
 
 
-def command_spec(cmd_: tuple[Field, ...]) -> CmdSpec:
+def command_spec(cmd: CmdInvocation) -> CmdSpec:
     # https://pubs.opengroup.org/onlinepubs/9799919799/utilities/command.html
 
     # A note on 'command -v/-V cmd':
@@ -290,7 +289,6 @@ def command_spec(cmd_: tuple[Field, ...]) -> CmdSpec:
     # - Another idea (which would probably be useless in practice) is to have the precondition that cmd cannot be a reserved word,
     #   with the "intuition" being that the command turns to a no-op (at best) or to a const cond (at worst)
 
-    cmd = parse_command(cmd_)
     (name, flags, _, operands) = (cmd.cmd_name, cmd.flags, cmd.options, cmd.operands)
     flags.discard("-p") # -p tells command to use a default value for PATH, guaranteed to find all standard utilities
     io = IOType.NONE
@@ -304,24 +302,24 @@ def command_spec(cmd_: tuple[Field, ...]) -> CmdSpec:
     # fi
     # my_alias
 
-    if flags == set(["-v"]) or flags == set(["-V"]) and len(operands) == 1: # command -v/-V cmd
+    if flags == set(["-v"]) or flags == set(["-V"]) and len(operands) == 1: # command -v/-V subcmd
         # check:
         #   (1) none
         # z-postcond:
-        #   (1) none (cmd might be a reserved word, see note above)
+        #   (1) none (subcmd might be a reserved word, see note above)
         # nz-postcond:
-        #   (1) cmd is not a command
-        cmd = operands[0]
+        #   (1) subcmd is not a command
+        subcmd = operands[0]
         check = Empty()
         success_postcond = Empty()
-        failure_postcond = ~CommandExists(cmd)
+        failure_postcond = ~CommandExists(subcmd)
         io = IOType.add_stdout(io)
 
     else: # command cmd args...
-        log_crit_unhandled_inv(cmd_)
+        log_crit_unhandled_inv(cmd)
 
-        cmd = operands[0]
-        cmd_name = parse_command((cmd,)).cmd_name.parts[0] # hack to get the command name
+        subcmd = operands[0]
+        cmd_name = parse_command((subcmd,)).cmd_name.parts[0] # hack to get the command name
         if isinstance(cmd_name, str):
             spec = get_spec(cmd_name, tuple(operands))
             if spec:
@@ -334,7 +332,7 @@ def command_spec(cmd_: tuple[Field, ...]) -> CmdSpec:
     return CmdSpec(check, success_postcond, failure_postcond, io)
 
 
-def cp_spec(cmd_: tuple[Field, ...]) -> CmdSpec:
+def cp_spec(cmd: CmdInvocation) -> CmdSpec:
     # https://pubs.opengroup.org/onlinepubs/9799919799/utilities/cp.html
 
     # NOTE:
@@ -342,7 +340,6 @@ def cp_spec(cmd_: tuple[Field, ...]) -> CmdSpec:
     #   cp prompts before overwriting non-writable files, unless -f is present
     #   the current spec is modeled as if -P and -f are present on every call
 
-    cmd = parse_command(cmd_)
     (name, flags, _, operands) = (cmd.cmd_name, cmd.flags, cmd.options, cmd.operands)
 
     flags.discard("-p") # -p is used to control metadata of the created files
@@ -420,7 +417,7 @@ def cp_spec(cmd_: tuple[Field, ...]) -> CmdSpec:
         # nz-postcond:
         #   (1) none (command can fail due to reasons we don't model, such as permissions)
 
-        log_crit_unhandled_inv(cmd_)
+        log_crit_unhandled_inv(cmd)
 
         ss, t = operands[:-1], operands[-1]
         check = (
@@ -438,7 +435,7 @@ def cp_spec(cmd_: tuple[Field, ...]) -> CmdSpec:
         if len(operands) < 2:
             logging.error("cp command with less than 2 operands is invalid; treating as no-op")
         else:
-            return handle_non_posix(cmd_)
+            return handle_non_posix(cmd)
 
         check = Empty()
         success_postcond = Empty()
@@ -448,17 +445,16 @@ def cp_spec(cmd_: tuple[Field, ...]) -> CmdSpec:
     return CmdSpec(check, success_postcond, failure_postcond, io)
 
 
-def echo_spec(cmd_: tuple[Field, ...]) -> CmdSpec:
+def echo_spec(cmd: CmdInvocation) -> CmdSpec:
     # https://pubs.opengroup.org/onlinepubs/9799919799/utilities/echo.html
 
-    cmd = parse_command(cmd_)
     (name, flags, _, _) = (cmd.cmd_name, cmd.flags, cmd.options, cmd.operands)
     io = IOType.STDOUT
 
     assert name == SymStr(("echo",)), f"Expected echo command, got: {name}"
 
     if flags != set(): # POSIX does not define any flags for echo
-        return handle_non_posix(cmd_)
+        return handle_non_posix(cmd)
 
     # check:        none
     # z-postcond:   none
@@ -467,10 +463,9 @@ def echo_spec(cmd_: tuple[Field, ...]) -> CmdSpec:
     return CmdSpec(Empty(), Empty(), Empty(), io)
 
 
-def grep_spec(cmd_: tuple[Field, ...]) -> CmdSpec:
+def grep_spec(cmd: CmdInvocation) -> CmdSpec:
     # https://pubs.opengroup.org/onlinepubs/9799919799/utilities/grep.html
 
-    cmd = parse_command(cmd_)
     (name, flags, _, operands) = (cmd.cmd_name, cmd.flags, cmd.options, cmd.operands)
     io = IOType.STDOUT if "-q" not in flags else IOType.NONE
     flags.discard("-q")
@@ -498,7 +493,7 @@ def grep_spec(cmd_: tuple[Field, ...]) -> CmdSpec:
         failure_postcond = Empty()
 
     else:
-        log_crit_unhandled_inv(cmd_)
+        log_crit_unhandled_inv(cmd)
 
         check = Empty()
         success_postcond = Empty()
@@ -508,14 +503,13 @@ def grep_spec(cmd_: tuple[Field, ...]) -> CmdSpec:
     return CmdSpec(check, success_postcond, failure_postcond, io)
 
 
-def mkdir_spec(cmd_: tuple[Field, ...]) -> CmdSpec:
+def mkdir_spec(cmd: CmdInvocation) -> CmdSpec:
     # https://pubs.opengroup.org/onlinepubs/9799919799/utilities/mkdir.html
 
     # Note:
     #   The file system model is a flat map, there is no hierarchy of directories
     #   So `mkdir -p a/b` will not be assumed to fail if `a` is a file, even though in reality it would
 
-    cmd = parse_command(cmd_)
     (name, flags, _, operands) = (cmd.cmd_name, cmd.flags, cmd.options, cmd.operands)
     flags.discard("-m") # -m is used to control permissions, which we do not model
     io = IOType.NONE
@@ -547,15 +541,14 @@ def mkdir_spec(cmd_: tuple[Field, ...]) -> CmdSpec:
         failure_postcond = Empty()
 
     else:
-        return handle_non_posix(cmd_)
+        return handle_non_posix(cmd)
 
     return CmdSpec(check, success_postcond, failure_postcond, io)
 
 
-def mv_spec(cmd_: tuple[Field, ...]) -> CmdSpec:
+def mv_spec(cmd: CmdInvocation) -> CmdSpec:
     # https://pubs.opengroup.org/onlinepubs/9799919799/utilities/mv.html
 
-    cmd = parse_command(cmd_)
     (name, flags, _, operands) = (cmd.cmd_name, cmd.flags, cmd.options, cmd.operands)
     flags.discard("-f") # ignore -f flag, i think it does not affect preconds/postconds
 
@@ -586,11 +579,11 @@ def mv_spec(cmd_: tuple[Field, ...]) -> CmdSpec:
             success_postcond=And.from_field_iter(srcs, IsDeleted), # TODO: similar to cp, this postcond does not encode the new files created in the dir
             failure_postcond=Empty())
     else:
-        log_crit_unhandled_inv(cmd_)
+        log_crit_unhandled_inv(cmd)
         return CmdSpec(Empty(), Empty(), Empty(), IOType.UNKNOWN)
 
 
-def rm_spec(cmd_: tuple[Field, ...]) -> CmdSpec:
+def rm_spec(cmd: CmdInvocation) -> CmdSpec:
     # https://pubs.opengroup.org/onlinepubs/9799919799/utilities/rm.html
 
     cmd = parse_command(cmd_)
@@ -662,27 +655,28 @@ def rm_spec(cmd_: tuple[Field, ...]) -> CmdSpec:
 def sudo_spec(cmd_: tuple[Field, ...]) -> CmdSpec | None:
 
     cmd = parse_command(cmd_)
+def sudo_spec(cmd: CmdInvocation) -> CmdSpec | None:
+
     operands = cmd.operands
 
     # Return the spec of the underlying command
     # TODO: A lot of interesting things can be modeled about sudo itself (e.g., permission denied, env vars, etc.)
-    assert len(operands) >= 1, f"Expected at least one operand for sudo, got: {operands} for command {cmd_}"
+    assert len(operands) >= 1, f"Expected at least one operand for sudo, got: {operands} for command {cmd}"
     assert isinstance(operands[0].content, SymStr), f"Expected first operand of sudo to be a command string, got: {operands[0].content}"
     if isinstance(operands[0].content.parts[0], str):
         return get_spec(operands[0].content.parts[0], tuple(operands))
     else:
-        logging.critical(f"Got non-str command name in sudo:{cmd_}\n{cmd}")
+        logging.critical(f"Got non-str command name in sudo:{cmd}\n{cmd}")
         return CmdSpec(Empty(), Empty(), Empty())
 
 
-def test_spec(cmd_: tuple[Field, ...]) -> CmdSpec:
+def test_spec(cmd: CmdInvocation) -> CmdSpec:
     # https://pubs.opengroup.org/onlinepubs/9799919799/utilities/test.html
 
     # NOTE: We do not support arithmetic expressions so we only reason about numbers as strings,
     #       and all the information we get about them is whether they are equal or not to other strings
     #       e.g.: 'test 5 < 3' will have the z-postcond that '5' is not equal to '3' and no nz-postcond
 
-    cmd = parse_command(cmd_)
     (name, flags, options, operands) = (cmd.cmd_name, cmd.flags, cmd.options, cmd.operands)
     success_postcond = None
     failure_postcond = None
@@ -696,7 +690,7 @@ def test_spec(cmd_: tuple[Field, ...]) -> CmdSpec:
     if name == SymStr(("[" ,)):
         if len(operands) == 0 or operands[-1] != Field(SymStr(("]",)), WordCount(1,1)):
             # TODO: malformed command, will produce error
-            return handle_non_posix(cmd_) # missing closing ']'
+            return handle_non_posix(cmd) # missing closing ']'
         operands = operands[:-1] # remove closing ']'
 
     negated = False
@@ -886,7 +880,7 @@ def test_spec(cmd_: tuple[Field, ...]) -> CmdSpec:
         failure_postcond = ~StringEq(int1, int2)
 
     else: # default case
-        log_crit_unhandled_inv(cmd_)
+        log_crit_unhandled_inv(cmd)
 
         check = Empty()
         success_postcond = Empty()
@@ -907,10 +901,9 @@ def test_spec(cmd_: tuple[Field, ...]) -> CmdSpec:
     return CmdSpec(check, success_postcond, failure_postcond, io)
 
 
-def touch_spec(cmd_: tuple[Field, ...]) -> CmdSpec:
+def touch_spec(cmd: CmdInvocation) -> CmdSpec:
     # https://pubs.opengroup.org/onlinepubs/9799919799/utilities/touch.html
 
-    cmd = parse_command(cmd_)
     (name, flags, _, operands) = (cmd.cmd_name, cmd.flags, cmd.options, cmd.operands)
     io = IOType.NONE
     flags.discard("-a") # -a changes access time, which we do not model
@@ -942,7 +935,7 @@ def touch_spec(cmd_: tuple[Field, ...]) -> CmdSpec:
         failure_postcond = Empty()
 
     else:
-        return handle_non_posix(cmd_)
+        return handle_non_posix(cmd)
 
     return CmdSpec(check, success_postcond, failure_postcond, io)
 
@@ -963,19 +956,17 @@ for name, func in inspect.getmembers(current_module, inspect.isfunction):
 
 def get_spec(cmd_name: str | None, cmd_: tuple[Field, ...]) -> CmdSpec | None:
     if cmd_name in CMD_SPECS:
-        return CMD_SPECS[cmd_name](cmd_)
+        return CMD_SPECS[cmd_name](parse_command(cmd_))
     logging.info(f"Specs are {CMD_SPECS}")
     logging.warning(f"No spec found for command '{cmd_name}', treating as no-op.")
     logging.critical(f"No spec found for '{cmd_name}'")
 
 
-def log_crit_unhandled_inv(cmd_: tuple[Field, ...]) -> None:
+def log_crit_unhandled_inv(cmd: CmdInvocation) -> None:
     import json
 
-    cmd = parse_command(cmd_)
     cmd_json = {
-        "original" : [field for field in cmd_],
-        "pash_parsed" : {
+        "cmd_invocation" : {
             "cmd_name": cmd.cmd_name,
             "flags": list(cmd.flags),
             "options": {k: v for k, v in cmd.options.items()},
@@ -985,13 +976,12 @@ def log_crit_unhandled_inv(cmd_: tuple[Field, ...]) -> None:
 
     logging.critical(f"Unhandled invocation for command '{cmd.cmd_name}':\n{json.dumps(cmd_json, indent=2, default=str)}")
 
-def handle_non_posix(cmd_: tuple[Field, ...]) -> CmdSpec:
+
+def handle_non_posix(cmd: CmdInvocation) -> CmdSpec:
     import json
 
-    cmd = parse_command(cmd_)
     cmd_json = {
-        "original" : [field for field in cmd_],
-        "pash_parsed" : {
+        "cmd_invocation" : {
             "cmd_name": cmd.cmd_name,
             "flags": list(cmd.flags),
             "options": {k: v for k, v in cmd.options.items()},
@@ -1004,16 +994,17 @@ def handle_non_posix(cmd_: tuple[Field, ...]) -> CmdSpec:
     #logging.warning(f"Non-POSIX '{cmd_name}' handling is not supported; treating as no-op")
     return CmdSpec(Empty(), Empty(), Empty(), IOType.UNKNOWN) # no-op spec
 
+
 # TODO: this code is very diffcult to maintain, consider refactoring it to use classes (should have done from the start...)
 # outline of a handle() method:
 #def handle_invocation(self, cmd: tuple[Field, ...]) -> CmdSpec:
 #    cmd_parsed = parse_command(cmd)
 #    (name, flags, options, operands) = (cmd_parsed.cmd_name, cmd_parsed.flags, cmd_parsed.options, cmd_parsed.operands)
 #
-#    if flags >= self.posix_flags:
+#    if flags - self.posix_flags != set():
 #        spec = self.handle_non_posix(cmd)
 #
-#    elif flags >= self.supported_flags:
+#    elif flags - self.supported_flags != set():
 #        spec = self.handle_non_supported(cmd)
 #
 #    else:
