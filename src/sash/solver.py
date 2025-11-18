@@ -68,7 +68,7 @@ def state_to_z3(s: State) -> z3.ExprRef:
         env_formula.append(eq_formula)
     env_formula = z3.And(env_formula)
 
-    fs_state_formula = s.fs_model.state_to_z3(field_to_z3)
+    fs_state_formula = s.fs_model.state_to_z3()
     logging.debug(f"FS state: {s.fs_model}")
 
     return z3.And(fs_state_formula, pathcond_formula, env_formula)

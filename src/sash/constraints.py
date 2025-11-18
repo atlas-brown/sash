@@ -185,7 +185,7 @@ class FSModel():
     def is_deleted_z3(self, path_z3) -> 'z3.ExprRef':
         return z3.BoolVal(False)
 
-    def state_to_z3(self, field_to_z3: Callable) -> 'z3.ExprRef':
+    def state_to_z3(self) -> 'z3.ExprRef':
         return z3.BoolVal(True)
 
 
@@ -242,13 +242,14 @@ class FSModelSimple(FSModel):
     id: int  = 0
     # history: (z3var for FS at time step `id`, z3 array representing FS at time step `id`)
     history: tuple[tuple[z3.ExprRef, z3.ExprRef]] = field(default_factory=lambda: ((z3.Array('fs0', z3.StringSort(), FileInfo),
-                                                                                    z3.K(z3.StringSort(), FileInfo.mk_pair(Unknown, Unread))),)
+                                                                                    z3.K(z3.StringSort(), FileInfo.mk_pair(Unknown, Unread))),))
 
     def _next_state(self, z3array: z3.ExprRef) -> FSModelSimple:
         return replace(self, id=self.id + 1, history=self.history + ((z3.Array(f'fs{self.id + 1}', z3.StringSort(), FileInfo), z3array),))
+
     def _set(self, path: Field, state: z3.ExprRef, status: Optional[z3.ExprRef] = Unread) -> FSModelSimple:
         """Return a new abstract file system with the given path set to the given state."""
-        return self._next_state(z3.Store(self.history[-1][1], self.field_to_z3(path), FileInfo.mk_pair(state, status)))
+        return self._next_state(z3.Store(self.history[-1][0], self.field_to_z3(path), FileInfo.mk_pair(state, status)))
 
     def _delete(self, path: Field) -> FSModelSimple:
         """Return a new abstract file system after removing the given path."""
@@ -291,6 +292,8 @@ class FSModelSimple(FSModel):
                 return self._create_dir(path)
             case IsDeleted(path):
                 return self._delete(path)
+            case Reads(path):
+                return self._create_file(path, Read)
             case Not(constraint):
                 assert False, f"Unclear what Not means in postcond: {constraints}"
                 return self
@@ -298,9 +301,9 @@ class FSModelSimple(FSModel):
                 assert False, f"Unclear what `IsUnread` means in postconds: {constraints}"
                 return self
             case Writes(path):
-                # For simplicity, assume writing creates a file
+                # For simplicity, say that writing creates an unread file
                 return self._create_file(path)
-            case StringEq(_) | Reads(_) | CommandExists(_) | HasStdout(_) | ExpectsStdin(_) | Description(_):
+            case StringEq(_) | CommandExists(_) | HasStdout(_) | ExpectsStdin(_) | Description(_):
                 # These constraints do not affect the FS model
                 return self
             case _:
@@ -316,7 +319,5 @@ class FSModelSimple(FSModel):
     def is_deleted_z3(self, path_z3) -> 'z3.ExprRef':
         return self.history[-1][0].select(path_z3).state == Del
 
-    def state_to_z3(self, field_to_z3: Callable) -> 'z3.ExprRef':
-        # TODO: Reify the whole sequence of FS states as equalities between each variable name and the corresponding array
-        
-        
+    def state_to_z3(self) -> 'z3.ExprRef':
+        return z3.And([fsvar == array_expr for fsvar, array_expr in self.history])
