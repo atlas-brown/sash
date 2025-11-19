@@ -649,6 +649,32 @@ def touch_spec(cmd: CmdInvocation) -> CmdSpec:
 
     return CmdSpec(check, success_postcond, failure_postcond, io)
 
+def cat_spec(cmd: CmdInvocation) -> CmdSpec:
+    # https://pubs.opengroup.org/onlinepubs/9799919799/utilities/cat.html
+
+    (name, flags, _, operands) = (cmd.cmd_name, cmd.flags, cmd.options, cmd.operands)
+    io = IOType.STDOUT
+
+    assert name == SymStr(("cat",)), f"Expected cat command, got: {name}"
+
+    if flags == set(): # cat file...
+        # check:
+        #   (1) all operands must be files
+        # z-postcond:
+        #   (1) all operands are files or directories
+        # nz-postcond:
+        #   (1) none (maybe permission issue, etc.)
+
+        check = And.from_field_iter(operands, IsFile)
+        success_postcond = And.from_field_iter(operands, IsFile)
+        failure_postcond = Empty()
+
+    else:
+        return handle_non_posix(cmd)
+
+    return CmdSpec(check, success_postcond, failure_postcond, io)
+
+
 # -- Specs end here --
 # Do not define specs below this line, they will not be registered!
 
