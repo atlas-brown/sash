@@ -209,10 +209,10 @@ def test_expand_pre_and_suffix():
     assert isinstance(script[0], AST.CommandNode)
 
     state = starting_state()
-    expanded = expand_simple_r(script[0].arguments[2], state, config)
-    assert expanded == [Field(CompletelyArbitrary(freeze_thing([script[0].arguments[2][1], script[0].arguments[2][3]]),
+    expanded = expand_simple(script[0].arguments[2], state, config)
+    assert expanded[0][0] == [Field(CompletelyArbitrary(freeze_thing([script[0].arguments[2][1], script[0].arguments[2][3]]),
                                                   ArbitraryType.APPROXIMATION,
-                                                  state,
+                                                  expanded[0][1],
                                                   prefix=SymStr(("b",)),
                                                   suffix=SymStr(("a",))),
                               WordCount(0, float('inf')))]
@@ -318,8 +318,8 @@ rm -rf $A/*
     assert v2_expansions[2] == constant_field("value2/*")
 
 
-# TODO: need some kind of test to capture that the producing_state is correctly set in CompletelyArbitrary instances
-# Also some to test that we keep track of the decisions about whether an unbound var is set or not (e.g. the below) should only have 2 expansions, not 4
+# TODO: we need to keep track of the decisions about whether an unbound var is set or not (e.g. the below should only have 2 expansions, not 4)
+# This will allow us to trim paths and
 def test_expand_undefined_fork_state_tracking():
     #script = parse_script("""${1:-default}${2:-default2}${1:-default3}""")
     script = parse_script("""${1:-default}${1:-default2}""")

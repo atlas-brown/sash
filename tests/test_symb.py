@@ -453,7 +453,7 @@ A=$1
 B=$2
 myfunc() {
 if [ "$A" = "$1" ]; then
-    echo "This should always run"
+    echo "we cant tell if this will always run"
 fi
 }
 myfunc foo
@@ -490,6 +490,22 @@ cp "$2" something.txt
     report = reporter.Reporter.get_report()
     expected_warning = reporter.UnsatisfiedPrecondition("cp \"$2\" something.txt", 0)
     assert_expected_report(report, [expected_warning])
+
+def test_nested_function_localenv(tmp_path):
+    # A function that is called should not produce unbound variable errors for its parameters
+    script = write_script(tmp_path, """
+f1() {
+    f2 ok
+    rm "$1"
+}
+f2() {
+    echo "$1"
+}
+f1 /usr
+""")
+    report = symb.main(script)
+    expected_error = reporter.DeleteSystemFile("/usr", 0)
+    assert_expected_report(report, [])
 
 # def test_function_call_multipath(tmp_path):
 #     # A function that is called should not produce unbound variable errors for its parameters

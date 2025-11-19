@@ -511,7 +511,10 @@ def expand_simple(stuff: list[AST.ArgChar],
                         # This is the case that $VAR is unset: take the default
                         non_default, default = self.fork(Description(f"{var.var} takes the default value {constant_field(shasta_pretty(var.arg))}"))
                         Partial.add_the_default(default, var)
-                        non_default.add_a_field(arbitrary_field(var, ArbitraryType.ENVIRONMENT, self.state))
+                        arbitrary_for_this_var = arbitrary_field(var, ArbitraryType.ENVIRONMENT, non_default.state)
+                        # localenv to avoid creating an arbitrary that persists beyond a function body
+                        non_default.state = non_default.state.extend_localenv({var.var: ShellVar(arbitrary_for_this_var)})
+                        non_default.add_a_field(arbitrary_for_this_var)
                         return [non_default, default]
                     else:
                         # todo we should report path information
@@ -521,7 +524,7 @@ def expand_simple(stuff: list[AST.ArgChar],
                         arbitrary_for_this_var = arbitrary_field(var,
                                                                  ArbitraryType.APPROXIMATION if is_special_var(var.var) else ArbitraryType.ENVIRONMENT,
                                                                  self.state)
-                        # localenv to avoid creating an arbitrary that persists beyond the function body
+                        # localenv to avoid creating an arbitrary that persists beyond a function body
                         self.state = self.state.extend_localenv({var.var: ShellVar(arbitrary_for_this_var)})
                         self.add_a_field(arbitrary_for_this_var)
                 case AST.BArgChar() as b:
