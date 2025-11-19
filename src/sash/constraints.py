@@ -241,11 +241,19 @@ class FSModelSimple(FSModel):
 
     id: int  = 0
     # history: (z3var for FS at time step `id`, z3 array representing FS at time step `id`)
-    history: tuple[tuple[z3.ExprRef, z3.ExprRef]] = field(default_factory=lambda: ((z3.Array('fs0', z3.StringSort(), FileInfo),
+    history: tuple[tuple[z3.ArrayRef, z3.ExprRef]] = field(default_factory=lambda: ((z3.Array('fs0', z3.StringSort(), FileInfo),
                                                                                     z3.K(z3.StringSort(), FileInfo.mk_pair(Unknown, Unread))),))
+
+    def _rename_fs_var_append(self, var: z3.ArrayRef, suffix: str) -> z3.ExprRef:
+        var_name = var.decl().name()
+        return z3.Array(f'{var_name}{suffix}', z3.StringSort(), FileInfo)
 
     def _next_state(self, z3array: z3.ExprRef) -> FSModelSimple:
         return replace(self, id=self.id + 1, history=self.history + ((z3.Array(f'fs{self.id + 1}', z3.StringSort(), FileInfo), z3array),))
+
+    # ASSUMPTION: `intermediate_history` ids do not overlap with self ids
+    def _extend_history(self, z3array: z3.ExprRef, intermediate_history: Optional[tuple[tuple[z3.ExprRef, z3.ExprRef], ...]] = None) -> FSModelSimple:
+        return replace(self, id=self.id + 1, history=self.history + (intermediate_history or ()) + ((z3.Array(f'fs{self.id + 1}', z3.StringSort(), FileInfo), z3array),))
 
     def _set(self, path: Field, state: z3.ExprRef, status: Optional[z3.ExprRef] = Unread) -> FSModelSimple:
         """Return a new abstract file system with the given path set to the given state."""
@@ -274,18 +282,30 @@ class FSModelSimple(FSModel):
             case Or(lhs, rhs):
                 fs_after_lhs = self.apply_postcondition(lhs)
                 fs_after_rhs = self.apply_postcondition(rhs)
-                new_state = z3.If(z3.FreshBool("postcond_or"), fs_after_lhs, fs_after_rhs)
-                return self._next_state(new_state) # type: ignore
+                lhs_new_history = fs_after_lhs.history[len(self.history):]
+                rhs_new_history = fs_after_rhs.history[len(self.history):]
+                lhs_new_history_renamed = tuple((self._rename_fs_var_append(var, "_lhs"), array_expr) for var, array_expr in lhs_new_history)
+                rhs_new_history_renamed = tuple((self._rename_fs_var_append(var, "_rhs"), array_expr) for var, array_expr in rhs_new_history)
+                lhs_last_fs = lhs_new_history_renamed[-1][0]
+                rhs_last_fs = rhs_new_history_renamed[-1][0]
+                new_state = z3.If(z3.FreshBool("postcond_or"), lhs_last_fs, rhs_last_fs)
+                return self._extend_history(new_state, lhs_new_history_renamed + rhs_new_history_renamed) # type: ignore
             case Not(IsDeleted(path)):
                 return self.apply_postcondition(IsFile(path) | IsDir(path))
             case Not(IsFile(path)):
                 return self.apply_postcondition(IsDeleted(path) | IsDir(path))
             case Not(IsDir(path)):
                 return self.apply_postcondition(IsDeleted(path) | IsFile(path))
+            case Not(Or(lhs, rhs)):
+                return self.apply_postcondition(Not(lhs) & Not(rhs))
+            case Not(And(lhs, rhs)):
+                return self.apply_postcondition(Not(lhs) | Not(rhs))
             case Implies(premise, conclusion):
                 fs_after_conclusion = self.apply_postcondition(conclusion)
-                new_state = z3.If(z3.FreshBool("postcond_implies"), fs_after_conclusion, self.history[-1])
-                return self._next_state(new_state) # type: ignore
+                # Apply the postcondition, so we get the final state if the premise is true, and then add a new final state
+                # that chooses between the old final state and the new final state based on the premise
+                new_state = z3.If(premise, fs_after_conclusion.history[-1][0], self.history[-1][0])
+                return fs_after_conclusion._next_state(new_state) # type: ignore
             case IsFile(path):
                 return self._create_file(path)
             case IsDir(path):
@@ -294,30 +314,30 @@ class FSModelSimple(FSModel):
                 return self._delete(path)
             case Reads(path):
                 return self._create_file(path, Read)
-            case Not(constraint):
-                assert False, f"Unclear what Not means in postcond: {constraints}"
-                return self
-            case IsUnread(path):
-                assert False, f"Unclear what `IsUnread` means in postconds: {constraints}"
-                return self
             case Writes(path):
                 # For simplicity, say that writing creates an unread file
                 return self._create_file(path)
-            case StringEq(_) | CommandExists(_) | HasStdout(_) | ExpectsStdin(_) | Description(_):
+            case StringEq() | Not(StringEq()) | CommandExists() | HasStdout() | ExpectsStdin() | Description() | IsUnread():
                 # These constraints do not affect the FS model
+                return self
+            case Not(constraint):
+                assert False, f"Unclear what Not means in postcond: {constraints}"
                 return self
             case _:
                 assert False, f"Unhandled FS postcondition: {constraints}"
         return self
 
     def is_file_z3(self, path_z3) -> 'z3.ExprRef':
-        return self.history[-1][0].select(path_z3).state == File | self.history[-1][0].select(path_z3).state == Unknown
+        return z3.Or(FileInfo.state(z3.Select(self.history[-1][0], path_z3)) == File, FileInfo.state(z3.Select(self.history[-1][0], path_z3)) == Unknown)
 
     def is_dir_z3(self, path_z3) -> 'z3.ExprRef':
-        return self.history[-1][0].select(path_z3).state == Dir | self.history[-1][0].select(path_z3).state == Unknown
+        return z3.Or(FileInfo.state(z3.Select(self.history[-1][0], path_z3)) == Dir, FileInfo.state(z3.Select(self.history[-1][0], path_z3)) == Unknown)
 
     def is_deleted_z3(self, path_z3) -> 'z3.ExprRef':
-        return self.history[-1][0].select(path_z3).state == Del
+        return FileInfo.state(z3.Select(self.history[-1][0], path_z3)) == Del
+
+    def is_unread_z3(self, path_z3) -> 'z3.ExprRef':
+        return FileInfo.status(z3.Select(self.history[-1][0], path_z3)) == Unread
 
     def state_to_z3(self) -> 'z3.ExprRef':
         return z3.And([fsvar == array_expr for fsvar, array_expr in self.history])

@@ -26,7 +26,7 @@ def assert_equiv_formulas(f1, f2):
     assert res == z3.unsat, f"Formulas are not equivalent:\nf1: {f1}\nf2: {f2}\nModel: {s.model()}"
 
 def make_env_constraints_z3(s, env_constraints):
-    default_env_constraints = {name: field_to_z3(shellvar.value.content) for name, shellvar in s.env.items() if name in {"HOME", "PWD", "OLDPWD", "PATH"}}
+    default_env_constraints = {name: field_content_to_z3(shellvar.value.content) for name, shellvar in s.env.items() if name in {"HOME", "PWD", "OLDPWD", "PATH"}}
     parts = [z3var(name) == z3expr for name, z3expr in (env_constraints | default_env_constraints).items()]
     return z3.And(*parts)
 
@@ -47,7 +47,7 @@ def test_state_to_z3():
         .set_env("B", ShellVar(arb))\
         .add_pathcond(StringEq(arb, constant_field("")))
 
-    arbz3var = field_to_z3(arb.content)
+    arbz3var = field_content_to_z3(arb.content)
 
     fs_formula = True
 
@@ -73,8 +73,8 @@ def test_state_to_z3_more_stuff():
         .add_pathcond(StringEq(arb, constant_field("")))\
         .add_pathcond(StringEq(arb2, arb))
 
-    arbz3var = field_to_z3(arb.content)
-    arb2z3var = field_to_z3(arb2.content)
+    arbz3var = field_content_to_z3(arb.content)
+    arb2z3var = field_content_to_z3(arb2.content)
 
     fs_formula = True
 
@@ -97,7 +97,7 @@ def test_state_to_z3_local_vars():
         .extend_localenv({"A": ShellVar(arb)})\
         .add_pathcond(StringEq(arb, constant_field("")))
 
-    arbz3var = field_to_z3(arb.content)
+    arbz3var = field_content_to_z3(arb.content)
 
     fs_formula = True
 
@@ -114,7 +114,7 @@ def test_state_to_z3_local_vars():
 def test_state_to_z3_fs_simple():
     reset_z3cache()
 
-    state = starting_state(FSModelSimple(lambda f: field_to_z3(f.content)))
+    state = starting_state(FSModelSimple(lambda f: field_content_to_z3(f.content)))
     s = state.set_env("A", ShellVar(constant_field("value1")))\
         .update_fs(IsDeleted(constant_field("somefile.txt")))
 
@@ -134,7 +134,7 @@ def test_state_to_z3_fs_simple():
 def test_state_to_z3_fs_more():
     reset_z3cache()
 
-    state = starting_state(FSModelSimple(lambda f: field_to_z3(f.content)))
+    state = starting_state(FSModelSimple(lambda f: field_content_to_z3(f.content)))
     s = state.set_env("A", ShellVar(constant_field("value1")))\
         .update_fs(IsDeleted(constant_field("somefile.txt")))\
         .update_fs(IsFile(constant_field("somefile.txt")))\

@@ -10,6 +10,7 @@ from typing import NamedTuple
 import shasta.ast_node as AST
 
 import sash.reporter as reporter
+from sash.solver import field_to_z3
 import sash.symb_utils as symb_utils
 from sash.config import Config
 from sash.frozen import FrozenAst, freeze, freeze_thing
@@ -113,7 +114,7 @@ def handle_function_call_or_unknown(func_name: str,
         else:
             the_func = func_defs.pop()
             assert isinstance(the_func, FrozenAst)
-            return handle_function_call(the_func.ast, arg_fields, traces, config)
+            return handle_function_call(func_name, the_func.ast, arg_fields, traces, config)
     else:
         logging.error(f"Name {func_name} is defined as different functions across traces, giving up on this call")
         return traces
@@ -131,7 +132,8 @@ def handle_unknown_command(name: str,
     logging.debug(f"Unknown command {name}, optimistically treating as no-op")
     return traces
 
-def handle_function_call(func_node: AST.DefunNode,
+def handle_function_call(name: str,
+                         func_node: AST.DefunNode,
                          arg_fields: list[Field],
                          traces: Traces,
                          config: InterpConfig) -> Traces:
@@ -148,8 +150,13 @@ def handle_function_call(func_node: AST.DefunNode,
     logging.debug(f"Bound localenv for call: {localenv}")
     t1 = []
     for t in traces:
-        t1.append(t.extend(lambda s: s.extend_localenv(localenv)))
-    return guarded_interp_node(t1, func_node.body, config)
+        if name in t.latest_state.call_stack:
+            logging.error(f"Found recursive function definition! {name} via {t.latest_state.call_stack}")
+            return traces
+        t1.append(t.extend(lambda s: s.enter_function(name).extend_localenv(localenv)))
+    call_result_traces = guarded_interp_node(t1, func_node.body, config)
+    # TODO: should actually pop the localenv as well! need a stack of localenvs...
+    return [t.extend(lambda s: s.exit_function()) for t in call_result_traces]
 
 def record_assignment(trace: Trace, var: str, rhs: Field) -> Trace:
     return trace.extend(lambda s: s.set_env(var, ShellVar(rhs)).set_last_exit_code(SymStr(("0",))))
@@ -233,14 +240,6 @@ def interpret_test(cmd: list[Field]) -> bool | None:
     if not len(args) in {2, 3}:
         return None
 
-    # Check if if all arguments are concrete
-    field_content = [f.content for f in cmd]
-    if not all(isinstance(c, SymStr) for c in field_content):
-        return None
-    field_parts = [c.parts for c in field_content if isinstance(c, SymStr)]
-    if not all(all(isinstance(p, str) for p in parts) for parts in field_parts):
-        return None
-
     if len(args) == 2:
         if args[0].content == SymStr(("!",)):
             res = interpret_test(args[1:])
@@ -261,6 +260,12 @@ def interpret_test(cmd: list[Field]) -> bool | None:
                 return s1 == s2
             case (SymStr([s1]), SymStr([op]), SymStr([s2])) if op == "!=":
                 return s1 != s2
+            case (CompletelyArbitrary() as lhs, SymStr([op]), CompletelyArbitrary() as rhs) if op in ["=", "!="]:
+                # if the two are definitely the same, we can say something in this case
+                if lhs == rhs:
+                    return op == "="
+                else:
+                    return None
             case (SymStr([s1]), SymStr([op]), SymStr([s2])) if op in ["-eq", "-ne", "-lt", "-le", "-gt", "-ge"]:
                 try:
                     assert isinstance(s1, str) and isinstance(s2, str)
@@ -476,8 +481,8 @@ def expand_simple(stuff: list[AST.ArgChar],
                     return res
                 case AST.VArgChar() as var:
                     if var.var == "?":
-                        self.add_a_field(Field(state.last_exit_code, WordCount(1, 1)))
-                    elif (v := state.lookup(var.var)):
+                        self.add_a_field(Field(self.state.last_exit_code, WordCount(1, 1)))
+                    elif (v := self.state.lookup(var.var)):
                         if var.fmt == "Normal" or (var.fmt == "Minus" and not var.null):
                             # explanation of the minus case: the POSIX spec says that for
                             # ${VAR-default} the result is the value of $VAR as long as $VAR is set -- whether it's empty ("null") or not
@@ -497,34 +502,37 @@ def expand_simple(stuff: list[AST.ArgChar],
                                 case something_not_constant: # either a symbolic str or arbitrary
                                     non_default, default = self.fork(Description(f"{var.pretty()} takes the default value"))
                                     Partial.add_the_default(default, var)
-                                    non_default.add_a_field(arbitrary_field(var, ArbitraryType.APPROXIMATION, state))
+                                    non_default.add_a_field(arbitrary_field(var, ArbitraryType.APPROXIMATION, self.state))
                                     return [non_default, default]
                         else:
                             logging.info(f"expansion: treating var {var.pretty()} with unhandled fmt {var.fmt} as completely arbitrary field")
-                            self.add_a_field(arbitrary_field(var, ArbitraryType.APPROXIMATION, state))
+                            self.add_a_field(arbitrary_field(var, ArbitraryType.APPROXIMATION, self.state))
                     elif var.fmt == "Minus":
                         # This is the case that $VAR is unset: take the default
                         non_default, default = self.fork(Description(f"{var.var} takes the default value {constant_field(shasta_pretty(var.arg))}"))
                         Partial.add_the_default(default, var)
-                        non_default.add_a_field(arbitrary_field(var, ArbitraryType.ENVIRONMENT, state))
+                        non_default.add_a_field(arbitrary_field(var, ArbitraryType.ENVIRONMENT, self.state))
                         return [non_default, default]
                     else:
                         # todo we should report path information
                         if not is_special_var(var.var):
-                            error_code = reporter.UnboundIDSetU if state.opts.is_set(SetOptions.NOUNSET) else reporter.UnboundID
+                            error_code = reporter.UnboundIDSetU if self.state.opts.is_set(SetOptions.NOUNSET) else reporter.UnboundID
                             Reporter.add_issue(error_code(var.pretty(), context_line))
-                        self.add_a_field(arbitrary_field(var,
-                                                         ArbitraryType.APPROXIMATION if is_special_var(var.var) else ArbitraryType.ENVIRONMENT,
-                                                         state))
+                        arbitrary_for_this_var = arbitrary_field(var,
+                                                                 ArbitraryType.APPROXIMATION if is_special_var(var.var) else ArbitraryType.ENVIRONMENT,
+                                                                 self.state)
+                        # localenv to avoid creating an arbitrary that persists beyond the function body
+                        self.state = self.state.extend_localenv({var.var: ShellVar(arbitrary_for_this_var)})
+                        self.add_a_field(arbitrary_for_this_var)
                 case AST.BArgChar() as b:
                     logging.info(f"expansion: treating backquote argchar {b.pretty()} as completely arbitrary field")
                     # todo use the trace: this case suggests we should really generalize the interface of `expand_simple` to be from one trace to many, instead of one state to many
-                    t = guarded_interp_node([Trace((state,))], b.node, config)
-                    self.add_a_field(arbitrary_field(b, ArbitraryType.APPROXIMATION, state))
+                    t = guarded_interp_node([Trace((self.state,))], b.node, config)
+                    self.add_a_field(arbitrary_field(b, ArbitraryType.APPROXIMATION, self.state))
                 case _:
                     logging.error(f"argchar: {argchar.pretty()} {type(argchar)}")
                     logging.info(f"expansion: treating unhandled argchar as completely arbitrary field: {argchar.pretty()}")
-                    self.add_a_field(arbitrary_field(argchar, ArbitraryType.APPROXIMATION, state))
+                    self.add_a_field(arbitrary_field(argchar, ArbitraryType.APPROXIMATION, self.state))
 
             # Most cases fall through to here, no forking going on
             return [self]
@@ -630,9 +638,6 @@ def field_to_str(field: Field) -> str | None:
             return symb_utils.symbstr_to_str(parts)
         case _:
             return None
-
-def is_special_var(name: str) -> bool:
-    return name.isdecimal() or name in ["@", "#", "?"]
 
 # =====================
 #  Field manipulation
@@ -929,7 +934,7 @@ def starting_state(fs_model: Optional[FSModel] = None) -> State:
     # env["IFS"] = ShellVar(" \t\n")
     # for defaultvar in ["HOME", "PWD", "OLDPWD", "PATH"]:
     #     env[defaultvar] = ShellVar(symb_utils.create_fresh_var(f"default_{defaultvar}"))
-    root = State() if fs_model is None else State(fs_model = fs_model)
+    root = State(fs_model = FSModelSimple(field_to_z3)) if fs_model is None else State(fs_model = fs_model)
     make_ast = lambda var: AST.VArgChar("Normal", False, var, [])
     starter_env = {
         "HOME": ShellVar(arbitrary_field(make_ast("HOME"), ArbitraryType.ENVIRONMENT, root)),

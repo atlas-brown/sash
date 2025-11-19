@@ -316,3 +316,17 @@ rm -rf $A/*
     assert v2_expansions[0] == constant_field("rm")
     assert v2_expansions[1] == constant_field("-rf")
     assert v2_expansions[2] == constant_field("value2/*")
+
+
+# TODO: need some kind of test to capture that the producing_state is correctly set in CompletelyArbitrary instances
+# Also some to test that we keep track of the decisions about whether an unbound var is set or not (e.g. the below) should only have 2 expansions, not 4
+def test_expand_undefined_fork_state_tracking():
+    #script = parse_script("""${1:-default}${2:-default2}${1:-default3}""")
+    script = parse_script("""${1:-default}${1:-default2}""")
+    assert len(script) == 1
+    assert isinstance(script[0], AST.CommandNode)
+
+    state = starting_state()
+
+    expanded = expand_simple(script[0].arguments[0], state, config)
+    assert len(expanded) == 2
