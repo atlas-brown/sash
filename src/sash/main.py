@@ -35,7 +35,7 @@ def symbexec_main(file: str,
 def main(file: str,
          debug=False,
          log_file: pathlib.Path | None=None,
-         solver=False,
+         solver=True,
          timeout: float | None = None) -> Report:
     Config.set("DEBUG", debug)
     logging.basicConfig(
