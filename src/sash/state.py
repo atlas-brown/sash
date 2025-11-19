@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field, replace, fields
-from sash.constraints import Constraint, FSModel, FSModelSimple
+import logging
+from sash.constraints import Constraint, Empty, FSModel, FSModelSimple
 from typing import Callable, Optional, Any
 from enum import Enum
 from sash.frozen import FrozenAst, FrozenDict
@@ -113,6 +114,8 @@ class SetOptions:
 class Assertion:
     producing_state: "State"
     constraint: Constraint
+    source_str: str
+    source_line: int
 
 @dataclass(frozen=True)
 class State:
@@ -152,8 +155,11 @@ class State:
         new_pathcond = self.pathcond + (cond,)
         return replace(self, pathcond=new_pathcond)
 
-    def add_assertion(self, assertion: Constraint) -> 'State':
-        new_assertions = self.assertions + (Assertion(producing_state=self, constraint=assertion),)
+    def add_assertion(self, assertion: Constraint, source_str: Optional[str] = None, source_line: Optional[int] = None) -> 'State':
+        if assertion == Empty():
+            logging.debug(f"Skipping empty assertion from {source_str} at line {source_line}")
+            return self
+        new_assertions = self.assertions + (Assertion(producing_state=self, constraint=assertion, source_str=source_str, source_line=source_line),)
         return replace(self, assertions=new_assertions)
 
     def lookup(self, var: str) -> Optional[ShellVar]:

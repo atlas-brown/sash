@@ -5,8 +5,8 @@ from sash.state import *
 from sash.util import shasta_pretty
 import z3
 
-arbitrary_to_z3_var = {}
-tracked_assertions = {}
+arbitrary_to_z3_var: dict[CompletelyArbitrary, z3.ExprRef] = {}
+tracked_assertions: dict[z3.BoolRef, Assertion] = {}
 
 def reset_z3cache():
     global arbitrary_to_z3_var, tracked_assertions
@@ -105,7 +105,8 @@ def model_to_reports(core: list[z3.BoolRef]):
 
         err = UnsatisfiedPrecondition(
             constraint,
-            0, # TODO: line number
+            assertion.source_str,
+            assertion.source_line
         )
         Reporter.add_issue(err)
 
@@ -126,10 +127,13 @@ def model_to_reports(core: list[z3.BoolRef]):
 # --> if sat, then there's a model where the assertion succeeds
 # --> if unsat, then there's no model where the assertion succeeds (ie it can only fail)
 def run_solver(traces: list[Trace], config: InterpConfig):
+    logging.debug("Running Z3 solver on assertions")
     reset_z3cache()
     for trace in traces:
         assertions = trace.latest_state.assertions
+        logging.debug(f"Checking {len(assertions)} assertions")
         for assertion in assertions:
+            logging.debug(f"Checking assertion: {assertion}")
             solver = z3.Solver()
             solver.set(unsat_core=True)
             assertion_var, assertion_formula = assertion_to_z3(assertion)

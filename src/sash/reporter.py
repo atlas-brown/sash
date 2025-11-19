@@ -136,8 +136,8 @@ class NotACommand(Issue):
 
 
 class UnsatisfiedPrecondition(Issue):
-    def __init__(self, constraint, line):
-        super().__init__(Code.UNSATISFIED_PRECONDITION, f"precondition '{constraint}' might not hold", Severity.ERROR, line)
+    def __init__(self, constraint, command: str, line):
+        super().__init__(Code.UNSATISFIED_PRECONDITION, f"precondition for '{command}' '{constraint}' might not hold", Severity.ERROR, line)
 
 
 class Report(NamedTuple):

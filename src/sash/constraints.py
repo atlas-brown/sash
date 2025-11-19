@@ -337,7 +337,7 @@ class FSModelSimple(FSModel):
         return FileInfo.state(z3.Select(self.history[-1][0], path_z3)) == Del
 
     def is_unread_z3(self, path_z3) -> 'z3.ExprRef':
-        return FileInfo.status(z3.Select(self.history[-1][0], path_z3)) == Unread
+        return z3.Select(self.history[-1][0], path_z3) == FileInfo.mk_pair(File, Unread)
 
     def state_to_z3(self) -> 'z3.ExprRef':
         return z3.And([fsvar == array_expr for fsvar, array_expr in self.history])

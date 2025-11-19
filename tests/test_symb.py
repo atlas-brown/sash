@@ -473,7 +473,7 @@ rm somefile.txt
     assert len(res.traces) == 1
     assert len(res.traces[0].latest_state.assertions) == 2
     report = reporter.Reporter.get_report()
-    expected_warning = reporter.UnsatisfiedPrecondition("rm somefile.txt", 0)
+    expected_warning = reporter.UnsatisfiedPrecondition(None, "rm somefile.txt", 0)
     assert_expected_report(report, [expected_warning])
 
 def test_read_after_rm(tmp_path):
@@ -486,9 +486,8 @@ cp "$2" something.txt
     res = symb.symbexec_main(script, solver=True)
     assert len(res.traces) == 1
     assert len(res.traces[0].latest_state.assertions) == 2
-    print(res.traces[0].latest_state.assertions[1])
     report = reporter.Reporter.get_report()
-    expected_warning = reporter.UnsatisfiedPrecondition("cp \"$2\" something.txt", 0)
+    expected_warning = reporter.UnsatisfiedPrecondition(None, "cp \"$2\" something.txt", 0)
     assert_expected_report(report, [expected_warning])
 
 def test_nested_function_localenv(tmp_path):
@@ -506,6 +505,18 @@ f1 /usr
     report = symb.main(script)
     expected_error = reporter.DeleteSystemFile("/usr", 0)
     assert_expected_report(report, [])
+
+def test_pathcond_and_precond(tmp_path):
+    # Path conditions should be used to reason about preconditions
+    script = write_script(tmp_path, """
+rm "$1"
+if [ "$2" = "$1" ]; then
+    cat "$2"
+fi
+""")
+    report = symb.main(script)
+    expected_warning = reporter.UnsatisfiedPrecondition(None, "cat \"$2\"", 0)
+    assert_expected_report(report, [expected_warning])
 
 # def test_function_call_multipath(tmp_path):
 #     # A function that is called should not produce unbound variable errors for its parameters

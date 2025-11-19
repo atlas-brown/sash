@@ -42,7 +42,7 @@ def handle_commandnode(traces: Traces,
                 cmd_traces = []
                 for arg_fields, traces in simplified_expansions.items():
                     for trace in traces:
-                        ts, tf = handle_rm(arg_fields, trace)
+                        ts, tf = handle_rm(arg_fields, trace, node)
                         cmd_traces.append(ts)
                         if config.in_checked_position:
                             cmd_traces.append(tf)
@@ -53,7 +53,8 @@ def handle_commandnode(traces: Traces,
                 t1 = handle_exit(t1)
             # TODO: Unify rm with other commands
             case cmd_name if spec := get_spec(cmd_name, tuple(expanded_args)):
-                t_precond = trace_map(t1, lambda s: s.add_assertion(spec.check))
+                logging.debug(f"Adding {cmd_name} precondition: {spec.check}")
+                t_precond = trace_map(t1, lambda s: s.add_assertion(spec.check, source_str=node.pretty(), source_line=context_line))
                 t_success = trace_map(t_precond, lambda s: s.add_pathcond(spec.success_postcond).update_fs(spec.success_postcond).set_last_exit_code(SymStr(("0",))))
                 t_failure = []
                 if config.in_checked_position:
@@ -74,14 +75,14 @@ def handle_commandnode(traces: Traces,
     logging.debug(f"Done with command {trim_string_for_logging(node.pretty())} after expanding its args to {expanded_args} (it had assignments: {node.assignments})")
     return t2
 
-def handle_rm(expanded_args: tuple[Field], trace: Trace) -> tuple[Trace, Trace]:
+def handle_rm(expanded_args: tuple[Field], trace: Trace, node: AST.CommandNode) -> tuple[Trace, Trace]:
     logging.debug(f"Checking rm command with expansion possibility: {expanded_args}")
     spec = get_spec("rm", expanded_args)
 
     assert spec is not None, "Expected rm spec to always be found"
 
     logging.debug(f"Adding rm precondition: {spec.check}")
-    trace = trace.extend(lambda s: s.add_assertion(spec.check))
+    trace = trace.extend(lambda s: s.add_assertion(spec.check, source_str=node.pretty(), source_line=context_line))
 
     def is_protected(path):
         return any(path in [p, p + "/", p + "/*"] for p in Config.get("PROTECTED_PATHS"))
