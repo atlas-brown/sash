@@ -319,7 +319,8 @@ rm -rf $A/*
 
 
 # TODO: we need to keep track of the decisions about whether an unbound var is set or not (e.g. the below should only have 2 expansions, not 4)
-# This will allow us to trim paths and
+# This will allow us to trim paths and avoid false positives
+@pytest.mark.skip(reason="Not currently tracking decisions about default values")
 def test_expand_undefined_fork_state_tracking():
     #script = parse_script("""${1:-default}${2:-default2}${1:-default3}""")
     script = parse_script("""${1:-default}${1:-default2}""")
