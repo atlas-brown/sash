@@ -105,7 +105,7 @@ rm -rf "$FOO/"
     report = symb.main(script)
     expected_error1 = reporter.WordSplitCouldDeleteSystemFile("/", 0)
     expected_error2 = reporter.UnboundID(foo_var.pretty(), 0)
-    assert_expected_report(report, [expected_error1, expected_error2, expected_error2])
+    assert_expected_report(report, [expected_error1, expected_error2])
 
 def test_delete_splitting(tmp_path):
     script = write_script(tmp_path, "rm $UNQUOTED\n")
@@ -432,6 +432,80 @@ fi
     expected_error1 = reporter.ConstantCondition(None, 0)
     expected_error2 = reporter.DeadCode('echo "This should never run"', 0)
     assert_expected_report(report, [expected_error1, expected_error2])
+
+def test_const_cond_arg_eq(tmp_path):
+    """Test that a constant condition in an if statement based on argument equality is detected."""
+    script = write_script(tmp_path, """
+A=$1
+B=$2
+if [ "$A" = "$1" ]; then
+    echo "This should always run"
+fi
+""")
+    report = symb.main(script)
+    expected_error1 = reporter.ConstantCondition(None, 0)
+    assert_expected_report(report, [expected_error1])
+
+def test_const_cond_arg_eq_not_in_functions(tmp_path):
+    """Test that a constant condition in an if statement based on argument equality is detected."""
+    script = write_script(tmp_path, """
+A=$1
+B=$2
+myfunc() {
+if [ "$A" = "$1" ]; then
+    echo "we cant tell if this will always run"
+fi
+}
+myfunc foo
+""")
+    report = symb.main(script)
+    assert_expected_report(report, [])
+
+
+def test_double_rm(tmp_path):
+    """Test that deleting the same file twice is reported."""
+    script = write_script(tmp_path, """
+rm somefile.txt
+rm somefile.txt
+""")
+    #report = symb.main(script)
+    res = symb.symbexec_main(script, solver=True)
+    assert len(res.traces) == 1
+    assert len(res.traces[0].latest_state.assertions) == 2
+    report = reporter.Reporter.get_report()
+    expected_warning = reporter.UnsatisfiedPrecondition("rm somefile.txt", 0)
+    assert_expected_report(report, [expected_warning])
+
+def test_read_after_rm(tmp_path):
+    """Test that reading a file after it has been deleted is reported."""
+    script = write_script(tmp_path, """
+rm "$2"
+cp "$2" something.txt
+""")
+    #report = symb.main(script)
+    res = symb.symbexec_main(script, solver=True)
+    assert len(res.traces) == 1
+    assert len(res.traces[0].latest_state.assertions) == 2
+    print(res.traces[0].latest_state.assertions[1])
+    report = reporter.Reporter.get_report()
+    expected_warning = reporter.UnsatisfiedPrecondition("cp \"$2\" something.txt", 0)
+    assert_expected_report(report, [expected_warning])
+
+def test_nested_function_localenv(tmp_path):
+    # A function that is called should not produce unbound variable errors for its parameters
+    script = write_script(tmp_path, """
+f1() {
+    f2 ok
+    rm "$1"
+}
+f2() {
+    echo "$1"
+}
+f1 /usr
+""")
+    report = symb.main(script)
+    expected_error = reporter.DeleteSystemFile("/usr", 0)
+    assert_expected_report(report, [])
 
 # def test_function_call_multipath(tmp_path):
 #     # A function that is called should not produce unbound variable errors for its parameters

@@ -40,3 +40,9 @@
 - Incremented each second (`SECONDS`, not POSIX)
 - Changes any time it's read (`RANDOM`, not POSIX)
 - Current line number in executing script (`LINENO`, not POSIX)
+
+
+## Optimization opportunities
+- Collapse traces
+- Avoid forking in the first place
+- Keep track of decisions about whether a variable is unset to avoid impossible traces where we decided at one point that the var is unset, and at another point that it is set (e.g. consider `something ${1:-default} ${1:-default}` -- there's only two possibilities here, either `$1` is unset and both expansions become default, or it is set and both become the same arbitrary)

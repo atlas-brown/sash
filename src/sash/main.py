@@ -10,32 +10,11 @@ from sash.interpreter_config import InterpConfig
 from sash.reporter import Report, Reporter
 from sash.solver import run_solver
 
-
-def main(file: str,
-         debug=False,
-         log_file: pathlib.Path | None=None,
-         solver=False,
-         timeout: float | None = None) -> Report:
-
-    Config.set("DEBUG", debug)
-    logging.basicConfig(
-        format="[%(filename)s:%(lineno)d] %(message)s",
-        level=logging.DEBUG if debug else logging.WARNING,
-        filename=log_file
-    )
-
-    logging.info(f"Processing file {file}")
+def symbexec_main(file: str,
+                  solver: bool = False,
+                  stop_event: threading.Event | None = None) -> sash.symb.SymbexecResult:
     Reporter.initialize(file)
     config = InterpConfig(trace_collapser = sash.symb.collapse_traces_if_too_many)
-
-    stop_event = threading.Event()
-    timer = None
-    if timeout is not None and timeout > 0:
-        logging.info(f"Setting timeout: {timeout} seconds")
-        timer = threading.Timer(timeout, stop_event.set)
-        timer.daemon = True
-        timer.start()
-
     result = sash.symb.symbexec_file(file, config, stop=stop_event)
     match result.status:
         case sash.symb.SymbexecStatus.COMPLETED:
@@ -50,6 +29,31 @@ def main(file: str,
 
     if solver:
         run_solver(result.traces, config)
+
+    return result
+
+def main(file: str,
+         debug=False,
+         log_file: pathlib.Path | None=None,
+         solver=False,
+         timeout: float | None = None) -> Report:
+    Config.set("DEBUG", debug)
+    logging.basicConfig(
+        format="[%(filename)s:%(lineno)d] %(message)s",
+        level=logging.DEBUG if debug else logging.WARNING,
+        filename=log_file
+    )
+
+    logging.info(f"Processing file {file} with solver={solver} and timeout={timeout}")
+    stop_event = threading.Event()
+    timer = None
+    if timeout is not None and timeout > 0:
+        logging.info(f"Setting timeout: {timeout} seconds")
+        timer = threading.Timer(timeout, stop_event.set)
+        timer.daemon = True
+        timer.start()
+
+    symbexec_main(file, solver, stop_event)
 
     if timer is not None:
         timer.cancel()

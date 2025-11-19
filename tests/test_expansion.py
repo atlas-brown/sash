@@ -209,10 +209,10 @@ def test_expand_pre_and_suffix():
     assert isinstance(script[0], AST.CommandNode)
 
     state = starting_state()
-    expanded = expand_simple_r(script[0].arguments[2], state, config)
-    assert expanded == [Field(CompletelyArbitrary(freeze_thing([script[0].arguments[2][1], script[0].arguments[2][3]]),
+    expanded = expand_simple(script[0].arguments[2], state, config)
+    assert expanded[0][0] == [Field(CompletelyArbitrary(freeze_thing([script[0].arguments[2][1], script[0].arguments[2][3]]),
                                                   ArbitraryType.APPROXIMATION,
-                                                  state,
+                                                  expanded[0][1],
                                                   prefix=SymStr(("b",)),
                                                   suffix=SymStr(("a",))),
                               WordCount(0, float('inf')))]
@@ -316,3 +316,18 @@ rm -rf $A/*
     assert v2_expansions[0] == constant_field("rm")
     assert v2_expansions[1] == constant_field("-rf")
     assert v2_expansions[2] == constant_field("value2/*")
+
+
+# TODO: we need to keep track of the decisions about whether an unbound var is set or not (e.g. the below should only have 2 expansions, not 4)
+# This will allow us to trim paths and avoid false positives
+@pytest.mark.skip(reason="Not currently tracking decisions about default values")
+def test_expand_undefined_fork_state_tracking():
+    #script = parse_script("""${1:-default}${2:-default2}${1:-default3}""")
+    script = parse_script("""${1:-default}${1:-default2}""")
+    assert len(script) == 1
+    assert isinstance(script[0], AST.CommandNode)
+
+    state = starting_state()
+
+    expanded = expand_simple(script[0].arguments[0], state, config)
+    assert len(expanded) == 2

@@ -67,6 +67,9 @@ class CompletelyArbitrary:
             and self.prefix == other.prefix \
             and self.suffix == other.suffix
 
+    def __hash__(self):
+        return hash((self.source, self.kind, self.producing_state if self.kind == ArbitraryType.APPROXIMATION else None, self.prefix, self.suffix))
+
     def __repr__(self):
         return f"CompletelyArbitrary(s`{repr(self.source)[:30]}`, {self.kind}, state<{hash(self.producing_state)}>, pre:{self.prefix}, suf:{self.suffix})"
 
@@ -116,6 +119,7 @@ class State:
     pathcond:                    tuple[Constraint, ...]      = field(default_factory=tuple)
     env:                         FrozenDict[str, ShellVar]   = field(default_factory=FrozenDict)
     localenv:                    FrozenDict[str, ShellVar]   = field(default_factory=FrozenDict)
+    call_stack:                  tuple[str, ...]             = field(default_factory=tuple)
     fundefs:                     FrozenDict[str, FrozenAst]  = field(default_factory=FrozenDict)
     last_exit_code:              SymStr                      = SymStr(("0",))
     last_cmd:                    Optional[FrozenAst]         = None
@@ -123,7 +127,7 @@ class State:
     known_nonexistant_commands:  frozenset[str]              = field(default_factory=frozenset)
     terminated:                  bool                        = False # by `exit` or similar
     assertions:                  tuple[Assertion]            = field(default_factory=tuple)
-    fs_model:                    FSModel                     = field(default_factory=FSModelSimple)
+    fs_model:                    FSModel                     = field(default_factory=FSModel)
 
     external_data: Any = None # ASSUMPTION: must be hashable
 
@@ -155,8 +159,8 @@ class State:
     def lookup(self, var: str) -> Optional[ShellVar]:
         if var in self.localenv:
             return self.localenv[var]
-        elif self.localenv and var.isnumeric():
-            # Positional parameters are not dynamically scoped?
+        elif self.call_stack and is_special_var(var):
+            # Positional parameters not provided end up referring to the outer context's value for that parameter?? For now, just give up on them inside functions
             return None
         elif var in self.env:
             return self.env[var]
@@ -186,6 +190,16 @@ class State:
 
     def record_nonexistant_command(self, name: str) -> 'State':
         return replace(self, known_nonexistant_commands=self.known_nonexistant_commands | {name})
+
+    def enter_function(self, name: str) -> 'State':
+        return replace(self, call_stack=self.call_stack + (name,))
+
+    def exit_function(self) -> 'State':
+        assert self.call_stack, "Tried to exit function when not in function"
+        return replace(self, call_stack=self.call_stack[:-1])
+
+def is_special_var(name: str) -> bool:
+    return name.isdecimal() or name in ["@", "#"]
 
 @dataclass(frozen=True)
 class Trace:
