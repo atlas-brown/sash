@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field, replace, fields
 import logging
-from sash.constraints import Constraint, Empty, FSModel, FSModelSimple
+from sash.constraints import Constraint, Empty, FSModel, FSModelSimple, NormalizedFSConstraint
 from typing import Callable, Optional, Any
 from enum import Enum
 from sash.frozen import FrozenAst, FrozenDict
@@ -93,6 +93,7 @@ class ShellVar:
     value: Field
     readonly : bool = False
     export : bool = False
+    ghost : bool = False # was this variable binding created implicitly by the engine, but has never actually been set?
 
 @dataclass(frozen=True)
 class SetOptions:
@@ -186,7 +187,7 @@ class State:
         return replace(self, opts=self.opts.set_options(options))
 
     def update_fs(self, constraints: Constraint) -> 'State':
-        return replace(self, fs_model=self.fs_model.apply_postcondition(constraints))
+        return replace(self, fs_model=self.fs_model.apply_postcondition(NormalizedFSConstraint(constraints)))
 
     def set_last_exit_code(self, code: SymStr) -> 'State':
         return replace(self, last_exit_code=code)

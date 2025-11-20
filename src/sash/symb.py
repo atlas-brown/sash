@@ -486,12 +486,12 @@ def expand_simple(stuff: list[AST.ArgChar],
                     if var.var == "?":
                         self.add_a_field(Field(self.state.last_exit_code, WordCount(1, 1)))
                     elif (v := self.state.lookup(var.var)):
-                        if var.fmt == "Normal" or (var.fmt == "Minus" and not var.null):
+                        if var.fmt == "Normal" or (var.fmt == "Minus" and not var.null and not v.ghost):
                             # explanation of the minus case: the POSIX spec says that for
                             # ${VAR-default} the result is the value of $VAR as long as $VAR is set -- whether it's empty ("null") or not
                             # ^^ this corresponds to the second part of the condition above (var.null false means no `:`)
                             self.add_a_field(v.value)
-                        elif var.fmt == "Minus" and var.null:
+                        elif var.fmt == "Minus" and (var.null or v.ghost):
                             # This is the case that it's ${VAR:-default}:
                             # IF $VAR is empty, take the default
                             # Otherwise, take the result is $VAR
@@ -516,7 +516,7 @@ def expand_simple(stuff: list[AST.ArgChar],
                         Partial.add_the_default(default, var)
                         arbitrary_for_this_var = arbitrary_field(var, ArbitraryType.ENVIRONMENT, non_default.state)
                         # localenv to avoid creating an arbitrary that persists beyond a function body
-                        non_default.state = non_default.state.extend_localenv({var.var: ShellVar(arbitrary_for_this_var)})
+                        non_default.state = non_default.state.extend_localenv({var.var: ShellVar(arbitrary_for_this_var, ghost=True)})
                         non_default.add_a_field(arbitrary_for_this_var)
                         return [non_default, default]
                     else:
@@ -528,7 +528,7 @@ def expand_simple(stuff: list[AST.ArgChar],
                                                                  ArbitraryType.APPROXIMATION if is_special_var(var.var) else ArbitraryType.ENVIRONMENT,
                                                                  self.state)
                         # localenv to avoid creating an arbitrary that persists beyond a function body
-                        self.state = self.state.extend_localenv({var.var: ShellVar(arbitrary_for_this_var)})
+                        self.state = self.state.extend_localenv({var.var: ShellVar(arbitrary_for_this_var, ghost=True)})
                         self.add_a_field(arbitrary_for_this_var)
                 case AST.BArgChar() as b:
                     logging.info(f"expansion: treating backquote argchar {b.pretty()} as completely arbitrary field")
