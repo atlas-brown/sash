@@ -1,15 +1,34 @@
 from itertools import combinations
 from pprint import pformat
+import pytest
+from hypothesis import given, strategies as st, settings, assume
 
+from sash.solver import assertion_to_z3
 import sash.specs as specs
 import sash.symb as symb
-from sash.constraints import And, CommandExists, Empty, Implies, IOType, IsDeleted, IsDir, IsFile, IsUnread, Not, Or, StringEq
+from sash.constraints import *
+from sash.state import State, FSModelSimple, Assertion
+from sash.util import constant_field
 
 # Nice little message for copilot:
 #   check: (essentially) the precondition that must hold for a command to succeed, but not exactly
 #   success_postcond: the postcondition that holds if the command succeeds
 #   failure_postcond: the postcondition that holds if the command fails
 # The things that we can check are limited to simple file system constraints and variable string equalities
+
+
+def sanity_check_spec_constraints(cmd_spec: specs.CmdSpec):
+    fs_model = FSModelSimple(lambda f: z3.FreshConst(z3.StringSort(), "field"))
+
+    fs_model.apply_postcondition(NormalizedFSConstraint(cmd_spec.success_postcond))
+    fs_model.apply_postcondition(NormalizedFSConstraint(cmd_spec.failure_postcond))
+
+    assertion_to_z3(Assertion(
+        producing_state=State(fs_model=fs_model),
+        constraint=cmd_spec.check,
+        source_str="",
+        source_line=0
+    ))
 
 
 def test_rm_spec__check_disallows_deleting_unreadable_files():
@@ -44,6 +63,7 @@ def test_rm_spec__check_disallows_deleting_unreadable_files():
     for inv, s, ecs in zip(invocations, generated_specs, expected_checks_per_inv):
         for ec in ecs:
             assert constraint_contains(s.check, ec), f"Expected check to contain:\n{pformat(ec)}\nbut got:\n{pformat(s.check)}\nfor invocation:\n{pformat(inv)}"
+        sanity_check_spec_constraints(s)
 
 
 def test_rm_spec__z_postcond_is_deleted_operands():
@@ -75,6 +95,7 @@ def test_rm_spec__z_postcond_is_deleted_operands():
     generated_specs = [specs.rm_spec(inv) for inv in invocations]
     for inv, s, esp in zip(invocations, generated_specs, expected_spost):
         assert s.success_postcond == esp, f"Expected check to be:\n{pformat(esp)}\nbut got:\n{pformat(s.success_postcond)}\nfor invocation:\n{pformat(inv)}"
+        sanity_check_spec_constraints(s)
 
 
 def test_rm_spec__failure_postcond_is_empty():
@@ -100,6 +121,7 @@ def test_rm_spec__failure_postcond_is_empty():
     generated_specs = [specs.rm_spec(inv) for inv in invocations]
     for s in generated_specs:
         assert s.failure_postcond == Empty(), f"Expected failure postcondition to be Empty, but got:\n{pformat(s.failure_postcond)}"
+        sanity_check_spec_constraints(s)
 
 
 def test_test_spec__check_is_always_empty():
@@ -125,6 +147,7 @@ def test_test_spec__check_is_always_empty():
     generated_specs = [specs.test_spec(inv) for inv in invocations]
     for s in generated_specs:
         assert s.check == Empty(), f"Expected check to be Empty, but got:\n{pformat(s.check)}"
+        sanity_check_spec_constraints(s)
 
 
 def test_test_spec__postconds_are_negations_of_each_other():
@@ -156,6 +179,8 @@ def test_test_spec__postconds_are_negations_of_each_other():
         assert (
             s.success_postcond == ~s.failure_postcond or s.failure_postcond == ~s.success_postcond
         ), f"Postconds must be negations of each other, but got:\nSuccess:\n{pformat(s.success_postcond)}\nFailure:\n{pformat(s.failure_postcond)}"
+
+        sanity_check_spec_constraints(s)
 
 
 def create_symstr(val: str) -> symb.SymStr:
@@ -206,3 +231,39 @@ def constraint_contains(constraint, subconstraint) -> bool:
         return constraint_contains(constraint.premise, subconstraint) or constraint_contains(constraint.conclusion, subconstraint)
 
     return False
+
+
+@settings(max_examples=200, deadline=None)
+@given(
+    cmd_name=st.sampled_from(sorted(set(specs.CMD_SPECS.keys()) - {"sudo", "command"})),
+    args=st.lists(
+        st.one_of(
+            # Common flag-like tokens and operators that many specs understand
+            st.sampled_from([
+                "-f", "-R", "-r", "-d", "-i", "-v", "-p", "-q", "-V", "-c",
+                "-eq", "-ne", "-gt", "-lt", "-ge", "-le",
+                "-e", "-n", "-z", "-r", "-w", "-x", "!", "-", "]"
+            ]),
+            # Alphanumeric tokens
+            st.from_regex(r"[A-Za-z0-9_\-]{0,8}", fullmatch=True),
+            # name=value style
+            st.builds(
+                lambda a, b: f"{a}={b}",
+                st.from_regex(r"[A-Za-z]{1,6}", fullmatch=True),
+                st.from_regex(r"[A-Za-z0-9]{0,6}", fullmatch=True),
+            ),
+        ),
+        min_size=0,
+        max_size=8,
+    ),
+)
+def test_hypothesis_specs_to_constraints_do_not_crash(cmd_name: str, args: list[str]):
+    import z3
+
+    # Build Fields (first token is the command name)
+    fields = tuple([constant_field(cmd_name)] + [constant_field(a) for a in args])
+    cmd_spec = specs.get_spec(cmd_name, fields)
+    assert cmd_spec is not None, f"Spec function for command '{cmd_name}' returned None for fields: {pformat(fields)}"
+
+    assume(cmd_spec.success_postcond != Empty() or cmd_spec.failure_postcond != Empty())
+    sanity_check_spec_constraints(cmd_spec)
