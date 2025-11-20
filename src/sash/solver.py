@@ -3,6 +3,7 @@ from sash.reporter import *
 from sash.interpreter_config import InterpConfig
 from sash.state import *
 from sash.util import shasta_pretty
+from pprint import pformat
 import z3
 
 arbitrary_to_z3_var: dict[CompletelyArbitrary, z3.ExprRef] = {}
@@ -32,39 +33,42 @@ def field_content_to_z3(field_content: SymStr | CompletelyArbitrary) -> z3.ExprR
             return z3_var
     assert False, f"Expected field content, got {field_content}"
 
-def constraint_to_z3(constraint: Constraint, s: State):
-    match constraint:
-        case Empty() | HasStdout() | ExpectsStdin() | Reads() | Writes() | Description():
-            return z3.BoolVal(True)
-        case Not(c):
-            return z3.Not(constraint_to_z3(c, s))
-        case And(lhs, rhs):
-            return z3.And(constraint_to_z3(lhs, s), constraint_to_z3(rhs, s))
-        case Or(lhs, rhs):
-            return z3.Or(constraint_to_z3(lhs, s), constraint_to_z3(rhs, s))
-        case StringEq(lhs, rhs):
-            return field_content_to_z3(lhs.content) == field_content_to_z3(rhs.content)
-        case IsFile(path):
-            return s.fs_model.is_file_z3(field_content_to_z3(path.content))
-        case IsDir(path):
-            return s.fs_model.is_dir_z3(field_content_to_z3(path.content))
-        case IsDeleted(path):
-            return s.fs_model.is_deleted_z3(field_content_to_z3(path.content))
-        case IsUnread(path):
-            return s.fs_model.is_unread_z3(field_content_to_z3(path.content))
-        case Description(text):
-            # A no-op constraint with a message attached to it
-            return z3.FreshBool(f"description: {text}")
-        case Implies(premise, conclusion):
-            return z3.Implies(constraint_to_z3(premise, s), constraint_to_z3(conclusion, s))
-        case _:
-            logging.error(f"Unrecognized constraint type in Z3 translation: {constraint} (type {type(constraint)})")
-            return z3.BoolVal(True)
+def constraint_to_z3(constraint: Constraint, s: State) -> z3.ExprRef:
+    def norm_constraint_to_z3(constraint: Constraint, s: State):
+        match constraint:
+            case Empty() | HasStdout() | ExpectsStdin() | Reads() | Writes():
+                return z3.BoolVal(True)
+            case Description(text):
+                # A no-op constraint with a message attached to it
+                return z3.FreshBool(f"description: {text}")
+            case And(lhs, rhs):
+                return z3.And(norm_constraint_to_z3(lhs, s), norm_constraint_to_z3(rhs, s))
+            case Or(lhs, rhs):
+                return z3.Or(norm_constraint_to_z3(lhs, s), norm_constraint_to_z3(rhs, s))
+            case StringEq(lhs, rhs):
+                return field_content_to_z3(lhs.content) == field_content_to_z3(rhs.content)
+            case IsFile(path):
+                return s.fs_model.is_file_z3(field_content_to_z3(path.content))
+            case IsDir(path):
+                return s.fs_model.is_dir_z3(field_content_to_z3(path.content))
+            case IsDeleted(path):
+                return s.fs_model.is_deleted_z3(field_content_to_z3(path.content))
+            case IsUnread(path):
+                return s.fs_model.is_unread_z3(field_content_to_z3(path.content))
+            case Not(c):
+                return z3.Not(norm_constraint_to_z3(c, s))
+            case Implies(premise, conclusion):
+                return z3.Implies(norm_constraint_to_z3(premise, s), norm_constraint_to_z3(conclusion, s))
+            case _:
+                logging.error(f"Unrecognized constraint type in Z3 translation: {constraint} (type {type(constraint)})")
+                return z3.BoolVal(True)
 
+    return norm_constraint_to_z3(NormalizedFSConstraint(constraint).constraint, s)
 
 def state_to_z3(s: State) -> z3.ExprRef:
+    logging.debug(f"Path condition constraints: {pformat(s.pathcond)}")
     pathcond_formula = z3.And([constraint_to_z3(pc, s) for pc in s.pathcond]) if s.pathcond else z3.BoolVal(True)
-    logging.debug(f"Path condition formula: {pathcond_formula}")
+    logging.debug(f"Path condition formula: {pformat(pathcond_formula)}")
 
     env_formula = []
     for var, val in (s.env | s.localenv).items():
@@ -75,7 +79,7 @@ def state_to_z3(s: State) -> z3.ExprRef:
     env_formula = z3.And(env_formula)
 
     fs_state_formula = s.fs_model.state_to_z3()
-    logging.debug(f"FS state: {s.fs_model}")
+    logging.debug(f"FS state:\n{pformat(s.fs_model)}")
 
     return z3.And(fs_state_formula, pathcond_formula, env_formula)
 
@@ -133,17 +137,17 @@ def run_solver(traces: list[Trace], config: InterpConfig):
         assertions = trace.latest_state.assertions
         logging.debug(f"Checking {len(assertions)} assertions")
         for assertion in assertions:
-            logging.debug(f"Checking assertion: {assertion}")
+            logging.debug(f"Checking assertion: {pformat(assertion)}")
             solver = z3.Solver()
             solver.set(unsat_core=True)
             assertion_var, assertion_formula = assertion_to_z3(assertion)
             solver.assert_and_track(assertion_formula, assertion_var)
 
-            logging.debug(f"Arb z3 map: {arbitrary_to_z3_var}")
+            logging.debug(f"Arb z3 map: {pformat(arbitrary_to_z3_var)}")
 
             #logging.debug(f"Current solver state: {solver}")
             result = solver.check()
-            logging.debug(f"Assertion: {assertion_formula}")
+            logging.debug(f"Assertion:\n{assertion_formula}")
             logging.debug(f"Assertion must be violated?: {result == z3.unsat} (ie {result})")
             if result == z3.unsat:
                 core = solver.unsat_core()

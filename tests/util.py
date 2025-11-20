@@ -20,6 +20,7 @@ def assert_expected_report(report: reporter.Report, expected_errors: list[report
         pytest.fail(
             f"\nExpected errors:\n{pformat(sorted(expected))}\n"
             f"Actual errors:\n{pformat(sorted(actual))}\n"
+            f"Full report:\n{pformat(report.to_dict())}\n"
         )
 
 def assert_not_expected_report(report, not_expected_errors: list[reporter.Issue]):

@@ -107,6 +107,15 @@ rm -rf "$FOO/"
     expected_error2 = reporter.UnboundID(foo_var.pretty(), 0)
     assert_expected_report(report, [expected_error1, expected_error2])
 
+    # regression test for binding unbound args after first expansion
+    script = write_script(tmp_path, """
+echo $1
+rm -rf "${1-/usr}"
+""")
+    report = symb.main(script)
+    expected_error = reporter.DeleteSystemFile("/usr", 0)
+    assert_expected_report(report, [expected_error])
+
 def test_delete_splitting(tmp_path):
     script = write_script(tmp_path, "rm $UNQUOTED\n")
     report = symb.main(script)
@@ -475,6 +484,21 @@ rm somefile.txt
     report = reporter.Reporter.get_report()
     expected_warning = reporter.UnsatisfiedPrecondition(None, "rm somefile.txt", 0)
     assert_expected_report(report, [expected_warning])
+
+def test_double_mv(tmp_path):
+    """Test that deleting the same file twice is reported."""
+    script = write_script(tmp_path, """
+mv somefile.txt otherfile.txt
+mv somefile.txt otherfile2.txt
+""")
+    #report = symb.main(script)
+    res = symb.symbexec_main(script, solver=True)
+    assert len(res.traces) == 1
+    assert len(res.traces[0].latest_state.assertions) == 2
+    report = reporter.Reporter.get_report()
+    expected_warning = reporter.UnsatisfiedPrecondition(None, "mv somefile.txt otherfile.txt", 0)
+    assert_expected_report(report, [expected_warning])
+
 
 def test_read_after_rm(tmp_path):
     """Test that reading a file after it has been deleted is reported."""

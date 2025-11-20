@@ -171,9 +171,44 @@ class ExpectsStdin(Constraint):
 class Description(Constraint):
     text: str
 
+
+
+def normalize_fs_constraints(constraints: Constraint) -> Constraint:
+    match constraints:
+        case And(lhs, rhs):
+            return And(normalize_fs_constraints(lhs), normalize_fs_constraints(rhs))
+        case Or(lhs, rhs):
+            return Or(normalize_fs_constraints(lhs), normalize_fs_constraints(rhs))
+        case Implies(premise, conclusion):
+            return Implies(normalize_fs_constraints(premise), normalize_fs_constraints(conclusion))
+        case Not(Not(c)):
+            return normalize_fs_constraints(c)
+        case Not(IsDeleted(path)):
+            return IsFile(path) | IsDir(path)
+        case Not(IsFile(path)):
+            return IsDeleted(path) | IsDir(path)
+        case Not(IsDir(path)):
+            return IsDeleted(path) | IsFile(path)
+        case Not(Or(lhs, rhs)):
+            return normalize_fs_constraints(Not(lhs)) & normalize_fs_constraints(Not(rhs))
+        case Not(And(lhs, rhs)):
+            return normalize_fs_constraints(Not(lhs)) | normalize_fs_constraints(Not(rhs))
+        case Not(c):
+            return Not(normalize_fs_constraints(c))
+        case _:
+            return constraints
+
+@dataclass(frozen=True)
+class NormalizedFSConstraint(Constraint):
+    constraint: Constraint
+
+    def __post_init__(self):
+        normalized = normalize_fs_constraints(self.constraint)
+        object.__setattr__(self, 'constraint', normalized)
+
 @dataclass(frozen=True)
 class FSModel():
-    def apply_postcondition(self, constraints: Constraint) -> FSModel:
+    def apply_postcondition(self, norm_constraints: NormalizedFSConstraint) -> FSModel:
         return self
 
     def is_file_z3(self, path_z3) -> 'z3.ExprRef':
@@ -183,6 +218,9 @@ class FSModel():
         return z3.BoolVal(False)
 
     def is_deleted_z3(self, path_z3) -> 'z3.ExprRef':
+        return z3.BoolVal(False)
+
+    def is_unread_z3(self, path_z3) -> 'z3.ExprRef':
         return z3.BoolVal(False)
 
     def state_to_z3(self) -> 'z3.ExprRef':
@@ -214,25 +252,6 @@ FileInfo.declare(
 
 # Finalize the Datatype creation
 FileInfo = FileInfo.create()
-
-# z3_is_file = z3.Function('is_file', z3.ArraySort(z3.StringSort(), FileInfo), z3.StringSort(), z3.BoolSort())
-# fs = z3.Const('fs', z3.ArraySort(z3.StringSort(), FileInfo))
-# path = z3.Const('path', z3.StringSort())
-# z3_is_file_axiom_body = z3.ForAll([fs, path],
-#     z3_is_file(fs, path) == \
-#     (fs.select(path).state == File) | (fs.select(path).state == Unknown)
-# )
-
-# z3_is_dir = z3.Function('is_dir', z3.ArraySort(z3.StringSort(), FileInfo), z3.StringSort(), z3.BoolSort())
-# z3_is_dir_axiom_body = z3.ForAll([fs, path],
-#     z3_is_dir(fs, path) == \
-#     (fs.select(path).state == Dir) | (fs.select(path).state == Unknown)
-# )
-
-# z3_is_deleted = z3.Function('is_deleted', z3.ArraySort(z3.StringSort(), FileInfo), z3.StringSort(), z3.BoolSort())
-# # important, is_deleted is only true if state is Del, not Unknown
-# z3_is_deleted_axiom_body = z3.ForAll([fs, path],
-#     z3_is_deleted(fs, path) == fs.select(path).state == Del)
 
 @dataclass(frozen=True)
 class FSModelSimple(FSModel):
@@ -271,17 +290,17 @@ class FSModelSimple(FSModel):
         """Return a new abstract file system after writing to the given path."""
         return self._set(path, Dir, status)
 
-    def apply_postcondition(self, constraints: Constraint) -> FSModelSimple:
+    def _apply_postcondition(self, constraints: Constraint) -> FSModelSimple:
         logging.debug(f"Applying FS postcondition: {constraints}")
         match constraints:
             case Empty():
                 return self
             case And(lhs, rhs):
-                fs_after_lhs = self.apply_postcondition(lhs)
-                return fs_after_lhs.apply_postcondition(rhs)
+                fs_after_lhs = self._apply_postcondition(lhs)
+                return fs_after_lhs._apply_postcondition(rhs)
             case Or(lhs, rhs):
-                fs_after_lhs = self.apply_postcondition(lhs)
-                fs_after_rhs = self.apply_postcondition(rhs)
+                fs_after_lhs = self._apply_postcondition(lhs)
+                fs_after_rhs = self._apply_postcondition(rhs)
                 lhs_new_history = fs_after_lhs.history[len(self.history):]
                 rhs_new_history = fs_after_rhs.history[len(self.history):]
                 lhs_new_history_renamed = tuple((self._rename_fs_var_append(var, "_lhs"), array_expr) for var, array_expr in lhs_new_history)
@@ -290,22 +309,6 @@ class FSModelSimple(FSModel):
                 rhs_last_fs = rhs_new_history_renamed[-1][0]
                 new_state = z3.If(z3.FreshBool("postcond_or"), lhs_last_fs, rhs_last_fs)
                 return self._extend_history(new_state, lhs_new_history_renamed + rhs_new_history_renamed) # type: ignore
-            case Not(IsDeleted(path)):
-                return self.apply_postcondition(IsFile(path) | IsDir(path))
-            case Not(IsFile(path)):
-                return self.apply_postcondition(IsDeleted(path) | IsDir(path))
-            case Not(IsDir(path)):
-                return self.apply_postcondition(IsDeleted(path) | IsFile(path))
-            case Not(Or(lhs, rhs)):
-                return self.apply_postcondition(Not(lhs) & Not(rhs))
-            case Not(And(lhs, rhs)):
-                return self.apply_postcondition(Not(lhs) | Not(rhs))
-            case Implies(premise, conclusion):
-                fs_after_conclusion = self.apply_postcondition(conclusion)
-                # Apply the postcondition, so we get the final state if the premise is true, and then add a new final state
-                # that chooses between the old final state and the new final state based on the premise
-                new_state = z3.If(premise, fs_after_conclusion.history[-1][0], self.history[-1][0])
-                return fs_after_conclusion._next_state(new_state) # type: ignore
             case IsFile(path):
                 return self._create_file(path)
             case IsDir(path):
@@ -320,12 +323,21 @@ class FSModelSimple(FSModel):
             case StringEq() | Not(StringEq()) | CommandExists() | HasStdout() | ExpectsStdin() | Description() | IsUnread():
                 # These constraints do not affect the FS model
                 return self
+            case Implies(premise, conclusion):
+                fs_after_conclusion = self._apply_postcondition(conclusion)
+                # Apply the postcondition, so we get the final state if the premise is true, and then add a new final state
+                # that chooses between the old final state and the new final state based on the premise
+                new_state = z3.If(self._fs_constraint_z3(premise), fs_after_conclusion.history[-1][0], self.history[-1][0])
+                return fs_after_conclusion._next_state(new_state) # type: ignore
             case Not(constraint):
-                assert False, f"Unclear what Not means in postcond: {constraints}"
+                assert False, f"Unclear what Not means in postcond (is it un-normalized?): {constraints}"
                 return self
             case _:
                 assert False, f"Unhandled FS postcondition: {constraints}"
         return self
+
+    def apply_postcondition(self, norm_constraints: NormalizedFSConstraint) -> FSModel:
+        return self._apply_postcondition(norm_constraints.constraint)
 
     def is_file_z3(self, path_z3) -> 'z3.ExprRef':
         return z3.Or(FileInfo.state(z3.Select(self.history[-1][0], path_z3)) == File, FileInfo.state(z3.Select(self.history[-1][0], path_z3)) == Unknown)
@@ -337,7 +349,31 @@ class FSModelSimple(FSModel):
         return FileInfo.state(z3.Select(self.history[-1][0], path_z3)) == Del
 
     def is_unread_z3(self, path_z3) -> 'z3.ExprRef':
-        return z3.Select(self.history[-1][0], path_z3) == FileInfo.mk_pair(File, Unread)
+        return z3.And(FileInfo.state(z3.Select(self.history[-1][0], path_z3)) == File,
+                      FileInfo.status(z3.Select(self.history[-1][0], path_z3)) == Unread)
+
+    def _fs_constraint_z3(self, constraint: Constraint) -> 'z3.ExprRef':
+        match constraint:
+            case IsFile(path):
+                return self.is_file_z3(self.field_to_z3(path))
+            case IsDir(path):
+                return self.is_dir_z3(self.field_to_z3(path))
+            case IsDeleted(path):
+                return self.is_deleted_z3(self.field_to_z3(path))
+            case IsUnread(path):
+                return self.is_unread_z3(self.field_to_z3(path))
+            case And(lhs, rhs):
+                return z3.And(self._fs_constraint_z3(lhs), self._fs_constraint_z3(rhs))
+            case Or(lhs, rhs):
+                return z3.Or(self._fs_constraint_z3(lhs), self._fs_constraint_z3(rhs))
+            case Not(c):
+                return z3.Not(self._fs_constraint_z3(c))
+            case Empty():
+                return z3.BoolVal(True)
+            case StringEq(lhs, rhs):
+                return self.field_to_z3(lhs) == self.field_to_z3(rhs)
+            case _:
+                assert False, f"FSModelSimple cannot evaluate constraint: {constraint}"
 
     def state_to_z3(self) -> 'z3.ExprRef':
         return z3.And([fsvar == array_expr for fsvar, array_expr in self.history])
