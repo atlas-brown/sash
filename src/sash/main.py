@@ -89,7 +89,7 @@ def parse_cli():
     parser.add_argument(
         "-d",
         "--debug",
-        action="store_true",
+        action="store_false",
         help="Enable debug logging",
     )
 
@@ -104,7 +104,7 @@ def parse_cli():
     parser.add_argument(
         "-S",
         "--solver",
-        action="store_true",
+        action="store_false",
         help="Enable the solver and get additional reports",
     )
 
