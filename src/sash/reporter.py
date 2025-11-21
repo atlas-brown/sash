@@ -169,7 +169,9 @@ class Reporter:
     @classmethod
     def initialize(cls, filename:str):
         if cls._initialized:
-            logging.debug("Reinitializing reporter for %s", filename)
+            logging.warning("Reporter is already initialized")
+            return
+
         cls._filename = filename
         cls._issues = set()
         cls._exec_time = math.nan
