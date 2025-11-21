@@ -1,22 +1,29 @@
 """
 Tests for state utilities.
 """
-import sash
-import sash.reporter as reporter
-from sash.symb import expand_simple, expand_args_dumb, starting_state
-from sash.state import *
-import shasta.ast_node as AST
 from util import *
+
+import sash.reporter as reporter
+from sash.state import (
+    ArbitraryType,
+    CompletelyArbitrary,
+    Field,
+    ShellVar,
+    SymStr,
+    Trace,
+    WordCount,
+)
+from sash.symb import collapse_traces, starting_state
 
 reporter.Reporter.initialize("<test>")
 
 def test_collapse_traces():
-    assert len(collapse_traces([Trace([starting_state()])])) == 1
-    assert len(collapse_traces([Trace([starting_state()]),
-                                Trace([starting_state()])])) == 1
-    assert len(collapse_traces([Trace([starting_state()]),
-                                Trace([starting_state()]),
-                                Trace([starting_state()])])) == 1
+    assert len(collapse_traces([Trace((starting_state(),))])) == 1
+    assert len(collapse_traces([Trace((starting_state(),)),
+                                Trace((starting_state(),))])) == 1
+    assert len(collapse_traces([Trace((starting_state(),)),
+                                Trace((starting_state(),)),
+                                Trace((starting_state(),))])) == 1
 
     assert len(collapse_traces([Trace((starting_state().set_env("foo", ShellVar(Field(SymStr(("hi",)), WordCount(1, 1))))\
                                        .add_pathcond("cond_L5:true"),)),
@@ -32,3 +39,23 @@ def test_quote():
     assert Field(arb, WordCount(0, 5)).quote() == Field(arb, WordCount(0, 1))
     assert Field(arb, WordCount(0, float('inf'))).quote() == Field(arb, WordCount(0, 1))
     assert Field(arb, WordCount(0, 0)).quote() == Field(arb, WordCount(0, 0))
+
+
+
+def test_field_normalization():
+    path1 = create_field("/a/b/c/")
+    path2 = create_field("/a/b/c")
+
+    assert path1.without_trailing_slash() == path2.without_trailing_slash()
+
+def test_field_normalization_with_glob():
+    path1 = create_field("/a/b*/c/")
+    path2 = create_field("/a/b*/c")
+
+    assert path1.without_trailing_slash() == path2.without_trailing_slash()
+
+def test_field_normalization_with_spaces():
+    path1 = create_field("   /a/  b/ c/   ")
+    path2 = create_field("   /a/  b/ c")
+
+    assert path1.without_trailing_slash() != path2.without_trailing_slash()
