@@ -360,11 +360,11 @@ class FSModelSimple(FSModel):
                 # that chooses between the old final state and the new final state based on the premise
                 new_state = z3.If(self._fs_constraint_z3(premise), fs_after_conclusion.history[-1][0], self.history[-1][0])
                 return fs_after_conclusion._next_state(new_state) # type: ignore
-            case CommandExists():
+            case CommandExists() | Not(CommandExists()):
                 # Does not affect FS model
                 return self
             case Not(constraint):
-                assert False, f"Unclear what Not means in postcond (is it un-normalized?): {constraints}"
+                assert False, f"Unclear what Not means in postcond (is it un-normalized?): {constraint}"
                 return self
             case _:
                 assert False, f"Unhandled FS postcondition: {constraints}"

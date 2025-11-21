@@ -1,4 +1,3 @@
-from abc import ABC, abstractmethod
 import inspect
 import logging
 import sys
@@ -285,72 +284,7 @@ def cd_spec(cmd: CmdInvocation) -> CmdSpec:
 def command_spec(cmd: CmdInvocation) -> CmdSpec:
     # https://pubs.opengroup.org/onlinepubs/9799919799/utilities/command.html
 
-    # A note on 'command -v/-V cmd':
-    # - Currently, we only care about the failure case, which informs us that a command does not exist
-    # - This works because our default assumption for unknown commands is that they exist
-    # - If at any point we decide to change this default assumption, we might need to revisit this spec
-    #
-    # Issue when modeling the success case:
-    # - 'command -v/-V cmd' identifies commands, built-ins, aliases, functions, *and reserved words*
-    # - The first four are covered by a simple CommandExists(cmd) constraint, but reserved words are tricky
-    #
-    # Consider the following example:
-    # ```
-    # if ! command -v if; then # output: "if", exit code: 0
-    #     exit 1
-    # fi
-    # \if # error: "if: command not found", exit code: non-0
-    # ```
-    #
-    # - The previously mentioned success spec would make this code seem not buggy, even though it is
-    # - Realistically this will never be an issue, however it is still technically incorrect
-    # - In order to model this correctly we would need to have a way to check if cmd is a shell reserved word
-    #   - But what if a CompletelyArbitrary is passed as cmd?
-    #
-    # - Another idea (which would probably be useless in practice) is to have the precondition that cmd cannot be a reserved word,
-    #   with the "intuition" being that the command turns to a no-op (at best) or to a const cond (at worst)
-
-    (name, flags, _, operands) = (cmd.cmd_name, cmd.flags, cmd.options, cmd.operands)
-    flags.discard("-p") # -p tells command to use a default value for PATH, guaranteed to find all standard utilities
-    io = IOType.NONE
-
-    assert name == SymStr(("command",)), f"Expected command command, got: {name}"
-
-    # Otherwise the following (plausible) code would be marked as buggy:
-    # ```
-    # if ! command -v my_alias; then
-    #     alias my_alias='ls -l'
-    # fi
-    # my_alias
-
-    if flags == set(["-v"]) or flags == set(["-V"]) and len(operands) == 1: # command -v/-V subcmd
-        # check:
-        #   (1) none
-        # z-postcond:
-        #   (1) none (subcmd might be a reserved word, see note above)
-        # nz-postcond:
-        #   (1) subcmd is not a command
-        subcmd = operands[0]
-        check = Empty()
-        success_postcond = Empty()
-        failure_postcond = ~CommandExists(subcmd)
-        io = IOType.add_stdout(io)
-
-    else: # command cmd args...
-        log_crit_unhandled_inv(cmd)
-
-        subcmd = operands[0]
-        cmd_name = parse_command((subcmd,)).cmd_name.parts[0] # hack to get the command name
-        if isinstance(cmd_name, str):
-            spec = get_spec(cmd_name, tuple(operands))
-            if spec:
-                return spec
-
-        check = Empty()
-        success_postcond = Empty()
-        failure_postcond = Empty()
-
-    return CmdSpec(check, success_postcond, failure_postcond, io)
+    return Command.handle_invocation(cmd)
 
 
 def cp_spec(cmd: CmdInvocation) -> CmdSpec:
@@ -765,6 +699,74 @@ class Cmd(ABC):
         pass
 
 
+class Command(Cmd):
+    # https://pubs.opengroup.org/onlinepubs/9799919799/utilities/command.html
+
+    # NOTE: The current parsing function does not produce flags/options for test, and instead encodes everything in operands
+
+    name = "command"
+    posix_flags     = set()
+    supported_flags = set()
+
+    @classmethod
+    def _handle_supported(cls, cmd: CmdInvocation) -> CmdSpec:
+        # implement this similar to Test._handle_supported
+        (name, flags, options, operands) = (cmd.cmd_name, cmd.flags, cmd.options, cmd.operands)
+
+        assert name == SymStr((cls.name,)), f"Expected command command, got: {cmd}"
+        assert len(flags) == 0 and len(options) == 0, f"The current parsing function does not produce flags/options for {cls.name}; something changed?"
+
+        check = Empty()
+        success_postcond = Empty()
+        failure_postcond = Empty()
+        io = IOType.NONE
+
+        # A note on 'command -v/-V cmd':
+        # - Currently, we only care about the failure case, which informs us that a command does not exist
+        # - This works because our default assumption for unknown commands is that they exist
+        # - If at any point we decide to change this default assumption, we might need to revisit this spec
+        #
+        # Issue when modeling the success case:
+        # - 'command -v/-V cmd' identifies commands, built-ins, aliases, functions, *and reserved words*
+        # - The first four are covered by a simple CommandExists(cmd) constraint, but reserved words are tricky
+        #
+        # Consider the following example:
+        # ```
+        # if ! command -v if; then # output: "if", exit code: 0
+        #     exit 1
+        # fi
+        # \if # error: "if: command not found", exit code: non-0
+        # ```
+        #
+        # - The previously mentioned success spec would make this code seem not buggy, even though it is
+        # - Realistically this will never be an issue, however it is still technically incorrect
+        # - In order to model this correctly we would need to have a way to check if cmd is a shell reserved word
+        #   - But what if a CompletelyArbitrary is passed as cmd?
+        #
+        # - Another idea (which would probably be useless in practice) is to have the precondition that cmd cannot be a reserved word,
+        #   with the "intuition" being that the command turns to a no-op (at best) or to a const cond (at worst)
+
+        if len(operands) > 0 and operands[0].content == SymStr(("-p",)): # command -p cmd args...
+            operands = operands[1:] # discard -p operand
+            # proceed as normal without -p
+            # if -v/-V are first, we don't mind -p as no subcommands are called
+
+        if len(operands) > 0 and (operands[0].content == SymStr(("-v",)) or \
+                                  operands[0].content == SymStr(("-V",))): # command -v/-V subcmd
+            subcmd = operands[1]
+            failure_postcond = ~CommandExists(subcmd)
+            io = IOType.add_stdout(io)
+
+        else: # command cmd args...
+            subcmd = operands[0]
+            cmd_name = parse_command((subcmd,)).cmd_name.parts[0] # hack to get the command name
+            if isinstance(cmd_name, str):
+                if spec := get_spec(cmd_name, tuple(operands)): # this call will log any unhandled invocations
+                    return spec
+
+        return CmdSpec(check, success_postcond, failure_postcond, io)
+
+
 class Mv(Cmd):
     # https://pubs.opengroup.org/onlinepubs/9799919799/utilities/mv.html
 
@@ -886,7 +888,7 @@ class Test(Cmd):
         (name, flags, options, operands) = (cmd.cmd_name, cmd.flags, cmd.options, cmd.operands)
 
         assert name == SymStr((cls.name,)) or name == SymStr(("[",)), f"Expected test command, got: {cmd}"
-        assert len(flags) == 0 and len(options) == 0, f"The current parsing function does not produce flags/options for test; something changed?"
+        assert len(flags) == 0 and len(options) == 0, f"The current parsing function does not produce flags/options for {cls.name}; something changed?"
 
         check = Empty()
         success_postcond = None
