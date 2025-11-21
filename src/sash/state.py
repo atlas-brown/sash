@@ -4,6 +4,7 @@ from sash.constraints import Constraint, Empty, FSModel, FSModelSimple, Normaliz
 from typing import Callable, Optional, Any
 from enum import Enum
 from sash.frozen import FrozenAst, FrozenDict
+import shasta.ast_node as AST
 
 @dataclass(frozen=True)
 class SymVar:
@@ -236,7 +237,11 @@ def collapse_traces(traces: Traces) -> Traces:
 
 
 @dataclass(frozen=True)
-class ScriptInfo:
-    # Set of function names where the corresponding function definitions
-    # are known to appear, perhaps later, in the script.
-    known_fundefs_names: frozenset[str] = field(default_factory=frozenset)
+class FuncMap:
+    # Map from function name to set function definitions (by name)
+    funcs: FrozenDict[str, AST.Command] = field(default_factory=FrozenDict)
+    # Set of functions that have been called
+    called: set[str] = field(default_factory=set)
+
+    def uncalled_funcs(self) -> dict[str, AST.Command]:
+        return {name: node for name, node in self.funcs.items() if name not in self.called}

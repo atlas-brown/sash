@@ -127,7 +127,7 @@ def handle_unknown_command(name: str,
                            arg_fields: list[Field],
                            traces: Traces,
                            config: InterpConfig) -> Traces:
-    if name in config.info.known_fundefs_names:
+    if name in func_map.funcs.keys():
         Reporter.add_issue(reporter.UndefinedFunction(name, context_line))
 
     if name.endswith("/") or any(name in t.latest_state.known_nonexistant_commands for t in traces):
@@ -142,6 +142,7 @@ def handle_function_call(name: str,
                          traces: Traces,
                          config: InterpConfig) -> Traces:
     logging.debug(f"Handling function call to {trim_string_for_logging(func_node.pretty())} with args {arg_fields}")
+    func_map.called.add(name) # record that this function was called
     # As long as arg_fields are a single word, map those to local positional parameters
     # as soon as we hit a field that is not a single word, give up
     localenv: dict[str, ShellVar] = {}
@@ -969,9 +970,9 @@ def starting_state(fs_model: Optional[FSModel] = None) -> State:
 def trim_string_for_logging(s: str, max_len: int = 300) -> str:
     return s if len(s) <= max_len else s[:max_len] + "..."
 
-def find_func_defs(traces: Traces, nodes: list[WrappedAst], config: InterpConfig) -> set[str]:
+def find_func_defs(traces: Traces, nodes: list[WrappedAst], config: InterpConfig) -> FrozenDict[str, AST.Command]:
     # TODO: Write unit tests for function definitions being recorded correctly (low priority)
-    known_fundefs_names: set[str] = set()
+    funcs: FrozenDict[str, AST.Command] = FrozenDict({})
     for node in nodes:
         if not isinstance(node.ast_node, AST.Command):
             continue
@@ -987,12 +988,12 @@ def find_func_defs(traces: Traces, nodes: list[WrappedAst], config: InterpConfig
             if isinstance(n, AST.DefunNode):
                 try:
                     _, func_name = expand_assuming_single_constant_word(traces, n.name, config)
-                    known_fundefs_names.add(func_name)
+                    funcs = funcs.set(func_name, n.body)
                 except AssertionError:
                     # Only statically-known function names are recorded
                     continue
 
-    return known_fundefs_names
+    return funcs
 
 
 class SymbexecStatus(Enum):
@@ -1009,18 +1010,23 @@ class SymbexecResult(NamedTuple):
 # TODO: make the FS model selection configurable via the `InterpConfig`
 def symb_engine(nodes: list[WrappedAst], config: InterpConfig) -> Traces:
     global context_line
+    global func_map
     logging.debug(f"Running symb engine with {len(nodes)} raw nodes")
     traces = [Trace((starting_state(),))]
 
-    known_fundefs_names = find_func_defs(traces, nodes, config)
-    updated_config = config.set_info(ScriptInfo(known_fundefs_names=frozenset(known_fundefs_names)))
+    func_map = replace(FuncMap(funcs=find_func_defs(traces, nodes, config)))
 
     for node in nodes:
         context_line = node.line_before + 1
         logging.debug(f"Interpreting next node (line {context_line}) {trim_string_for_logging(node.ast_node.pretty())}")
-        traces = guarded_interp_node(traces, node.ast_node, updated_config)
+        traces = guarded_interp_node(traces, node.ast_node, config)
 
-    return traces
+    func_traces: dict[str, Traces] = {}
+    for (name, node) in func_map.uncalled_funcs().items():
+        logging.debug(f"Interpreting uncalled function '{name}'")
+        func_traces[name] = guarded_interp_node([Trace((starting_state(),))], node, config)
+
+    return traces + [t for ts in func_traces.values() for t in ts]
 
 def symbexec_file(input_file: str,
                   config: InterpConfig,
@@ -1041,3 +1047,4 @@ def symbexec_file(input_file: str,
         return SymbexecResult(SymbexecStatus.FAILED, [])
 
 stop_event: Event | None = None
+func_map = FuncMap()

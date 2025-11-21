@@ -94,3 +94,9 @@ class FrozenDict(Generic[K, V]):
 
     def items(self):
         return self._d.items()
+
+    def keys(self):
+        return self._d.keys()
+
+    def values(self):
+        return self._d.values()
