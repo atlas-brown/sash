@@ -45,6 +45,15 @@ class SymStr:
             new_parts.append(this_str)
         return SymStr(tuple(new_parts))
 
+    def try_to_str(self) -> str | None:
+        nls : list[str] = []
+        for i in self.parts:
+            if isinstance(i,str):
+                nls.append(i)
+            else:
+                return None
+        return "".join(nls)
+
 class ArbitraryType(Enum):
     APPROXIMATION = 0
     ENVIRONMENT = 1
