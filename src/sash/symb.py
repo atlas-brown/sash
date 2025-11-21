@@ -893,13 +893,15 @@ def interp_node(traces: Traces,
                     t2 = guarded_interp_node(t2, node.body, config)
                 return t2
             else:
-                t2 = [record_assignment(t, var_name, arbitrary_field(node.argument,
-                                                                    ArbitraryType.APPROXIMATION,
-                                                                    t.latest_state)) \
-                    for t in t1]
-                # TODO: Will want to interpret the body multiple times (up to max count of times).
-                t3 = guarded_interp_node(t2, node.body, config)
-                return t3
+                t_res = t1
+                for i in range(config.max_loop_unroll):
+                    logging.debug(f"For loop unrolling iteration {i+1}/{config.max_loop_unroll}")
+                    t2 = [record_assignment(t, var_name, arbitrary_field(node.argument,
+                                                                        ArbitraryType.APPROXIMATION,
+                                                                        t.latest_state)) \
+                        for t in t_res]
+                    t_res = guarded_interp_node(t2, node.body, config)
+                return t_res
 
         case AST.FileRedirNode():
             res = []

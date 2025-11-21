@@ -14,6 +14,7 @@ class InterpConfig:
     expanded_command_cbs: list[ExpandedCmdCB] = field(default_factory=list)
     trace_collapser: TraceCollapser = lambda ts: ts
     in_checked_position: bool = False
+    max_loop_unroll: int = 2
 
     def add_node_callback(self, cb: NodeCB) -> 'InterpConfig':
         return replace(self, node_cbs=(self.node_cbs + [cb]))
