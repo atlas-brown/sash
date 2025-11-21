@@ -216,7 +216,6 @@ def test_loop_runs_multiple__cmdsubst_no_warning(tmp_path):
     assert_expected_report(report, [])
 
 # for i in *.sh; do echo $i; done\n
-@pytest.mark.skip(reason="Currently no support for globs")
 def test_loop_runs_multiple__glob_no_warning(tmp_path):
     # A loop over a glob should not produce a LoopRunsOnce warning
     script = write_script(tmp_path, "for i in *.sh; do echo $i; done\n")
