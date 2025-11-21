@@ -348,20 +348,26 @@ def handle_if(traces: Traces, node: AST.IfNode, config: InterpConfig) -> Traces:
     t_failure = [t for t in t1 if t.latest_state.last_exit_code == SymStr(("1",))]
     t_other   = [t for t in t1 if t.latest_state.last_exit_code not in {SymStr(("0",)), SymStr(("1",))}]
     assert len(t_success) + len(t_failure) + len(t_other) == len(t1), f"Expected all traces to be either success or failure, got {len(t_success)} success and {len(t_failure)} failure out of {len(t1)} total"
+
+    t_then = []
+    t_else = []
     if test_result in {True, None}:
-        # Always take the 'then' branch, unless test condition is known to always be false
+        # if constant true or unknown, interpret then branch (assume t_other are successes)
         t_then = guarded_interp_node(t_success + trace_map(t_other, lambda s: s.set_last_exit_code(SymStr(("0",)))),
                                     node.then_b,
                                     config)
-        return t_then
 
-    if node.else_b is not None and test_result in {False, None}:
-        t_else = guarded_interp_node(t_failure + trace_map(t_other, lambda s: s.set_last_exit_code(SymStr(("1",)))),
-                                    node.else_b,
-                                    config)
-        return t_else
+    if node.else_b is not None:
+        if test_result in {False, None}:
+            # if constant false or unknown, interpret else branch (assume t_other are failures)
+            t_else = guarded_interp_node(t_failure + trace_map(t_other, lambda s: s.set_last_exit_code(SymStr(("1",)))),
+                                        node.else_b,
+                                        config)
+    else:
+        # if no else branch, consider fail cases for t_other as well
+        t_else = t_failure + trace_map(t_other, lambda s: s.set_last_exit_code(SymStr(("1",))))
 
-    return t_other
+    return t_then + t_else
 
 def handle_exit(traces: Traces) -> Traces:
     logging.debug(f"Handling exit command, terminating {len(traces)} traces")
