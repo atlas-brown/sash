@@ -17,7 +17,7 @@ def main(script_path: pathlib.Path) -> None:
             traverse_ast(pn.ast_node)
         except Exception as e:
             print(
-                f"{script_path} | Error traversing AST at line {pn.line_before}: {e}",
+                f"{script_path} | Error traversing AST at line {pn.get_line_number()}: {e}",
                 file=sys.stderr,
             )
             sys.exit(1)

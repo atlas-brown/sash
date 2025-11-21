@@ -22,6 +22,15 @@ class WrappedAst:
     rawtext: str
     line_before: int
     line_after: int  # relevant for mysterious shell reasons
+    cmd_linno: int | None = None
+
+    def get_line_number(self) -> int:
+        """
+        Returns the line number of the node.
+        If the node is an `NCMD` node and the `linno` field is available, returns its value.
+        Otherwise, returns the line number before the node.
+        """
+        return self.cmd_linno or self.line_before + 1
 
 
 @dataclasses.dataclass(frozen=True)
@@ -47,7 +56,12 @@ def parse_shell_script(script_path: str) -> list[WrappedAst]:
     wrapped_nodes = []
     for libdash_node, rawtext, linno_before, linno_after in parsed_data:
         shasta_node = to_ast_node(libdash_node)
-        wrapped_node = WrappedAst(shasta_node, rawtext or "", linno_before, linno_after)
+
+        # Extract the `linno` field from `NCMD` nodes if available.
+        # Only `NCMD` nodes have the `ncmd` structure attribute with a `linno` field, while other node types do not have this field.
+        cmd_linno = getattr(libdash_node, 'ncmd', {}).get('linno', None)
+
+        wrapped_node = WrappedAst(shasta_node, rawtext or "", linno_before, linno_after, cmd_linno)
         wrapped_nodes.append(wrapped_node)
 
     logging.debug(
