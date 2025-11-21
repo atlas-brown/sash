@@ -1,9 +1,9 @@
-import time
+import math
 from abc import ABC
 from dataclasses import dataclass
 from enum import Enum
 from typing import NamedTuple
-
+import logging
 
 class Severity(Enum):
     ERROR = "error"
@@ -160,29 +160,37 @@ class Report(NamedTuple):
 class Reporter:
     _filename: str
     _issues: set[Issue]
-    _start_time: float
-    _solver_time: float
+    _exec_time: float = math.nan
+    _solver_time: float = math.nan
     _timed_out: bool
+    _initialized: bool = False
 
     @classmethod
     def initialize(cls, filename:str):
+        if cls._initialized:
+            logging.warning("Reporter is already initialized")
+            return
+
         cls._filename = filename
         cls._issues = set()
-        cls._start_time = time.perf_counter()
-        cls._solver_time : float = 0
         cls._timed_out = False
+        cls._initialized = True
 
     @classmethod
     def add_issue(cls, issue: Issue):
         cls._issues.add(issue)
 
     @classmethod
-    def set_solver_time(cls, time:float):
-        cls._solver_time = time
+    def set_exec_time(cls, exec_time: float):
+        cls._exec_time = exec_time
 
     @classmethod
-    def set_timed_out(cls, timed_out: bool):
-        cls._timed_out = timed_out
+    def set_solver_time(cls, solver_time: float):
+        cls._solver_time = solver_time
+
+    @classmethod
+    def set_timed_out(cls):
+        cls._timed_out = True
 
     @classmethod
     def get_timed_out(cls) -> bool:
@@ -190,12 +198,18 @@ class Reporter:
 
     @classmethod
     def get_report(cls) -> Report:
-        end_time = time.perf_counter()
-        time_elapsed = end_time - cls._start_time
+        if math.isnan(cls._exec_time):
+            logging.debug("Execution time not set; defaulting to 0.0")
+            cls._exec_time = 0.0
+
+        if math.isnan(cls._solver_time):
+            logging.debug("Solver time not set; defaulting to 0.0")
+            cls._solver_time = 0.0
+
         return Report(
             filename=cls._filename,
             issues=list(cls._issues),
-            time=time_elapsed,
+            time=cls._exec_time,
             solver_time=cls._solver_time,
             timed_out=cls._timed_out,
         )

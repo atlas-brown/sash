@@ -3,6 +3,7 @@ import json
 import logging
 import pathlib
 import threading
+import time
 
 import sash.symb
 from sash.config import Config
@@ -13,9 +14,13 @@ from sash.solver import run_solver
 def symbexec_main(file: str,
                   solver: bool = False,
                   stop_event: threading.Event | None = None) -> sash.symb.SymbexecResult:
-    Reporter.initialize(file)
     config = InterpConfig(trace_collapser = sash.symb.collapse_traces_if_too_many)
+
+    Reporter.initialize(file)
+    start_time = time.perf_counter()
     result = sash.symb.symbexec_file(file, config, stop=stop_event)
+    Reporter.set_exec_time(time.perf_counter() - start_time)
+
     match result.status:
         case sash.symb.SymbexecStatus.COMPLETED:
             logging.info("Symbolic execution completed")
@@ -28,7 +33,9 @@ def symbexec_main(file: str,
             assert False, "unreachable"
 
     if solver:
+        start_time = time.perf_counter()
         run_solver(result.traces, config)
+        Reporter.set_solver_time(time.perf_counter() - start_time)
 
     return result
 
