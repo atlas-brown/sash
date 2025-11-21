@@ -11,7 +11,6 @@ import shasta.ast_node as AST
 
 import sash.reporter as reporter
 from sash.solver import field_to_z3
-import sash.symb_utils as symb_utils
 from sash.config import Config
 from sash.frozen import FrozenAst, freeze, freeze_thing
 from sash.interpreter_config import InterpConfig
@@ -19,7 +18,7 @@ from sash.parser import *
 from sash.reporter import Reporter
 from sash.specs import get_spec, Description, Not
 from sash.state import *
-from sash.util import *
+import sash.util as util
 
 
 def set_exit_code_arbitrary(traces: Traces) -> Traces:
@@ -522,7 +521,7 @@ def expand_simple(stuff: list[AST.ArgChar],
                             self.add_a_field(arbitrary_field(var, ArbitraryType.APPROXIMATION, self.state))
                     elif var.fmt == "Minus":
                         # This is the case that $VAR is unset: take the default
-                        non_default, default = self.fork(Description(f"{var.var} takes the default value {Field.create_constant(shasta_pretty(var.arg))}"))
+                        non_default, default = self.fork(Description(f"{var.var} takes the default value {Field.create_constant(util.shasta_pretty(var.arg))}"))
                         Partial.add_the_default(default, var)
                         arbitrary_for_this_var = arbitrary_field(var, ArbitraryType.ENVIRONMENT, non_default.state)
                         # localenv to avoid creating an arbitrary that persists beyond a function body
@@ -556,7 +555,7 @@ def expand_simple(stuff: list[AST.ArgChar],
         def finish(self) -> tuple[list[Field], State]:
             self.finish_field_so_far()
             # Join the combined fields so far, folding symstrs into arbitrary fields as prefixes and suffixes
-            split = split_at(self.combined_fields_so_far, None)
+            split = util.split_at(self.combined_fields_so_far, None)
             return ([merge_partial_fields(part, None, self.state) for part in split if part != []], self.state)
 
         def fork(self, pathcond: Constraint) -> tuple['Partial', 'Partial']:
@@ -647,13 +646,6 @@ def expand_assuming_single_constant_word(traces: Traces,
             return t0, one_word
         case _:
             assert False, f"expected {stuff} to be a single constant word, but found something else after expansion: {fields}"
-
-def field_to_str(field: Field) -> str | None:
-    match field:
-        case Field(SymStr(parts), _):
-            return symb_utils.symbstr_to_str(parts)
-        case _:
-            return None
 
 # =====================
 #  Field manipulation
@@ -984,7 +976,7 @@ def find_func_defs(traces: Traces, nodes: list[WrappedAst], config: InterpConfig
             AST.SubshellNode,
             AST.WhileNode
         ]
-        for n in symb_utils.iter_ast_commands(node.ast_node, skip=skip):
+        for n in util.iter_ast_command(node.ast_node, skip=skip):
             if isinstance(n, AST.DefunNode):
                 try:
                     _, func_name = expand_assuming_single_constant_word(traces, n.name, config)
