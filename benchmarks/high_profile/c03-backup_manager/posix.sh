@@ -1004,7 +1004,7 @@ backup_method_svn()
     done
 }
 
-# This is never used by the script so it's safe to comment out
+# This is never used by the script so it's safe to comment out (it's difficult to turn into POSIX)
 #backup_method_pipe()
 #{
 #    method="$1"
@@ -1034,6 +1034,3 @@ backup_method_svn()
 #        index=$(($index + 1))
 #    done
 #}
-
-# The following is added to apply the function with the proper arguments.
-__exec_meta_command "some_cmd" "some_file" "gzip"
