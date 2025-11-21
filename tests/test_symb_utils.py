@@ -1,6 +1,7 @@
 from typing import Iterable
 from hypothesis import given, strategies as st, settings
 import z3
+from sash.state import SymStr
 from sash.state import SymVar
 from sash.symb_utils import symbstr_to_str, create_fresh_varname, create_fresh_var
 
@@ -10,10 +11,10 @@ settings.load_profile("default")
 @given(l=st.lists(st.text()))
 def test_symbstr_to_str_with_strings(l: list[str]) -> None:
     """Property-based test for `symbstr_to_str` with only string components."""
-    symbstr: Iterable[str | SymVar] = l
+    symbstr = SymStr(tuple(l))
 
     # If all components are strings, the result should be their concatenation.
-    assert symbstr_to_str(symbstr) == "".join(l)
+    assert symbstr.try_to_str() == "".join(l)
 
 
 @st.composite
@@ -29,7 +30,7 @@ def lst_with_at_least_one_symvar(draw) -> list[str | SymVar]:
 def test_symbstr_to_str_with_symvars(seq: list[str | SymVar]) -> None:
     """Property-based test for `symbstr_to_str` with `SymVar` components."""
     # If there exists any `SymVar` in the iterable, the result should be None.
-    assert symbstr_to_str(seq) is None
+    assert SymStr(tuple(seq)).try_to_str() is None
 
 
 @given(seq=st.lists(st.one_of(st.text(), st.builds(SymVar, st.text(min_size=1)))))
@@ -37,10 +38,10 @@ def test_symbstr_to_str_equivalence(seq: list[str | SymVar]) -> None:
     """Property-based test for `symbstr_to_str` checking structural equivalence."""
     # If all components are strings, the result should be their concatenation.
     if all(isinstance(x, str) for x in seq):
-        assert symbstr_to_str(seq) == "".join(x for x in seq if isinstance(x, str))
+        assert SymStr(tuple(seq)).try_to_str() == "".join(x for x in seq if isinstance(x, str))
     # Otherwise (i.e., if any component is a `SymVar`), the result should be None.
     else:
-        assert symbstr_to_str(seq) is None
+        assert SymStr(tuple(seq)).try_to_str() is None
 
 
 def test_symbstr_to_str_empty_iterable() -> None:
@@ -48,7 +49,7 @@ def test_symbstr_to_str_empty_iterable() -> None:
     symbstr: Iterable[str | SymVar] = []
 
     # The result should be an empty string.
-    assert symbstr_to_str(symbstr) == ""
+    assert SymStr(tuple(symbstr)).try_to_str() == ""
 
 
 z3_prefixes = st.one_of(
@@ -91,18 +92,14 @@ def test_create_fresh_varname_is_unique(prefix: str | None, n: int) -> None:
 
 @given(prefix=z3_prefixes)
 def test_create_fresh_var_shape_and_uniqueness(prefix: str | None) -> None:
-    """Property-based test for the shape and uniqueness of `SymVar`s created by `create_fresh_var`."""
-    v1 = create_fresh_var(prefix)
-    v2 = create_fresh_var(prefix)
+    """Property-based test for the shape and uniqueness of varnames created by `create_fresh_varname`."""
+    v1 = create_fresh_varname(prefix)
+    v2 = create_fresh_varname(prefix)
     expected_prefix = "vr" if prefix is None else prefix
 
-    # Both created variables should be instances of `SymVar`.
-    assert isinstance(v1, SymVar)
-    assert isinstance(v2, SymVar)
-
     # Both variable names should start with the expected prefix.
-    assert v1.name.startswith(expected_prefix)
-    assert v2.name.startswith(expected_prefix)
+    assert v1.startswith(expected_prefix)
+    assert v2.startswith(expected_prefix)
 
     # The two created variables should be distinct.
     assert v1 != v2

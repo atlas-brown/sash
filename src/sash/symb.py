@@ -34,7 +34,7 @@ def handle_commandnode(traces: Traces,
     logging.debug(f"Expanded cmd to {expanded_args}")
 
     if expanded_args:
-        match field_to_str(expanded_args[0]):
+        match expanded_args[0].try_to_str():
             case "rm":
                 logging.debug("Exploring all possible expansions of rm args")
                 expansions = expand_args(traces, node.arguments, config)
@@ -88,16 +88,16 @@ def handle_rm(expanded_args: tuple[Field], trace: Trace, node: AST.CommandNode) 
     def is_protected(path):
         return any(path in [p, p + "/", p + "/*"] for p in Config.get("PROTECTED_PATHS"))
     for arg_field in expanded_args[1:]:
-        if (path := field_to_str(arg_field)) and is_protected(path):
+        if (path := arg_field.try_to_str()) and is_protected(path):
             Reporter.add_issue(reporter.DeleteSystemFile(path, context_line))
         match arg_field:
             case Field(CompletelyArbitrary(source=source), WordCount(max=m)) if m > 1:
                 Reporter.add_issue(reporter.DangerousWordSplit(source, context_line))
         match arg_field:
             case Field(CompletelyArbitrary(prefix=pre, suffix=suf), WordCount(min, max)) if min == 0 or max > 1:
-                if pre is not None and (path := symb_utils.symbstr_to_str(pre.parts)) and is_protected(path):
+                if pre is not None and (path := pre.try_to_str()) and is_protected(path):
                     Reporter.add_issue(reporter.WordSplitCouldDeleteSystemFile(path, context_line))
-                if suf is not None and (path := symb_utils.symbstr_to_str(suf.parts)) and is_protected(path):
+                if suf is not None and (path := suf.try_to_str()) and is_protected(path):
                     Reporter.add_issue(reporter.WordSplitCouldDeleteSystemFile(path, context_line))
 
     return (
@@ -522,7 +522,7 @@ def expand_simple(stuff: list[AST.ArgChar],
                             self.add_a_field(arbitrary_field(var, ArbitraryType.APPROXIMATION, self.state))
                     elif var.fmt == "Minus":
                         # This is the case that $VAR is unset: take the default
-                        non_default, default = self.fork(Description(f"{var.var} takes the default value {constant_field(shasta_pretty(var.arg))}"))
+                        non_default, default = self.fork(Description(f"{var.var} takes the default value {Field.create_constant(shasta_pretty(var.arg))}"))
                         Partial.add_the_default(default, var)
                         arbitrary_for_this_var = arbitrary_field(var, ArbitraryType.ENVIRONMENT, non_default.state)
                         # localenv to avoid creating an arbitrary that persists beyond a function body
@@ -884,7 +884,7 @@ def interp_node(traces: Traces,
             if join_fields(items).count.max <= 1:
                 Reporter.add_issue(reporter.LoopRunsOnce(node, context_line))
             # if all items are constant, we can unroll the loop
-            if all(symb_utils.is_constant(field) for field in items):
+            if all(field.is_constant() for field in items):
                 logging.debug(f"For loop over constant items, unrolling: {items}")
                 t2 = t1
                 for item_field in items:
