@@ -6,7 +6,6 @@ from collections.abc import Iterable
 import z3
 from dataclasses import dataclass, field, replace
 from enum import Enum
-from sash.frozen import FrozenDict
 import logging
 import functools
 from enum import Enum, auto
@@ -172,6 +171,19 @@ class Description(Constraint):
     text: str
 
 
+def normalize_dir_path(path: Field) -> Field:
+    from sash.state import SymStr, Field
+    if not isinstance(path.content, SymStr):
+        return path  # if it's completely arbitrary, do nothing
+
+    if isinstance(path.content.parts[-1], str):
+        first_parts = path.content.parts[:-1]
+        last_part = path.content.parts[-1]
+        if last_part.endswith("/"):
+            new_path = Field(SymStr(first_parts + (last_part[:-1],)), path.count)
+            return new_path
+    return path
+
 
 def normalize_fs_constraints(constraints: Constraint) -> Constraint:
     match constraints:
@@ -195,6 +207,13 @@ def normalize_fs_constraints(constraints: Constraint) -> Constraint:
             return normalize_fs_constraints(Not(lhs)) | normalize_fs_constraints(Not(rhs))
         case Not(c):
             return Not(normalize_fs_constraints(c))
+        case IsFile() | IsDir() | IsDeleted() | IsUnread() | Reads() | Writes():
+            normalized_path = normalize_dir_path(constraints.path)
+            return type(constraints)(normalized_path)
+        case StringEq(lhs, rhs):
+            normalized_lhs = normalize_dir_path(lhs)
+            normalized_rhs = normalize_dir_path(rhs)
+            return StringEq(normalized_lhs, normalized_rhs)
         case _:
             return constraints
 
