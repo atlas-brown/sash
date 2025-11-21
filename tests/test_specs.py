@@ -1,14 +1,26 @@
 from itertools import combinations
 from pprint import pformat
-from hypothesis import given, strategies as st, settings, assume
 
-from sash.solver import assertion_to_z3
+import z3
+from hypothesis import assume, given, settings
+from hypothesis import strategies as st
+from util import create_field, create_symstr
+
 import sash.specs as specs
 import sash.symb as symb
-from sash.constraints import *
-from sash.state import State, FSModelSimple, Assertion
-from sash.util import constant_field
-from util import create_field, create_symstr
+from sash.constraints import (
+    And,
+    Empty,
+    Implies,
+    IsDeleted,
+    IsFile,
+    IsUnread,
+    NormalizedFSConstraint,
+    Not,
+    Or,
+)
+from sash.solver import assertion_to_z3
+from sash.state import Assertion, Field, FSModelSimple, State
 
 # Nice little message for copilot:
 #   check: (essentially) the precondition that must hold for a command to succeed, but not exactly
@@ -240,7 +252,7 @@ def test_hypothesis_specs_to_constraints_do_not_crash(cmd_name: str, args: list[
     import z3
 
     # Build Fields (first token is the command name)
-    fields = tuple([constant_field(cmd_name)] + [constant_field(a) for a in args])
+    fields = tuple([Field.create_constant(cmd_name)] + [Field.create_constant(a) for a in args])
     cmd_spec = specs.get_spec(cmd_name, fields)
     assert cmd_spec is not None, f"Spec function for command '{cmd_name}' returned None for fields: {pformat(fields)}"
 

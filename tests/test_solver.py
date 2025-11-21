@@ -1,16 +1,24 @@
 """
 Tests for SMT solver integration.
 """
-import sash.main as main
-import sash.reporter as reporter
-import shasta.ast_node as AST
-from sash.state import *
-from util import *
-from sash.util import *
-from sash.symb import starting_state
-from sash.constraints import *
-from sash.solver import *
 import z3
+from util import *
+
+import sash.reporter as reporter
+from sash.constraints import FSModel, FSModelSimple, IsDeleted, IsFile, Reads, StringEq
+from sash.solver import (
+    Del,
+    File,
+    FileInfo,
+    Read,
+    Unknown,
+    Unread,
+    field_content_to_z3,
+    reset_z3cache,
+    state_to_z3,
+)
+from sash.state import ArbitraryType, CompletelyArbitrary, Field, ShellVar, WordCount
+from sash.symb import starting_state
 
 reporter.Reporter.initialize("<test>")
 
@@ -43,9 +51,9 @@ def test_state_to_z3():
 
     state = starting_state(FSModel())
     arb = Field(CompletelyArbitrary(None, ArbitraryType.ENVIRONMENT, state), WordCount(0, float('inf')))
-    s = state.set_env("A", ShellVar(constant_field("value1")))\
+    s = state.set_env("A", ShellVar(Field.create_constant("value1")))\
         .set_env("B", ShellVar(arb))\
-        .add_pathcond(StringEq(arb, constant_field("")))
+        .add_pathcond(StringEq(arb, Field.create_constant("")))
 
     arbz3var = field_content_to_z3(arb.content)
 
@@ -67,10 +75,10 @@ def test_state_to_z3_more_stuff():
     state = starting_state(FSModel())
     arb = Field(CompletelyArbitrary(None, ArbitraryType.ENVIRONMENT, state), WordCount(0, float('inf')))
     arb2 = Field(CompletelyArbitrary(None, ArbitraryType.ENVIRONMENT, state), WordCount(0, float('inf')))
-    s = state.set_env("A", ShellVar(constant_field("value1")))\
+    s = state.set_env("A", ShellVar(Field.create_constant("value1")))\
         .set_env("B", ShellVar(arb))\
         .set_env("1", ShellVar(arb2))\
-        .add_pathcond(StringEq(arb, constant_field("")))\
+        .add_pathcond(StringEq(arb, Field.create_constant("")))\
         .add_pathcond(StringEq(arb2, arb))
 
     arbz3var = field_content_to_z3(arb.content)
@@ -93,9 +101,9 @@ def test_state_to_z3_local_vars():
 
     state = starting_state(FSModel())
     arb = Field(CompletelyArbitrary(None, ArbitraryType.ENVIRONMENT, state), WordCount(0, float('inf')))
-    s = state.set_env("A", ShellVar(constant_field("value1")))\
+    s = state.set_env("A", ShellVar(Field.create_constant("value1")))\
         .extend_localenv({"A": ShellVar(arb)})\
-        .add_pathcond(StringEq(arb, constant_field("")))
+        .add_pathcond(StringEq(arb, Field.create_constant("")))
 
     arbz3var = field_content_to_z3(arb.content)
 
@@ -115,8 +123,8 @@ def test_state_to_z3_fs_simple():
     reset_z3cache()
 
     state = starting_state(FSModelSimple(lambda f: field_content_to_z3(f.content)))
-    s = state.set_env("A", ShellVar(constant_field("value1")))\
-        .update_fs(IsDeleted(constant_field("somefile.txt")))
+    s = state.set_env("A", ShellVar(Field.create_constant("value1")))\
+        .update_fs(IsDeleted(Field.create_constant("somefile.txt")))
 
     fs_formula = z3.And(z3_fs_var(0) == z3.K(z3.StringSort(), FileInfo.mk_pair(Unknown, Unread)),
                         z3_fs_var(1) == z3.Store(z3_fs_var(0), z3.StringVal("somefile.txt"), FileInfo.mk_pair(Del, Unread)))
@@ -135,10 +143,10 @@ def test_state_to_z3_fs_more():
     reset_z3cache()
 
     state = starting_state(FSModelSimple(lambda f: field_content_to_z3(f.content)))
-    s = state.set_env("A", ShellVar(constant_field("value1")))\
-        .update_fs(IsDeleted(constant_field("somefile.txt")))\
-        .update_fs(IsFile(constant_field("somefile.txt")))\
-        .update_fs(Reads(constant_field("somefile.txt")))
+    s = state.set_env("A", ShellVar(Field.create_constant("value1")))\
+        .update_fs(IsDeleted(Field.create_constant("somefile.txt")))\
+        .update_fs(IsFile(Field.create_constant("somefile.txt")))\
+        .update_fs(Reads(Field.create_constant("somefile.txt")))
 
     fs_formula = z3.And(z3_fs_var(0) == z3.K(z3.StringSort(), FileInfo.mk_pair(Unknown, Unread)),
                         z3_fs_var(1) == z3.Store(z3_fs_var(0), z3.StringVal("somefile.txt"), FileInfo.mk_pair(Del, Unread)),

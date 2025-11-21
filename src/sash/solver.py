@@ -1,7 +1,9 @@
 from sash.constraints import *
 from sash.reporter import *
 from sash.interpreter_config import InterpConfig
-from sash.state import *
+from sash.state import State, SymStr, Field, CompletelyArbitrary, Assertion, Trace
+from dataclasses import replace
+import logging
 from sash.util import shasta_pretty
 from pprint import pformat
 import z3
@@ -20,7 +22,7 @@ def field_content_to_z3(field_content: SymStr | CompletelyArbitrary) -> z3.ExprR
     match field_content:
         case SymStr(parts):
             assert all(isinstance(part, str) for part in parts), "SymStr with SymVars not supported in Z3 translation yet"
-            return z3.StringVal("".join(parts))
+            return z3.StringVal("".join(parts)) # type: ignore
         case CompletelyArbitrary() as arbitrary:
             arbitrary_no_pfx_sfx = replace(arbitrary, prefix=None, suffix=None)
             if arbitrary_no_pfx_sfx not in arbitrary_to_z3_var:

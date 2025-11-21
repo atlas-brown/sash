@@ -1,24 +1,15 @@
-from sash.constraints import normalize_dir_path, normalize_fs_constraints, IsFile, IsDir, IsDeleted, IsUnread, Reads, Writes, StringEq
 from util import create_field
 
-
-def test_dir_normalization():
-    path1 = create_field("/a/b/c/")
-    path2 = create_field("/a/b/c")
-
-    assert normalize_dir_path(path1) == normalize_dir_path(path2)
-
-def test_normalize_dir_path_with_glob():
-    path1 = create_field("/a/b*/c/")
-    path2 = create_field("/a/b*/c")
-
-    assert normalize_dir_path(path1) == normalize_dir_path(path2)
-
-def test_normalize_dir_path_with_spaces():
-    path1 = create_field("   /a/  b/ c/   ")
-    path2 = create_field("   /a/  b/ c")
-
-    assert normalize_dir_path(path1) != normalize_dir_path(path2)
+from sash.constraints import (
+    IsDeleted,
+    IsDir,
+    IsFile,
+    IsUnread,
+    Reads,
+    StringEq,
+    Writes,
+    normalize_fs_constraints,
+)
 
 
 def test_normalize_fs_constraints():

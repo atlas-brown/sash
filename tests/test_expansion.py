@@ -2,15 +2,14 @@
 Tests for the simple symbolic expander.
 """
 import pytest
-import sash
-import sash.reporter as reporter
-from sash.symb import expand_simple, expand_args_dumb, expand_args, starting_state
-from sash.state import *
-from sash.frozen import freeze, freeze_thing
-from sash.interpreter_config import InterpConfig
 import shasta.ast_node as AST
 from util import *
-from unittest.mock import Mock, MagicMock
+
+import sash.reporter as reporter
+from sash.frozen import freeze, freeze_thing
+from sash.interpreter_config import InterpConfig
+from sash.state import *
+from sash.symb import expand_args, expand_args_dumb, expand_simple, starting_state
 
 reporter.Reporter.initialize("<test>")
 config = InterpConfig()

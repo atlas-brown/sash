@@ -1,9 +1,10 @@
+import logging
 import math
 from abc import ABC
 from dataclasses import dataclass
 from enum import Enum
 from typing import NamedTuple
-import logging
+
 
 class Severity(Enum):
     ERROR = "error"
@@ -195,6 +196,14 @@ class Reporter:
     @classmethod
     def get_timed_out(cls) -> bool:
         return cls._timed_out
+
+    @classmethod
+    def reset(cls):
+        cls._initialized = False
+        cls._issues = set()
+        cls._exec_time = math.nan
+        cls._solver_time = math.nan
+        cls._timed_out = False
 
     @classmethod
     def get_report(cls) -> Report:

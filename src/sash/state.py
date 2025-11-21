@@ -1,10 +1,25 @@
-from dataclasses import dataclass, field, replace, fields
 import logging
-from sash.constraints import Constraint, Empty, FSModel, FSModelSimple, NormalizedFSConstraint
-from typing import Callable, Optional, Any
+from collections.abc import Callable
+from dataclasses import dataclass, field, fields, replace
 from enum import Enum
-from sash.frozen import FrozenAst, FrozenDict
+from typing import Any
+
 import shasta.ast_node as AST
+
+import sash.util as util
+from sash.constraints import (
+    CommandExists,
+    Constraint,
+    Empty,
+    FSModel,
+    FSModelSimple,
+    Implies,
+    NormalizedFSConstraint,
+    Not,
+    normalize_fs_constraints,
+)
+from sash.frozen import FrozenAst, FrozenDict
+
 
 @dataclass(frozen=True)
 class SymVar:
@@ -45,6 +60,15 @@ class SymStr:
             new_parts.append(this_str)
         return SymStr(tuple(new_parts))
 
+    def try_to_str(self) -> str | None:
+        nls : list[str] = []
+        for i in self.parts:
+            if isinstance(i,str):
+                nls.append(i)
+            else:
+                return None
+        return "".join(nls)
+
 class ArbitraryType(Enum):
     APPROXIMATION = 0
     ENVIRONMENT = 1
@@ -53,9 +77,9 @@ class ArbitraryType(Enum):
 class CompletelyArbitrary:
     source: FrozenAst
     kind: ArbitraryType
-    producing_state: Optional['State'] # shouldn't ever result in cyclic data, because the state that is used to compute an arbitrary value should only ever be an ancester of the state the stores it, but beware
-    prefix: Optional[SymStr] = None
-    suffix: Optional[SymStr] = None
+    producing_state: 'State | None' # shouldn't ever result in cyclic data, because the state that is used to compute an arbitrary value should only ever be an ancester of the state the stores it, but beware
+    prefix: SymStr | None = None
+    suffix: SymStr | None = None
 
     def __eq__(self, other):
         # If the state producing this is unknown, conservatively say it can't be equal to any other
@@ -88,6 +112,32 @@ class Field:
     def quote(self) -> 'Field':
         return Field(self.content, WordCount(min(self.count.min, 1),
                                              min(self.count.max, 1)))
+
+    def is_constant(self) -> bool:
+        return isinstance(self.content, SymStr) and all(isinstance(p, str) for p in self.content.parts)
+
+    def try_to_str(self) -> str | None:
+        match self.content:
+            case SymStr():
+                return self.content.try_to_str()
+            case _:
+                return None
+
+    def without_trailing_slash(self) -> 'Field':
+        if isinstance(self.content, SymStr) and isinstance(self.content.parts[-1], str):
+            # only remove trailing slash if it's part of a string literal at the end
+            first_parts = self.content.parts[:-1]
+            last_part = self.content.parts[-1]
+            if last_part.endswith("/"):
+                new_path = Field(SymStr(first_parts + (last_part[:-1],)), self.count)
+                return new_path
+
+        # otherwise, do nothing
+        return self
+
+    @staticmethod
+    def create_constant(s: str, words: int = 1) -> 'Field':
+        return Field(SymStr((s,)), WordCount(words, words))
 
 @dataclass(frozen=True)
 class ShellVar:
@@ -127,9 +177,9 @@ class State:
     call_stack:                  tuple[str, ...]             = field(default_factory=tuple)
     fundefs:                     FrozenDict[str, FrozenAst]  = field(default_factory=FrozenDict)
     last_exit_code:              SymStr                      = SymStr(("0",))
-    last_cmd:                    Optional[FrozenAst]         = None
+    last_cmd:                    FrozenAst | None            = None
     opts:                        SetOptions                  = field(default_factory=SetOptions)
-    known_nonexistant_commands:  frozenset[str]              = field(default_factory=frozenset)
+    known_nonexistent_commands:  frozenset[str]              = field(default_factory=frozenset)
     terminated:                  bool                        = False # by `exit` or similar
     assertions:                  tuple[Assertion]            = field(default_factory=tuple)
     fs_model:                    FSModel                     = field(default_factory=FSModel)
@@ -157,14 +207,14 @@ class State:
         new_pathcond = self.pathcond + (cond,)
         return replace(self, pathcond=new_pathcond)
 
-    def add_assertion(self, assertion: Constraint, source_str: Optional[str] = None, source_line: Optional[int] = None) -> 'State':
+    def add_assertion(self, assertion: Constraint, source_str: str | None = None, source_line: int | None = None) -> 'State':
         if assertion == Empty():
             logging.debug(f"Skipping empty assertion from {source_str} at line {source_line}")
             return self
         new_assertions = self.assertions + (Assertion(producing_state=self, constraint=assertion, source_str=source_str, source_line=source_line),)
         return replace(self, assertions=new_assertions)
 
-    def lookup(self, var: str) -> Optional[ShellVar]:
+    def lookup(self, var: str) -> ShellVar | None:
         if var in self.localenv:
             return self.localenv[var]
         elif self.call_stack and is_special_var(var):
@@ -178,7 +228,7 @@ class State:
     def set_fundef(self, name: str, defn: FrozenAst) -> 'State':
         return replace(self, fundefs=self.fundefs.set(name, defn))
 
-    def lookup_fundef(self, name: str) -> Optional[FrozenAst]:
+    def lookup_fundef(self, name: str) -> FrozenAst | None:
         return self.fundefs.get(name, None)
 
     def set_external(self, data) -> 'State':
@@ -196,8 +246,31 @@ class State:
     def terminate(self) -> 'State':
         return replace(self, terminated=True)
 
-    def record_nonexistant_command(self, name: str) -> 'State':
-        return replace(self, known_nonexistant_commands=self.known_nonexistant_commands | {name})
+    def record_nonexistent_command(self, name: str) -> 'State':
+        return replace(self, known_nonexistent_commands=self.known_nonexistent_commands | {name})
+
+    def remove_nonexistent_command(self, name: str) -> 'State':
+        return replace(self, known_nonexistent_commands=self.known_nonexistent_commands - {name})
+
+    def update_known_commands(self, spec: Constraint) -> 'State':
+        norm_spec = normalize_fs_constraints(spec) # turns ~(a & b) into (~a | ~b), removes double negations, etc.
+
+        updated_state = self
+
+        negation = False
+        for c in util.iter_constraint(norm_spec, skip=[Implies]): # unclear how to handle command existence in implications (which does not happen anyways now)
+            if isinstance(c, Not):
+                negation = True
+            elif isinstance(c, CommandExists):
+                cmd_name = c.name.try_to_str()
+                if cmd_name and negation:
+                    updated_state = updated_state.record_nonexistent_command(cmd_name)
+                elif cmd_name:
+                    updated_state = updated_state.remove_nonexistent_command(cmd_name)
+            else:
+                negation = False
+
+        return updated_state
 
     def enter_function(self, name: str) -> 'State':
         return replace(self, call_stack=self.call_stack + (name,))

@@ -1,7 +1,8 @@
 from dataclasses import dataclass
-from typing import Any, TypeVar, Generic
-import collections
+from typing import Any, Generic, TypeVar
+
 import shasta.ast_node as AST
+
 
 @dataclass(frozen=True)
 class FrozenAst:

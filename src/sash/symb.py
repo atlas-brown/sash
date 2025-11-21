@@ -2,24 +2,25 @@ import logging
 import traceback
 from collections import defaultdict
 from copy import copy
-from dataclasses import dataclass
+from dataclasses import dataclass, field, replace
+from enum import Enum
 from math import inf
 from threading import Event
 from typing import NamedTuple
 
 import shasta.ast_node as AST
 
+import sash.parser as parser
 import sash.reporter as reporter
-from sash.solver import field_to_z3
-import sash.symb_utils as symb_utils
+import sash.util as util
 from sash.config import Config
-from sash.frozen import FrozenAst, freeze, freeze_thing
+from sash.constraints import Constraint, FSModel, FSModelSimple, Description, Not
+from sash.frozen import FrozenAst, FrozenDict, freeze, freeze_thing
 from sash.interpreter_config import InterpConfig
-from sash.parser import *
 from sash.reporter import Reporter
-from sash.specs import get_spec, Description, Not
-from sash.state import *
-from sash.util import *
+from sash.solver import field_to_z3
+from sash.specs import get_spec
+from sash.state import ArbitraryType, CompletelyArbitrary, Field, FuncMap, SetOptions, ShellVar, State, SymStr, SymVar, Trace, Traces, WordCount, collapse_traces, is_special_var, trace_map
 
 
 def set_exit_code_arbitrary(traces: Traces) -> Traces:
@@ -34,7 +35,7 @@ def handle_commandnode(traces: Traces,
     logging.debug(f"Expanded cmd to {expanded_args}")
 
     if expanded_args:
-        match field_to_str(expanded_args[0]):
+        match expanded_args[0].try_to_str():
             case "rm":
                 logging.debug("Exploring all possible expansions of rm args")
                 expansions = expand_args(traces, node.arguments, config)
@@ -88,16 +89,16 @@ def handle_rm(expanded_args: tuple[Field], trace: Trace, node: AST.CommandNode) 
     def is_protected(path):
         return any(path in [p, p + "/", p + "/*"] for p in Config.get("PROTECTED_PATHS"))
     for arg_field in expanded_args[1:]:
-        if (path := field_to_str(arg_field)) and is_protected(path):
+        if (path := arg_field.try_to_str()) and is_protected(path):
             Reporter.add_issue(reporter.DeleteSystemFile(path, context_line))
         match arg_field:
             case Field(CompletelyArbitrary(source=source), WordCount(max=m)) if m > 1:
                 Reporter.add_issue(reporter.DangerousWordSplit(source, context_line))
         match arg_field:
             case Field(CompletelyArbitrary(prefix=pre, suffix=suf), WordCount(min, max)) if min == 0 or max > 1:
-                if pre is not None and (path := symb_utils.symbstr_to_str(pre.parts)) and is_protected(path):
+                if pre is not None and (path := pre.try_to_str()) and is_protected(path):
                     Reporter.add_issue(reporter.WordSplitCouldDeleteSystemFile(path, context_line))
-                if suf is not None and (path := symb_utils.symbstr_to_str(suf.parts)) and is_protected(path):
+                if suf is not None and (path := suf.try_to_str()) and is_protected(path):
                     Reporter.add_issue(reporter.WordSplitCouldDeleteSystemFile(path, context_line))
 
     return (
@@ -130,7 +131,7 @@ def handle_unknown_command(name: str,
     if name in func_map.funcs.keys():
         Reporter.add_issue(reporter.UndefinedFunction(name, context_line))
 
-    if name.endswith("/") or any(name in t.latest_state.known_nonexistant_commands for t in traces):
+    if name.endswith("/") or any(name in t.latest_state.known_nonexistent_commands for t in traces):
         Reporter.add_issue(reporter.NotACommand(name, context_line))
 
     logging.debug(f"Unknown command {name}, optimistically treating as no-op")
@@ -522,7 +523,7 @@ def expand_simple(stuff: list[AST.ArgChar],
                             self.add_a_field(arbitrary_field(var, ArbitraryType.APPROXIMATION, self.state))
                     elif var.fmt == "Minus":
                         # This is the case that $VAR is unset: take the default
-                        non_default, default = self.fork(Description(f"{var.var} takes the default value {constant_field(shasta_pretty(var.arg))}"))
+                        non_default, default = self.fork(Description(f"{var.var} takes the default value {Field.create_constant(util.shasta_pretty(var.arg))}"))
                         Partial.add_the_default(default, var)
                         arbitrary_for_this_var = arbitrary_field(var, ArbitraryType.ENVIRONMENT, non_default.state)
                         # localenv to avoid creating an arbitrary that persists beyond a function body
@@ -556,7 +557,7 @@ def expand_simple(stuff: list[AST.ArgChar],
         def finish(self) -> tuple[list[Field], State]:
             self.finish_field_so_far()
             # Join the combined fields so far, folding symstrs into arbitrary fields as prefixes and suffixes
-            split = split_at(self.combined_fields_so_far, None)
+            split = util.split_at(self.combined_fields_so_far, None)
             return ([merge_partial_fields(part, None, self.state) for part in split if part != []], self.state)
 
         def fork(self, pathcond: Constraint) -> tuple['Partial', 'Partial']:
@@ -647,13 +648,6 @@ def expand_assuming_single_constant_word(traces: Traces,
             return t0, one_word
         case _:
             assert False, f"expected {stuff} to be a single constant word, but found something else after expansion: {fields}"
-
-def field_to_str(field: Field) -> str | None:
-    match field:
-        case Field(SymStr(parts), _):
-            return symb_utils.symbstr_to_str(parts)
-        case _:
-            return None
 
 # =====================
 #  Field manipulation
@@ -805,7 +799,7 @@ def guarded_interp_node(traces: Traces,
     global stop_event
     if stop_event and stop_event.is_set():
         logging.info("Symbolic execution interrupted by stop event")
-        Reporter.set_timed_out(True)
+        Reporter.set_timed_out()
         return traces # same behavior as if the rest of the script is not implemented
         # todo is this sound?
 
@@ -884,7 +878,7 @@ def interp_node(traces: Traces,
             if join_fields(items).count.max <= 1:
                 Reporter.add_issue(reporter.LoopRunsOnce(node, context_line))
             # if all items are constant, we can unroll the loop
-            if all(symb_utils.is_constant(field) for field in items):
+            if all(field.is_constant() for field in items):
                 logging.debug(f"For loop over constant items, unrolling: {items}")
                 t2 = t1
                 for item_field in items:
@@ -953,10 +947,10 @@ def interp_node(traces: Traces,
                     node
                 )
 
-def starting_state(fs_model: Optional[FSModel] = None) -> State:
+def starting_state(fs_model: FSModel | None = None) -> State:
     # env["IFS"] = ShellVar(" \t\n")
     # for defaultvar in ["HOME", "PWD", "OLDPWD", "PATH"]:
-    #     env[defaultvar] = ShellVar(symb_utils.create_fresh_var(f"default_{defaultvar}"))
+    #     env[defaultvar] = ShellVar(SymStr(util.create_fresh_varname(f"default_{defaultvar}"))
     root = State(fs_model = FSModelSimple(field_to_z3)) if fs_model is None else State(fs_model = fs_model)
     make_ast = lambda var: AST.VArgChar("Normal", False, var, [])
     starter_env = {
@@ -970,7 +964,7 @@ def starting_state(fs_model: Optional[FSModel] = None) -> State:
 def trim_string_for_logging(s: str, max_len: int = 300) -> str:
     return s if len(s) <= max_len else s[:max_len] + "..."
 
-def find_func_defs(traces: Traces, nodes: list[WrappedAst], config: InterpConfig) -> FrozenDict[str, AST.Command]:
+def find_func_defs(traces: Traces, nodes: list[parser.WrappedAst], config: InterpConfig) -> FrozenDict[str, AST.Command]:
     # TODO: Write unit tests for function definitions being recorded correctly (low priority)
     funcs: FrozenDict[str, AST.Command] = FrozenDict({})
     for node in nodes:
@@ -984,7 +978,7 @@ def find_func_defs(traces: Traces, nodes: list[WrappedAst], config: InterpConfig
             AST.SubshellNode,
             AST.WhileNode
         ]
-        for n in symb_utils.iter_ast_commands(node.ast_node, skip=skip):
+        for n in util.iter_ast_command(node.ast_node, skip=skip):
             if isinstance(n, AST.DefunNode):
                 try:
                     _, func_name = expand_assuming_single_constant_word(traces, n.name, config)
@@ -1008,7 +1002,7 @@ class SymbexecResult(NamedTuple):
 
 
 # TODO: make the FS model selection configurable via the `InterpConfig`
-def symb_engine(nodes: list[WrappedAst], config: InterpConfig) -> Traces:
+def symb_engine(nodes: list[parser.WrappedAst], config: InterpConfig) -> Traces:
     global context_line
     global func_map
     logging.debug(f"Running symb engine with {len(nodes)} raw nodes")
@@ -1035,7 +1029,7 @@ def symbexec_file(input_file: str,
     stop_event = stop
 
     try:
-        nodes = parse_shell_script(input_file)
+        nodes = parser.parse_shell_script(input_file)
         # opt_store = parse_shebang_args(input_file)
         traces = symb_engine(nodes, config)
         if Reporter.get_timed_out():

@@ -1,13 +1,17 @@
-import tempfile
-import pytest
 import math
-from pprint import pformat
+import tempfile
 from pathlib import Path
+from pprint import pformat
+
+import pytest
 import shasta.ast_node as AST
+
 import sash.parser as parser
 import sash.reporter as reporter
 import sash.specs as specs
 import sash.symb as symb
+import sash.main as main
+
 
 def write_script(tmp_path, content: str) -> str:
     """Helper to write a shell script to a temporary file."""
@@ -61,3 +65,15 @@ def create_field(val: str) -> specs.Field:
 
 def create_symstr(val: str) -> symb.SymStr:
     return symb.SymStr((val,))
+
+def reset_and_run_main(script: str, solver: bool = False) -> reporter.Report:
+    """Helper to reset the reporter and run the main analysis on a script."""
+    reporter.Reporter.reset()
+    report = main.main(script, solver=solver)
+    return report
+
+def reset_and_run_symbexec_main(script: str, solver: bool = False) -> symb.SymbexecResult:
+    """Helper to reset the reporter and run only the symbolic execution on a script."""
+    reporter.Reporter.reset()
+    symr = main.symbexec_main(script, solver=solver)
+    return symr

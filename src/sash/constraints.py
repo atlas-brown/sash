@@ -1,14 +1,19 @@
 from __future__ import annotations  # for postponed evaluation of annotations
-from typing import TYPE_CHECKING
+
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any
+
 if TYPE_CHECKING:
-    from sash.state import *
-from collections.abc import Iterable
-import z3
-from dataclasses import dataclass, field, replace
-from enum import Enum
-import logging
+    from sash.state import Field
+
 import functools
+import logging
+from collections.abc import Iterable
+from dataclasses import dataclass, field, replace
 from enum import Enum, auto
+
+import z3
+
 
 @dataclass(frozen=True)
 class Constraint:
@@ -29,9 +34,11 @@ class Constraint:
     def __rshift__(self, other: Constraint) -> Implies:
         return Implies(self, other)
 
+
 @dataclass(frozen=True)
 class Empty(Constraint):
     pass
+
 
 @dataclass(frozen=True)
 class And(Constraint):
@@ -51,6 +58,7 @@ class And(Constraint):
     def from_field_iter(cons: Iterable[Field], tfm: Callable[[Field], Constraint]) -> Constraint:
         return And.from_iter((tfm(c) for c in cons))
 
+
 @dataclass(frozen=True)
 class Or(Constraint):
     lhs: Constraint
@@ -69,47 +77,58 @@ class Or(Constraint):
     def from_field_iter(cons: Iterable[Field], tfm: Callable[[Field], Constraint]) -> Constraint:
         return Or.from_iter((tfm(c) for c in cons))
 
+
 @dataclass(frozen=True)
 class Not(Constraint):
     constraint: Constraint
+
 
 @dataclass(frozen=True)
 class Implies(Constraint):
     premise: Constraint
     conclusion: Constraint
 
+
 @dataclass(frozen=True)
 class StringEq(Constraint):
     lhs: Field
     rhs: Field
 
+
 @dataclass(frozen=True)
 class IsFile(Constraint):
     path: Field
+
 
 @dataclass(frozen=True)
 class IsDir(Constraint):
     path: Field
 
+
 @dataclass(frozen=True)
 class IsDeleted(Constraint):
     path: Field
+
 
 @dataclass(frozen=True)
 class IsUnread(Constraint):
     path: Field
 
+
 @dataclass(frozen=True)
 class Reads(Constraint):
     path: Field
+
 
 @dataclass(frozen=True)
 class Writes(Constraint):
     path: Field
 
+
 @dataclass(frozen=True)
 class CommandExists(Constraint):
     name: Field
+
 
 class IOType(Enum):
     NONE = auto()
@@ -158,31 +177,20 @@ class IOType(Enum):
             case IOType.STDIN | IOType.NONE | IOType.UNKNOWN:
                 return io
 
+
 @dataclass(frozen=True)
 class HasStdout(Constraint):
     command: Field
+
 
 @dataclass(frozen=True)
 class ExpectsStdin(Constraint):
     command: Field
 
+
 @dataclass(frozen=True)
 class Description(Constraint):
     text: str
-
-
-def normalize_dir_path(path: Field) -> Field:
-    from sash.state import SymStr, Field
-    if not isinstance(path.content, SymStr):
-        return path  # if it's completely arbitrary, do nothing
-
-    if isinstance(path.content.parts[-1], str):
-        first_parts = path.content.parts[:-1]
-        last_part = path.content.parts[-1]
-        if last_part.endswith("/"):
-            new_path = Field(SymStr(first_parts + (last_part[:-1],)), path.count)
-            return new_path
-    return path
 
 
 def normalize_fs_constraints(constraints: Constraint) -> Constraint:
@@ -208,14 +216,15 @@ def normalize_fs_constraints(constraints: Constraint) -> Constraint:
         case Not(c):
             return Not(normalize_fs_constraints(c))
         case IsFile() | IsDir() | IsDeleted() | IsUnread() | Reads() | Writes():
-            normalized_path = normalize_dir_path(constraints.path)
+            normalized_path = constraints.path.without_trailing_slash()
             return type(constraints)(normalized_path)
         case StringEq(lhs, rhs):
-            normalized_lhs = normalize_dir_path(lhs)
-            normalized_rhs = normalize_dir_path(rhs)
+            normalized_lhs = lhs.without_trailing_slash()
+            normalized_rhs = rhs.without_trailing_slash()
             return StringEq(normalized_lhs, normalized_rhs)
         case _:
             return constraints
+
 
 @dataclass(frozen=True)
 class NormalizedFSConstraint(Constraint):
@@ -224,6 +233,7 @@ class NormalizedFSConstraint(Constraint):
     def __post_init__(self):
         normalized = normalize_fs_constraints(self.constraint)
         object.__setattr__(self, 'constraint', normalized)
+
 
 @dataclass(frozen=True)
 class FSModel():
@@ -246,31 +256,33 @@ class FSModel():
         return z3.BoolVal(True)
 
 
-
-
-
-
 StateSort, (File, Dir, Del, Unknown) = z3.EnumSort(
     "State", ["File", "Dir", "Del", "Unknown"]
 )
+
+
 ReadStatus, (Read, Unread) = z3.EnumSort(
     "ReadStatus", ["Read", "Unread"]
 )
 
+
 # 2. Define the "pair" Datatype
 # This creates a new sort called 'FileInfo'
-FileInfo = z3.Datatype('FileInfo')
+FileInfo: Any = z3.Datatype('FileInfo')
+
 
 # Add one 'constructor' called 'mk_pair'
 # It takes two 'fields': 'state' and 'status'
 FileInfo.declare(
     'mk_pair',
     ('state', StateSort),    # Accessor 'state' returns a StateSort
-    ('status', ReadStatus)  # Accessor 'status' returns a ReadStatus
+    ('status', ReadStatus)   # Accessor 'status' returns a ReadStatus
 )
+
 
 # Finalize the Datatype creation
 FileInfo = FileInfo.create()
+
 
 @dataclass(frozen=True)
 class FSModelSimple(FSModel):
@@ -290,10 +302,10 @@ class FSModelSimple(FSModel):
         return replace(self, id=self.id + 1, history=self.history + ((z3.Array(f'fs{self.id + 1}', z3.StringSort(), FileInfo), z3array),))
 
     # ASSUMPTION: `intermediate_history` ids do not overlap with self ids
-    def _extend_history(self, z3array: z3.ExprRef, intermediate_history: Optional[tuple[tuple[z3.ExprRef, z3.ExprRef], ...]] = None) -> FSModelSimple:
+    def _extend_history(self, z3array: z3.ExprRef, intermediate_history: tuple[tuple[z3.ExprRef, z3.ExprRef], ...] | None = None) -> FSModelSimple:
         return replace(self, id=self.id + 1, history=self.history + (intermediate_history or ()) + ((z3.Array(f'fs{self.id + 1}', z3.StringSort(), FileInfo), z3array),))
 
-    def _set(self, path: Field, state: z3.ExprRef, status: Optional[z3.ExprRef] = Unread) -> FSModelSimple:
+    def _set(self, path: Field, state: z3.ExprRef, status: z3.ExprRef | None = Unread) -> FSModelSimple:
         """Return a new abstract file system with the given path set to the given state."""
         return self._next_state(z3.Store(self.history[-1][0], self.field_to_z3(path), FileInfo.mk_pair(state, status)))
 
@@ -301,11 +313,11 @@ class FSModelSimple(FSModel):
         """Return a new abstract file system after removing the given path."""
         return self._set(path, Del, Unread)
 
-    def _create_file(self, path: Field, status: Optional[z3.ExprRef] = Unread) -> FSModelSimple:
+    def _create_file(self, path: Field, status: z3.ExprRef | None = Unread) -> FSModelSimple:
         """Return a new abstract file system after writing to the given path."""
         return self._set(path, File, status)
 
-    def _create_dir(self, path: Field, status: Optional[z3.ExprRef] = Unread) -> FSModelSimple:
+    def _create_dir(self, path: Field, status: z3.ExprRef | None = Unread) -> FSModelSimple:
         """Return a new abstract file system after writing to the given path."""
         return self._set(path, Dir, status)
 
@@ -348,8 +360,11 @@ class FSModelSimple(FSModel):
                 # that chooses between the old final state and the new final state based on the premise
                 new_state = z3.If(self._fs_constraint_z3(premise), fs_after_conclusion.history[-1][0], self.history[-1][0])
                 return fs_after_conclusion._next_state(new_state) # type: ignore
+            case CommandExists() | Not(CommandExists()):
+                # Does not affect FS model
+                return self
             case Not(constraint):
-                assert False, f"Unclear what Not means in postcond (is it un-normalized?): {constraints}"
+                assert False, f"Unclear what Not means in postcond (is it un-normalized?): {constraint}"
                 return self
             case _:
                 assert False, f"Unhandled FS postcondition: {constraints}"
