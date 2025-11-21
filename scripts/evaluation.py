@@ -32,9 +32,8 @@ def main():
     parser.add_argument('-O', '--only', type=str, default=None, help='Regex to filter benchmarks to run (default: run all)')
     parser.add_argument('-o', '--output', type=Path, default=None, help='File to write output to (default: stdout)')
     parser.add_argument('-G', '--ground-truth-only', action='store_true', help='Only run benchmarks that have ground truth defined (default: run all)')
-    parser.add_argument('-V', '--verbose', action='store_true', help='Enable printing of exceptions that occur and raw output when ground truth is missing (default: false)')
+    parser.add_argument('-V', '--verbose', action='store_true', help='Enable printing of error reports or exceptions that occur, and raw output when ground truth is missing (default: false)')
     parser.add_argument('-N', '--no-color', action='store_true', help='Disable colored output to stderr (default: false)')
-    parser.add_argument('-L', '--log-issues', action='store_true', help='Enable printing of detected issues with their line numbers for each benchmark (default: false)')
     args = parser.parse_args()
 
     if args.no_color:
@@ -54,7 +53,6 @@ def main():
     output_file = args.output.resolve() if isinstance(args.output, Path) else None
     ground_truth_only: bool = args.ground_truth_only
     verbose: bool = args.verbose
-    should_log_issues: bool = args.log_issues
 
     top = get_git_toplevel()
     if args.benchmarks:
@@ -128,23 +126,23 @@ def main():
         finally:
             ran += 1
 
-        sorted_issues = sorted(report.issues, key=sash.reporter.issue_sort_key)
-        actual_codes = [issue.code.value for issue in sorted_issues]
-        issue_line_numbers = [issue.source_line for issue in sorted_issues]
-
-        if should_log_issues:
-            print_issue_details(benchmark.relative_to(top), sorted_issues, file=sys.stderr)
-
         if report.timed_out:
             print_warn(f"Analysis timed out; time elapsed: {report.time + report.solver_time}s", file=sys.stderr)
             timed_out += 1
         else:
             print_info(f"Analysis completed; time elapsed: {report.time + report.solver_time}s", file=sys.stderr)
+
+        actual_codes = [issue.code.value for issue in report.issues]
+        line_numbers = [issue.source_line for issue in report.issues]
         if gt_exists and all(code in actual_codes for code in expected_codes):
             print_pass("All expected codes detected", file=sys.stderr)
+            if verbose:
+                print_issue_details(benchmark.relative_to(top), report.issues, file=sys.stderr)
         elif gt_exists:
             print_fail(f"Missing expected codes: {[code for code in expected_codes if code not in actual_codes]}", file=sys.stderr)
             failed += 1
+            if verbose:
+                print_issue_details(benchmark.relative_to(top), report.issues, file=sys.stderr)
         else:
             if verbose:
                 print_info(f"Report: {json.dumps(report.to_dict(), indent=2)}", file=sys.stderr)
@@ -160,7 +158,7 @@ def main():
             expected_codes=expected_codes,
             actual_codes=actual_codes,
             shellcheck_codes=shellcheck_results,
-            line_numbers=issue_line_numbers
+            line_numbers=line_numbers
         ))
 
     print(file=sys.stderr)
@@ -213,23 +211,15 @@ def print_info(msg: str, file = None, indent=2):
     print(f"{' ' * indent}[{CYAN}INFO{RESET}] {msg}", file=file)
 
 
-def print_issue_details(benchmark, issues, file=None):
-    if file is None:
-        file = sys.stderr
-    script_label = benchmark.as_posix() if isinstance(benchmark, pathlib.Path) else str(benchmark)
-
-    if not issues:
-        print_info(f"No issues detected for {script_label}", file=file)
+def print_issue_details(benchmark: Path, issues: list[sash.reporter.Issue], file=None, indent=2):
+    if len(issues) == 0:
+        print_info(f"No issues detected for {benchmark}", file=file, indent=indent)
         return
 
-    print_info(f"Issues detected for {script_label}:", file=file)
+    print_info(f"Issues detected for {benchmark}:", file=file, indent=indent)
     for issue in issues:
-        location = f"line {issue.source_line}" if issue.source_line is not None else "unknown line"
-        msg = f"{issue.code.value} ({issue.severity.value}) at {location}: {issue.message}"
-        if issue.is_error():
-            print_fail(msg, file=file, indent=4)
-        else:
-            print_warn(msg, file=file, indent=4)
+        location = "L" + str(issue.source_line) if issue.source_line is not None else "?"
+        print(f"{' ' * (indent + 3)}{location} | {BOLD}{issue.code.value}{RESET} ({issue.severity.value}): {issue.message}", file=file)
 
 
 class RunResult(NamedTuple):
