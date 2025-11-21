@@ -813,6 +813,10 @@ def interp_node(traces: Traces,
                 node: AST.AstNode,
                 config: InterpConfig) -> Traces:
     # refer to https://github.com/binpash/shasta/blob/main/shasta/ast_node.py
+    global context_line
+    if hasattr(node, "line_number") and node.line_number is not None:
+        context_line = getattr(node, "line_number")
+
     traces = drop_terminated_traces(traces)
     traces = config.trace_collapser(traces)
     traces = config.apply_node_cbs(traces, node)
