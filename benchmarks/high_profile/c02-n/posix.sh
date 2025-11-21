@@ -98,7 +98,7 @@ display_n_version() {
 #
 
 check_current_version() {
-  which node &> /dev/null
+  which node >/dev/null 2>&1
   if test $? -eq 0; then
     active=`node --version`
     active=${active#v}
@@ -113,14 +113,16 @@ check_current_version() {
 display_versions() {
   check_current_version
   for dir in $VERSIONS_DIR/*; do
-    local version=${dir##*/}
-    local config=`test -f $dir/.config && cat $dir/.config`
-    if test "$version" = "$active"; then
-      printf "  \033[32mο\033[0m $version \033[90m$config\033[0m\n"
+    local_version=${dir##*/}
+    local_config=`test -f $dir/.config && cat $dir/.config`
+    if test "$local_version" = "$active"; then
+      printf "  \033[32mο\033[0m $local_version \033[90m$local_config\033[0m\n"
     else
-      printf "    $version \033[90m$config\033[0m\n"
+      printf "    $local_version \033[90m$local_config\033[0m\n"
     fi
   done
+  unset local_version
+  unset local_config
 }
 
 #
@@ -128,32 +130,38 @@ display_versions() {
 #
 
 install_node() {
-  local version=$1; shift
-  local config=$@
+  local_version=$1; shift
+  local_config=$@
   check_current_version
 
   # remove "v"
-  version=${version#v}
+  local_version=${local_version#v}
 
   # activate
-  local dir=$VERSIONS_DIR/$version
-  if test -d $dir; then
+  local_dir=$VERSIONS_DIR/$local_version
+  if test -d $local_dir; then
     # symlink everything, purge old copies or symlinks
     for d in bin lib share include; do
       rm -rf $N_PREFIX/$d # bug here: if N_REFIX is not set externally, line 6 sets it to /usr/local
-      ln -s $dir/$d $N_PREFIX/$d
+      ln -s $local_dir/$d $N_PREFIX/$d
     done
   # install
   else
-    local tarball="node-v$version.tar.gz"
-    local url="http://nodejs.org/dist/$tarball"
+    local_tarball="node-v$local_version.tar.gz"
+    local_url="http://nodejs.org/dist/$local_tarball"
 
     # >= 0.5.x
-    local minor=$(echo $version | cut -d '.' -f 2)
-    test $minor -ge "5" && url="http://nodejs.org/dist/v$version/$tarball"
+    local_minor=$(echo $local_version | cut -d '.' -f 2)
+    test $local_minor -ge "5" && local_url="http://nodejs.org/dist/v$local_version/$local_tarball"
 
-    install_tarball $version $url $config
+    install_tarball $local_version $local_url $local_config
   fi
+  unset local_version
+  unset local_config
+  unset local_dir
+  unset local_tarball
+  unset local_url
+  unset local_minor
 }
 
 #
@@ -161,45 +169,52 @@ install_node() {
 #
 
 install_tarball() {
-  local version=$1
-  local url=$2; shift 2
-  local config=$@
+  local_version=$1
+  local_url=$2; shift 2
+  local_config=$@
 
   # remove "v"
-  version=${version#v}
+  local_version=${local_version#v}
 
-  local dir=$VERSIONS_DIR/$version
-  local tarball="node-v$version.tar.gz"
-  local logpath="/tmp/n.log"
+  local_dir=$VERSIONS_DIR/$local_version
+  local_tarball="node-v$local_version.tar.gz"
+  local_logpath="/tmp/n.log"
 
   # create build directory
-  mkdir -p $N_PREFIX/n/node-v$version
+  mkdir -p $N_PREFIX/n/node-v$local_version
 
   # fetch and unpack
-  cd $N_PREFIX/n/node-v$version \
-    && $GET $url | tar xz --strip-components=1 > $logpath 2>&1
+  cd $N_PREFIX/n/node-v$local_version \
+    && $GET $local_url | tar xz --strip-components=1 > $local_logpath 2>&1
 
   # see if things are alright
   if test $? -gt 0; then
-    rm $tarball
+    rm $local_tarball
     echo "\033[31mError: installation failed\033[0m"
-    echo "  node version $version does not exist,"
+    echo "  node version $local_version does not exist,"
     echo "  n failed to fetch the tarball,"
     echo "  or tar failed. Try a different"
-    echo "  version or view $logpath to view"
+    echo "  version or view $local_logpath to view"
     echo "  error details."
     exit 1
   fi
 
-  cd "$N_PREFIX/n/node-v$version" \
-    && ./configure --prefix $VERSIONS_DIR/$version $config\
+  cd "$N_PREFIX/n/node-v$local_version" \
+    && ./configure --prefix $VERSIONS_DIR/$local_version $local_config\
     && JOBS=4 make install \
     && cd .. \
-    && cleanup $version \
-    && mkdir -p $dir \
-    && echo $config > "$dir/.config" \
-    && n $version \
-    && ln -s "$N_PREFIX/n/versions/$version" "$N_PREFIX/n/current"
+    && cleanup $local_version \
+    && mkdir -p $local_dir \
+    && echo $local_config > "$local_dir/.config" \
+    && n $local_version \
+    && ln -s "$N_PREFIX/n/versions/$local_version" "$N_PREFIX/n/current"
+
+  unset local_version
+  unset local_url
+  unset local_config
+  unset local_dir
+  unset local_tarball
+  unset local_logpath
 }
 
 #
@@ -207,18 +222,20 @@ install_tarball() {
 #
 
 cleanup() {
-  local version=$1
-  local dir="node-v$version"
+  local_version=$1
+  local_dir="node-v$local_version"
 
-  if test -d $dir; then
+  if test -d $local_dir; then
     log "removing source"
-    rm -fr $dir
+    rm -fr $local_dir
   fi
 
-  if test -f "$dir.tar.gz"; then
+  if test -f "$local_dir.tar.gz"; then
     log "removing tarball"
-    rm -fr "$dir.tar.gz"
+    rm -fr "$local_dir.tar.gz"
   fi
+  unset local_version
+  unset local_dir
 }
 
 #
@@ -227,11 +244,12 @@ cleanup() {
 
 remove_version() {
   test -z $1 && abort "version(s) required"
-  local version=${1#v}
+  local_version=${1#v}
   while test $# -ne 0; do
-    rm -rf $VERSIONS_DIR/$version
+    rm -rf $VERSIONS_DIR/$local_version
     shift
   done
+  unset local_version
 }
 
 #
@@ -240,13 +258,15 @@ remove_version() {
 
 display_bin_path_for_version() {
   test -z $1 && abort "version required"
-  local version=${1#v}
-  local bin=$VERSIONS_DIR/$version/bin/node
-  if test -f $bin; then
-    printf $bin
+  local_version=${1#v}
+  local_bin=$VERSIONS_DIR/$local_version/bin/node
+  if test -f $local_bin; then
+    printf $local_bin
   else
     abort "$1 is not installed"
   fi
+  unset local_version
+  unset local_bin
 }
 
 #
@@ -256,16 +276,18 @@ display_bin_path_for_version() {
 
 execute_with_version() {
   test -z $1 && abort "version required"
-  local version=${1#v}
-  local bin=$VERSIONS_DIR/$version/bin/node
+  local_version=${1#v}
+  local_bin=$VERSIONS_DIR/$local_version/bin/node
 
   shift # remove version
 
-  if test -f $bin; then
-    $bin $@
+  if test -f $local_bin; then
+    $local_bin $@
   else
-    abort "$version is not installed"
+    abort "$local_version is not installed"
   fi
+  unset local_version
+  unset local_bin
 }
 
 #
@@ -275,16 +297,18 @@ execute_with_version() {
 
 execute_with_npm_version() {
   test -z $1 && abort "version required"
-  local version=${1#v}
-  local bin=$VERSIONS_DIR/$version/bin
+  local_version=${1#v}
+  local_bin=$VERSIONS_DIR/$local_version/bin
 
   shift # remove version
 
-  if test -f $bin/npm; then
-    $bin/node $bin/npm $@
+  if test -f $local_bin/npm; then
+    $local_bin/node $local_bin/npm $@
   else
     abort "npm is not installed, node.js version must be greater than or equal to 0.6.3"
   fi
+  unset local_version
+  unset local_bin
 }
 
 #
@@ -315,13 +339,13 @@ display_latest_stable_version() {
 
 list_versions() {
   check_current_version
-  local versions=""
-  versions=`$GET 2> /dev/null http://nodejs.org/dist/ \
+  local_versions=""
+  local_versions=`$GET 2> /dev/null http://nodejs.org/dist/ \
     | egrep -o '[0-9]+\.[0-9]+\.[0-9]+' \
     | sort -u -k 1,1n -k 2,2n -k 3,3n -t . \
     | awk '{ print "  " $1 }'`
 
-  for v in $versions; do
+  for v in $local_versions; do
     if test "$active" = "$v"; then
       printf "  \033[32mο\033[0m $v \033[0m\n"
     else
@@ -332,6 +356,7 @@ list_versions() {
       fi
     fi
   done
+  unset local_versions
 }
 
 # Handle arguments
