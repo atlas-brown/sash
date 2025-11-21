@@ -11,6 +11,7 @@ from sash.interpreter_config import InterpConfig
 from sash.reporter import Report, Reporter
 from sash.solver import run_solver
 
+
 def symbexec_main(file: str,
                   solver: bool = False,
                   stop_event: threading.Event | None = None) -> sash.symb.SymbexecResult:
@@ -39,15 +40,16 @@ def symbexec_main(file: str,
 
     return result
 
+
 def main(file: str,
-         debug=False,
+         log_level: str = "warning",
          log_file: pathlib.Path | None=None,
          solver=True,
          timeout: float | None = None) -> Report:
-    Config.set("DEBUG", debug)
+    Config.set("DEBUG", log_level.lower() == "debug")
     logging.basicConfig(
         format="[%(filename)s:%(lineno)d] %(message)s",
-        level=logging.DEBUG if debug else logging.WARNING,
+        level=getattr(logging, log_level.upper()),
         filename=log_file
     )
 
@@ -73,7 +75,7 @@ def cli_main():
 
     report = main(
         args.filename.resolve(strict=True).as_posix(),
-        debug=args.debug,
+        log_level=args.log_level,
         log_file=args.log_file.resolve().as_posix() if args.log_file else None,
         solver=args.solver,
         timeout=args.timeout,
@@ -94,10 +96,12 @@ def parse_cli():
     )
 
     parser.add_argument(
-        "-d",
-        "--debug",
-        action="store_false",
-        help="Enable debug logging",
+        "-L",
+        "--log-level",
+        type=str,
+        default="warning",
+        choices=["debug", "info", "warning", "error", "critical"],
+        help="Set the logging level (default: warning)",
     )
 
     parser.add_argument(
