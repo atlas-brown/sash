@@ -1,13 +1,26 @@
 from itertools import combinations
 from pprint import pformat
-from hypothesis import given, strategies as st, settings, assume
 
-from sash.solver import assertion_to_z3
+import z3
+from hypothesis import assume, given, settings
+from hypothesis import strategies as st
+from util import create_field, create_symstr
+
 import sash.specs as specs
 import sash.symb as symb
-from sash.constraints import *
-from sash.state import State, FSModelSimple, Assertion, Field
-from util import create_field, create_symstr
+from sash.constraints import (
+    And,
+    Empty,
+    Implies,
+    IsDeleted,
+    IsFile,
+    IsUnread,
+    NormalizedFSConstraint,
+    Not,
+    Or,
+)
+from sash.solver import assertion_to_z3
+from sash.state import Assertion, Field, FSModelSimple, State
 
 # Nice little message for copilot:
 #   check: (essentially) the precondition that must hold for a command to succeed, but not exactly

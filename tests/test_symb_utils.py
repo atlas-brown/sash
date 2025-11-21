@@ -1,9 +1,10 @@
-from typing import Iterable
-from hypothesis import given, strategies as st, settings
-import z3
-from sash.state import SymStr
-from sash.state import SymVar
-from sash.symb_utils import symbstr_to_str, create_fresh_varname, create_fresh_var
+from collections.abc import Iterable
+
+from hypothesis import given, settings
+from hypothesis import strategies as st
+
+from sash.state import SymStr, SymVar
+from sash.util import create_fresh_varname
 
 settings.register_profile("default", max_examples=5)
 settings.load_profile("default")

@@ -1,16 +1,24 @@
 """
 Tests for SMT solver integration.
 """
-import sash.main as main
-import sash.reporter as reporter
-import shasta.ast_node as AST
-from sash.state import *
-from util import *
-from sash.util import *
-from sash.symb import starting_state
-from sash.constraints import *
-from sash.solver import *
 import z3
+from util import *
+
+import sash.reporter as reporter
+from sash.constraints import FSModel, FSModelSimple, IsDeleted, IsFile, Reads, StringEq
+from sash.solver import (
+    Del,
+    File,
+    FileInfo,
+    Read,
+    Unknown,
+    Unread,
+    field_content_to_z3,
+    reset_z3cache,
+    state_to_z3,
+)
+from sash.state import ArbitraryType, CompletelyArbitrary, Field, ShellVar, WordCount
+from sash.symb import starting_state
 
 reporter.Reporter.initialize("<test>")
 
