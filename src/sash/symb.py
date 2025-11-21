@@ -2,23 +2,25 @@ import logging
 import traceback
 from collections import defaultdict
 from copy import copy
-from dataclasses import dataclass
+from dataclasses import dataclass, field, replace
+from enum import Enum
 from math import inf
 from threading import Event
 from typing import NamedTuple
 
 import shasta.ast_node as AST
 
+import sash.parser as parser
 import sash.reporter as reporter
-from sash.solver import field_to_z3
-from sash.config import Config
-from sash.frozen import FrozenAst, freeze, freeze_thing
-from sash.interpreter_config import InterpConfig
-from sash.parser import *
-from sash.reporter import Reporter
-from sash.specs import get_spec, Description, Not
-from sash.state import *
 import sash.util as util
+from sash.config import Config
+from sash.constraints import Constraint, FSModel, FSModelSimple, Description, Not
+from sash.frozen import FrozenAst, FrozenDict, freeze, freeze_thing
+from sash.interpreter_config import InterpConfig
+from sash.reporter import Reporter
+from sash.solver import field_to_z3
+from sash.specs import get_spec
+from sash.state import ArbitraryType, CompletelyArbitrary, Field, FuncMap, SetOptions, ShellVar, State, SymStr, SymVar, Trace, Traces, WordCount, collapse_traces, is_special_var, trace_map
 
 
 def set_exit_code_arbitrary(traces: Traces) -> Traces:
@@ -129,7 +131,7 @@ def handle_unknown_command(name: str,
     if name in func_map.funcs.keys():
         Reporter.add_issue(reporter.UndefinedFunction(name, context_line))
 
-    if name.endswith("/") or any(name in t.latest_state.known_nonexistant_commands for t in traces):
+    if name.endswith("/") or any(name in t.latest_state.known_nonexistent_commands for t in traces):
         Reporter.add_issue(reporter.NotACommand(name, context_line))
 
     logging.debug(f"Unknown command {name}, optimistically treating as no-op")
@@ -945,10 +947,10 @@ def interp_node(traces: Traces,
                     node
                 )
 
-def starting_state(fs_model: Optional[FSModel] = None) -> State:
+def starting_state(fs_model: FSModel | None = None) -> State:
     # env["IFS"] = ShellVar(" \t\n")
     # for defaultvar in ["HOME", "PWD", "OLDPWD", "PATH"]:
-    #     env[defaultvar] = ShellVar(symb_utils.create_fresh_var(f"default_{defaultvar}"))
+    #     env[defaultvar] = ShellVar(SymStr(util.create_fresh_varname(f"default_{defaultvar}"))
     root = State(fs_model = FSModelSimple(field_to_z3)) if fs_model is None else State(fs_model = fs_model)
     make_ast = lambda var: AST.VArgChar("Normal", False, var, [])
     starter_env = {
@@ -962,7 +964,7 @@ def starting_state(fs_model: Optional[FSModel] = None) -> State:
 def trim_string_for_logging(s: str, max_len: int = 300) -> str:
     return s if len(s) <= max_len else s[:max_len] + "..."
 
-def find_func_defs(traces: Traces, nodes: list[WrappedAst], config: InterpConfig) -> FrozenDict[str, AST.Command]:
+def find_func_defs(traces: Traces, nodes: list[parser.WrappedAst], config: InterpConfig) -> FrozenDict[str, AST.Command]:
     # TODO: Write unit tests for function definitions being recorded correctly (low priority)
     funcs: FrozenDict[str, AST.Command] = FrozenDict({})
     for node in nodes:
@@ -1000,7 +1002,7 @@ class SymbexecResult(NamedTuple):
 
 
 # TODO: make the FS model selection configurable via the `InterpConfig`
-def symb_engine(nodes: list[WrappedAst], config: InterpConfig) -> Traces:
+def symb_engine(nodes: list[parser.WrappedAst], config: InterpConfig) -> Traces:
     global context_line
     global func_map
     logging.debug(f"Running symb engine with {len(nodes)} raw nodes")
@@ -1027,7 +1029,7 @@ def symbexec_file(input_file: str,
     stop_event = stop
 
     try:
-        nodes = parse_shell_script(input_file)
+        nodes = parser.parse_shell_script(input_file)
         # opt_store = parse_shebang_args(input_file)
         traces = symb_engine(nodes, config)
         if Reporter.get_timed_out():

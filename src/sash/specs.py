@@ -1,16 +1,36 @@
 from abc import ABC, abstractmethod
 import inspect
 import logging
-from math import inf
 import sys
+from abc import ABC, abstractmethod
+from collections.abc import Callable
 from dataclasses import dataclass
+from math import inf
 
 import shasta.ast_node as AST
 from pash_annotations.parser import parser as pash_annot_parser
 
-from sash.constraints import *
-from sash.state import *
+from sash.constraints import (
+    And,
+    CommandExists,
+    Constraint,
+    Empty,
+    IOType,
+    IsDeleted,
+    IsDir,
+    IsFile,
+    IsUnread,
+    StringEq,
+)
 from sash.frozen import freeze_thing
+from sash.state import (
+    ArbitraryType,
+    CompletelyArbitrary,
+    Field,
+    SymStr,
+    SymVar,
+    WordCount,
+)
 
 
 @dataclass(frozen=True)

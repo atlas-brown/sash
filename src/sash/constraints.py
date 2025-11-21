@@ -1,14 +1,18 @@
 from __future__ import annotations  # for postponed evaluation of annotations
-from typing import TYPE_CHECKING
+
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any
+
 if TYPE_CHECKING:
-    from sash.state import *
-from collections.abc import Iterable
-import z3
-from dataclasses import dataclass, field, replace
-from enum import Enum
-import logging
+    from sash.state import Field
+
 import functools
+import logging
+from collections.abc import Iterable
+from dataclasses import dataclass, field, replace
 from enum import Enum, auto
+
+import z3
 
 
 @dataclass(frozen=True)
@@ -264,7 +268,7 @@ ReadStatus, (Read, Unread) = z3.EnumSort(
 
 # 2. Define the "pair" Datatype
 # This creates a new sort called 'FileInfo'
-FileInfo = z3.Datatype('FileInfo')
+FileInfo: Any = z3.Datatype('FileInfo')
 
 
 # Add one 'constructor' called 'mk_pair'
@@ -272,7 +276,7 @@ FileInfo = z3.Datatype('FileInfo')
 FileInfo.declare(
     'mk_pair',
     ('state', StateSort),    # Accessor 'state' returns a StateSort
-    ('status', ReadStatus)  # Accessor 'status' returns a ReadStatus
+    ('status', ReadStatus)   # Accessor 'status' returns a ReadStatus
 )
 
 
@@ -298,10 +302,10 @@ class FSModelSimple(FSModel):
         return replace(self, id=self.id + 1, history=self.history + ((z3.Array(f'fs{self.id + 1}', z3.StringSort(), FileInfo), z3array),))
 
     # ASSUMPTION: `intermediate_history` ids do not overlap with self ids
-    def _extend_history(self, z3array: z3.ExprRef, intermediate_history: Optional[tuple[tuple[z3.ExprRef, z3.ExprRef], ...]] = None) -> FSModelSimple:
+    def _extend_history(self, z3array: z3.ExprRef, intermediate_history: tuple[tuple[z3.ExprRef, z3.ExprRef], ...] | None = None) -> FSModelSimple:
         return replace(self, id=self.id + 1, history=self.history + (intermediate_history or ()) + ((z3.Array(f'fs{self.id + 1}', z3.StringSort(), FileInfo), z3array),))
 
-    def _set(self, path: Field, state: z3.ExprRef, status: Optional[z3.ExprRef] = Unread) -> FSModelSimple:
+    def _set(self, path: Field, state: z3.ExprRef, status: z3.ExprRef | None = Unread) -> FSModelSimple:
         """Return a new abstract file system with the given path set to the given state."""
         return self._next_state(z3.Store(self.history[-1][0], self.field_to_z3(path), FileInfo.mk_pair(state, status)))
 
@@ -309,11 +313,11 @@ class FSModelSimple(FSModel):
         """Return a new abstract file system after removing the given path."""
         return self._set(path, Del, Unread)
 
-    def _create_file(self, path: Field, status: Optional[z3.ExprRef] = Unread) -> FSModelSimple:
+    def _create_file(self, path: Field, status: z3.ExprRef | None = Unread) -> FSModelSimple:
         """Return a new abstract file system after writing to the given path."""
         return self._set(path, File, status)
 
-    def _create_dir(self, path: Field, status: Optional[z3.ExprRef] = Unread) -> FSModelSimple:
+    def _create_dir(self, path: Field, status: z3.ExprRef | None = Unread) -> FSModelSimple:
         """Return a new abstract file system after writing to the given path."""
         return self._set(path, Dir, status)
 

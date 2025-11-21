@@ -1,8 +1,10 @@
 from dataclasses import dataclass
-from sash.state import *
+from sash.state import Traces, Field
+from dataclasses import field, replace
+from collections.abc import Callable
 import shasta.ast_node as AST
 
-NodeCB = Callable[[Traces, AST.AstNode], Optional[list[Any]]]
+NodeCB = Callable[[Traces, AST.AstNode], list | None]
 ExpandedCmdCB = Callable[[list[Field]], None]
 TraceCollapser = Callable[[Traces], Traces]
 
