@@ -98,6 +98,32 @@ class Field:
         return Field(self.content, WordCount(min(self.count.min, 1),
                                              min(self.count.max, 1)))
 
+    def is_constant(self) -> bool:
+        return isinstance(self.content, SymStr) and all(isinstance(p, str) for p in self.content.parts)
+
+    def try_to_str(self) -> str | None:
+        match self.content:
+            case SymStr():
+                return self.content.try_to_str()
+            case _:
+                return None
+
+    def without_trailing_slash(self) -> 'Field':
+        if isinstance(self.content, SymStr) and isinstance(self.content.parts[-1], str):
+            # only remove trailing slash if it's part of a string literal at the end
+            first_parts = self.content.parts[:-1]
+            last_part = self.content.parts[-1]
+            if last_part.endswith("/"):
+                new_path = Field(SymStr(first_parts + (last_part[:-1],)), self.count)
+                return new_path
+
+        # otherwise, do nothing
+        return self
+
+    @staticmethod
+    def create_constant(s: str, words: int = 1) -> 'Field':
+        return Field(SymStr((s,)), WordCount(words, words))
+
 @dataclass(frozen=True)
 class ShellVar:
     value: Field
