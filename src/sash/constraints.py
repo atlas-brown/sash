@@ -10,6 +10,7 @@ import logging
 import functools
 from enum import Enum, auto
 
+
 @dataclass(frozen=True)
 class Constraint:
 
@@ -29,9 +30,11 @@ class Constraint:
     def __rshift__(self, other: Constraint) -> Implies:
         return Implies(self, other)
 
+
 @dataclass(frozen=True)
 class Empty(Constraint):
     pass
+
 
 @dataclass(frozen=True)
 class And(Constraint):
@@ -51,6 +54,7 @@ class And(Constraint):
     def from_field_iter(cons: Iterable[Field], tfm: Callable[[Field], Constraint]) -> Constraint:
         return And.from_iter((tfm(c) for c in cons))
 
+
 @dataclass(frozen=True)
 class Or(Constraint):
     lhs: Constraint
@@ -69,47 +73,58 @@ class Or(Constraint):
     def from_field_iter(cons: Iterable[Field], tfm: Callable[[Field], Constraint]) -> Constraint:
         return Or.from_iter((tfm(c) for c in cons))
 
+
 @dataclass(frozen=True)
 class Not(Constraint):
     constraint: Constraint
+
 
 @dataclass(frozen=True)
 class Implies(Constraint):
     premise: Constraint
     conclusion: Constraint
 
+
 @dataclass(frozen=True)
 class StringEq(Constraint):
     lhs: Field
     rhs: Field
 
+
 @dataclass(frozen=True)
 class IsFile(Constraint):
     path: Field
+
 
 @dataclass(frozen=True)
 class IsDir(Constraint):
     path: Field
 
+
 @dataclass(frozen=True)
 class IsDeleted(Constraint):
     path: Field
+
 
 @dataclass(frozen=True)
 class IsUnread(Constraint):
     path: Field
 
+
 @dataclass(frozen=True)
 class Reads(Constraint):
     path: Field
+
 
 @dataclass(frozen=True)
 class Writes(Constraint):
     path: Field
 
+
 @dataclass(frozen=True)
 class CommandExists(Constraint):
     name: Field
+
 
 class IOType(Enum):
     NONE = auto()
@@ -158,13 +173,16 @@ class IOType(Enum):
             case IOType.STDIN | IOType.NONE | IOType.UNKNOWN:
                 return io
 
+
 @dataclass(frozen=True)
 class HasStdout(Constraint):
     command: Field
 
+
 @dataclass(frozen=True)
 class ExpectsStdin(Constraint):
     command: Field
+
 
 @dataclass(frozen=True)
 class Description(Constraint):
@@ -173,6 +191,7 @@ class Description(Constraint):
 
 def normalize_dir_path(path: Field) -> Field:
     from sash.state import SymStr, Field
+
     if not isinstance(path.content, SymStr):
         return path  # if it's completely arbitrary, do nothing
 
@@ -182,6 +201,7 @@ def normalize_dir_path(path: Field) -> Field:
         if last_part.endswith("/"):
             new_path = Field(SymStr(first_parts + (last_part[:-1],)), path.count)
             return new_path
+
     return path
 
 
@@ -217,6 +237,7 @@ def normalize_fs_constraints(constraints: Constraint) -> Constraint:
         case _:
             return constraints
 
+
 @dataclass(frozen=True)
 class NormalizedFSConstraint(Constraint):
     constraint: Constraint
@@ -224,6 +245,7 @@ class NormalizedFSConstraint(Constraint):
     def __post_init__(self):
         normalized = normalize_fs_constraints(self.constraint)
         object.__setattr__(self, 'constraint', normalized)
+
 
 @dataclass(frozen=True)
 class FSModel():
@@ -246,20 +268,20 @@ class FSModel():
         return z3.BoolVal(True)
 
 
-
-
-
-
 StateSort, (File, Dir, Del, Unknown) = z3.EnumSort(
     "State", ["File", "Dir", "Del", "Unknown"]
 )
+
+
 ReadStatus, (Read, Unread) = z3.EnumSort(
     "ReadStatus", ["Read", "Unread"]
 )
 
+
 # 2. Define the "pair" Datatype
 # This creates a new sort called 'FileInfo'
 FileInfo = z3.Datatype('FileInfo')
+
 
 # Add one 'constructor' called 'mk_pair'
 # It takes two 'fields': 'state' and 'status'
@@ -269,8 +291,10 @@ FileInfo.declare(
     ('status', ReadStatus)  # Accessor 'status' returns a ReadStatus
 )
 
+
 # Finalize the Datatype creation
 FileInfo = FileInfo.create()
+
 
 @dataclass(frozen=True)
 class FSModelSimple(FSModel):
@@ -348,6 +372,9 @@ class FSModelSimple(FSModel):
                 # that chooses between the old final state and the new final state based on the premise
                 new_state = z3.If(self._fs_constraint_z3(premise), fs_after_conclusion.history[-1][0], self.history[-1][0])
                 return fs_after_conclusion._next_state(new_state) # type: ignore
+            case CommandExists():
+                # Does not affect FS model
+                return self
             case Not(constraint):
                 assert False, f"Unclear what Not means in postcond (is it un-normalized?): {constraints}"
                 return self
