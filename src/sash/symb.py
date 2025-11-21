@@ -797,25 +797,28 @@ def guarded_interp_node(traces: Traces,
                         node: AST.AstNode,
                         config: InterpConfig) -> Traces:
     global stop_event
+    global context_line
     if stop_event and stop_event.is_set():
         logging.info("Symbolic execution interrupted by stop event")
         Reporter.set_timed_out()
         return traces # same behavior as if the rest of the script is not implemented
         # todo is this sound?
 
+    prev_context_line = context_line
+    context_line = getattr(node, "line_number", context_line)
+
     try:
-        return interp_node(traces, node, config)
+        traces = interp_node(traces, node, config)
     except NotImplementedError as e:
         logging.error(f"Interp raised: {traceback.format_exc()}. Ignoring.")
+    finally:
+        context_line = prev_context_line
         return traces
 
 def interp_node(traces: Traces,
                 node: AST.AstNode,
                 config: InterpConfig) -> Traces:
     # refer to https://github.com/binpash/shasta/blob/main/shasta/ast_node.py
-    global context_line
-    context_line = getattr(node, "line_number", None)
-
     traces = drop_terminated_traces(traces)
     traces = config.trace_collapser(traces)
     traces = config.apply_node_cbs(traces, node)
