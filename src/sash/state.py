@@ -1,4 +1,3 @@
-from dataclasses import dataclass, field, replace, fields
 import logging
 from collections.abc import Callable
 from dataclasses import dataclass, field, fields, replace
@@ -249,6 +248,29 @@ class State:
 
     def record_nonexistent_command(self, name: str) -> 'State':
         return replace(self, known_nonexistent_commands=self.known_nonexistent_commands | {name})
+
+    def remove_nonexistent_command(self, name: str) -> 'State':
+        return replace(self, known_nonexistent_commands=self.known_nonexistent_commands - {name})
+
+    def update_known_commands(self, spec: Constraint) -> 'State':
+        norm_spec = normalize_fs_constraints(spec) # turns ~(a & b) into (~a | ~b), removes double negations, etc.
+
+        updated_state = self
+
+        negation = False
+        for c in util.iter_constraint(norm_spec, skip=[Implies]): # unclear how to handle command existence in implications (which does not happen anyways now)
+            if isinstance(c, Not):
+                negation = True
+            elif isinstance(c, CommandExists):
+                cmd_name = c.name.try_to_str()
+                if cmd_name and negation:
+                    updated_state = updated_state.record_nonexistent_command(cmd_name)
+                elif cmd_name:
+                    updated_state = updated_state.remove_nonexistent_command(cmd_name)
+            else:
+                negation = False
+
+        return updated_state
 
     def enter_function(self, name: str) -> 'State':
         return replace(self, call_stack=self.call_stack + (name,))
