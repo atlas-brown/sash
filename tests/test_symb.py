@@ -331,7 +331,7 @@ rm -rf /usr
     assert_expected_report(report, [expected_error1, expected_error2]) # Notice: no DeleteSystemFile error
 
     script = write_script(tmp_path, """
-wget foobar || exit 1
+cd foobar || exit 1
 echo "not dead code!"
 """)
     report = reset_and_run_main(script)
