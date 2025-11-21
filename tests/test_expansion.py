@@ -18,6 +18,10 @@ config = InterpConfig()
 def constant_field(string: str, words: int = 1) -> Field:
     return Field(SymStr((string,)), WordCount(words, words))
 
+def glob_field(string: str, min_words: int = 1) -> Field:
+    assert '*' in string
+    return Field(SymStr((string,)), WordCount(min_words, float('inf')))
+
 def expand_simple_r(stuff: list[AST.ArgChar],
                    state: State,
                    config: InterpConfig) -> list[Field]:
@@ -311,11 +315,64 @@ rm -rf $A/*
     assert len(v1_expansions) == 3
     assert v1_expansions[0] == constant_field("rm")
     assert v1_expansions[1] == constant_field("-rf")
-    assert v1_expansions[2] == constant_field("value1/*")
+    assert v1_expansions[2] == glob_field("value1/*")
     assert len(v2_expansions) == 3
     assert v2_expansions[0] == constant_field("rm")
     assert v2_expansions[1] == constant_field("-rf")
-    assert v2_expansions[2] == constant_field("value2/*")
+    assert v2_expansions[2] == glob_field("value2/*")
+
+
+def test_expand_glob_var():
+    script = parse_script("""echo $A*""")
+    assert len(script) == 1
+    assert isinstance(script[0], AST.CommandNode)
+
+    state = starting_state()
+    state = state.set_env("A", ShellVar(constant_field("hi")))
+    expanded = expand_simple_r(script[0].arguments[1], state, config)
+    assert expanded == [glob_field("hi*")]
+
+
+def test_expand_undefined_glob_var():
+    script = parse_script("""echo $A*""")
+    assert len(script) == 1
+    assert isinstance(script[0], AST.CommandNode)
+
+    state = starting_state()
+
+    expanded = expand_simple_r(script[0].arguments[1], state, config)
+    assert expanded == [Field(CompletelyArbitrary(freeze(script[0].arguments[1][0]),
+                                                 ArbitraryType.ENVIRONMENT,
+                                                 state,
+                                                 suffix=SymStr(("*",))),
+                             WordCount(0, float('inf')))]
+
+
+def test_expand_quoted_glob_var():
+    script = parse_script("""echo "$A*" """)
+    assert len(script) == 1
+    assert isinstance(script[0], AST.CommandNode)
+
+    state = starting_state()
+    state = state.set_env("A", ShellVar(constant_field("hi")))
+    expanded = expand_simple_r(script[0].arguments[1], state, config)
+    assert expanded == [constant_field("hi*")]
+
+
+def test_expand_undefined_quoted_glob_var():
+    script = parse_script("""echo "$A*" """)
+    assert len(script) == 1
+    assert isinstance(script[0], AST.CommandNode)
+
+    state = starting_state()
+
+    expanded = expand_simple_r(script[0].arguments[1], state, config)
+    # left side is a VArgChar, right side is a QArgChar (thus the .arg[0] indexing)
+    assert expanded == [Field(CompletelyArbitrary(freeze(script[0].arguments[1][0].arg[0]), # type: ignore
+                                                 ArbitraryType.ENVIRONMENT,
+                                                 state,
+                                                 suffix=SymStr(("*",))),
+                             WordCount(0, 1))]
 
 
 # TODO: we need to keep track of the decisions about whether an unbound var is set or not (e.g. the below should only have 2 expansions, not 4)

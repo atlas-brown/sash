@@ -67,6 +67,7 @@ def handle_commandnode(traces: Traces,
             case _:
                 logging.debug(f"Non-constant command invocation {expanded_args}, optimistically treating as no-op")
 
+    # todo: i think this should not happen in the case of command specs (because we explicitly set the exit code above)
     t2 = set_exit_code_arbitrary(t1)
     for redir in node.redir_list:
         t2 = t2.extend(guarded_interp_node(t1, redir, config)) or t2
@@ -476,6 +477,8 @@ def expand_simple(stuff: list[AST.ArgChar],
                         self.finish_field_so_far(True)
                     else:
                         self.field_so_far.append(c.pretty(AST.QUOTED if self.quoted else AST.UNQUOTED))
+                        if c.pretty() == "*" and not self.quoted:
+                            self.field_so_far_words_max = inf
                 case AST.EArgChar() as c:
                     self.field_so_far.append(c.pretty(AST.QUOTED if self.quoted else AST.UNQUOTED))
                 case AST.QArgChar() as q:
