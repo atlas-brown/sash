@@ -934,6 +934,13 @@ def interp_node(traces: Traces,
             t3 = trace_map(t1, lambda s: s.add_pathcond(Description(f"{node.NodeName}_L{context_line}:{'false' if isinstance(node, AST.AndNode) else 'true'}")))
             return t2 + t3
 
+        case AST.NotNode():
+            t1 = guarded_interp_node(traces, node.body, config)
+            t2 = trace_map(t1,
+                          lambda s: s if s.last_exit_code not in {SymStr(("0",)), SymStr(("1",))}
+                                      else s.set_last_exit_code(SymStr(("1",)) if s.last_exit_code == SymStr(("0",)) else SymStr(("0",))))
+            return t2
+
         # todo bring other cases as needed
 
         case _:
