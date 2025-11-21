@@ -550,38 +550,7 @@ def mkdir_spec(cmd: CmdInvocation) -> CmdSpec:
 def mv_spec(cmd: CmdInvocation) -> CmdSpec:
     # https://pubs.opengroup.org/onlinepubs/9799919799/utilities/mv.html
 
-    (name, flags, _, operands) = (cmd.cmd_name, cmd.flags, cmd.options, cmd.operands)
-    flags.discard("-f") # ignore -f flag, i think it does not affect preconds/postconds
-
-    assert name == SymStr(("mv",)), f"Expected mv command, got: {name}"
-
-    if flags == set() and len(operands) == 2: # mv src dst
-        # NOTE: `mv file nonexistent_dir/` fails (notice the trailing slash)
-        # precond:      src must not be deleted, dst must not be an unread file
-        # z-postcond:   too much to write here
-        # nz-postcond:  none (maybe permission issue, etc.)
-        src, dst = operands[0], operands[1]
-        return CmdSpec(
-            check=~IsDeleted(src) & # src must exist
-                    (IsDir(src) >> ~IsFile(dst)) & # if src is a dir, dst must not be a file
-                    (IsFile(dst) >> ~IsUnread(dst)), # if dst is a file, it must not be unread
-            success_postcond=~StringEq(src, dst) >> (IsDeleted(src) & (IsFile(dst) | IsDir(dst))) # if src != dst, src is deleted, dst is a file or dir
-                            & (StringEq(src, dst) >> (IsFile(dst) | IsDir(dst))) # if src == dst, nothing gets deleted, dst is a file or dir
-                            & ((IsUnread(src) & ~IsDir(dst)) >> IsUnread(dst)), # if src was unread and dst wasn't a dir, dst is unread
-                            # TODO: similar to cp, this postcond does not encode the new files created in the dir
-            failure_postcond=Empty())
-    if flags == set() and len(operands) > 2: # mv src... dst
-        # precond:      all src must not be deleted, dst must be dir
-        # z-postcond:   all src are deleted (unless dir moved to self...?)
-        # nz-postcond:  none (maybe permission issue, etc.)
-        srcs, dst = operands[:-1], operands[-1]
-        return CmdSpec(
-            check=And.from_field_iter(srcs, lambda path: ~IsDeleted(path)) & IsDir(dst),
-            success_postcond=And.from_field_iter(srcs, IsDeleted), # TODO: similar to cp, this postcond does not encode the new files created in the dir
-            failure_postcond=Empty())
-    else:
-        log_crit_unhandled_inv(cmd)
-        return CmdSpec(Empty(), Empty(), Empty(), IOType.UNKNOWN)
+    return Mv.handle_invocation(cmd)
 
 
 def rm_spec(cmd: CmdInvocation) -> CmdSpec:
@@ -774,6 +743,67 @@ class Cmd(ABC):
     @abstractmethod
     def _handle_supported(cls, cmd: CmdInvocation) -> CmdSpec:
         pass
+
+
+class Mv(Cmd):
+    # https://pubs.opengroup.org/onlinepubs/9799919799/utilities/mv.html
+
+    name = "mv"
+    posix_flags     = {"-f", "-i"}
+    supported_flags = {"-f", "-i"}
+
+    @classmethod
+    def _handle_supported(cls, cmd: CmdInvocation) -> CmdSpec:
+        (name, flags, _, operands) = (cmd.cmd_name, cmd.flags, cmd.options, cmd.operands)
+        io = IOType.NONE
+        io = IOType.add_stdin(io) if "-i" in flags else io
+
+        # NOTE: To be completely correct, the order of -f and -i matters, but we ignore that for now
+        flags.discard("-i")
+        flags.discard("-f") # ignore -f flag, i think it does not affect preconds/postconds
+
+        assert name == SymStr((cls.name,)), f"Expected mv command, got: {name}"
+
+        if len(operands) < 2:
+            logging.error("mv command with less than 2 operands is invalid; treating as no-op")
+            return CmdSpec(Empty(), Empty(), Empty(), IOType.UNKNOWN)
+
+        elif len(operands) == 2: # mv src dst (dst can be a file or a dir)
+            src, dst = operands[0], operands[1]
+            if isinstance(dst.content, SymStr) and \
+               isinstance(dst.content.parts[-1], str) and \
+               dst.content.parts[-1].endswith("/"): # dst cannot be a file
+                check = (
+                    ~IsDeleted(src) &                   # src must exist
+                    ~IsFile(dst) &                      # dst cannot be a file
+                    (IsFile(src) >> ~IsDeleted(dst)) &  # if src is a file, dst must exist
+                    ~StringEq(src, dst)                 # src and dst cannot be the same
+                )
+                success_postcond = (
+                    IsDeleted(src) &    # src is deleted
+                    IsDir(dst)          # dst is a dir
+                )
+                failure_postcond = Empty()
+            else: # dst can be a file or a dir
+                check = (
+                    ~IsDeleted(src) &                      # src must exist
+                    (IsDir(src) >> ~IsFile(dst)) &         # if src is a dir, dst cannot be a file
+                    (IsFile(dst) >> ~IsUnread(dst)) &      # if dst is a file, it must not be unread
+                    ((IsDir(src) | IsDir(dst)) >> ~StringEq(src, dst)) # src and dst cannot be the same directory
+                )
+                success_postcond = (
+                    IsDeleted(src) &            # src is deleted
+                    (IsFile(dst) | IsDir(dst))  # dst is a file or dir
+                )
+                failure_postcond = Empty()
+
+        else: # mv src... dst (dst must be a dir)
+            srcs, dst = operands[:-1], operands[-1]
+            check = And.from_field_iter(srcs, lambda path: ~IsDeleted(path)) & IsDir(dst)
+            success_postcond = And.from_field_iter(srcs, IsDeleted)
+            failure_postcond = Empty()
+
+        return CmdSpec(check, success_postcond, failure_postcond, io)
 
 
 class Rm(Cmd):
