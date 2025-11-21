@@ -1,6 +1,5 @@
 from itertools import combinations
 from pprint import pformat
-import pytest
 from hypothesis import given, strategies as st, settings, assume
 
 from sash.solver import assertion_to_z3
@@ -9,6 +8,7 @@ import sash.symb as symb
 from sash.constraints import *
 from sash.state import State, FSModelSimple, Assertion
 from sash.util import constant_field
+from util import create_field, create_symstr
 
 # Nice little message for copilot:
 #   check: (essentially) the precondition that must hold for a command to succeed, but not exactly
@@ -18,7 +18,7 @@ from sash.util import constant_field
 
 
 def sanity_check_spec_constraints(cmd_spec: specs.CmdSpec):
-    fs_model = FSModelSimple(lambda f: z3.FreshConst(z3.StringSort(), "field"))
+    fs_model = FSModelSimple(lambda _: z3.FreshConst(z3.StringSort(), "field"))
 
     fs_model.apply_postcondition(NormalizedFSConstraint(cmd_spec.success_postcond))
     fs_model.apply_postcondition(NormalizedFSConstraint(cmd_spec.failure_postcond))
@@ -181,27 +181,6 @@ def test_test_spec__postconds_are_negations_of_each_other():
         ), f"Postconds must be negations of each other, but got:\nSuccess:\n{pformat(s.success_postcond)}\nFailure:\n{pformat(s.failure_postcond)}"
 
         sanity_check_spec_constraints(s)
-
-
-def create_symstr(val: str) -> symb.SymStr:
-    return symb.SymStr((val,))
-
-
-def create_field(val: str) -> specs.Field:
-    words = 0
-    if len(val) > 0:
-        words = 1
-
-    previously_space = True # to handle leading spaces
-    for c in val:
-        if c.isspace() and not previously_space:
-            words += 1
-        previously_space = c.isspace()
-
-    return specs.Field(
-        create_symstr(val),
-        symb.WordCount(words, words)
-    )
 
 
 def create_cmd_inv(cmd_name: symb.SymStr, flags: set[str], options: dict[str, symb.Field], operands: list[symb.Field]) -> specs.CmdInvocation:

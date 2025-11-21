@@ -1,7 +1,7 @@
 """
 Tests for SMT solver integration.
 """
-import sash.main as symb
+import sash.main as main
 import sash.reporter as reporter
 import shasta.ast_node as AST
 from sash.state import *

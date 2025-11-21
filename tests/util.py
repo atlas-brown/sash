@@ -1,10 +1,13 @@
 import tempfile
 import pytest
+import math
 from pprint import pformat
 from pathlib import Path
 import shasta.ast_node as AST
 import sash.parser as parser
 import sash.reporter as reporter
+import sash.specs as specs
+import sash.symb as symb
 
 def write_script(tmp_path, content: str) -> str:
     """Helper to write a shell script to a temporary file."""
@@ -38,3 +41,23 @@ def parse_script(script_content: str) -> list[AST.AstNode]:
             res.append(wrapped_ast.ast_node)
         return res
 
+def create_field(val: str) -> specs.Field:
+    min_words = 0
+    max_words = 0
+
+    previously_space = True # to handle leading spaces
+    for c in val:
+        if c == "*":
+            # glob character
+            max_words = math.inf
+        elif not c.isspace() and previously_space:
+            min_words += 1
+        previously_space = c.isspace()
+
+    return specs.Field(
+        create_symstr(val),
+        symb.WordCount(min_words, max(min_words, max_words))
+    )
+
+def create_symstr(val: str) -> symb.SymStr:
+    return symb.SymStr((val,))
