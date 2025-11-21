@@ -799,7 +799,7 @@ def guarded_interp_node(traces: Traces,
     global stop_event
     if stop_event and stop_event.is_set():
         logging.info("Symbolic execution interrupted by stop event")
-        Reporter.set_timed_out(True)
+        Reporter.set_timed_out()
         return traces # same behavior as if the rest of the script is not implemented
         # todo is this sound?
 
