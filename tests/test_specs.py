@@ -6,8 +6,7 @@ from sash.solver import assertion_to_z3
 import sash.specs as specs
 import sash.symb as symb
 from sash.constraints import *
-from sash.state import State, FSModelSimple, Assertion
-from sash.util import constant_field
+from sash.state import State, FSModelSimple, Assertion, Field
 from util import create_field, create_symstr
 
 # Nice little message for copilot:
@@ -240,7 +239,7 @@ def test_hypothesis_specs_to_constraints_do_not_crash(cmd_name: str, args: list[
     import z3
 
     # Build Fields (first token is the command name)
-    fields = tuple([constant_field(cmd_name)] + [constant_field(a) for a in args])
+    fields = tuple([Field.create_constant(cmd_name)] + [Field.create_constant(a) for a in args])
     cmd_spec = specs.get_spec(cmd_name, fields)
     assert cmd_spec is not None, f"Spec function for command '{cmd_name}' returned None for fields: {pformat(fields)}"
 

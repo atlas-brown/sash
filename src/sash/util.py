@@ -4,7 +4,6 @@ import shasta.ast_node as AST
 import z3
 
 from sash.constraints import And, Constraint, Implies, Not, Or
-from sash.state import Field, SymStr, WordCount
 
 
 def split_at(l: list, element) -> list[list]:
@@ -29,8 +28,6 @@ def split_at(l: list, element) -> list[list]:
     result.append(current)
     return result
 
-def constant_field(string: str, words: int = 1) -> Field:
-    return Field(SymStr((string,)), WordCount(words, words))
 
 def shasta_pretty(ast_node) -> str:
     return ast_node.pretty() if hasattr(ast_node, 'pretty') else str(ast_node)
