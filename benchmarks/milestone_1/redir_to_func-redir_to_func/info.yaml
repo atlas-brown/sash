@@ -9,11 +9,11 @@ sources:
 
 ground_truth:
   errors:
-  - line: 30
+  - line: 25 # the redirection is technically part of the {...} block starting on line 25
     code: redir_func
     shellcheck:
       detects: false
-  - line: 30
+  - line: 25 # the redirection is technically part of the {...} block starting on line 25
     code: redir_func
     shellcheck:
       detects: false

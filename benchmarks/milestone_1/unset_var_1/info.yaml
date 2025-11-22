@@ -43,30 +43,35 @@ ground_truth:
       note: Needs --enable=check-unassigned-uppercase
   - line: 61
     code: unbound
+    duplicate: true
     shellcheck:
       detects: true
       code: SC2154
       note: Needs --enable=check-unassigned-uppercase
   - line: 62
     code: unbound
+    duplicate: true
     shellcheck:
       detects: true
       code: SC2154
       note: Needs --enable=check-unassigned-uppercase
   - line: 63
     code: unbound
+    duplicate: true
     shellcheck:
       detects: true
       code: SC2154
       note: Needs --enable=check-unassigned-uppercase
   - line: 64
     code: unbound
+    duplicate: true
     shellcheck:
       detects: true
       code: SC2154
       note: Needs --enable=check-unassigned-uppercase
   - line: 65
     code: unbound
+    duplicate: true
     shellcheck:
       detects: true
       code: SC2154

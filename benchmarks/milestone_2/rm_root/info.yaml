@@ -78,16 +78,16 @@ ground_truth:
       detects: true
       code: SC1127
   - line: 10
-    code: unbound
-    shellcheck:
-      detects: true
-      code: SC2154
-  - line: 10
     code: not_a_command
     note: A command name never ends in /
     shellcheck:
       detects: true
       code: SC1127
+  - line: 10
+    code: unbound
+    shellcheck:
+      detects: true
+      code: SC2154
   - line: 11
     code: unbound
     shellcheck:
@@ -120,18 +120,48 @@ ground_truth:
     shellcheck:
       detects: true
       code: SC2154
+  - line: 14
+    code: unbound
+    duplicate: true
+    shellcheck:
+      detects: true
+      code: SC2154
+  - line: 14
+    code: unbound
+    duplicate: true
+    shellcheck:
+      detects: true
+      code: SC2154
   - line: 15
     code: unbound
     shellcheck:
       detects: true
       code: SC2154
   - line: 15
+    code: unbound
+    shellcheck:
+      detects: true
+      code: SC2154
+  - line: 15
+    code: unbound
+    duplicate: true
+    shellcheck:
+      detects: true
+      code: SC2154
+  - line: 15
+    code: unbound
+    duplicate: true
+    shellcheck:
+      detects: true
+      code: SC2154
+  - line: 16
     code: unbound
     shellcheck:
       detects: true
       code: SC2154
   - line: 16
     code: unbound
+    duplicate: true
     shellcheck:
       detects: true
       code: SC2154
