@@ -72,6 +72,15 @@ def main():
     skipped = 0
     timed_out = 0
 
+    total_issues = 0
+    detected_issues_expected = 0
+    detected_issues_extra = 0
+    detected_issues_extra_unsat_preconds = 0
+    detected_issues_extra_unset_vars = 0
+
+    tota_exec_time = 0.0
+    total_solver_time = 0.0
+
     run_results = []
 
     for benchmark in find_benchmarks(bench_dir):
@@ -89,18 +98,23 @@ def main():
                 skipped += 1
                 continue
 
-        expected_codes = []
+        expected_results: list[CheckResult] = []
         shellcheck_results = []
         if gt_exists:
-            expected_codes = [e for e in load_expected_codes(gt_path) if e not in out_of_scope_codes]
-            unknown_codes = [e for e in expected_codes if e not in known_codes]
+            expected_results = [r for r in load_expected_results(gt_path) if r.code not in out_of_scope_codes]
+            unknown_codes = [e.code for e in expected_results if e.code not in known_codes]
             if len(unknown_codes) > 0:
                 print_warn(f"Unknown in-scope codes in ground truth: {unknown_codes}", file=sys.stderr)
+
+            total_issues += len(expected_results)
 
             shellcheck_results = load_shellcheck_results(gt_path)
 
         try:
-            report = sash.main.main(benchmark.as_posix(), timeout=timeout, log_file=Path("/dev/null"))
+            sash.reporter.Reporter.reset()
+            report = sash.main.main(benchmark.as_posix(), log_level="critical", timeout=timeout, log_file=Path("/dev/null"))
+            tota_exec_time += report.time
+            total_solver_time += report.solver_time
         except (AssertionError, BaseException) as e: # catch EVERYTHING, including KeyboardInterrupt
             err_type = "AssertionError" if isinstance(e, AssertionError) else "Exception"
             print_fail(f"{err_type} raised during analysis{f': {e}' if verbose else ''}", file=sys.stderr)
@@ -117,8 +131,8 @@ def main():
                 timed_out=None,
                 time=None,
                 detected_all=None,
-                expected_codes=expected_codes,
-                actual_codes=None,
+                expected_results=[e.code for e in expected_results],
+                actual_results=None,
                 shellcheck_codes=shellcheck_results,
                 line_numbers=None
             ))
@@ -127,19 +141,22 @@ def main():
             ran += 1
 
         if report.timed_out:
-            print_warn(f"Analysis timed out; time elapsed: {report.time + report.solver_time}s", file=sys.stderr)
+            print_warn(f"Analysis timed out; exec time: {report.time}s, sover time: {report.solver_time}s", file=sys.stderr)
             timed_out += 1
         else:
-            print_info(f"Analysis completed; time elapsed: {report.time + report.solver_time}s", file=sys.stderr)
+            print_info(f"Analysis completed; exec time: {report.time}s, sover time: {report.solver_time}s", file=sys.stderr)
 
-        actual_codes = [issue.code.value for issue in report.issues]
-        line_numbers = [issue.source_line for issue in report.issues]
-        if gt_exists and all(code in actual_codes for code in expected_codes):
-            print_pass("All expected codes detected", file=sys.stderr)
+        actual_results: list[CheckResult] = [CheckResult(code=issue.code.value, line=issue.source_line) for issue in report.issues if issue.code.value not in out_of_scope_codes]
+        detected_issues_expected += len([e for e in expected_results if e in actual_results])
+        detected_issues_extra += len([a for a in actual_results if a not in expected_results])
+        detected_issues_extra_unsat_preconds += len([a for a in actual_results if a not in expected_results and a.code == "unsat_precond"])
+        detected_issues_extra_unset_vars += len([a for a in actual_results if a not in expected_results and a.code in ["unbound", "unbound_setu"]])
+        if gt_exists and all(e in actual_results for e in expected_results):
+            print_pass("All expected results detected", file=sys.stderr)
             if verbose:
                 print_issue_details(benchmark.relative_to(top), report.issues, file=sys.stderr)
         elif gt_exists:
-            print_fail(f"Missing expected codes: {[code for code in expected_codes if code not in actual_codes]}", file=sys.stderr)
+            print_fail(f"Missing expected results: {[r for r in expected_results if r not in actual_results]}", file=sys.stderr)
             failed += 1
             if verbose:
                 print_issue_details(benchmark.relative_to(top), report.issues, file=sys.stderr)
@@ -154,22 +171,30 @@ def main():
             crashed=False,
             timed_out=report.timed_out,
             time=report.time + report.solver_time,
-            detected_all=gt_exists and all(code in actual_codes for code in expected_codes),
-            expected_codes=expected_codes,
-            actual_codes=actual_codes,
+            detected_all=gt_exists and all(code in actual_results for code in expected_results),
+            expected_results=[e.code for e in expected_results],
+            actual_results=[a.code for a in actual_results],
             shellcheck_codes=shellcheck_results,
-            line_numbers=line_numbers
+            line_numbers=[a.line for a in actual_results]
         ))
 
     print(file=sys.stderr)
     print("Summary", file=sys.stderr)
-    print(f"  Total: {ran + skipped}", file=sys.stderr)
-    print(f"  Skipped: {skipped}", file=sys.stderr)
-    print(f"  Ran: {ran}", file=sys.stderr)
+    print(f"  Total benchmarks: {ran + skipped}", file=sys.stderr)
+    print(f"  Skipped benchmarks: {skipped}", file=sys.stderr)
+    print(f"  Ran benchmarks: {ran}", file=sys.stderr)
     print(f"    Succeeded: {ran - failed - unknown}", file=sys.stderr)
     print(f"    Failed: {failed}", file=sys.stderr)
     print(f"    Unknown (no ground truth): {unknown}", file=sys.stderr)
     print(f"    Timed out: {timed_out}", file=sys.stderr)
+    print()
+    print(f"  Total expected issues (in-scope): {total_issues}", file=sys.stderr)
+    print(f"  Detected expected issues: {detected_issues_expected}", file=sys.stderr)
+    print(f"  Detected issues not in ground truth: {detected_issues_extra}", file=sys.stderr)
+    print(f"    Unsatisfied preconditions: {detected_issues_extra_unsat_preconds}", file=sys.stderr)
+    print(f"    Unset variables (incl. setu): {detected_issues_extra_unset_vars}", file=sys.stderr)
+    print(f"  Total execution time: {tota_exec_time}s", file=sys.stderr)
+    print(f"  Total solver time: {total_solver_time}s", file=sys.stderr)
 
     if output_file:
         output_file = output_file.open("w")
@@ -186,8 +211,8 @@ def main():
               f"{r.timed_out},"
               f"{r.time},"
               f"{r.detected_all},"
-              f"{';'.join(r.expected_codes) if r.expected_codes else ''},"
-              f"{';'.join(r.actual_codes) if r.actual_codes else ''},"
+              f"{';'.join(r.expected_results) if r.expected_results else ''},"
+              f"{';'.join(r.actual_results) if r.actual_results else ''},"
               f"{';'.join(r.shellcheck_codes) if r.shellcheck_codes else ''},"
               f"{';'.join('' if line is None else str(line) for line in r.line_numbers) if r.line_numbers else ''}",
               file=output_file)
@@ -222,6 +247,10 @@ def print_issue_details(benchmark: Path, issues: list[sash.reporter.Issue], file
         print(f"{' ' * (indent + 3)}{location} | {BOLD}{issue.code.value}{RESET} ({issue.severity.value}): {issue.message}", file=file)
 
 
+class CheckResult(NamedTuple):
+    code: str
+    line: int | None
+
 class RunResult(NamedTuple):
     benchmark: str
     missing_gt: bool | None
@@ -229,8 +258,8 @@ class RunResult(NamedTuple):
     timed_out: bool | None
     time: float | None
     detected_all: bool | None
-    expected_codes: list[str] | None
-    actual_codes: list[str] | None
+    expected_results: list[str] | None
+    actual_results: list[str] | None
     shellcheck_codes: list[str] | None
     line_numbers: list[int | None] | None
 
@@ -265,17 +294,21 @@ def find_benchmarks(bench_dir: Path):
             yield path.resolve(strict=True)
 
 
-def load_expected_codes(gt_path) -> list[str]:
+def load_expected_results(gt_path) -> list[CheckResult]:
     with open(gt_path, "r") as f:
         data = yaml.safe_load(f)
-    codes = []
+    results = []
     for entry in data.get("ground_truth", []).get("errors", []):
         code = entry.get("code")
-        if isinstance(code, str):
-            codes.append(code)
-        elif isinstance(code, list):
-            codes.extend(code)
-    return codes
+        line = entry.get("line")
+        if entry.get("duplicate", False):
+            continue
+
+        if isinstance(code, str) and line is not None:
+            results.append(CheckResult(code=code, line=int(line)))
+        elif isinstance(code, list) and isinstance(line, list):
+            results.extend(CheckResult(code=c, line=int(l)) for c, l in zip(code, line))
+    return results
 
 
 def load_shellcheck_results(gt_path) -> list[str]:

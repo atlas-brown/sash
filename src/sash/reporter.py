@@ -219,13 +219,8 @@ class Reporter:
 
         return Report(
             filename=cls._filename,
-            issues=sorted(cls._issues, key=issue_sort_key),
+            issues=sorted(cls._issues, key=lambda i: i.source_line if i.source_line is not None else -1),
             time=cls._exec_time,
             solver_time=cls._solver_time,
             timed_out=cls._timed_out,
         )
-
-
-def issue_sort_key(issue: Issue):
-    line = issue.source_line if issue.source_line is not None else -1
-    return (line, issue.code.value, issue.message)
