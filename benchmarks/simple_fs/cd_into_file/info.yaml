@@ -8,6 +8,7 @@ sources:
 ground_truth:
   errors:
   - line: 12
-    code: cd_into_file
+    #code: cd_into_file
+    code: unsat_precond
     shellcheck:
       detects: false

@@ -8,6 +8,7 @@ sources:
 ground_truth:
   errors:
   - line: 49
-    code: access_nonexistent_path
+    #code: access_nonexistent_path
+    code: unsat_precond
     shellcheck:
       detects: false

@@ -12,10 +12,12 @@ sources:
 ground_truth:
   errors:
   - line: 3
-    code: file_overwrite
+    #code: file_overwrite
+    code: unsat_precond
     shellcheck:
       detects: false
   - line: 5
-    code: file_overwrite
+    #code: file_overwrite
+    code: unsat_precond
     shellcheck:
       detects: false
