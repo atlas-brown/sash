@@ -6,7 +6,7 @@ from dataclasses import dataclass, field, replace
 from enum import Enum
 from math import inf
 from threading import Event
-from typing import NamedTuple
+from typing import NamedTuple, Callable
 
 import shasta.ast_node as AST
 
@@ -191,8 +191,9 @@ def handle_while(traces: Traces,
     if len(test_cmds) > 0 and interpret_test(test_cmds[0]) == False:
         logging.debug(f"While loop never runs")
         return t1
-    # todo extend path condition
-    t1, _, _ = split_exit_code(t1, node, config)
+
+    t1 = [t for t in t1 if t.latest_state.last_exit_code != SymStr(("1",))]
+    t_skip_body = [t for t in traces if t.latest_state.last_exit_code == SymStr(("1",))]
     t2 = guarded_interp_node(t1, node.body, config)
 
 
@@ -231,7 +232,7 @@ def handle_while(traces: Traces,
     if len(test_cmds) > 2 and is_constant_test(test_cmds[2], test_cmds[1]):
         Reporter.add_issue(reporter.InfiniteLoop(node, context_line))
 
-    return t2 # Continue with traces after *one* iteration
+    return t2 + t_skip_body# Continue with traces after *one* iteration
 
 def is_test(s):
     return s in ["test", "["]
@@ -367,39 +368,37 @@ def handle_if(traces: Traces, node: AST.IfNode, config: InterpConfig) -> Traces:
     # 2. Constant test false with no else -- just return t1
     # 3. Constant test false with else -- interpret else_b and return that
     # 4. Non-constant test -- interpret both branches and combine results
-    t_success, t_failure, t_other = split_exit_code(t1, node, config)
-    t_then = []
-    t_else = []
-    if test_result in {True, None}:
-        # if constant true or unknown, interpret then branch (assume t_other are successes)
-        t_then = guarded_interp_node(t_success + trace_map(t_other, lambda s: s.set_last_exit_code(SymStr(("0",)))),
-                                    node.then_b,
-                                    config)
-
-    if node.else_b is not None:
-        if test_result in {False, None}:
-            # if constant false or unknown, interpret else branch (assume t_other are failures)
-            t_else = guarded_interp_node(t_failure + trace_map(t_other, lambda s: s.set_last_exit_code(SymStr(("1",)))),
-                                        node.else_b,
-                                        config)
+    if test_result is True:
+        return guarded_interp_node(t1, node.then_b, config)
+    elif test_result is False:
+        if node.else_b is not None:
+            return guarded_interp_node(t1, node.else_b, config)
+        else:
+            return t1
     else:
-        # if no else branch, consider fail cases for t_other as well
-        t_else = t_failure + trace_map(t_other, lambda s: s.set_last_exit_code(SymStr(("1",))))
-
-    return t_then + t_else
+        return handle_branch(t1,
+                            lambda ts: guarded_interp_node(ts, node.then_b, config),
+                            lambda fs: guarded_interp_node(fs, node.else_b, config) if node.else_b is not None else fs,
+                            node,
+                            config)
 
 def handle_exit(traces: Traces) -> Traces:
     logging.debug(f"Handling exit command, terminating {len(traces)} traces")
     return trace_map(traces, lambda s: s.terminate())
 
-def split_exit_code(traces: Traces, node: AST.AstNode, config: InterpConfig) -> tuple[Traces, Traces, Traces]:
-    """Split `traces` into three groups (sucess, failure, unknown): those in which the last command succeeded, it failed, and unknown --- applying the InterpConfig's branch policy"""
+def handle_branch(traces: Traces, success_cb: Callable[[Traces], Traces], failure_cb: Callable[[Traces], Traces], node: AST.AstNode, config: InterpConfig) -> Traces:
     t_success = [t for t in traces if t.latest_state.last_exit_code == SymStr(("0",))]
     t_failure = [t for t in traces if t.latest_state.last_exit_code == SymStr(("1",))]
-    t_success, t_failure = config.branch_policy(node, t_success, t_failure)
     t_other   = [t for t in traces if t.latest_state.last_exit_code not in {SymStr(("0",)), SymStr(("1",))}]
-    logging.info(f"Configured branch policy dropped {len(traces) - (len(t_success) + len(t_failure) + len(t_other))} traces")
-    return t_success, t_failure, t_other
+    t_then = success_cb(t_success + trace_map(t_other, lambda s: s.set_last_exit_code(SymStr(("0",)))))
+    t_else = failure_cb(t_failure + trace_map(t_other, lambda s: s.set_last_exit_code(SymStr(("1",)))))
+    t_then_bp, t_else_bp = config.branch_policy(node, t_then, t_else)
+    res = t_then_bp + t_else_bp
+    if all(t.latest_state.terminated for t in res):
+        logging.debug(f"All traces terminated with branch policy decision; ignoring policy for this branch (line {context_line})")
+        return t_then + t_else
+    else:
+        return res
 
 def handle_read(expanded_args: list[Field], traces: Traces) -> Traces:
     """Handle a `read` command with given expanded args (list of `Fields`) on the given traces."""
@@ -1008,15 +1007,22 @@ def interp_node(traces: Traces,
 
         case AST.AndNode() | AST.OrNode():
             logging.debug("FORK: explicit AND/OR")
-            # workaround the `checked_position` because some programs use huge functions inside AND/OR nodes, and there's no need to fork on EVERYTHING inside them
+            # workaround the `checked_position` by manually adding the failure traces back
+            # because some programs use huge functions inside AND/OR nodes, and there's no need to fork on EVERYTHING inside them
             t1 = guarded_interp_node(traces, node.left_operand, config) # intentionally not in a checked position
             t_failure = [t.fail_last_command() for t in t1 if t.latest_state.last_exit_code == SymStr(("0",))]
-            t_success, t_failure, t_other = split_exit_code(t1 + t_failure, node, config)
-            if isinstance(node, AST.OrNode):
-                t2 = guarded_interp_node(t_failure + t_other, node.right_operand, config) + t_success
-            else:
-                t2 = guarded_interp_node(t_success + t_other, node.right_operand, config) + t_failure
-            return t2
+            def success(traces_with_exit_0: Traces) -> Traces:
+                if isinstance(node, AST.AndNode):
+                    return guarded_interp_node(traces_with_exit_0, node.right_operand, config)
+                else:
+                    return traces_with_exit_0
+            def failure(traces_with_exit_1: Traces) -> Traces:
+                logging.debug(f"Inside the failure case of {'AND' if isinstance(node, AST.AndNode) else 'OR'} node with {len(traces_with_exit_1)} traces")
+                if isinstance(node, AST.AndNode):
+                    return traces_with_exit_1
+                else:
+                    return guarded_interp_node(traces_with_exit_1, node.right_operand, config)
+            return handle_branch(t1 + t_failure, success, failure, node, config)
 
         case AST.NotNode():
             t1 = guarded_interp_node(traces, node.body, config)
