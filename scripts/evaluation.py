@@ -117,6 +117,11 @@ def main():
             total_solver_time += report.solver_time
         except (AssertionError, BaseException) as e: # catch EVERYTHING, including KeyboardInterrupt
             err_type = "AssertionError" if isinstance(e, AssertionError) else "Exception"
+
+            if isinstance(e, KeyboardInterrupt):
+                print_fail("KeyboardInterrupt received, exiting...", file=sys.stderr)
+                raise SystemExit(1)
+
             print_fail(f"{err_type} raised during analysis{f': {e}' if verbose else ''}", file=sys.stderr)
             failed += 1
 
@@ -137,8 +142,8 @@ def main():
                 line_numbers=None
             ))
             continue
-        finally:
-            ran += 1
+
+        ran += 1
 
         if report.timed_out:
             print_warn(f"Analysis timed out; exec time: {report.time}s, sover time: {report.solver_time}s", file=sys.stderr)

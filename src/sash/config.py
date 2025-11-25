@@ -1,3 +1,4 @@
+# TODO: trim or drop this file
 class Config:
     __conf = {
     "CONCRETE_CWD": True,

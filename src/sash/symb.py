@@ -809,10 +809,11 @@ def guarded_interp_node(traces: Traces,
     context_line = getattr(node, "line_number", context_line)
 
     try:
-        traces = interp_node(traces, node, config)
+        res = interp_node(traces, node, config)
+        context_line = prev_context_line
+        return res
     except NotImplementedError as e:
         logging.error(f"Interp raised: {traceback.format_exc()}. Ignoring.")
-    finally:
         context_line = prev_context_line
         return traces
 
