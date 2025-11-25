@@ -1,5 +1,5 @@
 bugs:
-- line: 7
+- line: 5
   description: Unquoted variable in rm can word-split and delete arbitrary files
 
 name: "iTunes updater"
@@ -9,7 +9,7 @@ sources:
 
 ground_truth:
   errors:
-  - line: 7
+  - line: 5
     code: word_split
     shellcheck:
       detects: true
