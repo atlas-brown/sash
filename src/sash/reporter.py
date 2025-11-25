@@ -208,6 +208,10 @@ class Reporter:
         cls._timed_out = False
 
     @classmethod
+    def drop_issues(cls, codes: set[Code]):
+        cls._issues = {issue for issue in cls._issues if issue.code not in codes}
+
+    @classmethod
     def get_report(cls) -> Report:
         if math.isnan(cls._exec_time):
             logging.debug("Execution time not set; defaulting to 0.0")

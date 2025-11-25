@@ -1,12 +1,24 @@
 from dataclasses import dataclass
-from sash.state import Traces, Field
+from sash.state import Trace, Traces, Field
 from dataclasses import field, replace
 from collections.abc import Callable
 import shasta.ast_node as AST
+from enum import Enum
 
 NodeCB = Callable[[Traces, AST.AstNode], list | None]
 ExpandedCmdCB = Callable[[list[Field]], None]
 TraceCollapser = Callable[[Traces], Traces]
+
+class BranchDecision(Enum):
+    ALL = 0
+    FIRST = 1
+    SECOND = 2
+
+BranchPolicy = Callable[[AST.AstNode, Traces, Traces], tuple[Traces, Traces]]
+
+class UnboundVariablePolicy(Enum):
+    EMPTY = 0
+    SYMBOLIC = 1
 
 @dataclass(frozen=True)
 class InterpConfig:
@@ -15,6 +27,9 @@ class InterpConfig:
     trace_collapser: TraceCollapser = lambda ts: ts
     in_checked_position: bool = False
     max_loop_unroll: int = 2
+    unbound_policy: UnboundVariablePolicy = UnboundVariablePolicy.SYMBOLIC
+    DFS_first: bool = True
+    branch_policy: BranchPolicy = lambda n, t_then, t_else: (t_then, t_else)
 
     def add_node_callback(self, cb: NodeCB) -> 'InterpConfig':
         return replace(self, node_cbs=(self.node_cbs + [cb]))

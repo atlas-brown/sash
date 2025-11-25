@@ -16,7 +16,7 @@ import sash.util as util
 from sash.config import Config
 from sash.constraints import *
 from sash.frozen import FrozenAst, FrozenDict, freeze, freeze_thing
-from sash.interpreter_config import InterpConfig
+from sash.interpreter_config import InterpConfig, UnboundVariablePolicy
 from sash.reporter import Reporter
 from sash.solver import field_to_z3
 from sash.specs import get_spec
@@ -175,15 +175,20 @@ def handle_while(traces: Traces,
     def get_the_test(cmd_fields):
         test_cmds.append(cmd_fields)
     temp_config = config.add_expanded_command_callback(get_the_test)
+
+
     logging.debug(f"Interpreting first iteration")
     t1 = guarded_interp_node(traces, node.test, temp_config)
     logging.debug(f"collected test_cmds: {test_cmds}")
     # Special case: never runs
-    if interpret_test(test_cmds[0]) == False:
+    if len(test_cmds) > 0 and interpret_test(test_cmds[0]) == False:
         logging.debug(f"While loop never runs")
         return t1
     # todo extend path condition
+    t1, _, _ = split_exit_code(t1, node, config)
     t2 = guarded_interp_node(t1, node.body, config)
+
+
     logging.debug(f"Interpreting second iteration")
     # If all traces happen to terminate in the body, t3 will be empty after the next line
     # Additionally, test_cmds will not have a second entry
@@ -192,12 +197,20 @@ def handle_while(traces: Traces,
         logging.debug(f"All traces terminated on first iter of while body")
         return t3
     # Special case: only one iteration
-    if interpret_test(test_cmds[1]) == False:
+    if len(test_cmds) < 2:
+        logging.debug("Failing to collect test commands? Giving up on constant loop checks.")
+        return t3
+    elif interpret_test(test_cmds[1]) == False:
         logging.debug(f"While loop only runs once")
+        return t3
+    elif is_constant_test(test_cmds[0], test_cmds[1]):
+        Reporter.add_issue(reporter.InfiniteLoop(node, context_line))
         return t3
     logging.debug(f"collected test_cmds: {test_cmds}")
     # todo extend path condition
     t4 = guarded_interp_node(t3, node.body, config)
+
+
     logging.debug(f"Interpreting third test")
     t5 = guarded_interp_node(t4, node.test, temp_config)
     # If all traces happen to terminate on the second iteration, t5 will be empty
@@ -208,11 +221,10 @@ def handle_while(traces: Traces,
     logging.debug(f"collected test_cmds: {test_cmds}")
 
     logging.debug(f"Checking constant test cond")
-    assert len(test_cmds) == 3
-    if is_constant_test(test_cmds[2], test_cmds[1]):
+    if len(test_cmds) > 2 and is_constant_test(test_cmds[2], test_cmds[1]):
         Reporter.add_issue(reporter.InfiniteLoop(node, context_line))
 
-    return t5
+    return t2 # Continue with traces after *one* iteration
 
 def is_test(s):
     return s in ["test", "["]
@@ -341,12 +353,14 @@ def handle_if(traces: Traces, node: AST.IfNode, config: InterpConfig) -> Traces:
             t1 = trace_map(t1, lambda s: s.set_last_exit_code(SymStr(("1",))))
             logging.debug(f"Reporting dead code in then branch")
             Reporter.add_issue(reporter.DeadCode(node.then_b, context_line))
+    else:
+        logging.debug("FORK: explicit if")
     # Several possibilities here:
     # 1. Constant test true -- interpret then_b and return that
     # 2. Constant test false with no else -- just return t1
     # 3. Constant test false with else -- interpret else_b and return that
     # 4. Non-constant test -- interpret both branches and combine results
-    t_success, t_failure, t_other = split_exit_code(t1)
+    t_success, t_failure, t_other = split_exit_code(t1, node, config)
     t_then = []
     t_else = []
     if test_result in {True, None}:
@@ -371,12 +385,13 @@ def handle_exit(traces: Traces) -> Traces:
     logging.debug(f"Handling exit command, terminating {len(traces)} traces")
     return trace_map(traces, lambda s: s.terminate())
 
-def split_exit_code(traces: Traces) -> tuple[Traces, Traces, Traces]:
-    """Split `traces` into three groups (sucess, failure, unknown): those in which the last command succeeded, it failed, and unknown"""
+def split_exit_code(traces: Traces, node: AST.AstNode, config: InterpConfig) -> tuple[Traces, Traces, Traces]:
+    """Split `traces` into three groups (sucess, failure, unknown): those in which the last command succeeded, it failed, and unknown --- applying the InterpConfig's branch policy"""
     t_success = [t for t in traces if t.latest_state.last_exit_code == SymStr(("0",))]
     t_failure = [t for t in traces if t.latest_state.last_exit_code == SymStr(("1",))]
+    t_success, t_failure = config.branch_policy(node, t_success, t_failure)
     t_other   = [t for t in traces if t.latest_state.last_exit_code not in {SymStr(("0",)), SymStr(("1",))}]
-    assert len(t_success) + len(t_failure) + len(t_other) == len(traces), f"Expected all traces to be either success or failure, got {len(t_success)} success and {len(t_failure)} failure out of {len(traces)} total"
+    logging.info(f"Configured branch policy dropped {len(traces) - (len(t_success) + len(t_failure) + len(t_other))} traces")
     return t_success, t_failure, t_other
 
 def handle_read(expanded_args: list[Field], traces: Traces) -> Traces:
@@ -544,29 +559,45 @@ def expand_simple(stuff: list[AST.ArgChar],
                                     Partial.add_the_default(default, var)
                                     non_default.add_a_field(arbitrary_field(var, ArbitraryType.APPROXIMATION, self.state))
                                     return [non_default, default]
+                        elif var.fmt in {"Length", "TrimR", "TrimRMax", "TrimL", "TrimLMax"} and v.value == Field(SymStr(("",)), WordCount(0, 0)):
+                            # All of these manipulations have known results on the empty string
+                            logging.info("Special casing string manipulation expansion on empty string")
+                            match var.fmt:
+                                case "Length":
+                                    self.add_a_field(Field(SymStr(("0",)), WordCount(1, 1)))
+                                case "TrimR" | "TrimRMax" | "TrimL" | "TrimLMax":
+                                    self.add_a_field(Field(SymStr(("",)), WordCount(0, 0)))
                         else:
                             logging.info(f"expansion: treating var {var.pretty()} with unhandled fmt {var.fmt} as completely arbitrary field")
                             self.add_a_field(arbitrary_field(var, ArbitraryType.APPROXIMATION, self.state))
                     elif var.fmt == "Minus":
                         # This is the case that $VAR is unset: take the default
-                        non_default, default = self.fork(Description(f"{var.var} takes the default value {Field.create_constant(util.shasta_pretty(var.arg))}"))
-                        Partial.add_the_default(default, var)
-                        arbitrary_for_this_var = arbitrary_field(var, ArbitraryType.ENVIRONMENT, non_default.state)
-                        # localenv to avoid creating an arbitrary that persists beyond a function body
-                        non_default.state = non_default.state.extend_localenv({var.var: ShellVar(arbitrary_for_this_var, ghost=True)})
-                        non_default.add_a_field(arbitrary_for_this_var)
-                        return [non_default, default]
+                        if config.unbound_policy == UnboundVariablePolicy.EMPTY:
+                            logging.info(f"expansion: treating unset var {var.pretty()} as empty string due to config, so taking the default unconditionally")
+                            Partial.add_the_default(self, var)
+                        else:
+                            non_default, default = self.fork(Description(f"{var.var} takes the default value {Field.create_constant(util.shasta_pretty(var.arg))}"))
+                            Partial.add_the_default(default, var)
+                            arbitrary_for_this_var = arbitrary_field(var, ArbitraryType.ENVIRONMENT, non_default.state)
+                            # localenv to avoid creating an arbitrary that persists beyond a function body
+                            non_default.state = non_default.state.extend_localenv({var.var: ShellVar(arbitrary_for_this_var, ghost=True)})
+                            non_default.add_a_field(arbitrary_for_this_var)
+                            return [non_default, default]
                     else:
                         # todo we should report path information
                         if not is_special_var(var.var):
                             error_code = reporter.UnboundIDSetU if self.state.opts.is_set(SetOptions.NOUNSET) else reporter.UnboundID
                             Reporter.add_issue(error_code(var.pretty(), context_line))
-                        arbitrary_for_this_var = arbitrary_field(var,
-                                                                 ArbitraryType.APPROXIMATION if is_special_var(var.var) else ArbitraryType.ENVIRONMENT,
-                                                                 self.state)
-                        # localenv to avoid creating an arbitrary that persists beyond a function body
-                        self.state = self.state.extend_localenv({var.var: ShellVar(arbitrary_for_this_var, ghost=True)})
-                        self.add_a_field(arbitrary_for_this_var)
+                        if config.unbound_policy == UnboundVariablePolicy.EMPTY:
+                            logging.info(f"expansion: treating unbound var {var.pretty()} as empty string due to config")
+                            self.add_a_field(Field(SymStr(("",)), WordCount(0, 0)))
+                        else:
+                            arbitrary_for_this_var = arbitrary_field(var,
+                                                                    ArbitraryType.APPROXIMATION if is_special_var(var.var) else ArbitraryType.ENVIRONMENT,
+                                                                    self.state)
+                            # localenv to avoid creating an arbitrary that persists beyond a function body
+                            self.state = self.state.extend_localenv({var.var: ShellVar(arbitrary_for_this_var, ghost=True)})
+                            self.add_a_field(arbitrary_for_this_var)
                 case AST.BArgChar() as b:
                     logging.info(f"expansion: treating backquote argchar {b.pretty()} as completely arbitrary field")
                     # todo use the trace: this case suggests we should really generalize the interface of `expand_simple` to be from one trace to many, instead of one state to many
@@ -587,6 +618,7 @@ def expand_simple(stuff: list[AST.ArgChar],
             return ([merge_partial_fields(part, None, self.state) for part in split if part != []], self.state)
 
         def fork(self, pathcond: Constraint) -> tuple['Partial', 'Partial']:
+            logging.debug("FORK: expansion")
             lhs = self.fork_state(self.state.add_pathcond(pathcond))
             rhs = self.fork_state(self.state.add_pathcond(Not(pathcond)))
             return (lhs, rhs)
@@ -854,7 +886,7 @@ def interp_node(traces: Traces,
         Reporter.add_issue(reporter.DeadCode(node, context_line))
         return traces
 
-    logging.debug(f"Interpreting {trim_string_for_logging(node.pretty())} with {len(traces)} traces")
+    logging.debug(f"Interpreting line {context_line} {trim_string_for_logging(node.pretty())} with {len(traces)} traces")
     match node:
         case AST.CommandNode():
             if len(node.arguments) == 0:
@@ -878,6 +910,7 @@ def interp_node(traces: Traces,
             t1, case_arg_fields = expand_args_dumb(traces, [node.argument], config)
             res = []
             for case in node.cases:
+                logging.debug("FORK: explicit case")
                 # todo handle patterns; this is like a conditional, we could learn something about pathcond here
                 res.extend(guarded_interp_node(trace_map(t1, lambda s: s.add_pathcond(Description(f"case_L{context_line}_pattern_{case['cpattern']}:matched"))),
                                                case["cbody"],
@@ -919,14 +952,18 @@ def interp_node(traces: Traces,
                     t2 = guarded_interp_node(t2, node.body, config)
                 return t2
             else:
-                t_res = t1
+                t_res = None # result is just the traces after one iteration
+                t_current = t1
                 for i in range(config.max_loop_unroll):
                     logging.debug(f"For loop unrolling iteration {i+1}/{config.max_loop_unroll}")
                     t2 = [record_assignment(t, var_name, arbitrary_field(node.argument,
                                                                         ArbitraryType.APPROXIMATION,
                                                                         t.latest_state)) \
-                        for t in t_res]
-                    t_res = guarded_interp_node(t2, node.body, config)
+                        for t in t_current]
+                    t_current = guarded_interp_node(t2, node.body, config)
+                    if t_res is None:
+                        t_res = t_current
+                assert t_res is not None
                 return t_res
 
         case AST.FileRedirNode():
@@ -965,7 +1002,7 @@ def interp_node(traces: Traces,
             logging.debug("FORK: explicit AND/OR")
             temp_config = replace(config, in_checked_position=True)
             t1 = guarded_interp_node(traces, node.left_operand, temp_config)
-            t_success, t_failure, t_other = split_exit_code(t1)
+            t_success, t_failure, t_other = split_exit_code(t1, node, config)
             if isinstance(node, AST.OrNode):
                 t2 = guarded_interp_node(t_failure + t_other, node.right_operand, config) + t_success
             else:
@@ -1076,9 +1113,35 @@ def symbexec_file(input_file: str,
     stop_event = stop
 
     try:
+        def branch_policy_half_n_half_if_too_many(node, t_then: Traces, t_else: Traces) -> tuple[Traces, Traces]:
+            if len(t_then) + len(t_else) > 256:
+                logging.info(f"Too many traces, dropping half of them in branch policy")
+                half_then = [t for i, t in enumerate(t_then) if i % 2 == 0]
+                half_else = [t for i, t in enumerate(t_else) if i % 2 == 0]
+                return (half_then, half_else)
+            else:
+                return (t_then, t_else)
+        def branch_policy_only_then(node, t_then: Traces, t_else: Traces) -> tuple[Traces, Traces]:
+            return (t_then, []) if t_then else ([], t_else)
+        def branch_policy_only_else(node, t_then: Traces, t_else: Traces) -> tuple[Traces, Traces]:
+            return ([], t_else) if t_else else (t_then, [])
+
         nodes = parser.parse_shell_script(input_file)
         # opt_store = parse_shebang_args(input_file)
-        traces = symb_engine(nodes, config)
+        if config.DFS_first:
+            logging.info("Doing whole execution with a single trace first (DFS_first)")
+            logging.info("DFS run: only taking THEN branches")
+            symb_engine(nodes, replace(config, branch_policy=branch_policy_only_then))
+            logging.info("DFS run: only taking ELSE branches")
+            symb_engine(nodes, replace(config, branch_policy=branch_policy_only_else))
+            logging.info("DFS run: treating unbound variables solely as empty strings")
+            symb_engine(nodes, replace(config, unbound_policy=UnboundVariablePolicy.EMPTY))
+            logging.info("DFS run: exploring the first trace only")
+            symb_engine(nodes, replace(config, trace_collapser = lambda ts: ts[:1]))
+            logging.info("DFS_first run complete, proceeding with normal symbolic execution")
+            Reporter.drop_issues({reporter.Code.DEAD_CODE})
+
+        traces = symb_engine(nodes, replace(config, branch_policy=branch_policy_half_n_half_if_too_many))
         if Reporter.get_timed_out():
             return SymbexecResult(SymbexecStatus.INTERRUPTED, traces)
         return SymbexecResult(SymbexecStatus.COMPLETED, traces)
