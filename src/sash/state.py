@@ -186,13 +186,17 @@ class State:
 
     external_data: Any = None # ASSUMPTION: must be hashable
 
-    # NOTE: (and beware) intentionally ignoring pathcond in equality and hash
+    # # NOTE: (and beware) intentionally ignoring pathcond in equality and hash
+    _hash: int = None
+    def __post_init__(self):
+        object.__setattr__(self, '_hash',
+                           hash(tuple(getattr(self, field.name) for field in fields(self))))
     def __hash__(self):
-        return hash(tuple(getattr(self, field.name) for field in fields(self) if field.name != "pathcond"))
-    def __eq__(self, other):
-        return isinstance(other, State) and \
-            all(getattr(self, field.name) == getattr(other, field.name)
-                for field in fields(self) if field.name != "pathcond")
+        return self._hash
+    # def __eq__(self, other):
+    #     return isinstance(other, State) and \
+    #         all(getattr(self, field.name) == getattr(other, field.name)
+    #             for field in fields(self) if field.name != "pathcond")
 
     def set_env(self, var: str, value: ShellVar) -> 'State':
         return replace(self, env=self.env.set(var, value))

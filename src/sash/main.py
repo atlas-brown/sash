@@ -48,7 +48,7 @@ def main(file: str,
          timeout: float | None = None) -> Report:
     Config.set("DEBUG", log_level.lower() == "debug")
     logging.basicConfig(
-        format="[%(filename)s:%(lineno)d] %(message)s",
+        format="[%(asctime)s %(filename)s:%(lineno)d] %(message)s",
         level=getattr(logging, log_level.upper()),
         filename=log_file
     )
