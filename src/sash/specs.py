@@ -557,7 +557,7 @@ def touch_spec(cmd: CmdInvocation) -> CmdSpec:
         #   (1) none (maybe permission issue, etc.)
 
         check = Empty()
-        success_postcond = And.from_field_iter(operands, lambda p: IsFile(p) | IsDir(p))
+        success_postcond = And.from_field_iter(operands, lambda p: (~IsFile(p) & ~IsDir(p)) >> IsFile(p))
         failure_postcond = Empty()
 
     elif flags == set(["-c"]): # touch -c file...
