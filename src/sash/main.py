@@ -33,10 +33,14 @@ def symbexec_main(file: str,
         case _:
             assert False, "unreachable"
 
-    if solver:
+    if solver and (stop_event is None or not stop_event.is_set()):
         start_time = time.perf_counter()
         run_solver(result.traces, config)
         Reporter.set_solver_time(time.perf_counter() - start_time)
+    elif solver and stop_event is not None and stop_event.is_set():
+        logging.warning("Skipping solver due to timeout during symbolic execution")
+    else:
+        logging.info("Skipping solver as configured")
 
     return result
 
