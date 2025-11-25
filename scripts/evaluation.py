@@ -34,6 +34,7 @@ def main():
     parser.add_argument('-G', '--ground-truth-only', action='store_true', help='Only run benchmarks that have ground truth defined (default: run all)')
     parser.add_argument('-V', '--verbose', action='store_true', help='Enable printing of error reports or exceptions that occur, and raw output when ground truth is missing (default: false)')
     parser.add_argument('-N', '--no-color', action='store_true', help='Disable colored output to stderr (default: false)')
+    parser.add_argument('-e', '--error-log', type=Path, default=Path("/dev/null"), help='File to write error logs to (default: /dev/null)')
     args = parser.parse_args()
 
     if args.no_color:
@@ -53,6 +54,7 @@ def main():
     output_file = args.output.resolve() if isinstance(args.output, Path) else None
     ground_truth_only: bool = args.ground_truth_only
     verbose: bool = args.verbose
+    error_log: Path = args.error_log.resolve()
 
     top = get_git_toplevel()
     if args.benchmarks:
@@ -112,7 +114,7 @@ def main():
 
         try:
             sash.reporter.Reporter.reset()
-            report = sash.main.main(benchmark.as_posix(), log_level="critical", timeout=timeout, log_file=Path("/dev/null"))
+            report = sash.main.main(benchmark.as_posix(), log_level="error", timeout=timeout, log_file=error_log)
             tota_exec_time += report.time
             total_solver_time += report.solver_time
         except (AssertionError, BaseException) as e: # catch EVERYTHING, including KeyboardInterrupt
