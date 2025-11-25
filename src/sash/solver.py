@@ -146,7 +146,6 @@ def run_solver(traces: list[Trace], config: InterpConfig, stop: threading.Event 
                 logging.warning("Solver timed out")
                 Reporter.set_timed_out()
                 return
-            logging.debug(f"Checking assertion: {assertion.render_short()}")
             solver = z3.Solver()
             solver.set(unsat_core=True)
             assertion_var, assertion_formula = assertion_to_z3(assertion)
