@@ -114,7 +114,7 @@ class Field:
                                              min(self.count.max, 1)))
 
     def is_constant(self) -> bool:
-        return isinstance(self.content, SymStr) and all(isinstance(p, str) for p in self.content.parts)
+        return isinstance(self.content, SymStr) and all(isinstance(p, str) for p in self.content.parts) and self.count.min == self.count.max
 
     def try_to_str(self) -> str | None:
         match self.content:
