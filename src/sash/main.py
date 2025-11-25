@@ -11,15 +11,29 @@ from sash.interpreter_config import InterpConfig
 from sash.reporter import Report, Reporter
 from sash.solver import run_solver
 
+timers = [] # keep references to timers to prevent garbage collection
+def set_timer(timeout: float | None, name: str) -> threading.Event | None:
+    stop_event = threading.Event()
+    if timeout is None or timeout <= 0:
+        return None
+    timer = threading.Timer(timeout, stop_event.set)
+    timer.daemon = True
+    timers.append(timer)
+    timer.start()
+    return stop_event
 
 def symbexec_main(file: str,
                   solver: bool = False,
-                  stop_event: threading.Event | None = None) -> sash.symb.SymbexecResult:
+                  symbexec_timeout: float | None = None,
+                  solver_timeout: float | None = None) -> sash.symb.SymbexecResult:
+    global timers
+    timers = []
+
     config = InterpConfig(trace_collapser = sash.symb.collapse_traces_if_too_many)
 
     Reporter.initialize(file)
     start_time = time.perf_counter()
-    result = sash.symb.symbexec_file(file, config, stop=stop_event)
+    result = sash.symb.symbexec_file(file, config, stop=set_timer(symbexec_timeout, "symbexec"))
     Reporter.set_exec_time(time.perf_counter() - start_time)
 
     match result.status:
@@ -33,12 +47,10 @@ def symbexec_main(file: str,
         case _:
             assert False, "unreachable"
 
-    if solver and (stop_event is None or not stop_event.is_set()):
+    if solver:
         start_time = time.perf_counter()
-        run_solver(result.traces, config)
+        run_solver(result.traces, config, stop=set_timer(solver_timeout, "solver"))
         Reporter.set_solver_time(time.perf_counter() - start_time)
-    elif solver and stop_event is not None and stop_event.is_set():
-        logging.warning("Skipping solver due to timeout during symbolic execution")
     else:
         logging.info("Skipping solver as configured")
 
@@ -49,7 +61,8 @@ def main(file: str,
          log_level: str = "warning",
          log_file: pathlib.Path | None=None,
          solver=True,
-         timeout: float | None = None) -> Report:
+         timeout: float | None = None,
+         solver_timeout: float | None = None) -> Report:
     Config.set("DEBUG", log_level.lower() == "debug")
     logging.basicConfig(
         format="[%(asctime)s %(filename)s:%(lineno)d] %(message)s",
@@ -58,18 +71,8 @@ def main(file: str,
     )
 
     logging.info(f"Processing file {file} with solver={solver} and timeout={timeout}")
-    stop_event = threading.Event()
-    timer = None
-    if timeout is not None and timeout > 0:
-        logging.info(f"Setting timeout: {timeout} seconds")
-        timer = threading.Timer(timeout, stop_event.set)
-        timer.daemon = True
-        timer.start()
 
-    symbexec_main(file, solver, stop_event)
-
-    if timer is not None:
-        timer.cancel()
+    symbexec_main(file, solver, timeout, solver_timeout)
 
     return Reporter.get_report()
 
@@ -83,6 +86,7 @@ def cli_main():
         log_file=args.log_file.resolve().as_posix() if args.log_file else None,
         solver=args.solver,
         timeout=args.timeout,
+        solver_timeout=args.solver_timeout,
     )
 
     print(json.dumps(report.to_dict(), indent=2))
@@ -129,6 +133,14 @@ def parse_cli():
         type=float,
         default=None,
         help="Set a timeout (in seconds) for the symbolic execution (not including the solver step)",
+    )
+
+    # solver timeout
+    parser.add_argument(
+        "--solver-timeout",
+        type=float,
+        default=None,
+        help="Set a timeout (in seconds) for the solver step",
     )
 
     return parser.parse_args()

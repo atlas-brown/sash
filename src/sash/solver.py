@@ -1,3 +1,4 @@
+import threading
 from sash.constraints import *
 from sash.reporter import *
 from sash.interpreter_config import InterpConfig
@@ -134,13 +135,18 @@ def model_to_reports(core: list[z3.BoolRef]):
 # assert <assertion_constraint>
 # --> if sat, then there's a model where the assertion succeeds
 # --> if unsat, then there's no model where the assertion succeeds (ie it can only fail)
-def run_solver(traces: list[Trace], config: InterpConfig):
+def run_solver(traces: list[Trace], config: InterpConfig, stop: threading.Event | None = None):
     logging.debug("Running Z3 solver on assertions")
     for trace in traces:
         assertions = trace.latest_state.assertions
         logging.debug(f"Checking {len(assertions)} assertions")
         for assertion in assertions:
             logging.debug(f"Checking assertion: {pformat(assertion)}")
+            if stop and stop.is_set():
+                logging.warning("Solver timed out")
+                Reporter.set_timed_out()
+                return
+            logging.debug(f"Checking assertion: {assertion.render_short()}")
             solver = z3.Solver()
             solver.set(unsat_core=True)
             assertion_var, assertion_formula = assertion_to_z3(assertion)
