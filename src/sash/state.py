@@ -2,7 +2,7 @@ import logging
 from collections.abc import Callable
 from dataclasses import dataclass, field, fields, replace
 from enum import Enum
-from typing import Any
+from typing import Any, Optional
 
 import shasta.ast_node as AST
 
@@ -177,11 +177,11 @@ class State:
     call_stack:                  tuple[str, ...]             = field(default_factory=tuple)
     fundefs:                     FrozenDict[str, FrozenAst]  = field(default_factory=FrozenDict)
     last_exit_code:              SymStr                      = SymStr(("0",))
-    last_cmd:                    FrozenAst | None            = None
+    last_cmd_failure_postcond:   Optional[Constraint]        = None
     opts:                        SetOptions                  = field(default_factory=SetOptions)
     known_nonexistent_commands:  frozenset[str]              = field(default_factory=frozenset)
     terminated:                  bool                        = False # by `exit` or similar
-    assertions:                  tuple[Assertion]            = field(default_factory=tuple)
+    assertions:                  tuple[Assertion, ...]       = field(default_factory=tuple)
     fs_model:                    FSModel                     = field(default_factory=FSModel)
 
     external_data: Any = None # ASSUMPTION: must be hashable
@@ -244,8 +244,10 @@ class State:
     def update_fs(self, constraints: Constraint) -> 'State':
         return replace(self, fs_model=self.fs_model.apply_postcondition(NormalizedFSConstraint(constraints)))
 
-    def set_last_exit_code(self, code: SymStr) -> 'State':
-        return replace(self, last_exit_code=code)
+    def set_last_exit_code(self, code: SymStr, failure_postcond: Optional[Constraint] = None) -> 'State':
+        return replace(self,
+                       last_exit_code=code,
+                       last_cmd_failure_postcond=(failure_postcond if failure_postcond is not None else self.last_cmd_failure_postcond))
 
     def terminate(self) -> 'State':
         return replace(self, terminated=True)
@@ -299,6 +301,17 @@ class Trace:
     @property
     def latest_state(self):
         return self.states[-1]
+
+    def fail_last_command(self) -> 'Trace':
+        assert len(self.states) > 1, "Cannot fail last command of a trace with only one state (no last command)"
+        last_state = self.states[-1]
+        if last_state.last_cmd_failure_postcond is not None:
+            new_state = self.states[-2].add_pathcond(last_state.last_cmd_failure_postcond)\
+                                       .update_fs(last_state.last_cmd_failure_postcond)\
+                                       .set_last_exit_code(SymStr(("1",)))
+            return replace(self, states=self.states[:-1] + (new_state,))
+        else:
+            return self
 
 Traces = list[Trace]
 

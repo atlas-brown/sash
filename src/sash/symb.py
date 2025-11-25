@@ -23,10 +23,6 @@ from sash.specs import get_spec
 from sash.state import ArbitraryType, CompletelyArbitrary, Field, FuncMap, SetOptions, ShellVar, State, SymStr, SymVar, Trace, Traces, WordCount, collapse_traces, is_special_var, trace_map
 
 
-def set_exit_code_arbitrary(traces: Traces) -> Traces:
-    """Set the exit code to an arbitrary symbolic value to denote that it is unknown."""
-    return trace_map(traces, lambda s: s.set_last_exit_code(SymStr((SymVar("exit_code"),))))
-
 def handle_commandnode(traces: Traces,
                        node: AST.CommandNode,
                        config: InterpConfig) -> Traces:
@@ -46,6 +42,7 @@ def handle_commandnode(traces: Traces,
                         ts, tf = handle_rm(arg_fields, trace, node)
                         cmd_traces.append(ts)
                         if config.in_checked_position:
+                            logging.debug("rm is in a checked position? Adding failure traces")
                             cmd_traces.append(tf)
                 t1 = cmd_traces
             case "set":
@@ -58,10 +55,16 @@ def handle_commandnode(traces: Traces,
             case cmd_name if spec := get_spec(cmd_name, tuple(expanded_args)):
                 logging.debug(f"Adding {cmd_name} precondition: {spec.check}")
                 t_precond = trace_map(t1, lambda s: s.add_assertion(spec.check, source_str=node.pretty(), source_line=context_line))
-                t_success = trace_map(t_precond, lambda s: s.add_pathcond(spec.success_postcond).update_fs(spec.success_postcond).set_last_exit_code(SymStr(("0",))))
+                t_success = trace_map(t_precond,
+                                      lambda s: s.add_pathcond(spec.success_postcond)\
+                                                 .update_fs(spec.success_postcond)\
+                                                 .set_last_exit_code(SymStr(("0",)), spec.failure_postcond))
                 t_failure = []
                 if config.in_checked_position:
-                    t_failure = trace_map(t_precond, lambda s: s.add_pathcond(spec.failure_postcond).update_fs(spec.failure_postcond).set_last_exit_code(SymStr(("1",))))
+                    t_failure = trace_map(t_precond,
+                                          lambda s: s.add_pathcond(spec.failure_postcond)\
+                                                     .update_fs(spec.failure_postcond)\
+                                                     .set_last_exit_code(SymStr(("1",)), spec.failure_postcond))
                 t1 = t_success + t_failure
             case some_name if isinstance(some_name, str):
                 # todo: we could actually not use `expand_args_dumb` here, and instead do trace-specific expansion, since the function body is handled trace-specifically anyway
@@ -102,8 +105,12 @@ def handle_rm(expanded_args: tuple[Field], trace: Trace, node: AST.CommandNode) 
                     Reporter.add_issue(reporter.WordSplitCouldDeleteSystemFile(path, context_line))
 
     return (
-        trace.extend(lambda s: s.add_pathcond(spec.success_postcond).update_fs(spec.success_postcond).set_last_exit_code(SymStr(("0",)))),
-        trace.extend(lambda s: s.add_pathcond(spec.failure_postcond).update_fs(spec.failure_postcond).set_last_exit_code(SymStr(("1",))))
+        trace.extend(lambda s: s.add_pathcond(spec.success_postcond)\
+                                .update_fs(spec.success_postcond)\
+                                .set_last_exit_code(SymStr(("0",)), spec.failure_postcond)),
+        trace.extend(lambda s: s.add_pathcond(spec.failure_postcond)\
+                                .update_fs(spec.failure_postcond)\
+                                .set_last_exit_code(SymStr(("1",)), spec.failure_postcond))
     )
 
 
@@ -573,9 +580,10 @@ def expand_simple(stuff: list[AST.ArgChar],
                     elif var.fmt == "Minus":
                         # This is the case that $VAR is unset: take the default
                         if config.unbound_policy == UnboundVariablePolicy.EMPTY:
-                            logging.info(f"expansion: treating unset var {var.pretty()} as empty string due to config, so taking the default unconditionally")
+                            logging.info(f"expansion: treating unset var {var.pretty()} as empty string due to config, so taking the default ({util.shasta_pretty(var.arg)}) unconditionally")
                             Partial.add_the_default(self, var)
                         else:
+                            logging.debug(f"expansion: forking on unset var {var.var} to take default ({util.shasta_pretty(var.arg)}) or arbitrary")
                             non_default, default = self.fork(Description(f"{var.var} takes the default value {Field.create_constant(util.shasta_pretty(var.arg))}"))
                             Partial.add_the_default(default, var)
                             arbitrary_for_this_var = arbitrary_field(var, ArbitraryType.ENVIRONMENT, non_default.state)
@@ -1000,9 +1008,10 @@ def interp_node(traces: Traces,
 
         case AST.AndNode() | AST.OrNode():
             logging.debug("FORK: explicit AND/OR")
-            temp_config = replace(config, in_checked_position=True)
-            t1 = guarded_interp_node(traces, node.left_operand, temp_config)
-            t_success, t_failure, t_other = split_exit_code(t1, node, config)
+            # workaround the `checked_position` because some programs use huge functions inside AND/OR nodes, and there's no need to fork on EVERYTHING inside them
+            t1 = guarded_interp_node(traces, node.left_operand, config) # intentionally not in a checked position
+            t_failure = [t.fail_last_command() for t in t1 if t.latest_state.last_exit_code == SymStr(("0",))]
+            t_success, t_failure, t_other = split_exit_code(t1 + t_failure, node, config)
             if isinstance(node, AST.OrNode):
                 t2 = guarded_interp_node(t_failure + t_other, node.right_operand, config) + t_success
             else:
