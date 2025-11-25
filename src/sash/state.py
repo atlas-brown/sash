@@ -306,25 +306,11 @@ def trace_map(traces: Traces, f: Callable[[State], State]) -> Traces:
     return [trace.extend(f) for trace in traces]
 
 def collapse_traces(traces: Traces) -> Traces:
-    traces_by_state_keys: dict[tuple, Trace] = {}
+    traces_by_latest_states: dict[State, Trace] = {}
     for t in traces:
-        s = t.latest_state
-        state_keys = (
-            s.env,
-            s.localenv,
-            s.call_stack,
-            s.fundefs,
-            s.last_exit_code,
-            s.last_cmd,
-            s.opts,
-            s.known_nonexistent_commands,
-            s.terminated,
-            s.fs_model,
-            s.external_data,
-        )
-        if state_keys not in traces_by_state_keys:
-            traces_by_state_keys[state_keys] = t
-    return list(traces_by_state_keys.values())
+        if t.latest_state not in traces_by_latest_states:
+            traces_by_latest_states[t.latest_state] = t
+    return list(traces_by_latest_states.values())
 
 @dataclass(frozen=True)
 class FuncMap:

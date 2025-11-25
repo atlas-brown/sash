@@ -24,11 +24,20 @@ def test_collapse_traces():
     assert len(collapse_traces([Trace((starting_state(),)),
                                 Trace((starting_state(),)),
                                 Trace((starting_state(),))])) == 1
-
-    assert len(collapse_traces([Trace((starting_state().set_env("foo", ShellVar(Field(SymStr(("hi",)), WordCount(1, 1))))\
-                                       .add_pathcond("cond_L5:true"),)),
-                                Trace((starting_state().set_env("foo", ShellVar(Field(SymStr(("hi",)), WordCount(1, 1))))\
-                                       .add_pathcond("cond_L5:false"),))])) == 1
+    # If the path conditions differ, the states should be distinct.
+    assert len(collapse_traces([
+        Trace((starting_state().set_env("foo", ShellVar(Field(SymStr(("hi",)), WordCount(1, 1))))
+               .add_pathcond("cond_L5:true"),)),
+        Trace((starting_state().set_env("foo", ShellVar(Field(SymStr(("hi",)), WordCount(1, 1))))
+               .add_pathcond("cond_L5:false"),))
+    ])) == 2
+    # If they do have the same path conditions, they should collapse to one.
+    assert len(collapse_traces([
+        Trace((starting_state().set_env("foo", ShellVar(Field(SymStr(("hello",)), WordCount(1, 1))))
+               .add_pathcond("cond_L5:true"),)),
+        Trace((starting_state().set_env("foo", ShellVar(Field(SymStr(("hello",)), WordCount(1, 1))))
+               .add_pathcond("cond_L5:true"),))
+    ])) == 1
 
 def test_quote():
     assert Field(SymStr(("why hello there",)), WordCount(3, 3)).quote() == Field(SymStr(("why hello there",)), WordCount(1, 1))
