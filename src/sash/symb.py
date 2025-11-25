@@ -952,6 +952,13 @@ def interp_node(traces: Traces,
                                       else s.set_last_exit_code(SymStr(("1",)) if s.last_exit_code == SymStr(("0",)) else SymStr(("0",))))
             return t2
 
+        case AST.PipeNode():
+            t = traces
+            # Sequentially interpret each command in the pipe, and return the aggregated traces.
+            for cmd in node.items:
+                t = guarded_interp_node(t, cmd, config)
+            return t
+
         # todo bring other cases as needed
 
         case _:
