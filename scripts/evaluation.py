@@ -27,7 +27,8 @@ UNDERLINE = '\033[4m'
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('-t', '--timeout', type=float, default=None, help='Timeout in seconds for each benchmark (default: no timeout)')
+    parser.add_argument('-t', '--timeout', type=float, default=None, help='Timeout in seconds for symbolic execution in each benchmark (default: no timeout)')
+    parser.add_argument('-T', '--solver-timeout', type=float, default=None, help='Timeout in seconds for solving in each benchmark (default: no timeout)')
     parser.add_argument('-b', '--benchmarks', type=Path, default=None, help='Path to the benchmarks directory, relative to the git toplevel (default: <git_toplevel>/benchmarks)')
     parser.add_argument('-O', '--only', type=str, default=None, help='Regex to filter benchmarks to run (default: run all)')
     parser.add_argument('-o', '--output', type=Path, default=None, help='File to write output to (default: stdout)')
@@ -35,6 +36,7 @@ def main():
     parser.add_argument('-V', '--verbose', action='store_true', help='Enable printing of error reports or exceptions that occur, and raw output when ground truth is missing (default: false)')
     parser.add_argument('-N', '--no-color', action='store_true', help='Disable colored output to stderr (default: false)')
     parser.add_argument('-e', '--error-log', type=Path, default=Path("/dev/null"), help='File to write error logs to (default: /dev/null)')
+    parser.add_argument('-D', '--enable-dfs', action='store_true', help='Enable depth-first symbolic execution passes (default: false)')
     args = parser.parse_args()
 
     if args.no_color:
@@ -49,12 +51,14 @@ def main():
         BOLD = ""
         UNDERLINE = ""
 
-    timeout: float | None = args.timeout
+    symbexec_timeout: float | None = args.timeout
+    solver_timeout: float | None = args.solver_timeout
     benchmark_filter = re.compile(args.only) if args.only else None
     output_file = args.output.resolve() if isinstance(args.output, Path) else None
     ground_truth_only: bool = args.ground_truth_only
     verbose: bool = args.verbose
     error_log: Path = args.error_log.resolve()
+    enable_dfs: bool = args.enable_dfs
 
     top = get_git_toplevel()
     if args.benchmarks:
@@ -114,7 +118,10 @@ def main():
 
         try:
             sash.reporter.Reporter.reset()
-            report = sash.main.main(benchmark.as_posix(), log_level="error", timeout=timeout, log_file=error_log)
+            report = sash.main.main(benchmark.as_posix(),
+                                    timeout=symbexec_timeout, solver_timeout=solver_timeout,
+                                    log_level="error", log_file=error_log,
+                                    enable_dfs=enable_dfs)
             tota_exec_time += report.time
             total_solver_time += report.solver_time
         except (AssertionError, BaseException) as e: # catch EVERYTHING, including KeyboardInterrupt

@@ -25,12 +25,13 @@ def set_timer(timeout: float | None, name: str) -> threading.Event | None:
 def symbexec_main(file: str,
                   solver: bool = False,
                   symbexec_timeout: float | None = None,
-                  solver_timeout: float | None = None) -> sash.symb.SymbexecResult:
+                  solver_timeout: float | None = None,
+                  enable_dfs: bool = False) -> sash.symb.SymbexecResult:
     global timers
     timers = []
 
     config = InterpConfig(trace_collapser = sash.symb.collapse_traces_if_too_many,
-                          DFS_first = False)
+                          DFS_first = enable_dfs)
 
     Reporter.initialize(file)
     start_time = time.perf_counter()
@@ -63,7 +64,8 @@ def main(file: str,
          log_file: pathlib.Path | None=None,
          solver=True,
          timeout: float | None = None,
-         solver_timeout: float | None = None) -> Report:
+         solver_timeout: float | None = None,
+         enable_dfs: bool = False) -> Report:
     Config.set("DEBUG", log_level.lower() == "debug")
     logging.basicConfig(
         format="[%(asctime)s %(filename)s:%(lineno)d] %(message)s",
@@ -73,7 +75,7 @@ def main(file: str,
 
     logging.info(f"Processing file {file} with solver={solver} and timeout={timeout}")
 
-    symbexec_main(file, solver, timeout, solver_timeout)
+    symbexec_main(file, solver, timeout, solver_timeout, enable_dfs)
 
     return Reporter.get_report()
 
