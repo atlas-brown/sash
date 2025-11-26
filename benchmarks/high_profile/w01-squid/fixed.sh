@@ -128,7 +128,7 @@ stop() {
 		fi
 		echo
 	fi
-	rm -rf $SQUID_PIDFILE_DIR/*
+	rm -rf ${SQUID_PIDFILE_DIR:?}/*
 	return $RETVAL
 }
 
