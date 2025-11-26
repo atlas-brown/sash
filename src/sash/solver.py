@@ -136,7 +136,6 @@ def model_to_reports(core: list[z3.BoolRef]):
 # --> if unsat, then there's no model where the assertion succeeds (ie it can only fail)
 def run_solver(traces: list[Trace], config: InterpConfig):
     logging.debug("Running Z3 solver on assertions")
-    reset_z3cache()
     for trace in traces:
         assertions = trace.latest_state.assertions
         logging.debug(f"Checking {len(assertions)} assertions")
