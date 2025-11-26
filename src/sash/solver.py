@@ -39,7 +39,7 @@ def field_content_to_z3(field_content: SymStr | CompletelyArbitrary) -> z3.ExprR
 def constraint_to_z3(constraint: Constraint, s: State) -> z3.ExprRef:
     def norm_constraint_to_z3(constraint: Constraint, s: State):
         match constraint:
-            case Empty() | HasStdout() | ExpectsStdin() | IsWritten():
+            case Empty() | HasStdout() | ExpectsStdin() | IsWritten() | CommandExists():
                 return z3.BoolVal(True)
             case IsRead():
                 return s.fs_model.is_read_z3(field_content_to_z3(constraint.path.content))
