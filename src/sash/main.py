@@ -90,6 +90,7 @@ def cli_main():
         solver=args.solver,
         timeout=args.timeout,
         solver_timeout=args.solver_timeout,
+        enable_dfs=args.enable_dfs,
     )
 
     print(json.dumps(report.to_dict(), indent=2))
@@ -125,7 +126,7 @@ def parse_cli():
 
     parser.add_argument(
         "-D",
-        "--dfs-first",
+        "--enable-dfs",
         action="store_true",
         help="Use depth-first search strategy for symbolic execution (default: breadth-first search)",
     )
