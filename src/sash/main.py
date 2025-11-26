@@ -29,7 +29,8 @@ def symbexec_main(file: str,
     global timers
     timers = []
 
-    config = InterpConfig(trace_collapser = sash.symb.collapse_traces_if_too_many)
+    config = InterpConfig(trace_collapser = sash.symb.collapse_traces_if_too_many,
+                          DFS_first = False)
 
     Reporter.initialize(file)
     start_time = time.perf_counter()
