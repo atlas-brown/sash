@@ -561,6 +561,29 @@ def test_read_binds_quoted_variable_name(tmp_path):
     report = reset_and_run_main(script)
     assert_expected_report(report, [])
 
+def test_redirection_to_unread_file(tmp_path):
+    """Test that redirecting input from a file that was not read produces an error."""
+    script = write_script(tmp_path, """
+    x=$(pwd)
+    echo "Hello" > $x.txt
+    echo "bug" > $x.txt
+    """)
+    report = reset_and_run_main(script, solver=True)
+    expected_error = reporter.UnsatisfiedPrecondition(None, 'echo "bug" > $x.txt', 0)
+    assert_expected_report(report, [expected_error])
+
+def test_redirection_to_read_file(tmp_path):
+    """Test that redirecting input from a file that was not read produces an error."""
+    script = write_script(tmp_path, """
+    x=$(pwd)
+    echo "Hello" > $x.txt
+    cat $x.txt
+    echo "bug" > $x.txt
+    """)
+    report = reset_and_run_main(script, solver=True)
+    assert_expected_report(report, [])
+
+
 # def test_function_call_multipath(tmp_path):
 #     # A function that is called should not produce unbound variable errors for its parameters
 #     script = write_script(tmp_path, """
