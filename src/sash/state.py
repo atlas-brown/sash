@@ -305,10 +305,14 @@ class Trace:
     def fail_last_command(self) -> 'Trace':
         assert len(self.states) > 1, "Cannot fail last command of a trace with only one state (no last command)"
         last_state = self.states[-1]
+        prior_state = self.states[-2]
         if last_state.last_cmd_failure_postcond is not None:
-            new_state = self.states[-2].add_pathcond(last_state.last_cmd_failure_postcond)\
-                                       .update_fs(last_state.last_cmd_failure_postcond)\
-                                       .set_last_exit_code(SymStr(("1",)))
+            new_state = replace(last_state,
+                                pathcond=prior_state.pathcond,
+                                fs_model=prior_state.fs_model)\
+                                .add_pathcond(last_state.last_cmd_failure_postcond)\
+                                .update_fs(last_state.last_cmd_failure_postcond)\
+                                .set_last_exit_code(SymStr(("1",)))
             return replace(self, states=self.states[:-1] + (new_state,))
         else:
             return self

@@ -203,17 +203,17 @@ def handle_while(traces: Traces,
     t3 = guarded_interp_node(t2, node.test, temp_config)
     if len(t3) == 0:
         logging.debug(f"All traces terminated on first iter of while body")
-        return t3
+        return t3 + t_skip_body
     # Special case: only one iteration
     if len(test_cmds) < 2:
         logging.debug("Failing to collect test commands? Giving up on constant loop checks.")
-        return t3
+        return t3 + t_skip_body
     elif interpret_test(test_cmds[1]) == False:
         logging.debug(f"While loop only runs once")
-        return t3
+        return t3 + t_skip_body
     elif is_constant_test(test_cmds[0], test_cmds[1]):
         Reporter.add_issue(reporter.InfiniteLoop(node, context_line))
-        return t3
+        return t3 + t_skip_body
     logging.debug(f"collected test_cmds: {test_cmds}")
     # todo extend path condition
     t4 = guarded_interp_node(t3, node.body, config)
@@ -225,14 +225,14 @@ def handle_while(traces: Traces,
     # Additionally, test_cmds will not have a third entry
     if len(t5) == 0:
         logging.debug(f"All traces terminated on second iter of while body")
-        return t5
+        return t5 + t_skip_body
     logging.debug(f"collected test_cmds: {test_cmds}")
 
     logging.debug(f"Checking constant test cond")
     if len(test_cmds) > 2 and is_constant_test(test_cmds[2], test_cmds[1]):
         Reporter.add_issue(reporter.InfiniteLoop(node, context_line))
 
-    return t2 + t_skip_body# Continue with traces after *one* iteration
+    return t5 + t_skip_body
 
 def is_test(s):
     return s in ["test", "["]
