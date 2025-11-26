@@ -14,7 +14,7 @@ import sash.parser as parser
 import sash.reporter as reporter
 import sash.util as util
 from sash.config import Config
-from sash.constraints import Constraint, FSModel, FSModelSimple, Description, Not
+from sash.constraints import *
 from sash.frozen import FrozenAst, FrozenDict, freeze, freeze_thing
 from sash.interpreter_config import InterpConfig
 from sash.reporter import Reporter
@@ -932,7 +932,9 @@ def interp_node(traces: Traces,
         case AST.FileRedirNode():
             res = []
             for t, redir_args in expand(traces, node.arg, config):
-                res.append(t)
+                t_precond = t.extend(t.latest_state.add_assertion(And.from_field_iter(redir_args, lambda f: IsRead(f)), source_str=node.pretty(), source_line=context_line))
+                t_postcond = t_precond.extend(t_precond.latest_state.update_fs(And.from_field_iter(redir_args, lambda f: IsFile(f))))
+                res.append(t_postcond)
                 match redir_args:
                     case [Field(SymStr([something]), WordCount(1, 1))]:
                         if isinstance(something, str) and something in t.latest_state.fundefs:
