@@ -583,6 +583,33 @@ def test_redirection_to_read_file(tmp_path):
     report = reset_and_run_main(script, solver=True)
     assert_expected_report(report, [])
 
+def test_mv_unread_file(tmp_path):
+    """Test that moving a file that was not read produces an error."""
+    script = write_script(tmp_path, """
+    x=$(pwd)
+    y=$(pwd)/other
+    echo "Hello" > $x.txt
+    cat $x.txt
+    echo "Hello" > $y.txt
+    mv $x.txt $y.txt
+    """)
+    report = reset_and_run_main(script, solver=True)
+    expected_error = reporter.UnsatisfiedPrecondition(None, 'mv $x.txt $y.txt', 0)
+    assert_expected_report(report, [expected_error])
+
+def test_mv_read_file(tmp_path):
+    """Test that moving a file that was read does not produce an error."""
+    script = write_script(tmp_path, """
+    x=$(pwd)
+    y=$(pwd)/other
+    echo "Hello" > $x.txt
+    echo "Hello" > $y.txt
+    cat $y.txt # cat reads the file so there is no error
+    mv $x.txt $y.txt
+    """)
+    report = reset_and_run_main(script, solver=True)
+    assert_expected_report(report, [])
+
 
 # def test_function_call_multipath(tmp_path):
 #     # A function that is called should not produce unbound variable errors for its parameters
