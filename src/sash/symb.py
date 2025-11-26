@@ -52,6 +52,8 @@ def handle_commandnode(traces: Traces,
                 t1 = handle_set(expanded_args, t1)
             case "exit":
                 t1 = handle_exit(t1)
+            case "read":
+                t1 = handle_read(expanded_args, t1)
             # TODO: Unify rm with other commands
             case cmd_name if spec := get_spec(cmd_name, tuple(expanded_args)):
                 logging.debug(f"Adding {cmd_name} precondition: {spec.check}")
@@ -376,6 +378,29 @@ def split_exit_code(traces: Traces) -> tuple[Traces, Traces, Traces]:
     t_other   = [t for t in traces if t.latest_state.last_exit_code not in {SymStr(("0",)), SymStr(("1",))}]
     assert len(t_success) + len(t_failure) + len(t_other) == len(traces), f"Expected all traces to be either success or failure, got {len(t_success)} success and {len(t_failure)} failure out of {len(traces)} total"
     return t_success, t_failure, t_other
+
+def handle_read(expanded_args: list[Field], traces: Traces) -> Traces:
+    """Handle a `read` command with given expanded args (list of `Fields`) on the given traces."""
+    collected: list[tuple[str, Field]] = []
+    # Collect (variable name, original field) pairs from args.
+    for arg in expanded_args[1:]:
+        try:
+            name = arg.try_to_str()
+        except Exception:
+            name = None
+        if isinstance(name, str) and name != "":
+            collected.append((name, arg))
+    # If there are no variable names, return traces with exit code set to 0, as `read` consumed input but bound nothing.
+    if not collected:
+        return [t.extend(lambda s: s.set_last_exit_code(SymStr(("0",)))) for t in traces]
+    new_traces: Traces = []
+    for trace in traces:
+        curr_trace = trace
+        # For each variable to be read into, record an assignment of that variable to the corresponding field.
+        for var_name, value_field in collected:
+            curr_trace = record_assignment(curr_trace, var_name, value_field)
+        new_traces.append(curr_trace)
+    return new_traces
 
 # ============================================================
 #                  Symbolic Expander

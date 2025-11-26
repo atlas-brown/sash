@@ -536,6 +536,31 @@ fi
     expected_warning = reporter.UnsatisfiedPrecondition(None, "cat \"$2\"", 0)
     assert_expected_report(report, [expected_warning])
 
+def test_read_binds_single_variable(tmp_path):
+    """Test that read `FOO` binds variable `FOO`; later use should be bound."""
+    script = write_script(tmp_path, "read FOO\necho $FOO\n")
+    report = reset_and_run_main(script)
+    assert_expected_report(report, [])
+
+def test_read_no_variables(tmp_path):
+    """Test that read with no args does not bind any variables; later use should be unbound."""
+    script = write_script(tmp_path, "read\necho $FOO\n")
+    report = reset_and_run_main(script)
+    expected_error = reporter.UnboundID(foo_var.pretty(), 0)
+    assert_expected_report(report, [expected_error])
+
+def test_read_binds_multiple_variables(tmp_path):
+    """Test that read FOO BAR binds both FOO and BAR; later use should be bound."""
+    script = write_script(tmp_path, "read FOO BAR\necho $FOO $BAR\n")
+    report = reset_and_run_main(script)
+    assert_expected_report(report, [])
+
+def test_read_binds_quoted_variable_name(tmp_path):
+    """Test that read `"FOO"` binds variable `FOO`; later use should be bound."""
+    script = write_script(tmp_path, 'read "FOO"\necho $FOO\n')
+    report = reset_and_run_main(script)
+    assert_expected_report(report, [])
+
 # def test_function_call_multipath(tmp_path):
 #     # A function that is called should not produce unbound variable errors for its parameters
 #     script = write_script(tmp_path, """
