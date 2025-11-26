@@ -54,6 +54,8 @@ class CmdSpec:
     io: IOType = IOType.UNKNOWN # whether the command does IO on stdin/stdout
 
 
+# If a command is not present here github.com/binpash/annotations/tree/main/pash_annotations/parser/command_flag_option_info/data
+# the returned invocation will only contain operands (no flags/options), containing every part of the command after the command name
 def parse_command(cmd_inv: tuple[Field, ...]) -> CmdInvocation:
     """
     Parses a command invocation from a list of Fields into a CmdInvocation object.
@@ -112,13 +114,52 @@ def parse_command(cmd_inv: tuple[Field, ...]) -> CmdInvocation:
         operands=cmd_operands
     )
 
+
+def extract_flags_naively(cmd: str, operands: list[Field]) -> tuple[set[str], list[Field]]:
+    """
+    A naive way to extract flags from operands.
+    This function assumes that flags are of the form '-x'.
+    It does not handle combined short flags (e.g., '-abc'), long flags (e.g., '--long') or flags with arguments (e.g., '--option value').
+    """
+    flags = set()
+    remaining_operands = []
+
+    for idx, operand in enumerate(operands):
+        if isinstance(operand.content, CompletelyArbitrary):
+            remaining_operands.append(operand)
+            continue
+
+        # Operand is SymStr
+        if len(operand.content.parts) == 0 or len(operand.content.parts) > 1:
+            remaining_operands.append(operand)
+            continue
+
+        # Operand is SymStr with exactly one part
+        part = operand.content.parts[0]
+        if isinstance(part, SymVar):
+            remaining_operands.append(operand)
+            continue
+
+        # Operand is SymStr with exactly one str part
+        if part.startswith('-') and len(part) == 2:
+            flags.add(part)
+        elif part.startswith('--') and len(part) > 2:
+            logging.debug(f"Found long flag '{part}' in {cmd} invocation")
+        elif part == "--":
+            # Stop flag parsing after '--'
+            remaining_operands.extend(operands[idx + 1:])
+            break
+
+    return flags, remaining_operands
+
+
 # -- Specs start here --
 
 
 def alias_spec(cmd: CmdInvocation) -> CmdSpec:
     # https://pubs.opengroup.org/onlinepubs/9799919799/utilities/alias.html
 
-    (name, flags, _, operands) = (cmd.cmd_name, cmd.flags, cmd.options, cmd.operands)
+    (name, flags, options, operands) = (cmd.cmd_name, cmd.flags, cmd.options, cmd.operands)
     io = IOType.NONE
 
     # NOTE:
@@ -126,6 +167,9 @@ def alias_spec(cmd: CmdInvocation) -> CmdSpec:
     #   'alias name=newcmd cmdflags...' gets parsed as more than one operand with content SymStr(("name=newcmd",)), SymStr(("cmdflags",)), SymStr(("...",))
 
     assert name == SymStr(("alias",)), f"Expected alias command, got: {name}"
+    assert len(flags) == 0 and len(options) == 0, f"The current parsing function does not produce flags/options for alias; something changed?"
+
+    flags, operands = extract_flags_naively("alias", operands)
 
     if flags == set() and len(operands) == 0: # alias
         # prints all aliases to stdout
@@ -176,10 +220,13 @@ def cd_spec(cmd: CmdInvocation) -> CmdSpec:
     # NOTE:
     #   Invocations with multiple operands should fail, but we treat them as no-ops here.
 
-    (name, flags, _, operands) = (cmd.cmd_name, cmd.flags, cmd.options, cmd.operands)
+    (name, flags, options, operands) = (cmd.cmd_name, cmd.flags, cmd.options, cmd.operands)
     io = IOType.NONE
 
     assert name == SymStr(("cd",)), f"Expected cd command, got: {name}"
+    assert len(flags) == 0 and len(options) == 0, f"The current parsing function does not produce flags/options for cd; something changed?"
+
+    flags, operands = extract_flags_naively("cd", operands)
 
     # NOTE: we might want to ignore the postconditions, i suspect they might overcomplicate things
     # NOTE: cd also interacts with CDPATH, do we care? the interaction is quite complex
@@ -296,15 +343,18 @@ def cp_spec(cmd: CmdInvocation) -> CmdSpec:
     #   cp prompts before overwriting non-writable files, unless -f is present
     #   the current spec is modeled as if -P and -f are present on every call
 
-    (name, flags, _, operands) = (cmd.cmd_name, cmd.flags, cmd.options, cmd.operands)
+    (name, flags, options, operands) = (cmd.cmd_name, cmd.flags, cmd.options, cmd.operands)
+
+    assert name == SymStr(("cp",)), f"Expected cp command, got: {name}"
+    assert len(flags) == 0 and len(options) == 0, f"The current parsing function does not produce flags/options for cp; something changed?"
+
+    flags, operands = extract_flags_naively("cp", operands)
 
     flags.discard("-p") # -p is used to control metadata of the created files
     flags.discard("-P") # -P specifies that all actions be done on symbolic links themselves instead of their targets, see note above
     flags.discard("-f") # -f makes the command silently overwrite non-writable files, without asking for confirmation, see note above
     io = IOType.STDIN if "-i" in flags else IOType.NONE
     flags.discard("-i")
-
-    assert name == SymStr(("cp",)), f"Expected cp command, got: {name}"
 
     if flags == set() and len(operands) == 2: # cp [-Pfip] source target
         # check:
@@ -408,10 +458,13 @@ def cp_spec(cmd: CmdInvocation) -> CmdSpec:
 def echo_spec(cmd: CmdInvocation) -> CmdSpec:
     # https://pubs.opengroup.org/onlinepubs/9799919799/utilities/echo.html
 
-    (name, flags, _, _) = (cmd.cmd_name, cmd.flags, cmd.options, cmd.operands)
+    (name, flags, options, operands) = (cmd.cmd_name, cmd.flags, cmd.options, cmd.operands)
     io = IOType.STDOUT
 
     assert name == SymStr(("echo",)), f"Expected echo command, got: {name}"
+    assert len(flags) == 0 and len(options) == 0, f"The current parsing function does not produce flags/options for echo; something changed?"
+
+    flags, operands = extract_flags_naively("echo", operands)
 
     if flags != set(): # POSIX does not define any flags for echo
         return handle_non_posix(cmd)
@@ -470,11 +523,15 @@ def mkdir_spec(cmd: CmdInvocation) -> CmdSpec:
     #   The file system model is a flat map, there is no hierarchy of directories
     #   So `mkdir -p a/b` will not be assumed to fail if `a` is a file, even though in reality it would
 
-    (name, flags, _, operands) = (cmd.cmd_name, cmd.flags, cmd.options, cmd.operands)
-    flags.discard("-m") # -m is used to control permissions, which we do not model
-    io = IOType.NONE
+    (name, flags, options, operands) = (cmd.cmd_name, cmd.flags, cmd.options, cmd.operands)
 
     assert name == SymStr(("mkdir",)), f"Expected mkdir command, got: {name}"
+    assert len(flags) == 0 and len(options) == 0, f"The current parsing function does not produce flags/options for mkdir; something changed?"
+
+    flags, operands = extract_flags_naively("mkdir", operands)
+
+    flags.discard("-m") # -m is used to control permissions, which we do not model
+    io = IOType.NONE
 
     if flags == set(["-p"]): # mkdir [-m mode] -p dir...
         # check:
@@ -542,15 +599,19 @@ def test_spec(cmd: CmdInvocation) -> CmdSpec:
 def touch_spec(cmd: CmdInvocation) -> CmdSpec:
     # https://pubs.opengroup.org/onlinepubs/9799919799/utilities/touch.html
 
-    (name, flags, _, operands) = (cmd.cmd_name, cmd.flags, cmd.options, cmd.operands)
+    (name, flags, options, operands) = (cmd.cmd_name, cmd.flags, cmd.options, cmd.operands)
+
+    assert name == SymStr(("touch",)), f"Expected touch command, got: {name}"
+    assert len(flags) == 0 and len(options) == 0, f"The current parsing function does not produce flags/options for touch; something changed?"
+
+    flags, operands = extract_flags_naively("touch", operands)
+
     io = IOType.NONE
     flags.discard("-a") # -a changes access time, which we do not model
     flags.discard("-d") # -d changes time to a specific date, which we do not model
     flags.discard("-m") # -m changes modification time, which we do not model
     flags.discard("-r") # -r changes time to that of a reference file, which we do not model
     flags.discard("-t") # -t changes time to a specific time, which we do not model
-
-    assert name == SymStr(("touch",)), f"Expected touch command, got: {name}"
 
     if flags == set(): # touch file...
         # NOTE: Touch does not create unread files since they are empty upon creation
@@ -576,6 +637,7 @@ def touch_spec(cmd: CmdInvocation) -> CmdSpec:
         return handle_non_posix(cmd)
 
     return CmdSpec(check, success_postcond, failure_postcond, io)
+
 
 def cat_spec(cmd: CmdInvocation) -> CmdSpec:
     # https://pubs.opengroup.org/onlinepubs/9799919799/utilities/cat.html
