@@ -5,9 +5,9 @@ from sash.constraints import (
     IsDir,
     IsFile,
     IsUnread,
-    Reads,
+    IsRead,
     StringEq,
-    Writes,
+    IsWritten,
     normalize_fs_constraints,
 )
 
@@ -24,10 +24,10 @@ def test_normalize_fs_constraints():
     del2 = IsDeleted(path2)
     unr1 = IsUnread(path1)
     unr2 = IsUnread(path2)
-    read1 = Reads(path1)
-    read2 = Reads(path2)
-    write1 = Writes(path1)
-    write2 = Writes(path2)
+    read1 = IsRead(path1)
+    read2 = IsRead(path2)
+    write1 = IsWritten(path1)
+    write2 = IsWritten(path2)
     eqs = StringEq(path1, path2)
 
     norm_file1 = normalize_fs_constraints(file1)

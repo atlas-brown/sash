@@ -116,12 +116,12 @@ class IsUnread(Constraint):
 
 
 @dataclass(frozen=True)
-class Reads(Constraint):
+class IsRead(Constraint):
     path: Field
 
 
 @dataclass(frozen=True)
-class Writes(Constraint):
+class IsWritten(Constraint):
     path: Field
 
 
@@ -215,7 +215,7 @@ def normalize_fs_constraints(constraints: Constraint) -> Constraint:
             return normalize_fs_constraints(Not(lhs)) | normalize_fs_constraints(Not(rhs))
         case Not(c):
             return Not(normalize_fs_constraints(c))
-        case IsFile() | IsDir() | IsDeleted() | IsUnread() | Reads() | Writes():
+        case IsFile() | IsDir() | IsDeleted() | IsUnread() | IsRead() | IsWritten():
             normalized_path = constraints.path.without_trailing_slash()
             return type(constraints)(normalized_path)
         case StringEq(lhs, rhs):
@@ -247,6 +247,9 @@ class FSModel():
         return z3.BoolVal(False)
 
     def is_deleted_z3(self, path_z3) -> 'z3.ExprRef':
+        return z3.BoolVal(False)
+
+    def is_read_z3(self, path_z3) -> 'z3.ExprRef':
         return z3.BoolVal(False)
 
     def is_unread_z3(self, path_z3) -> 'z3.ExprRef':
@@ -346,9 +349,9 @@ class FSModelSimple(FSModel):
                 return self._create_dir(path)
             case IsDeleted(path):
                 return self._delete(path)
-            case Reads(path):
+            case IsRead(path):
                 return self._create_file(path, Read)
-            case Writes(path):
+            case IsWritten(path):
                 # For simplicity, say that writing creates an unread file
                 return self._create_file(path)
             case StringEq() | Not(StringEq()) | CommandExists() | HasStdout() | ExpectsStdin() | Description() | IsUnread():
@@ -382,6 +385,11 @@ class FSModelSimple(FSModel):
     def is_deleted_z3(self, path_z3) -> 'z3.ExprRef':
         return FileInfo.state(z3.Select(self.history[-1][0], path_z3)) == Del
 
+    def is_read_z3(self, path_z3) -> 'z3.ExprRef':
+        is_file_and_read = z3.And(FileInfo.state(z3.Select(self.history[-1][0], path_z3)) == File,
+                      FileInfo.status(z3.Select(self.history[-1][0], path_z3)) == Read)
+        is_unknown = FileInfo.state(z3.Select(self.history[-1][0], path_z3)) == Unknown
+        return z3.Or(is_file_and_read, is_unknown)
     def is_unread_z3(self, path_z3) -> 'z3.ExprRef':
         return z3.And(FileInfo.state(z3.Select(self.history[-1][0], path_z3)) == File,
                       FileInfo.status(z3.Select(self.history[-1][0], path_z3)) == Unread)

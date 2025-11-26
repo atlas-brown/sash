@@ -5,7 +5,7 @@ import z3
 from util import *
 
 import sash.reporter as reporter
-from sash.constraints import FSModel, FSModelSimple, IsDeleted, IsFile, Reads, StringEq
+from sash.constraints import FSModel, FSModelSimple, IsDeleted, IsFile, IsRead, StringEq
 from sash.solver import (
     Del,
     File,
@@ -146,7 +146,7 @@ def test_state_to_z3_fs_more():
     s = state.set_env("A", ShellVar(Field.create_constant("value1")))\
         .update_fs(IsDeleted(Field.create_constant("somefile.txt")))\
         .update_fs(IsFile(Field.create_constant("somefile.txt")))\
-        .update_fs(Reads(Field.create_constant("somefile.txt")))
+        .update_fs(IsRead(Field.create_constant("somefile.txt")))
 
     fs_formula = z3.And(z3_fs_var(0) == z3.K(z3.StringSort(), FileInfo.mk_pair(Unknown, Unread)),
                         z3_fs_var(1) == z3.Store(z3_fs_var(0), z3.StringVal("somefile.txt"), FileInfo.mk_pair(Del, Unread)),
