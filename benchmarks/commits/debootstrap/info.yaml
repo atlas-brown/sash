@@ -7,6 +7,8 @@ bugs:
 
 note:
 - very cool bug, let's try to target it
+- requires modeling output of echo, pwd, and cmd substs -- all within several nested ifs
+- idea is to do a run thru where all input vars are empty
 
 sources:
 - https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=337230
