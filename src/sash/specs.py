@@ -149,6 +149,8 @@ def extract_flags_naively(cmd: str, operands: list[Field]) -> tuple[set[str], li
             # Stop flag parsing after '--'
             remaining_operands.extend(operands[idx + 1:])
             break
+        else:
+            remaining_operands.append(operand)
 
     return flags, remaining_operands
 
