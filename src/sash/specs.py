@@ -594,7 +594,7 @@ def cat_spec(cmd: CmdInvocation) -> CmdSpec:
         #   (1) none (maybe permission issue, etc.)
 
         check = And.from_field_iter(operands, IsFile)
-        success_postcond = And.from_field_iter(operands, IsFile)
+        success_postcond = And.from_field_iter(operands, IsFile) & And.from_field_iter(operands, IsRead)
         failure_postcond = Empty()
 
     else:
