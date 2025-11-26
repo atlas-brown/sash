@@ -610,6 +610,17 @@ def test_mv_read_file(tmp_path):
     report = reset_and_run_main(script, solver=True)
     assert_expected_report(report, [])
 
+def test_xargs_rm(tmp_path):
+    """Test that deleting the same file twice is reported."""
+    script = write_script(tmp_path, """
+xargs -I thing rm somefile.txt thing
+""")
+    res = reset_and_run_symbexec_main(script, solver=True)
+    report = reporter.Reporter.get_report()
+    assert len(res.traces) == 1
+    assert len(res.traces[0].latest_state.assertions) == 2
+    expected_warning = reporter.UnsatisfiedPrecondition(None, "rm somefile.txt thing", 0)
+    assert_expected_report(report, [expected_warning])
 
 # def test_function_call_multipath(tmp_path):
 #     # A function that is called should not produce unbound variable errors for its parameters

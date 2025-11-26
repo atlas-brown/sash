@@ -7,6 +7,7 @@ from enum import Enum
 from math import inf
 from threading import Event
 from typing import NamedTuple, Callable
+from copy import deepcopy
 
 import shasta.ast_node as AST
 
@@ -51,6 +52,8 @@ def handle_commandnode(traces: Traces,
                 t1 = handle_exit(t1)
             case "read":
                 t1 = handle_read(expanded_args, t1)
+            case "xargs":
+                t1 = handle_xargs(t1, node, expanded_args, config)
             # TODO: Unify rm with other commands
             case cmd_name if spec := get_spec(cmd_name, tuple(expanded_args)):
                 logging.debug(f"Adding {cmd_name} precondition: {spec.check}")
@@ -422,6 +425,21 @@ def handle_read(expanded_args: list[Field], traces: Traces) -> Traces:
             curr_trace = record_assignment(curr_trace, var_name, value_field)
         new_traces.append(curr_trace)
     return new_traces
+
+def handle_xargs(traces: Traces, node: AST.CommandNode, expanded_args: list[Field], config: InterpConfig) -> Traces:
+    match expanded_args:
+        case [Field(SymStr(("xargs",)), _),
+              Field(SymStr(("-I",)), _),
+              Field(SymStr((thename,)), _),
+              *the_cmd]:
+            mangled_cmdnode = deepcopy(node)
+            mangled_cmdnode.arguments = mangled_cmdnode.arguments[3:]
+            t1 = handle_commandnode(traces, mangled_cmdnode, config)
+            t2 = handle_commandnode(t1, mangled_cmdnode, config)
+            return t2
+        case _:
+            logging.warning(f"Ignoring unsupported xargs invocation: {node.pretty()}")
+            return traces
 
 # ============================================================
 #                  Symbolic Expander
