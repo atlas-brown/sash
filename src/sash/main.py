@@ -69,7 +69,7 @@ def main(file: str,
     Config.set("DEBUG", log_level.lower() == "debug")
     logging.basicConfig(
         format="[%(asctime)s %(filename)s:%(lineno)d] %(message)s",
-        level=getattr(logging, log_level.upper()),
+        level=getattr(logging, log_level.upper()) if log_level.lower() != "disabled" else logging.CRITICAL + 10,
         filename=log_file
     )
 
@@ -112,7 +112,7 @@ def parse_cli():
         "--log-level",
         type=str,
         default="warning",
-        choices=["debug", "info", "warning", "error", "critical"],
+        choices=["debug", "info", "warning", "error", "critical", "disabled"],
         help="Set the logging level (default: warning)",
     )
 
