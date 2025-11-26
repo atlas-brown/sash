@@ -786,6 +786,9 @@ class Mv(Cmd):
         io = IOType.add_stdin(io) if "-i" in flags else io
 
         # NOTE: To be completely correct, the order of -f and -i matters, but we ignore that for now
+        # NOTE + TODO: due to the simplicity of the fs model, `mv src/* dst` would lead to the z-postcond of `IsDeleted(src/*)`
+        #              one refinement to this would be checking if the src string contains any slashes and adjusting the postcondition accordingly
+        #              however, we currently handle that during constraints-to-z3 translation by not considering src itself as deleted
         flags.discard("-i")
         flags.discard("-f") # ignore -f flag, i think it does not affect preconds/postconds
 
