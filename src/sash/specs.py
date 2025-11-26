@@ -310,8 +310,8 @@ def cp_spec(cmd: CmdInvocation) -> CmdSpec:
         # check:
         #   (1) source must be a file [command fails / bug]
         #   (2) source must not be target [command fails] (could be removed from the check)
-        #   (3) (if target is a file then target must not be unread) and (if target is a directory then target/source must not be unread) [bug]
-        #   (4) target must be read (to track overwrite bugs across loop iterations) [bug]
+        #   (3a) if target is a file, then target must not be unread (i.e., it must be read) [bug] (to track overwrite bugs across loop iterations)
+        #   (3b) if target is a directory, then target/source must not be unread [bug]
         # z-postcond:
         #   (1) source is a file
         #   (2) source is not target
@@ -322,10 +322,9 @@ def cp_spec(cmd: CmdInvocation) -> CmdSpec:
 
         s, t = operands[0], operands[1]
         check = (
-            IsRead(t) &                     # (4)
-            IsFile(s) &                     # (1)
-            ~StringEq(s, t) &               # (2)
-            (IsFile(t) >> ~IsUnread(t)))    # (3)
+            IsFile(s) &                 # (1)
+            ~StringEq(s, t) &           # (2)
+            (IsFile(t) >> IsRead(t)))   # (3a)
                                         # TODO: how to denote created files like this?
                                         # & (IsDir(t) >> ~IsUnread(ConcatPath(t, s))),
 
