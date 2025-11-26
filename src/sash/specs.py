@@ -311,22 +311,27 @@ def cp_spec(cmd: CmdInvocation) -> CmdSpec:
         #   (1) source must be a file [command fails / bug]
         #   (2) source must not be target [command fails] (could be removed from the check)
         #   (3) (if target is a file then target must not be unread) and (if target is a directory then target/source must not be unread) [bug]
+        #   (4) target must be read (to track overwrite bugs across loop iterations) [bug]
         # z-postcond:
         #   (1) source is a file
         #   (2) source is not target
         #   (3) (target is an unread file) or (target is a directory and target/source is an unread file)
+        #   (4) source is read
         # nz-postcond:
         #   (1) none (command can fail due to reasons we don't model, such as permissions)
 
         s, t = operands[0], operands[1]
         check = (
-            IsFile(s) &                  # (1)
-            ~StringEq(s, t) &            # (2)
-            (IsFile(t) >> ~IsUnread(t))) # (3)
+            IsRead(t) &                     # (4)
+            IsFile(s) &                     # (1)
+            ~StringEq(s, t) &               # (2)
+            (IsFile(t) >> ~IsUnread(t)))    # (3)
                                         # TODO: how to denote created files like this?
                                         # & (IsDir(t) >> ~IsUnread(ConcatPath(t, s))),
+
         success_postcond = (
             # TODO: decide whether target should be considered unread by default or inherit from source
+            IsRead(s) &                             # (4)
             IsFile(s) &                             # (1)
             ~StringEq(s, t) &                       # (2)
             ((IsFile(t) & IsUnread(t)) | IsDir(t))) # (3)
