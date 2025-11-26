@@ -20,6 +20,7 @@ from sash.constraints import (
     IsFile,
     IsUnread,
     StringEq,
+    IsRead
 )
 from sash.frozen import freeze_thing
 from sash.state import (
@@ -808,12 +809,14 @@ class Mv(Cmd):
                 failure_postcond = Empty()
             else: # dst can be a file or a dir
                 check = (
+                    IsRead(dst) &
                     ~IsDeleted(src) &                      # src must exist
                     (IsDir(src) >> ~IsFile(dst)) &         # if src is a dir, dst cannot be a file
                     (IsFile(dst) >> ~IsUnread(dst)) &      # if dst is a file, it must not be unread
                     ((IsDir(src) | IsDir(dst)) >> ~StringEq(src, dst)) # src and dst cannot be the same directory
                 )
                 success_postcond = (
+                    IsRead(src) &
                     IsDeleted(src) &            # src is deleted
                     (IsFile(dst) | IsDir(dst))  # dst is a file or dir
                 )
