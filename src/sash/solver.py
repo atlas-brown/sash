@@ -141,7 +141,7 @@ def run_solver(traces: list[Trace], config: InterpConfig, stop: threading.Event 
         assertions = trace.latest_state.assertions
         logging.debug(f"Checking {len(assertions)} assertions")
         for assertion in assertions:
-            logging.debug(f"Checking assertion: {pformat(assertion)}")
+            logging.debug(f"Checking assertion from line {assertion.source_str} :: {pformat(assertion)}")
             if stop and stop.is_set():
                 logging.warning("Solver timed out")
                 Reporter.set_timed_out()

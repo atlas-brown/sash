@@ -771,6 +771,12 @@ class Command(Cmd):
 
         return CmdSpec(check, success_postcond, failure_postcond, io)
 
+def Field_trimR(f: Field, suffix: str) -> Field:
+    match f:
+        case Field(SymStr(parts), wc) if len(parts) >= 1 and isinstance(parts[-1], str) and parts[-1].endswith(suffix):
+            return Field(SymStr(parts[:-1] + (parts[-1][:-len(suffix)],)), wc)
+        case _:
+            assert False, f"Attempted to trimr {suffix} from {f}, which doesn't have that suffix"
 
 class Mv(Cmd):
     # https://pubs.opengroup.org/onlinepubs/9799919799/utilities/mv.html
@@ -812,6 +818,20 @@ class Mv(Cmd):
                 success_postcond = (
                     IsDeleted(src) &    # src is deleted
                     IsDir(dst)          # dst is a dir
+                )
+                failure_postcond = Empty()
+            elif isinstance(src.content, SymStr) and \
+                 isinstance(src.content.parts[-1], str) and \
+                 src.content.parts[-1].endswith("/*"): # src is the stuff in a directory
+                check = (
+                    IsRead(dst) &
+                    IsDir(Field_trimR(src, "/*")) &
+                    IsDir(dst) &
+                    ~IsDeleted(dst) &
+                    ~StringEq(src, dst)
+                )
+                success_postcond = (
+                    IsDir(dst)
                 )
                 failure_postcond = Empty()
             else: # dst can be a file or a dir
