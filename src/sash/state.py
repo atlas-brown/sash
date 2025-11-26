@@ -213,7 +213,7 @@ class State:
 
     def add_assertion(self, assertion: Constraint, source_str: str | None = None, source_line: int | None = None) -> 'State':
         if assertion == Empty():
-            logging.debug(f"Skipping empty assertion from {source_str} at line {source_line}")
+            logging.debug("Skipping empty assertion from %s at line %s", source_str, source_line)
             return self
         new_assertions = self.assertions + (Assertion(producing_state=self, constraint=assertion, source_str=source_str, source_line=source_line),)
         return replace(self, assertions=new_assertions)

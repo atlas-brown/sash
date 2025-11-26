@@ -73,7 +73,7 @@ def main(file: str,
         filename=log_file
     )
 
-    logging.info(f"Processing file {file} with solver={solver} and timeout={timeout}")
+    logging.info("Processing file %s with solver=%s and timeout=%s", file, solver, timeout)
 
     symbexec_main(file, solver, timeout, solver_timeout, enable_dfs)
 
@@ -121,6 +121,13 @@ def parse_cli():
         type=pathlib.Path,
         default=None,
         help="Path to a file to write logs to (default: stdout)",
+    )
+
+    parser.add_argument(
+        "-D",
+        "--dfs-first",
+        action="store_true",
+        help="Use depth-first search strategy for symbolic execution (default: breadth-first search)",
     )
 
     parser.add_argument(

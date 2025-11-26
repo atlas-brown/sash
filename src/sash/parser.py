@@ -47,7 +47,7 @@ LIBDASH_INITIALIZED = False
 def parse_shell_script(script_path: str) -> list[WrappedAst]:
     global LIBDASH_INITIALIZED
 
-    logging.debug(f"Parsing {script_path}")
+    logging.debug("Parsing %s", script_path)
     parsed_data: collections.abc.Iterator = libdash.parse(script_path, init=not LIBDASH_INITIALIZED)
 
     LIBDASH_INITIALIZED = True
@@ -65,7 +65,9 @@ def parse_shell_script(script_path: str) -> list[WrappedAst]:
         wrapped_nodes.append(wrapped_node)
 
     logging.debug(
-        f"Finished parsing; script consists of {len(wrapped_nodes)} node{'' if len(wrapped_nodes) == 1 else 's'}"
+        "Finished parsing; script consists of %d node%s",
+        len(wrapped_nodes),
+        '' if len(wrapped_nodes) == 1 else 's'
     )
 
     return wrapped_nodes

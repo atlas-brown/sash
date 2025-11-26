@@ -61,7 +61,7 @@ def parse_command(cmd_inv: tuple[Field, ...]) -> CmdInvocation:
     Parses a command invocation from a list of Fields into a CmdInvocation object.
     The CmdInvocation only contains flags in their short form (e.g., '-l' instead of '--long').
     """
-    logging.debug(f"Parsing command from fields: {cmd_inv}")
+    logging.debug("Parsing command from fields: %s", cmd_inv)
 
     stringified_cmd = ""
     for field in cmd_inv:
@@ -86,7 +86,7 @@ def parse_command(cmd_inv: tuple[Field, ...]) -> CmdInvocation:
                 stringified_cmd += " $UNKNOWN"
 
     cmd_parsed = pash_annot_parser.parse(stringified_cmd.strip())
-    logging.debug(f"Parsed command: {cmd_parsed}")
+    logging.debug("Parsed command: %s", cmd_parsed)
     cmd_flags = set()
     cmd_options = dict()
     cmd_operands = []
@@ -144,7 +144,7 @@ def extract_flags_naively(cmd: str, operands: list[Field]) -> tuple[set[str], li
         if part.startswith('-') and len(part) == 2:
             flags.add(part)
         elif part.startswith('--') and len(part) > 2:
-            logging.debug(f"Found long flag '{part}' in {cmd} invocation")
+            logging.debug("Found long flag '%s' in %s invocation", part, cmd)
         elif part == "--":
             # Stop flag parsing after '--'
             remaining_operands.extend(operands[idx + 1:])
@@ -588,7 +588,7 @@ def sudo_spec(cmd: CmdInvocation) -> CmdSpec | None:
     if isinstance(operands[0].content.parts[0], str):
         return get_spec(operands[0].content.parts[0], tuple(operands))
     else:
-        logging.critical(f"Got non-str command name in sudo:{cmd}\n{cmd}")
+        logging.critical("Got non-str command name in sudo:%s\n%s", cmd, cmd)
         return CmdSpec(Empty(), Empty(), Empty())
 
 
@@ -685,9 +685,8 @@ for name, func in inspect.getmembers(current_module, inspect.isfunction):
 def get_spec(cmd_name: str | None, cmd_: tuple[Field, ...]) -> CmdSpec | None:
     if cmd_name in CMD_SPECS:
         return CMD_SPECS[cmd_name](parse_command(cmd_))
-    logging.info(f"Specs are {CMD_SPECS}")
-    logging.warning(f"No spec found for command '{cmd_name}', treating as no-op.")
-    logging.critical(f"No spec found for '{cmd_name}'")
+    logging.info("Specs are %s", CMD_SPECS)
+    logging.warning("No spec found for command '%s', treating as no-op.", cmd_name)
 
 
 def log_crit_unhandled_inv(cmd: CmdInvocation) -> None:
@@ -702,7 +701,8 @@ def log_crit_unhandled_inv(cmd: CmdInvocation) -> None:
         }
     }
 
-    logging.critical(f"Unhandled invocation for command '{cmd.cmd_name}':\n{json.dumps(cmd_json, indent=2, default=str)}")
+    logging.critical("Unhandled invocation for command '%s':\n%s",
+                     cmd.cmd_name, json.dumps(cmd_json, indent=2, default=str))
 
 
 def handle_non_posix(cmd: CmdInvocation) -> CmdSpec:
@@ -717,9 +717,9 @@ def handle_non_posix(cmd: CmdInvocation) -> CmdSpec:
         }
     }
 
-    logging.critical(f"Unsupported inv:\n{json.dumps(cmd_json, indent=2, default=str)}")
+    logging.critical("Unsupported inv:\n%s", json.dumps(cmd_json, indent=2, default=str))
 
-    #logging.warning(f"Non-POSIX '{cmd_name}' handling is not supported; treating as no-op")
+    #logging.warning("Non-POSIX '%s' handling is not supported; treating as no-op", cmd_name)
     return CmdSpec(Empty(), Empty(), Empty(), IOType.UNKNOWN) # no-op spec
 
 
@@ -743,7 +743,7 @@ class Cmd(ABC):
 
     @classmethod
     def _handle_non_posix(cls, cmd: CmdInvocation) -> CmdSpec:
-        logging.warning(f"Non-POSIX handling for command '{cmd.cmd_name}' is not supported; treating as no-op")
+        logging.warning("Non-POSIX handling for command '%s' is not supported; treating as no-op", cmd.cmd_name)
         return cls._handle_non_supported(cmd)
 
     @classmethod
@@ -759,7 +759,8 @@ class Cmd(ABC):
             }
         }
 
-        logging.critical(f"Unhandled invocation for command '{cmd.cmd_name}':\n{json.dumps(cmd_json, indent=2, default=str)}; treating as no-op")
+        logging.critical("Unhandled invocation for command '%s':\n%s; treating as no-op",
+                         cmd.cmd_name, json.dumps(cmd_json, indent=2, default=str))
         return CmdSpec(Empty(), Empty(), Empty(), IOType.UNKNOWN)
 
     @classmethod
@@ -1034,7 +1035,7 @@ class Test(Cmd):
                         success_postcond = StringEq(op, empty_str_var)
                         # nz-postcond is the negation of z-postcond
                     case _:
-                        logging.debug(f"Unhandled test invocation: {cmd}; treating as no-op")
+                        logging.debug("Unhandled test invocation: %s; treating as no-op", cmd)
                         success_postcond = Empty()
                         failure_postcond = Empty()
             case 3: # test operand1 operator operand2
@@ -1060,12 +1061,12 @@ class Test(Cmd):
                                                    # -ne: 'test 05 -ne 5' and 'test 5 -ne 5' both fail, but strings are not necessarily equal
                                                    # -gt/-lt: 'test 5 -gt/-lt 5' and 'test 05 -gt/-lt 5' both fail, but strings are not necessarily equal
                     case _:
-                        logging.debug(f"Unhandled test invocation: {cmd}; treating as no-op")
+                        logging.debug("Unhandled test invocation: %s; treating as no-op", cmd)
                         success_postcond = Empty()
                         failure_postcond = Empty()
             case _:
                 # NOTE: According to POSIX, in this case "the results are unspecified"
-                logging.warning(f"{cls.name} invocation with more than 4 operands is unspecified: {cmd}; treating as no-op")
+                logging.warning("%s invocation with more than 4 operands is unspecified: %s; treating as no-op", cls.name, cmd)
                 success_postcond = Empty()
                 failure_postcond = Empty()
 

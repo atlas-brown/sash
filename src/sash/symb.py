@@ -27,9 +27,11 @@ from sash.state import ArbitraryType, CompletelyArbitrary, Field, FuncMap, SetOp
 def handle_commandnode(traces: Traces,
                        node: AST.CommandNode,
                        config: InterpConfig) -> Traces:
-    logging.debug(f"Handling command node {trim_string_for_logging(node.pretty())} with {len(traces)} traces")
+    if logging.getLogger().isEnabledFor(logging.DEBUG):
+        logging.debug("Handling command node %s with %d traces", trim_string_for_logging(node.pretty()), len(traces))
+
     t1, expanded_args = expand_args_dumb(traces, node.arguments, config)
-    logging.debug(f"Expanded cmd to {expanded_args}")
+    logging.debug("Expanded cmd to %s", expanded_args)
 
     if expanded_args:
         match expanded_args[0].try_to_str():
@@ -56,7 +58,7 @@ def handle_commandnode(traces: Traces,
                 t1 = handle_xargs(t1, node, expanded_args, config)
             # TODO: Unify rm with other commands
             case cmd_name if spec := get_spec(cmd_name, tuple(expanded_args)):
-                logging.debug(f"Adding {cmd_name} precondition: {spec.check}")
+                logging.debug("Adding %s precondition: %s", cmd_name, spec.check)
                 t_precond = trace_map(t1, lambda s: s.add_assertion(spec.check, source_str=node.pretty(), source_line=context_line))
                 t_success = trace_map(t_precond,
                                       lambda s: s.add_pathcond(spec.success_postcond)\
@@ -74,22 +76,25 @@ def handle_commandnode(traces: Traces,
                 # deferred for now until we actually need it (see test_function_call_multipath)
                 t1 = handle_function_call_or_unknown(some_name, expanded_args[1:], t1, config)
             case _:
-                logging.debug(f"Non-constant command invocation {expanded_args}, optimistically treating as no-op")
+                logging.debug("Non-constant command invocation %s, optimistically treating as no-op", expanded_args)
 
     for redir in node.redir_list:
         t1 = guarded_interp_node(t1, redir, config)
 
     config.apply_expanded_command_cbs(expanded_args)
-    logging.debug(f"Done with command {trim_string_for_logging(node.pretty())} after expanding its args to {expanded_args} (it had assignments: {node.assignments})")
+
+    if logging.getLogger().isEnabledFor(logging.DEBUG):
+        logging.debug("Done with command %s after expanding its args to %s (it had assignments: %s)",
+                      trim_string_for_logging(node.pretty()), expanded_args, node.assignments)
     return t1
 
 def handle_rm(expanded_args: tuple[Field], trace: Trace, node: AST.CommandNode) -> tuple[Trace, Trace]:
-    logging.debug(f"Checking rm command with expansion possibility: {expanded_args}")
+    logging.debug("Checking rm command with expansion possibility: %s", expanded_args)
     spec = get_spec("rm", expanded_args)
 
     assert spec is not None, "Expected rm spec to always be found"
 
-    logging.debug(f"Adding rm precondition: {spec.check}")
+    logging.debug("Adding rm precondition: %s", spec.check)
     trace = trace.extend(lambda s: s.add_assertion(spec.check, source_str=node.pretty(), source_line=context_line))
 
     def is_protected(path):
@@ -131,7 +136,7 @@ def handle_function_call_or_unknown(func_name: str,
             assert isinstance(the_func, FrozenAst)
             return handle_function_call(func_name, the_func.ast, arg_fields, traces, config)
     else:
-        logging.error(f"Name {func_name} is defined as different functions across traces, giving up on this call")
+        logging.error("Name %s is defined as different functions across traces, giving up on this call", func_name)
         return traces
 
 def handle_unknown_command(name: str,
@@ -144,7 +149,7 @@ def handle_unknown_command(name: str,
     if name.endswith("/") or any(name in t.latest_state.known_nonexistent_commands for t in traces):
         Reporter.add_issue(reporter.NotACommand(name, context_line))
 
-    logging.debug(f"Unknown command {name}, optimistically treating as no-op")
+    logging.debug("Unknown command %s, optimistically treating as no-op", name)
     return traces
 
 def handle_function_call(name: str,
@@ -152,7 +157,10 @@ def handle_function_call(name: str,
                          arg_fields: list[Field],
                          traces: Traces,
                          config: InterpConfig) -> Traces:
-    logging.debug(f"Handling function call to {trim_string_for_logging(func_node.pretty())} with args {arg_fields}")
+    if logging.getLogger().isEnabledFor(logging.DEBUG):
+        logging.debug("Handling function call to %s with args %s",
+                      trim_string_for_logging(func_node.pretty()), arg_fields)
+
     func_map.called.add(name) # record that this function was called
     # As long as arg_fields are a single word, map those to local positional parameters
     # as soon as we hit a field that is not a single word, give up
@@ -161,13 +169,13 @@ def handle_function_call(name: str,
         if arg.count == WordCount(1, 1):
             localenv[str(i + 1)] = ShellVar(arg)
         else:
-            logging.debug(f"Function argument {i} is not guaranteed to be a single word, giving up on positional parameters ({arg})")
+            logging.debug("Function argument %d is not guaranteed to be a single word, giving up on positional parameters (%s)", i, arg)
             break
-    logging.debug(f"Bound localenv for call: {localenv}")
+    logging.debug("Bound localenv for call: %s", localenv)
     t1 = []
     for t in traces:
         if name in t.latest_state.call_stack:
-            logging.error(f"Found recursive function definition! {name} via {t.latest_state.call_stack}")
+            logging.error("Found recursive function definition! %s via %s", name, t.latest_state.call_stack)
             return traces
         t1.append(t.extend(lambda s: s.enter_function(name).extend_localenv(localenv)))
     call_result_traces = guarded_interp_node(t1, func_node.body, config)
@@ -180,19 +188,19 @@ def record_assignment(trace: Trace, var: str, rhs: Field) -> Trace:
 def handle_while(traces: Traces,
                  node: AST.WhileNode,
                  config: InterpConfig):
-    logging.debug(f"Checking while loop for an infinite loop")
+    logging.debug("Checking while loop for an infinite loop")
     test_cmds = []
     def get_the_test(cmd_fields):
         test_cmds.append(cmd_fields)
     temp_config = config.add_expanded_command_callback(get_the_test)
 
 
-    logging.debug(f"Interpreting first iteration")
+    logging.debug("Interpreting first iteration")
     t1 = guarded_interp_node(traces, node.test, temp_config)
-    logging.debug(f"collected test_cmds: {test_cmds}")
+    logging.debug("collected test_cmds: %s", test_cmds)
     # Special case: never runs
     if len(test_cmds) > 0 and interpret_test(test_cmds[0]) == False:
-        logging.debug(f"While loop never runs")
+        logging.debug("While loop never runs")
         return t1
 
     t1 = [t for t in t1 if t.latest_state.last_exit_code != SymStr(("1",))]
@@ -200,38 +208,38 @@ def handle_while(traces: Traces,
     t2 = guarded_interp_node(t1, node.body, config)
 
 
-    logging.debug(f"Interpreting second iteration")
+    logging.debug("Interpreting second iteration")
     # If all traces happen to terminate in the body, t3 will be empty after the next line
     # Additionally, test_cmds will not have a second entry
     t3 = guarded_interp_node(t2, node.test, temp_config)
     if len(t3) == 0:
-        logging.debug(f"All traces terminated on first iter of while body")
+        logging.debug("All traces terminated on first iter of while body")
         return t3 + t_skip_body
     # Special case: only one iteration
     if len(test_cmds) < 2:
         logging.debug("Failing to collect test commands? Giving up on constant loop checks.")
         return t3 + t_skip_body
     elif interpret_test(test_cmds[1]) == False:
-        logging.debug(f"While loop only runs once")
+        logging.debug("While loop only runs once")
         return t3 + t_skip_body
     elif is_constant_test(test_cmds[0], test_cmds[1]):
         Reporter.add_issue(reporter.InfiniteLoop(node, context_line))
         return t3 + t_skip_body
-    logging.debug(f"collected test_cmds: {test_cmds}")
+    logging.debug("collected test_cmds: %s", test_cmds)
     # todo extend path condition
     t4 = guarded_interp_node(t3, node.body, config)
 
 
-    logging.debug(f"Interpreting third test")
+    logging.debug("Interpreting third test")
     t5 = guarded_interp_node(t4, node.test, temp_config)
     # If all traces happen to terminate on the second iteration, t5 will be empty
     # Additionally, test_cmds will not have a third entry
     if len(t5) == 0:
-        logging.debug(f"All traces terminated on second iter of while body")
+        logging.debug("All traces terminated on second iter of while body")
         return t5 + t_skip_body
-    logging.debug(f"collected test_cmds: {test_cmds}")
+    logging.debug("collected test_cmds: %s", test_cmds)
 
-    logging.debug(f"Checking constant test cond")
+    logging.debug("Checking constant test cond")
     if len(test_cmds) > 2 and is_constant_test(test_cmds[2], test_cmds[1]):
         Reporter.add_issue(reporter.InfiniteLoop(node, context_line))
 
@@ -329,7 +337,7 @@ def handle_set(expanded_args: list[Field], traces: Traces) -> Traces:
                     if SetOptions.relevant(flag):
                         to_set.update(flag[1:])
                     else:
-                        logging.debug(f"set: ignoring irrelevant option: {flag}")
+                        logging.debug("set: ignoring irrelevant option: %s", flag)
                 else:
                     raise NotImplementedError(f"set: option unsetting not implemented: {expanded_args}")
 
@@ -344,25 +352,25 @@ def handle_if(traces: Traces, node: AST.IfNode, config: InterpConfig) -> Traces:
     temp_config = config.add_expanded_command_callback(get_the_test)
     temp_config = replace(temp_config, in_checked_position=True)
     t1 = guarded_interp_node(traces, node.cond, temp_config)
-    logging.debug(f"collected test_cmds: {test_cmds}")
-    logging.debug(f"Checking constant test cond")
+    logging.debug("collected test_cmds: %s", test_cmds)
+    logging.debug("Checking constant test cond")
     if len(test_cmds) == 0:
         logging.warning("Failed to collect any test commands? Giving up on constant condition check.")
         test_result = None
     else:
-        logging.debug(f"Checking if test command {test_cmds[-1]} is constant true/false")
+        logging.debug("Checking if test command %s is constant true/false", test_cmds[-1])
         test_result = interpret_test(test_cmds[-1])
-        logging.debug(f"Test command result: {test_result}")
+        logging.debug("Test command result: %s", test_result)
     if test_result is not None:
         Reporter.add_issue(reporter.ConstantCondition(test_cmds, context_line))
         if test_result == True and (node.else_b is not None and node.else_b.pretty()):
                                                              # Hack because libdash sometimes gives empty else bodies
             t1 = trace_map(t1, lambda s: s.set_last_exit_code(SymStr(("0",))))
-            logging.debug(f"Reporting dead code in else branch.")
+            logging.debug("Reporting dead code in else branch.")
             Reporter.add_issue(reporter.DeadCode(node.else_b, context_line))
         elif test_result == False:
             t1 = trace_map(t1, lambda s: s.set_last_exit_code(SymStr(("1",))))
-            logging.debug(f"Reporting dead code in then branch")
+            logging.debug("Reporting dead code in then branch")
             Reporter.add_issue(reporter.DeadCode(node.then_b, context_line))
     else:
         logging.debug("FORK: explicit if")
@@ -386,7 +394,7 @@ def handle_if(traces: Traces, node: AST.IfNode, config: InterpConfig) -> Traces:
                             config)
 
 def handle_exit(traces: Traces) -> Traces:
-    logging.debug(f"Handling exit command, terminating {len(traces)} traces")
+    logging.debug("Handling exit command, terminating %d traces", len(traces))
     return trace_map(traces, lambda s: s.terminate())
 
 def handle_branch(traces: Traces, success_cb: Callable[[Traces], Traces], failure_cb: Callable[[Traces], Traces], node: AST.AstNode, config: InterpConfig) -> Traces:
@@ -398,7 +406,7 @@ def handle_branch(traces: Traces, success_cb: Callable[[Traces], Traces], failur
     t_then_bp, t_else_bp = config.branch_policy(node, t_then, t_else)
     res = t_then_bp + t_else_bp
     if all(t.latest_state.terminated for t in res):
-        logging.debug(f"All traces terminated with branch policy decision; ignoring policy for this branch (line {context_line})")
+        logging.debug("All traces terminated with branch policy decision; ignoring policy for this branch (line %d)", context_line)
         return t_then + t_else
     else:
         return res
@@ -438,7 +446,7 @@ def handle_xargs(traces: Traces, node: AST.CommandNode, expanded_args: list[Fiel
             t2 = handle_commandnode(t1, mangled_cmdnode, config)
             return t2
         case _:
-            logging.warning(f"Ignoring unsupported xargs invocation: {node.pretty()}")
+            logging.warning("Ignoring unsupported xargs invocation: %s", node.pretty())
             return traces
 
 # ============================================================
@@ -592,15 +600,17 @@ def expand_simple(stuff: list[AST.ArgChar],
                                 case "TrimR" | "TrimRMax" | "TrimL" | "TrimLMax":
                                     self.add_a_field(Field(SymStr(("",)), WordCount(0, 0)))
                         else:
-                            logging.info(f"expansion: treating var {var.pretty()} with unhandled fmt {var.fmt} as completely arbitrary field")
+                            logging.info("expansion: treating var %s with unhandled fmt %s as completely arbitrary field", var.pretty(), var.fmt)
                             self.add_a_field(arbitrary_field(var, ArbitraryType.APPROXIMATION, self.state))
                     elif var.fmt == "Minus":
                         # This is the case that $VAR is unset: take the default
                         if config.unbound_policy == UnboundVariablePolicy.EMPTY:
-                            logging.info(f"expansion: treating unset var {var.pretty()} as empty string due to config, so taking the default ({util.shasta_pretty(var.arg)}) unconditionally")
+                            logging.info("expansion: treating unset var %s as empty string due to config, so taking the default (%s) unconditionally",
+                                         var.pretty(), util.shasta_pretty(var.arg))
                             Partial.add_the_default(self, var)
                         else:
-                            logging.debug(f"expansion: forking on unset var {var.var} to take default ({util.shasta_pretty(var.arg)}) or arbitrary")
+                            logging.debug("expansion: forking on unset var %s to take default (%s) or arbitrary",
+                                          var.var, util.shasta_pretty(var.arg))
                             non_default, default = self.fork(Description(f"{var.var} takes the default value {Field.create_constant(util.shasta_pretty(var.arg))}"))
                             Partial.add_the_default(default, var)
                             arbitrary_for_this_var = arbitrary_field(var, ArbitraryType.ENVIRONMENT, non_default.state)
@@ -614,7 +624,7 @@ def expand_simple(stuff: list[AST.ArgChar],
                             error_code = reporter.UnboundIDSetU if self.state.opts.is_set(SetOptions.NOUNSET) else reporter.UnboundID
                             Reporter.add_issue(error_code(var.pretty(), context_line))
                         if config.unbound_policy == UnboundVariablePolicy.EMPTY:
-                            logging.info(f"expansion: treating unbound var {var.pretty()} as empty string due to config")
+                            logging.info("expansion: treating unbound var %s as empty string due to config", var.pretty())
                             self.add_a_field(Field(SymStr(("",)), WordCount(0, 0)))
                         else:
                             arbitrary_for_this_var = arbitrary_field(var,
@@ -624,13 +634,13 @@ def expand_simple(stuff: list[AST.ArgChar],
                             self.state = self.state.extend_localenv({var.var: ShellVar(arbitrary_for_this_var, ghost=True)})
                             self.add_a_field(arbitrary_for_this_var)
                 case AST.BArgChar() as b:
-                    logging.info(f"expansion: treating backquote argchar {b.pretty()} as completely arbitrary field")
+                    logging.info("expansion: treating backquote argchar %s as completely arbitrary field", b.pretty())
                     # todo use the trace: this case suggests we should really generalize the interface of `expand_simple` to be from one trace to many, instead of one state to many
                     t = guarded_interp_node([Trace((self.state,))], b.node, config)
                     self.add_a_field(arbitrary_field(b, ArbitraryType.APPROXIMATION, self.state))
                 case _:
-                    logging.error(f"argchar: {argchar.pretty()} {type(argchar)}")
-                    logging.info(f"expansion: treating unhandled argchar as completely arbitrary field: {argchar.pretty()}")
+                    logging.error("argchar: %s %s", argchar.pretty(), type(argchar))
+                    logging.info("expansion: treating unhandled argchar as completely arbitrary field: %s", argchar.pretty())
                     self.add_a_field(arbitrary_field(argchar, ArbitraryType.APPROXIMATION, self.state))
 
             # Most cases fall through to here, no forking going on
@@ -864,16 +874,16 @@ trace_count = 1
 def collapse_traces_if_too_many(traces: Traces) -> Traces:
     global trace_count
     if len(traces) > trace_count:
-        logging.debug(f"Too many traces ({len(traces)}), collapsing")
+        logging.debug("Too many traces (%d), collapsing", len(traces))
         traces = collapse_traces(traces)
         trace_count = len(traces)
-        logging.debug(f"Collapsed to {trace_count} traces")
+        logging.debug("Collapsed to %d traces", trace_count)
     return traces
 
 def drop_terminated_traces(traces: Traces) -> Traces:
     active_traces = [t for t in traces if not t.latest_state.terminated]
     if len(active_traces) < len(traces):
-        logging.debug(f"Dropping {len(traces) - len(active_traces)} terminated traces")
+        logging.debug("Dropping %d terminated traces", len(traces) - len(active_traces))
     return active_traces
 
 def guarded_interp_node(traces: Traces,
@@ -895,7 +905,7 @@ def guarded_interp_node(traces: Traces,
         context_line = prev_context_line
         return res
     except NotImplementedError as e:
-        logging.error(f"Interp raised: {traceback.format_exc()}. Ignoring.")
+        logging.error("Interp raised: %s. Ignoring.", e)
         context_line = prev_context_line
         return traces
 
@@ -907,11 +917,12 @@ def interp_node(traces: Traces,
     traces = config.trace_collapser(traces)
     traces = config.apply_node_cbs(traces, node)
     if not traces:
-        logging.debug(f"No active traces when interpreting {trim_string_for_logging(node.pretty())}, reporting dead code and returning early")
+        logging.debug("No active traces when interpreting %s, reporting dead code and returning early", trim_string_for_logging(node.pretty()))
         Reporter.add_issue(reporter.DeadCode(node, context_line))
         return traces
 
-    logging.debug(f"Interpreting line {context_line} {trim_string_for_logging(node.pretty())} with {len(traces)} traces")
+    logging.debug("Interpreting line %d %s with %d traces",
+                  context_line, trim_string_for_logging(node.pretty()), len(traces))
     match node:
         case AST.CommandNode():
             if len(node.arguments) == 0:
@@ -970,7 +981,7 @@ def interp_node(traces: Traces,
                 Reporter.add_issue(reporter.LoopRunsOnce(node, context_line))
             # if all items are constant, we can unroll the loop
             if all(field.is_constant() for field in items):
-                logging.debug(f"For loop over constant items, unrolling: {items}")
+                logging.debug("For loop over constant items, unrolling: %s", items)
                 t2 = t1
                 for item_field in items:
                     t2 = [record_assignment(t, var_name, item_field) for t in t2]
@@ -980,7 +991,7 @@ def interp_node(traces: Traces,
                 t_res = None # result is just the traces after one iteration
                 t_current = t1
                 for i in range(config.max_loop_unroll):
-                    logging.debug(f"For loop unrolling iteration {i+1}/{config.max_loop_unroll}")
+                    logging.debug("For loop unrolling iteration %d/%d", i+1, config.max_loop_unroll)
                     t2 = [record_assignment(t, var_name, arbitrary_field(node.argument,
                                                                         ArbitraryType.APPROXIMATION,
                                                                         t.latest_state)) \
@@ -1005,7 +1016,7 @@ def interp_node(traces: Traces,
                     case [Field(CompletelyArbitrary(), _)]:
                         pass
                     case _:
-                        logging.warning(f"Found a redir to multiple words: {trim_string_for_logging(str(redir_args))} - Ignoring.")
+                        logging.warning("Found a redir to multiple words: %s - Ignoring.", trim_string_for_logging(str(redir_args)))
                         pass
             # TODO: Also handle the effects of redirection on the FS
             return res
@@ -1035,7 +1046,9 @@ def interp_node(traces: Traces,
                 else:
                     return traces_with_exit_0
             def failure(traces_with_exit_1: Traces) -> Traces:
-                logging.debug(f"Inside the failure case of {'AND' if isinstance(node, AST.AndNode) else 'OR'} node with {len(traces_with_exit_1)} traces")
+                logging.debug("Inside the failure case of %s node with %d traces",
+                              'AND' if isinstance(node, AST.AndNode) else 'OR',
+                              len(traces_with_exit_1))
                 if isinstance(node, AST.AndNode):
                     return traces_with_exit_1
                 else:
@@ -1059,10 +1072,7 @@ def interp_node(traces: Traces,
         # todo bring other cases as needed
 
         case _:
-            raise NotImplementedError(
-                    f"node type {type(node)} not handled",
-                    node
-                )
+            raise NotImplementedError(f"node type {node.NodeName} not handled")
 
 def starting_state(fs_model: FSModel | None = None) -> State:
     # env["IFS"] = ShellVar(" \t\n")
@@ -1122,19 +1132,20 @@ class SymbexecResult(NamedTuple):
 def symb_engine(nodes: list[parser.WrappedAst], config: InterpConfig) -> Traces:
     global context_line
     global func_map
-    logging.debug(f"Running symb engine with {len(nodes)} raw nodes")
+    logging.debug("Running symb engine with %d raw nodes", len(nodes))
     traces = [Trace((starting_state(),))]
 
     func_map = replace(FuncMap(funcs=find_func_defs(traces, nodes, config)))
 
     for node in nodes:
         context_line = node.get_line_number()
-        logging.debug(f"Interpreting next node (line {context_line}) {trim_string_for_logging(node.ast_node.pretty())}")
+        logging.debug("Interpreting next node (line %d) %s",
+                      context_line, trim_string_for_logging(node.ast_node.pretty()))
         traces = guarded_interp_node(traces, node.ast_node, config)
 
     func_traces: dict[str, Traces] = {}
     for (name, node) in func_map.uncalled_funcs().items():
-        logging.debug(f"Interpreting uncalled function '{name}'")
+        logging.debug("Interpreting uncalled function '%s'", name)
         func_traces[name] = guarded_interp_node([Trace((starting_state(),))], node, config)
 
     return traces + [t for ts in func_traces.values() for t in ts]
@@ -1148,7 +1159,7 @@ def symbexec_file(input_file: str,
     try:
         def branch_policy_half_n_half_if_too_many(node, t_then: Traces, t_else: Traces) -> tuple[Traces, Traces]:
             if len(t_then) + len(t_else) > 256:
-                logging.info(f"Too many traces, dropping half of them in branch policy")
+                logging.info("Too many traces, dropping half of them in branch policy")
                 half_then = [t for i, t in enumerate(t_then) if i % 2 == 0]
                 half_else = [t for i, t in enumerate(t_else) if i % 2 == 0]
                 return (half_then, half_else)
@@ -1186,7 +1197,7 @@ def symbexec_file(input_file: str,
             return SymbexecResult(SymbexecStatus.INTERRUPTED, traces)
         return SymbexecResult(SymbexecStatus.COMPLETED, traces)
     except Exception as e:
-        logging.error(f"Symbolic execution failed:")
+        logging.error("Symbolic execution failed:")
         logging.error(traceback.format_exc())
         return SymbexecResult(SymbexecStatus.FAILED, [])
 

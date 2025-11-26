@@ -325,7 +325,7 @@ class FSModelSimple(FSModel):
         return self._set(path, Dir, status)
 
     def _apply_postcondition(self, constraints: Constraint) -> FSModelSimple:
-        logging.debug(f"Applying FS postcondition: {constraints}")
+        logging.debug("Applying FS postcondition: %s", constraints)
         match constraints:
             case Empty():
                 return self

@@ -65,15 +65,19 @@ def constraint_to_z3(constraint: Constraint, s: State) -> z3.ExprRef:
             case Implies(premise, conclusion):
                 return z3.Implies(norm_constraint_to_z3(premise, s), norm_constraint_to_z3(conclusion, s))
             case _:
-                logging.error(f"Unrecognized constraint type in Z3 translation: {constraint} (type {type(constraint)})")
+                logging.error("Unrecognized constraint type in Z3 translation: %s (type %s)",
+                              constraint, type(constraint))
                 return z3.BoolVal(True)
 
     return norm_constraint_to_z3(NormalizedFSConstraint(constraint).constraint, s)
 
 def state_to_z3(s: State) -> z3.ExprRef:
-    logging.debug(f"Path condition constraints: {pformat(s.pathcond)}")
+    if logging.getLogger().isEnabledFor(logging.DEBUG):
+        logging.debug("Path condition constraints: %s", pformat(s.pathcond))
     pathcond_formula = z3.And([constraint_to_z3(pc, s) for pc in s.pathcond]) if s.pathcond else z3.BoolVal(True)
-    logging.debug(f"Path condition formula: {pformat(pathcond_formula)}")
+
+    if logging.getLogger().isEnabledFor(logging.DEBUG):
+        logging.debug("Path condition formula: %s", pformat(pathcond_formula))
 
     env_formula = []
     for var, val in (s.env | s.localenv).items():
@@ -84,7 +88,9 @@ def state_to_z3(s: State) -> z3.ExprRef:
     env_formula = z3.And(env_formula)
 
     fs_state_formula = s.fs_model.state_to_z3()
-    logging.debug(f"FS state:\n{pformat(s.fs_model)}")
+
+    if logging.getLogger().isEnabledFor(logging.DEBUG):
+        logging.debug("FS state:\n%s", pformat(s.fs_model))
 
     return z3.And(fs_state_formula, pathcond_formula, env_formula)
 
@@ -106,7 +112,7 @@ def model_to_reports(core: list[z3.BoolRef]):
     for tracked in core:
         assertion = tracked_assertions.get(tracked)
         if not assertion:
-            logging.warning(f"Unrecognized tracked var in core: {tracked}")
+            logging.warning("Unrecognized tracked var in core: %s", tracked)
             continue
 
         constraint = assertion.constraint
@@ -139,9 +145,11 @@ def run_solver(traces: list[Trace], config: InterpConfig, stop: threading.Event 
     logging.debug("Running Z3 solver on assertions")
     for trace in traces:
         assertions = trace.latest_state.assertions
-        logging.debug(f"Checking {len(assertions)} assertions")
+        logging.debug("Checking %d assertions", len(assertions))
         for assertion in assertions:
-            logging.debug(f"Checking assertion from line {assertion.source_str} :: {pformat(assertion)}")
+            if logging.getLogger().isEnabledFor(logging.DEBUG):
+                logging.debug("Checking assertion from line %s :: %s", assertion.source_str, pformat(assertion))
+
             if stop and stop.is_set():
                 logging.warning("Solver timed out")
                 Reporter.set_timed_out()
@@ -151,16 +159,17 @@ def run_solver(traces: list[Trace], config: InterpConfig, stop: threading.Event 
             assertion_var, assertion_formula = assertion_to_z3(assertion)
             solver.assert_and_track(assertion_formula, assertion_var)
 
-            logging.debug(f"Arb z3 map: {pformat(arbitrary_to_z3_var)}")
+            if logging.getLogger().isEnabledFor(logging.DEBUG):
+                logging.debug("Arb z3 map: %s", pformat(arbitrary_to_z3_var))
 
-            #logging.debug(f"Current solver state: {solver}")
+            #logging.debug("Current solver state: %s", solver)
             result = solver.check()
-            logging.debug(f"Assertion:\n{assertion_formula}")
-            logging.debug(f"Assertion must be violated?: {result == z3.unsat} (ie {result})")
+            logging.debug("Assertion:\n%s", assertion_formula)
+            logging.debug("Assertion must be violated?: %s (ie %s)", result == z3.unsat, result)
             if result == z3.unsat:
                 core = solver.unsat_core()
-                logging.debug(f"Unsat core: {core}")
+                logging.debug("Unsat core: %s", core)
                 model_to_reports(core)
             else:
                 model = solver.model()
-                logging.debug(f"SAT model: {model}")
+                logging.debug("SAT model: %s", model)
