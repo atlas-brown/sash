@@ -622,6 +622,15 @@ xargs -I thing rm somefile.txt thing
     expected_warning = reporter.UnsatisfiedPrecondition(None, "rm somefile.txt thing", 0)
     assert_expected_report(report, [expected_warning])
 
+def test_grep_no_pattern(tmp_path):
+    """Test that `grep` with no pattern is reported as an unexpected stdin issue."""
+    script = write_script(tmp_path, """
+grep $1 somefile.txt
+""")
+    report = reset_and_run_main(script, solver=True)
+    expected_error = reporter.UnexpectedStdin("grep", 0)
+    assert_expected_report(report, [expected_error])
+
 # def test_function_call_multipath(tmp_path):
 #     # A function that is called should not produce unbound variable errors for its parameters
 #     script = write_script(tmp_path, """

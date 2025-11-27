@@ -28,6 +28,7 @@ class Code(Enum):
     IGNORED_COMMAND_RESULT = "ignored_cmd_result"
     NOT_A_COMMAND = "not_a_command"
     UNSATISFIED_PRECONDITION = "unsat_precond"
+    UNEXPECTED_STDIN = "unexpected_stdin"
 
 
 @dataclass(frozen=True)
@@ -139,6 +140,11 @@ class NotACommand(Issue):
 class UnsatisfiedPrecondition(Issue):
     def __init__(self, constraint, command: str, line):
         super().__init__(Code.UNSATISFIED_PRECONDITION, f"precondition for '{command}' '{constraint}' might not hold", Severity.ERROR, line)
+
+
+class UnexpectedStdin(Issue):
+    def __init__(self, command: str, line):
+        super().__init__(Code.UNEXPECTED_STDIN, f"command '{command}' expects input from stdin if the first argument is empty", Severity.ERROR, line)
 
 
 class Report(NamedTuple):

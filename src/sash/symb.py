@@ -33,6 +33,15 @@ def handle_commandnode(traces: Traces,
     t1, expanded_args = expand_args_dumb(traces, node.arguments, config)
     logging.debug("Expanded cmd to %s", expanded_args)
 
+    if expanded_args and len(node.arguments) >= 2:
+        cmd_name = expanded_args[0].try_to_str()
+        if cmd_name == "grep":
+            # If the command is `grep` and the first argument is not provided (different from an empty string),
+            # meaning a pattern is not provided for the command,
+            # `grep` will expect input from stdin instead of treating the second argument as a file.
+            if expanded_args[1].count.min == 0:
+                Reporter.add_issue(reporter.UnexpectedStdin(cmd_name, context_line))
+
     if expanded_args:
         match expanded_args[0].try_to_str():
             case "rm":
