@@ -115,6 +115,16 @@ rm -rf "${1-/usr}"
     expected_error = reporter.DeleteSystemFile("/usr", 0)
     assert_expected_report(report, [expected_error])
 
+    script = write_script(tmp_path, """
+rm -rf "${DESTDIR}${LIBDIR}/${CAMLP5N}"
+""")
+    report = reset_and_run_main(script)
+    expected_error1 = reporter.WordSplitCouldDeleteSystemFile("${DESTDIR}${LIBDIR}/${CAMLP5N}", 0)
+    expected_error2 = reporter.UnboundID("DESTDIR", 0)
+    expected_error3 = reporter.UnboundID("LIBDIR", 0)
+    expected_error4 = reporter.UnboundID("CAMLP5N", 0)
+    assert_expected_report(report, [expected_error1, expected_error2, expected_error3, expected_error4])
+
 def test_delete_splitting(tmp_path):
     script = write_script(tmp_path, "rm $UNQUOTED\n")
     report = reset_and_run_main(script)
