@@ -62,7 +62,7 @@ def handle_commandnode(traces: Traces,
             case "exit":
                 t1 = handle_exit(t1)
             case "read":
-                t1 = handle_read(expanded_args, t1)
+                t1 = handle_read(expanded_args, t1, node)
             case "xargs":
                 t1 = handle_xargs(t1, node, expanded_args, config)
             # TODO: Unify rm with other commands
@@ -447,7 +447,7 @@ def handle_branch(traces: Traces, success_cb: Callable[[Traces], Traces], failur
     else:
         return res
 
-def handle_read(expanded_args: list[Field], traces: Traces) -> Traces:
+def handle_read(expanded_args: list[Field], traces: Traces, node: AST.AstNode) -> Traces:
     """Handle a `read` command with given expanded args (list of `Fields`) on the given traces."""
     collected: list[tuple[str, Field]] = []
     # Collect (variable name, original field) pairs from args.
@@ -466,7 +466,8 @@ def handle_read(expanded_args: list[Field], traces: Traces) -> Traces:
         curr_trace = trace
         # For each variable to be read into, record an assignment of that variable to the corresponding field.
         for var_name, value_field in collected:
-            curr_trace = record_assignment(curr_trace, var_name, value_field)
+            # TODO: Don't pass in the entire node, but the specific arg corresponding to this variable.
+            curr_trace = record_assignment(curr_trace, var_name, arbitrary_field(node, ArbitraryType.ENVIRONMENT, curr_trace.latest_state))
         new_traces.append(curr_trace)
     return new_traces
 
