@@ -1072,11 +1072,21 @@ def interp_node(traces: Traces,
             return t2
 
         case AST.PipeNode():
+            # Since variable assignments from parameter expansion, such as `${var:=default}`, in pipeline commands
+            # should not persist beyond the pipeline, save the environment before the pipeline and restore it after.
+            saved_envs = [(t.latest_state.env, t.latest_state.localenv) for t in traces]
             t = traces
-            # Sequentially interpret each command in the pipe, and return the aggregated traces.
+            # Sequentially interpret each command in the pipeline, and return the aggregated traces.
             for cmd in node.items:
                 t = guarded_interp_node(t, cmd, config)
-            return t
+            # Since traces can fork and merge, we need to match traces back to their original saved environments.
+            # Thus, restore the environment of each trace to the environment of the first trace that matches its current state.
+            restored_traces = []
+            for trace in t:
+                saved_env, saved_localenv = saved_envs[0] if saved_envs else (trace.latest_state.env, trace.latest_state.localenv)
+                restored_traces.append(trace.extend(lambda s, env=saved_env, localenv=saved_localenv:
+                                                    replace(s, env=env, localenv=localenv)))
+            return restored_traces
 
         # todo bring other cases as needed
 

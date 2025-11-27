@@ -667,6 +667,32 @@ def cat_spec(cmd: CmdInvocation) -> CmdSpec:
     return CmdSpec(check, success_postcond, failure_postcond, io)
 
 
+def file_spec(cmd: CmdInvocation) -> CmdSpec:
+    # https://pubs.opengroup.org/onlinepubs/9799919799/utilities/file.html
+    # The spec is (almost) identical to the `cat` spec other than the command name.
+
+    (name, flags, _, operands) = (cmd.cmd_name, cmd.flags, cmd.options, cmd.operands)
+    io = IOType.STDOUT
+
+    assert name == SymStr(("file",)), f"Expected file command, got: {name}"
+
+    if flags == set(): # file file...
+        # check:
+        #   (1) all operands must be files
+        # z-postcond:
+        #   (1) all operands are files or directories
+        # nz-postcond:
+        #   (1) none (maybe permission issue, etc.)
+
+        check = And.from_field_iter(operands, IsFile)
+        success_postcond = And.from_field_iter(operands, IsFile) & And.from_field_iter(operands, IsRead)
+        failure_postcond = Empty()
+
+    else:
+        return handle_non_posix(cmd)
+
+    return CmdSpec(check, success_postcond, failure_postcond, io)
+
 # -- Specs end here --
 # Do not define specs below this line, they will not be registered!
 

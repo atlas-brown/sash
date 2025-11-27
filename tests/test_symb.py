@@ -631,6 +631,18 @@ grep $1 somefile.txt
     expected_error = reporter.UnexpectedStdin("grep", 0)
     assert_expected_report(report, [expected_error])
 
+def test_var_assignment_in_pipeline_not_persistent(tmp_path):
+    """Test that variable assignments from ${var:=default} in pipelines don't persist."""
+    script = write_script(tmp_path, """
+file ${FOO:=value} | cat
+echo $FOO
+""")
+    report = reset_and_run_main(script, solver=True)
+    foo_assign_var = AST.VArgChar(fmt="Normal", null=True, var="FOO", arg=[])
+    expected_error1 = reporter.UnboundID(foo_assign_var.pretty(), 0)
+    expected_error2 = reporter.UnboundID(foo_var.pretty(), 1)
+    assert_expected_report(report, [expected_error1, expected_error2])
+
 # def test_function_call_multipath(tmp_path):
 #     # A function that is called should not produce unbound variable errors for its parameters
 #     script = write_script(tmp_path, """
