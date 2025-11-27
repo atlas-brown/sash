@@ -104,6 +104,19 @@ def handle_commandnode(traces: Traces,
                       trim_string_for_logging(node.pretty()), expanded_args, node.assignments)
     return t1
 
+def extract_literal_strings_from_arg(arg: list[AST.ArgChar]) -> str:
+    """Extract all literal character strings from an argument."""
+    result = []
+    for char in arg:
+        match char:
+            case AST.CArgChar() | AST.EArgChar():
+                result.append(char.pretty(AST.QUOTED))
+            case AST.QArgChar():
+                result.append(extract_literal_strings_from_arg(char.arg))
+            case AST.VArgChar() | AST.BArgChar() | AST.AArgChar() | AST.TArgChar():
+                pass
+    return "".join(result)
+
 def handle_rm(expanded_args: tuple[Field], trace: Trace, node: AST.CommandNode) -> tuple[Trace, Trace]:
     logging.debug("Checking rm command with expansion possibility: %s", expanded_args)
     spec = get_spec("rm", expanded_args)
@@ -115,7 +128,8 @@ def handle_rm(expanded_args: tuple[Field], trace: Trace, node: AST.CommandNode) 
 
     def is_protected(path):
         return any(path in [p, p + "/", p + "/*"] for p in Config.get("PROTECTED_PATHS"))
-    for arg_field in expanded_args[1:]:
+
+    for arg_idx, arg_field in enumerate(expanded_args[1:], start=1):
         if (path := arg_field.try_to_str()) and is_protected(path):
             Reporter.add_issue(reporter.DeleteSystemFile(path, context_line))
         match arg_field:
@@ -127,6 +141,12 @@ def handle_rm(expanded_args: tuple[Field], trace: Trace, node: AST.CommandNode) 
                     Reporter.add_issue(reporter.WordSplitCouldDeleteSystemFile(path, context_line))
                 if suf is not None and (path := suf.try_to_str()) and is_protected(path):
                     Reporter.add_issue(reporter.WordSplitCouldDeleteSystemFile(path, context_line))
+                # Handle cases like "${DESTDIR}${LIBDIR}/${CAMLP5N}" where the literal "/" is embedded between the prefixes and suffixes
+                # and gets untracked during merging (in `collect_prefixes_suffixes`).
+                if min == 0 and arg_idx < len(node.arguments):
+                    literal_path = extract_literal_strings_from_arg(node.arguments[arg_idx])
+                    if literal_path and is_protected(literal_path):
+                        Reporter.add_issue(reporter.WordSplitCouldDeleteSystemFile(literal_path, context_line))
 
     return (
         trace.extend(lambda s: s.add_pathcond(spec.success_postcond)\
