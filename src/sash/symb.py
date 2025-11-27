@@ -68,6 +68,13 @@ def handle_commandnode(traces: Traces,
             # TODO: Unify rm with other commands
             case cmd_name if spec := get_spec(cmd_name, tuple(expanded_args)):
                 logging.debug("Adding %s precondition: %s", cmd_name, spec.check)
+                if spec.min_operands > 0:
+                    assert isinstance(cmd_name, str), "cmd_name should be str when a spec is found"
+                    total_min_words = sum(f.count.min for f in expanded_args[1:])
+                    # If the total minimum word count of operands is less than the minimum number of operands required for the command to succeed,
+                    # it means that the command can only fail (due to, for instance, empty or invalid arguments).
+                    if total_min_words < spec.min_operands:
+                        Reporter.add_issue(reporter.CommandCanOnlyFail(cmd_name, context_line))
                 t_precond = trace_map(t1, lambda s: s.add_assertion(spec.check, source_str=node.pretty(), source_line=context_line))
                 t_success = trace_map(t_precond,
                                       lambda s: s.add_pathcond(spec.success_postcond)\

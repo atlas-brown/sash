@@ -29,6 +29,7 @@ class Code(Enum):
     NOT_A_COMMAND = "not_a_command"
     UNSATISFIED_PRECONDITION = "unsat_precond"
     UNEXPECTED_STDIN = "unexpected_stdin"
+    COMMAND_CAN_ONLY_FAIL = "command_can_only_fail"
 
 
 @dataclass(frozen=True)
@@ -146,6 +147,10 @@ class UnexpectedStdin(Issue):
     def __init__(self, command: str, line):
         super().__init__(Code.UNEXPECTED_STDIN, f"command '{command}' expects input from stdin if the first argument is empty", Severity.ERROR, line)
 
+
+class CommandCanOnlyFail(Issue):
+    def __init__(self, command: str, line):
+        super().__init__(Code.COMMAND_CAN_ONLY_FAIL, f"command '{command}' can only fail", Severity.WARNING, line)
 
 class Report(NamedTuple):
     filename: str

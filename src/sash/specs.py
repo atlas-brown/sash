@@ -52,6 +52,7 @@ class CmdSpec:
     success_postcond: Constraint # post-condition if exit code is 0
     failure_postcond: Constraint # post-condition if exit code is non-0
     io: IOType = IOType.UNKNOWN # whether the command does IO on stdin/stdout
+    min_operands: int = 0 # minimum number of operands required for command to succeed (for guarding against commands that can only fail)
 
 
 # If a command is not present here github.com/binpash/annotations/tree/main/pash_annotations/parser/command_flag_option_info/data
@@ -562,7 +563,7 @@ def mkdir_spec(cmd: CmdInvocation) -> CmdSpec:
     else:
         return handle_non_posix(cmd)
 
-    return CmdSpec(check, success_postcond, failure_postcond, io)
+    return CmdSpec(check, success_postcond, failure_postcond, io, min_operands=1)
 
 
 def mv_spec(cmd: CmdInvocation) -> CmdSpec:

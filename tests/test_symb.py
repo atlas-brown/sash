@@ -632,7 +632,7 @@ grep $1 somefile.txt
     assert_expected_report(report, [expected_error])
 
 def test_var_assignment_in_pipeline_not_persistent(tmp_path):
-    """Test that variable assignments from ${var:=default} in pipelines don't persist."""
+    """Test that variable assignments from `${var:=default}` in pipelines don't persist to the outer scope."""
     script = write_script(tmp_path, """
 file ${FOO:=value} | cat
 echo $FOO
@@ -642,6 +642,15 @@ echo $FOO
     expected_error1 = reporter.UnboundID(foo_assign_var.pretty(), 0)
     expected_error2 = reporter.UnboundID(foo_var.pretty(), 1)
     assert_expected_report(report, [expected_error1, expected_error2])
+
+def test_mkdir_can_only_fail(tmp_path):
+    """Test that `mkdir` can only fail if the argument is empty."""
+    script = write_script(tmp_path, """
+mkdir $1
+""")
+    report = reset_and_run_main(script, solver=True)
+    expected_error = reporter.CommandCanOnlyFail("mkdir", 0)
+    assert_expected_report(report, [expected_error])
 
 # def test_function_call_multipath(tmp_path):
 #     # A function that is called should not produce unbound variable errors for its parameters
