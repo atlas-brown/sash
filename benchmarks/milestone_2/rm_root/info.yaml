@@ -23,6 +23,10 @@ bugs:
   description: Everything under / is deleted because of an unset variable
 - line: 12
   description: Root is deleted
+- line: 13
+  description: An unset variable is used ($OUT_DIR)
+- line: 13
+  description: An unset variable is used ($DATE)
 - line: 14
   description: An unset variable is used ($DB_USER)
 - line: 14
@@ -83,16 +87,17 @@ ground_truth:
     shellcheck:
       detects: true
       code: SC1127
-  - line: 10
-    code: unbound
-    shellcheck:
-      detects: true
-      code: SC2154
   - line: 11
     code: unbound
     shellcheck:
       detects: true
       code: SC2154
+  # 2nd occurrence of $OUT_DIR not reported
+  # - line: 12
+  #   code: unbound
+  #   shellcheck:
+  #     detects: true
+  #     code: SC2154
   - code: word_split
     line: 12
     shellcheck:
@@ -110,58 +115,82 @@ ground_truth:
     shellcheck:
       detects: true
       code: SC2114
-  - line: 14
+  # 3rd occurence of $OUT_DIR
+  # - line: 13
+  #   code: unbound
+  #   shellcheck:
+  #     detects: true
+  #     code: SC2154
+  - line: 13
     code: unbound
     shellcheck:
       detects: true
       code: SC2154
   - line: 14
     code: unbound
+    note: DUMP
     shellcheck:
       detects: true
       code: SC2154
   - line: 14
     code: unbound
-    duplicate: true
+    note: DB_USER
     shellcheck:
       detects: true
       code: SC2154
   - line: 14
     code: unbound
-    duplicate: true
+    note: DB_PASS
+    shellcheck:
+      detects: true
+      code: SC2154
+  # 4th occurrence of OUT_DIR and DATE
+  # - line: 14
+  #   code: unbound
+  #   duplicate: true
+  #   shellcheck:
+  #     detects: true
+  #     code: SC2154
+  # - line: 14
+  #   code: unbound
+  #   duplicate: true
+  #   shellcheck:
+  #     detects: true
+  #     code: SC2154
+  - line: 15
+    code: unbound
+    note: TAR_DIR
     shellcheck:
       detects: true
       code: SC2154
   - line: 15
     code: unbound
+    note: TAR_BAK
     shellcheck:
       detects: true
       code: SC2154
-  - line: 15
-    code: unbound
-    shellcheck:
-      detects: true
-      code: SC2154
-  - line: 15
-    code: unbound
-    duplicate: true
-    shellcheck:
-      detects: true
-      code: SC2154
-  - line: 15
-    code: unbound
-    duplicate: true
-    shellcheck:
-      detects: true
-      code: SC2154
+  # OUT_DIR and DATE
+  # - line: 15
+  #   code: unbound
+  #   duplicate: true
+  #   shellcheck:
+  #     detects: true
+  #     code: SC2154
+  # - line: 15
+  #   code: unbound
+  #   duplicate: true
+  #   shellcheck:
+  #     detects: true
+  #     code: SC2154
+  # TAR_DIR
+  # - line: 16
+  #   code: unbound
+  #   shellcheck:
+  #     detects: true
+  #     code: SC2154
   - line: 16
     code: unbound
-    shellcheck:
-      detects: true
-      code: SC2154
-  - line: 16
-    code: unbound
-    duplicate: true
+    note: DAYS
     shellcheck:
       detects: true
       code: SC2154
