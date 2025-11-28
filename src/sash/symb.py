@@ -21,7 +21,7 @@ from sash.interpreter_config import InterpConfig, UnboundVariablePolicy
 from sash.reporter import Reporter
 from sash.solver import field_to_z3
 from sash.specs import get_spec
-from sash.state import ArbitraryType, CompletelyArbitrary, Field, FuncMap, SetOptions, ShellVar, State, SymStr, SymVar, Trace, Traces, WordCount, collapse_traces, is_special_var, trace_map
+from sash.state import *
 
 
 def handle_commandnode(traces: Traces,
@@ -79,13 +79,17 @@ def handle_commandnode(traces: Traces,
                 t_success = trace_map(t_precond,
                                       lambda s: s.add_pathcond(spec.success_postcond)\
                                                  .update_fs(spec.success_postcond)\
-                                                 .set_last_exit_code(SymStr(("0",)), spec.failure_postcond))
+                                                 .set_last_exit_code(SymStr(("0",)),
+                                                                     Confidence.SPECULATIVE,
+                                                                     spec.failure_postcond))
                 t_failure = []
                 if config.in_checked_position:
                     t_failure = trace_map(t_precond,
                                           lambda s: s.add_pathcond(spec.failure_postcond)\
                                                      .update_fs(spec.failure_postcond)\
-                                                     .set_last_exit_code(SymStr(("1",)), spec.failure_postcond))
+                                                     .set_last_exit_code(SymStr(("1",)),
+                                                                         Confidence.SPECULATIVE,
+                                                                         spec.failure_postcond))
                 t1 = t_success + t_failure
             case some_name if isinstance(some_name, str):
                 # todo: we could actually not use `expand_args_dumb` here, and instead do trace-specific expansion, since the function body is handled trace-specifically anyway
@@ -151,10 +155,10 @@ def handle_rm(expanded_args: tuple[Field], trace: Trace, node: AST.CommandNode) 
     return (
         trace.extend(lambda s: s.add_pathcond(spec.success_postcond)\
                                 .update_fs(spec.success_postcond)\
-                                .set_last_exit_code(SymStr(("0",)), spec.failure_postcond)),
+                                .set_last_exit_code(SymStr(("0",)), Confidence.SPECULATIVE, spec.failure_postcond)),
         trace.extend(lambda s: s.add_pathcond(spec.failure_postcond)\
                                 .update_fs(spec.failure_postcond)\
-                                .set_last_exit_code(SymStr(("1",)), spec.failure_postcond))
+                                .set_last_exit_code(SymStr(("1",)), Confidence.SPECULATIVE, spec.failure_postcond))
     )
 
 
@@ -219,7 +223,7 @@ def handle_function_call(name: str,
     return [t.extend(lambda s: s.exit_function()) for t in call_result_traces]
 
 def record_assignment(trace: Trace, var: str, rhs: Field) -> Trace:
-    return trace.extend(lambda s: s.set_env(var, ShellVar(rhs)).set_last_exit_code(SymStr(("0",))))
+    return trace.extend(lambda s: s.set_env(var, ShellVar(rhs)).set_last_exit_code(SymStr(("0",)), Confidence.DEFINITE))
 
 def handle_while(traces: Traces,
                  node: AST.WhileNode,
@@ -239,8 +243,8 @@ def handle_while(traces: Traces,
         logging.debug("While loop never runs")
         return t1
 
-    t1 = [t for t in t1 if t.latest_state.last_exit_code != SymStr(("1",))]
-    t_skip_body = [t for t in traces if t.latest_state.last_exit_code == SymStr(("1",))]
+    t1 = [t for t in t1 if t.latest_state.last_exit_code != (SymStr(("1",)), Confidence.DEFINITE)]
+    t_skip_body = [t for t in traces if t.latest_state.last_exit_code == (SymStr(("1",)), Confidence.DEFINITE)]
     t2 = guarded_interp_node(t1, node.body, config)
 
 
@@ -401,11 +405,11 @@ def handle_if(traces: Traces, node: AST.IfNode, config: InterpConfig) -> Traces:
         Reporter.add_issue(reporter.ConstantCondition(test_cmds, context_line))
         if test_result == True and (node.else_b is not None and node.else_b.pretty()):
                                                              # Hack because libdash sometimes gives empty else bodies
-            t1 = trace_map(t1, lambda s: s.set_last_exit_code(SymStr(("0",))))
+            t1 = trace_map(t1, lambda s: s.set_last_exit_code(SymStr(("0",)), Confidence.DEFINITE))
             logging.debug("Reporting dead code in else branch.")
             Reporter.add_issue(reporter.DeadCode(node.else_b, context_line))
         elif test_result == False:
-            t1 = trace_map(t1, lambda s: s.set_last_exit_code(SymStr(("1",))))
+            t1 = trace_map(t1, lambda s: s.set_last_exit_code(SymStr(("1",)), Confidence.DEFINITE))
             logging.debug("Reporting dead code in then branch")
             Reporter.add_issue(reporter.DeadCode(node.then_b, context_line))
     else:
@@ -434,11 +438,11 @@ def handle_exit(traces: Traces) -> Traces:
     return trace_map(traces, lambda s: s.terminate())
 
 def handle_branch(traces: Traces, success_cb: Callable[[Traces], Traces], failure_cb: Callable[[Traces], Traces], node: AST.AstNode, config: InterpConfig) -> Traces:
-    t_success = [t for t in traces if t.latest_state.last_exit_code == SymStr(("0",))]
-    t_failure = [t for t in traces if t.latest_state.last_exit_code == SymStr(("1",))]
-    t_other   = [t for t in traces if t.latest_state.last_exit_code not in {SymStr(("0",)), SymStr(("1",))}]
-    t_then = success_cb(t_success + trace_map(t_other, lambda s: s.set_last_exit_code(SymStr(("0",)))))
-    t_else = failure_cb(t_failure + trace_map(t_other, lambda s: s.set_last_exit_code(SymStr(("1",)))))
+    t_success = [t for t in traces if t.latest_state.last_exit_code[0] == SymStr(("0",))]
+    t_failure = [t for t in traces if t.latest_state.last_exit_code[0] == SymStr(("1",))]
+    t_other   = [t for t in traces if t.latest_state.last_exit_code[0] not in {SymStr(("0",)), SymStr(("1",))}]
+    t_then = success_cb(t_success + trace_map(t_other, lambda s: s.set_last_exit_code(SymStr(("0",)), Confidence.SPECULATIVE)))
+    t_else = failure_cb(t_failure + trace_map(t_other, lambda s: s.set_last_exit_code(SymStr(("1",)), Confidence.SPECULATIVE)))
     t_then_bp, t_else_bp = config.branch_policy(node, t_then, t_else)
     res = t_then_bp + t_else_bp
     if all(t.latest_state.terminated for t in res):
@@ -460,7 +464,7 @@ def handle_read(expanded_args: list[Field], traces: Traces, node: AST.AstNode) -
             collected.append((name, arg))
     # If there are no variable names, return traces with exit code set to 0, as `read` consumed input but bound nothing.
     if not collected:
-        return [t.extend(lambda s: s.set_last_exit_code(SymStr(("0",)))) for t in traces]
+        return [t.extend(lambda s: s.set_last_exit_code(SymStr(("0",)), Confidence.SPECULATIVE)) for t in traces]
     new_traces: Traces = []
     for trace in traces:
         curr_trace = trace
@@ -607,7 +611,14 @@ def expand_simple(stuff: list[AST.ArgChar],
                     if var.var == "?":
                         if self.state.opts.is_set(SetOptions.NOFAIL):
                             Reporter.add_issue(reporter.ConstantCondition("checking " + var.pretty() + " with `set -e`", context_line))
-                        self.add_a_field(Field(self.state.last_exit_code, WordCount(1, 1)))
+                        if self.state.last_exit_code[1] == Confidence.DEFINITE or self.state.opts.is_set(SetOptions.NOFAIL):
+                            logging.debug("expansion: treating special var $? as constant due to definite confidence")
+                            self.add_a_field(Field(self.state.last_exit_code[0], WordCount(1, 1)))
+                        else:
+                            self.add_a_field(Field(CompletelyArbitrary(freeze(var),
+                                                                       ArbitraryType.APPROXIMATION,
+                                                                       self.state),
+                                             WordCount(1, 1)))
                     elif (v := self.state.lookup(var.var)):
                         if var.fmt == "Normal" or (var.fmt == "Minus" and not var.null and not v.ghost):
                             # explanation of the minus case: the POSIX spec says that for
@@ -1078,7 +1089,7 @@ def interp_node(traces: Traces,
             # workaround the `checked_position` by manually adding the failure traces back
             # because some programs use huge functions inside AND/OR nodes, and there's no need to fork on EVERYTHING inside them
             t1 = guarded_interp_node(traces, node.left_operand, config) # intentionally not in a checked position
-            t_failure = [t.fail_last_command() for t in t1 if t.latest_state.last_exit_code == SymStr(("0",))]
+            t_failure = [t.fail_last_command() for t in t1 if t.latest_state.last_exit_code[0] == SymStr(("0",))]
             def success(traces_with_exit_0: Traces) -> Traces:
                 if isinstance(node, AST.AndNode):
                     return guarded_interp_node(traces_with_exit_0, node.right_operand, config)
@@ -1097,8 +1108,9 @@ def interp_node(traces: Traces,
         case AST.NotNode():
             t1 = guarded_interp_node(traces, node.body, config)
             t2 = trace_map(t1,
-                          lambda s: s if s.last_exit_code not in {SymStr(("0",)), SymStr(("1",))}
-                                      else s.set_last_exit_code(SymStr(("1",)) if s.last_exit_code == SymStr(("0",)) else SymStr(("0",))))
+                          lambda s: s if s.last_exit_code[0] not in {SymStr(("0",)), SymStr(("1",))}
+                                      else s.set_last_exit_code(SymStr(("1",)) if s.last_exit_code[0] == SymStr(("0",)) else SymStr(("0",)),
+                                                                s.last_exit_code[1]))
             return t2
 
         case AST.PipeNode():

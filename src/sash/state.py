@@ -170,6 +170,10 @@ class Assertion:
     source_str: str
     source_line: int
 
+class Confidence(Enum):
+    DEFINITE = 0
+    SPECULATIVE = 1
+
 @dataclass(frozen=True)
 class State:
     pathcond:                    tuple[Constraint, ...]      = field(default_factory=tuple)
@@ -177,7 +181,7 @@ class State:
     localenv:                    FrozenDict[str, ShellVar]   = field(default_factory=FrozenDict)
     call_stack:                  tuple[str, ...]             = field(default_factory=tuple)
     fundefs:                     FrozenDict[str, FrozenAst]  = field(default_factory=FrozenDict)
-    last_exit_code:              SymStr                      = SymStr(("0",))
+    last_exit_code:              tuple[SymStr, Confidence]   = (SymStr(("0",)), Confidence.DEFINITE)
     last_cmd_failure_postcond:   Optional[Constraint]        = None
     opts:                        SetOptions                  = field(default_factory=SetOptions)
     known_nonexistent_commands:  frozenset[str]              = field(default_factory=frozenset)
@@ -245,9 +249,9 @@ class State:
     def update_fs(self, constraints: Constraint) -> 'State':
         return replace(self, fs_model=self.fs_model.apply_postcondition(NormalizedFSConstraint(constraints)))
 
-    def set_last_exit_code(self, code: SymStr, failure_postcond: Optional[Constraint] = None) -> 'State':
+    def set_last_exit_code(self, code: SymStr, confidence: Confidence, failure_postcond: Optional[Constraint] = None) -> 'State':
         return replace(self,
-                       last_exit_code=code,
+                       last_exit_code=(code, confidence),
                        last_cmd_failure_postcond=(failure_postcond if failure_postcond is not None else self.last_cmd_failure_postcond))
 
     def terminate(self) -> 'State':
@@ -313,7 +317,7 @@ class Trace:
                                 fs_model=prior_state.fs_model)\
                                 .add_pathcond(last_state.last_cmd_failure_postcond)\
                                 .update_fs(last_state.last_cmd_failure_postcond)\
-                                .set_last_exit_code(SymStr(("1",)))
+                                .set_last_exit_code(SymStr(("1",)), Confidence.SPECULATIVE)
             return replace(self, states=self.states[:-1] + (new_state,))
         else:
             return self
