@@ -149,6 +149,7 @@ class ShellVar:
 @dataclass(frozen=True)
 class SetOptions:
     NOUNSET = "u"
+    NOFAIL = "e"
     current: frozenset[str] = field(default_factory=frozenset)
     def set_options(self, options: set[str]) -> 'SetOptions':
        return SetOptions(current=self.current | options)

@@ -605,6 +605,8 @@ def expand_simple(stuff: list[AST.ArgChar],
                     return res
                 case AST.VArgChar() as var:
                     if var.var == "?":
+                        if self.state.opts.is_set(SetOptions.NOFAIL):
+                            Reporter.add_issue(reporter.ConstantCondition("checking " + var.pretty() + " with `set -e`", context_line))
                         self.add_a_field(Field(self.state.last_exit_code, WordCount(1, 1)))
                     elif (v := self.state.lookup(var.var)):
                         if var.fmt == "Normal" or (var.fmt == "Minus" and not var.null and not v.ghost):
