@@ -80,7 +80,7 @@ def handle_commandnode(traces: Traces,
                                       lambda s: s.add_pathcond(spec.success_postcond)\
                                                  .update_fs(spec.success_postcond)\
                                                  .set_last_exit_code(SymStr(("0",)),
-                                                                     Confidence.SPECULATIVE,
+                                                                     Confidence.DEFINITE if s.opts.is_set(SetOptions.NOFAIL) and not config.in_checked_position else Confidence.SPECULATIVE,
                                                                      spec.failure_postcond))
                 t_failure = []
                 if config.in_checked_position:
@@ -609,9 +609,7 @@ def expand_simple(stuff: list[AST.ArgChar],
                     return res
                 case AST.VArgChar() as var:
                     if var.var == "?":
-                        if self.state.opts.is_set(SetOptions.NOFAIL):
-                            Reporter.add_issue(reporter.ConstantCondition("checking " + var.pretty() + " with `set -e`", context_line))
-                        if self.state.last_exit_code[1] == Confidence.DEFINITE or self.state.opts.is_set(SetOptions.NOFAIL):
+                        if self.state.last_exit_code[1] == Confidence.DEFINITE:
                             logging.debug("expansion: treating special var $? as constant due to definite confidence")
                             self.add_a_field(Field(self.state.last_exit_code[0], WordCount(1, 1)))
                         else:
