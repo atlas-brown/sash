@@ -386,8 +386,11 @@ def handle_set(expanded_args: list[Field], traces: Traces) -> Traces:
     return trace_map(traces, lambda s: s.set_options(to_set))
 
 def handle_if(traces: Traces, node: AST.IfNode, config: InterpConfig) -> Traces:
+    test_line_number = context_line
     test_cmds = []
     def get_the_test(cmd_fields):
+        nonlocal test_line_number
+        test_line_number = context_line
         test_cmds.append(cmd_fields)
     temp_config = config.add_expanded_command_callback(get_the_test)
     temp_config = replace(temp_config, in_checked_position=True)
@@ -402,16 +405,16 @@ def handle_if(traces: Traces, node: AST.IfNode, config: InterpConfig) -> Traces:
         test_result = interpret_test(test_cmds[-1])
         logging.debug("Test command result: %s", test_result)
     if test_result is not None:
-        Reporter.add_issue(reporter.ConstantCondition(test_cmds, context_line))
+        Reporter.add_issue(reporter.ConstantCondition(test_cmds, test_line_number))
         if test_result == True and (node.else_b is not None and node.else_b.pretty()):
                                                              # Hack because libdash sometimes gives empty else bodies
             t1 = trace_map(t1, lambda s: s.set_last_exit_code(SymStr(("0",)), Confidence.DEFINITE))
             logging.debug("Reporting dead code in else branch.")
-            Reporter.add_issue(reporter.DeadCode(node.else_b, context_line))
+            Reporter.add_issue(reporter.DeadCode(node.else_b, test_line_number))
         elif test_result == False:
             t1 = trace_map(t1, lambda s: s.set_last_exit_code(SymStr(("1",)), Confidence.DEFINITE))
             logging.debug("Reporting dead code in then branch")
-            Reporter.add_issue(reporter.DeadCode(node.then_b, context_line))
+            Reporter.add_issue(reporter.DeadCode(node.then_b, test_line_number))
     else:
         logging.debug("FORK: explicit if")
     # Several possibilities here:
