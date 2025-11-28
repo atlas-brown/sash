@@ -11,11 +11,7 @@ ground_truth:
   errors:
   - line: 85
     code: unbound
+    note: we only expect one report, first unbound occurence
     shellcheck:
       detects: true
       code: SC2153
-  - line: 86
-    code: unbound
-    shellcheck:
-      detects: false
-      note: Probably fails because the variable is used in a brace command
