@@ -1,7 +1,7 @@
 bugs:
-- line: 8
-  description: File is accidentally overwritten in every iteration of a loop
 - line: 9
+  description: File is accidentally overwritten in every iteration of a loop
+- line: 10
   description: File is accidentally overwritten in every iteration of a loop
 
 sources:
