@@ -1,7 +1,7 @@
 bugs:
-- line: 78
+- line: 74
   description: If some externally-set variables are not set, root gets deleted
-- line: 83
+- line: 79
   description: If some externally-set variables are not set, root gets deleted
 
 sources:
@@ -10,12 +10,12 @@ sources:
 
 ground_truth:
   errors:
-  - line: 78
+  - line: 74
     code: word_split_del_sys_file
     shellcheck:
       detects: true
       code: SC2115
-  - line: 83
+  - line: 79
     code: word_split_del_sys_file
     shellcheck:
       detects: true
