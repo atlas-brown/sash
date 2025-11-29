@@ -872,6 +872,7 @@ class Command(Cmd):
                                   operands[0].content == SymStr(("-V",))): # command -v/-V subcmd
             subcmd = operands[1]
             failure_postcond = ~CommandExists(subcmd)
+            success_postcond = CommandExists(subcmd)
             io = IOType.add_stdout(io)
 
         else: # command cmd args...

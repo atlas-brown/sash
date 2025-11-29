@@ -11,6 +11,7 @@ import z3
 
 arbitrary_to_z3_var: dict[CompletelyArbitrary, z3.ExprRef] = {}
 tracked_assertions: dict[z3.BoolRef, Assertion] = {}
+command_exists_predicate = z3.Function('command_exists', z3.StringSort(), z3.BoolSort())
 
 def reset_z3cache():
     global arbitrary_to_z3_var, tracked_assertions
@@ -36,11 +37,24 @@ def field_content_to_z3(field_content: SymStr | CompletelyArbitrary) -> z3.ExprR
             return z3_var
     assert False, f"Expected field content, got {field_content}"
 
+def _command_exists_to_z3(field: Field, s: State) -> z3.ExprRef:
+    """
+    Model command existence.
+    - If we have concrete evidence that the command is missing, encode False.
+    - Otherwise, leave it symbolic via an uninterpreted predicate over the command name.
+    """
+    if (cmd_name := field.try_to_str()) and cmd_name in s.known_nonexistent_commands:
+        return z3.BoolVal(False)
+    return command_exists_predicate(field_to_z3(field))
+
+
 def constraint_to_z3(constraint: Constraint, s: State) -> z3.ExprRef:
     def norm_constraint_to_z3(constraint: Constraint, s: State):
         match constraint:
-            case Empty() | HasStdout() | ExpectsStdin() | IsWritten() | CommandExists():
+            case Empty() | HasStdout() | ExpectsStdin() | IsWritten():
                 return z3.BoolVal(True)
+            case CommandExists(name):
+                return _command_exists_to_z3(name, s)
             case IsRead():
                 return s.fs_model.is_read_z3(field_content_to_z3(constraint.path.content))
             case Description(text):

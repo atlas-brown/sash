@@ -701,6 +701,38 @@ env VAR1=value1 VAR2=value2 NONEXISTENT_COMMAND
     expected_error = reporter.NotACommand("NONEXISTENT_COMMAND", 0)
     assert_expected_report(report, [expected_error])
 
+def test_command_exists(tmp_path):
+    """Test that calling a non-existent command produces an error."""
+    script = write_script(tmp_path, """
+    if command -v nonexistentcommand >/dev/null 2>&1; then
+     exit
+    fi
+    nonexistentcommand arg1 arg2
+    """)
+    report = reset_and_run_main(script, solver=True)
+    expected_error = reporter.NotACommand("nonexistentcommand", 0)
+    assert_expected_report(report, [expected_error])
+
+    script = write_script(tmp_path, """
+    if ! command -v existentcommand >/dev/null 2>&1; then
+        exit
+    fi
+    existentcommand arg1 arg2
+    """)
+    report = reset_and_run_main(script, solver=True)
+    assert_expected_report(report, [])
+
+def test_command_exists_no_error(tmp_path):
+    """Test that calling an existent command does not produce an error."""
+    script = write_script(tmp_path, """
+    if command -v a_command >/dev/null 2>&1; then
+     exit
+    fi
+    other_cmd "Hello, World!"
+    """)
+    report = reset_and_run_main(script, solver=True)
+    assert_expected_report(report, [])
+
 # def test_function_call_multipath(tmp_path):
 #     # A function that is called should not produce unbound variable errors for its parameters
 #     script = write_script(tmp_path, """
