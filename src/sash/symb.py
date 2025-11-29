@@ -73,7 +73,12 @@ def handle_commandnode(traces: Traces,
                         case Not(CommandExists(non_existent_cmd_field)):
                             non_existent_cmd_name = non_existent_cmd_field.try_to_str()
                             if isinstance(non_existent_cmd_name, str):
-                                Reporter.add_issue(reporter.NotACommand(non_existent_cmd_name, context_line))
+                                should_report = any(
+                                    non_existent_cmd_name not in trace.latest_state.known_existing_commands
+                                    for trace in t1
+                                )
+                                if should_report:
+                                    Reporter.add_issue(reporter.NotACommand(non_existent_cmd_name, context_line))
                 if spec.min_operands > 0:
                     assert isinstance(cmd_name, str), "cmd_name should be str when a spec is found"
                     total_min_words = sum(f.count.min for f in expanded_args[1:])

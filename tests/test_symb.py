@@ -733,6 +733,18 @@ def test_command_exists_no_error(tmp_path):
     report = reset_and_run_main(script, solver=True)
     assert_expected_report(report, [])
 
+def test_command_not_exists_no_error(tmp_path):
+    """Test that calling a non-existent command after checking its non-existence does not produce an error."""
+    script = write_script(tmp_path, """
+    command -v git >/dev/null 2>&1 || {
+        echo "Error: git is not installed"
+        exit 1
+    }
+    env git --version
+    """)
+    report = reset_and_run_main(script, solver=True)
+    assert_expected_report(report, [])
+
 # def test_function_call_multipath(tmp_path):
 #     # A function that is called should not produce unbound variable errors for its parameters
 #     script = write_script(tmp_path, """

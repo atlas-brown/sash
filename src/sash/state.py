@@ -185,6 +185,7 @@ class State:
     last_cmd_failure_postcond:   Optional[Constraint]        = None
     opts:                        SetOptions                  = field(default_factory=SetOptions)
     known_nonexistent_commands:  frozenset[str]              = field(default_factory=frozenset)
+    known_existing_commands:     frozenset[str]              = field(default_factory=frozenset)
     terminated:                  bool                        = False # by `exit` or similar
     assertions:                  tuple[Assertion, ...]       = field(default_factory=tuple)
     fs_model:                    FSModel                     = field(default_factory=FSModel)
@@ -258,10 +259,24 @@ class State:
         return replace(self, terminated=True)
 
     def record_nonexistent_command(self, name: str) -> 'State':
-        return replace(self, known_nonexistent_commands=self.known_nonexistent_commands | {name})
+        return replace(
+            self,
+            known_nonexistent_commands=self.known_nonexistent_commands | {name},
+            known_existing_commands=self.known_existing_commands - {name},
+        )
 
     def remove_nonexistent_command(self, name: str) -> 'State':
         return replace(self, known_nonexistent_commands=self.known_nonexistent_commands - {name})
+
+    def record_existing_command(self, name: str) -> 'State':
+        return replace(
+            self,
+            known_existing_commands=self.known_existing_commands | {name},
+            known_nonexistent_commands=self.known_nonexistent_commands - {name},
+        )
+
+    def remove_existing_command(self, name: str) -> 'State':
+        return replace(self, known_existing_commands=self.known_existing_commands - {name})
 
     def update_known_commands(self, spec: Constraint) -> 'State':
         norm_spec = normalize_fs_constraints(spec) # turns ~(a & b) into (~a | ~b), removes double negations, etc.
@@ -274,10 +289,14 @@ class State:
                 negation = True
             elif isinstance(c, CommandExists):
                 cmd_name = c.name.try_to_str()
-                if cmd_name and negation:
+                if not cmd_name:
+                    negation = False
+                    continue
+                if negation:
                     updated_state = updated_state.record_nonexistent_command(cmd_name)
-                elif cmd_name:
-                    updated_state = updated_state.remove_nonexistent_command(cmd_name)
+                else:
+                    updated_state = updated_state.record_existing_command(cmd_name)
+                negation = False
             else:
                 negation = False
 
