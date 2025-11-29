@@ -1054,7 +1054,6 @@ def interp_node(traces: Traces,
                     t2 = guarded_interp_node(t2, node.body, config)
                 return t2
             else:
-                t_res = None # result is just the traces after one iteration
                 t_current = t1
                 for i in range(config.max_loop_unroll):
                     logging.debug("For loop unrolling iteration %d/%d", i+1, config.max_loop_unroll)
@@ -1063,10 +1062,7 @@ def interp_node(traces: Traces,
                                                                         t.latest_state)) \
                         for t in t_current]
                     t_current = guarded_interp_node(t2, node.body, config)
-                    if t_res is None:
-                        t_res = t_current
-                assert t_res is not None
-                return t_res
+                return t_current
 
         case AST.FileRedirNode():
             res = []
