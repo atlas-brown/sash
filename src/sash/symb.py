@@ -68,6 +68,12 @@ def handle_commandnode(traces: Traces,
             # TODO: Unify rm with other commands
             case cmd_name if spec := get_spec(cmd_name, tuple(expanded_args)):
                 logging.debug("Adding %s precondition: %s", cmd_name, spec.check)
+                if cmd_name == "env":
+                    match spec.failure_postcond:
+                        case Not(CommandExists(non_existent_cmd_field)):
+                            non_existent_cmd_name = non_existent_cmd_field.try_to_str()
+                            if isinstance(non_existent_cmd_name, str):
+                                Reporter.add_issue(reporter.NotACommand(non_existent_cmd_name, context_line))
                 if spec.min_operands > 0:
                     assert isinstance(cmd_name, str), "cmd_name should be str when a spec is found"
                     total_min_words = sum(f.count.min for f in expanded_args[1:])
@@ -75,10 +81,11 @@ def handle_commandnode(traces: Traces,
                     # it means that the command can only fail (due to, for instance, empty or invalid arguments).
                     if total_min_words < spec.min_operands:
                         Reporter.add_issue(reporter.CommandCanOnlyFail(cmd_name, context_line))
-                t_precond = trace_map(t1, lambda s: s.add_assertion(spec.check, source_str=node.pretty(), source_line=context_line))
+                t_precond = trace_map(t1, lambda s: s.add_assertion(spec.check, source_str=node.pretty(), source_line=context_line).update_known_commands(spec.check))
                 t_success = trace_map(t_precond,
                                       lambda s: s.add_pathcond(spec.success_postcond)\
                                                  .update_fs(spec.success_postcond)\
+                                                 .update_known_commands(spec.success_postcond)\
                                                  .set_last_exit_code(SymStr(("0",)),
                                                                      Confidence.DEFINITE if s.opts.is_set(SetOptions.NOFAIL) and not config.in_checked_position else Confidence.SPECULATIVE,
                                                                      spec.failure_postcond))
@@ -87,6 +94,7 @@ def handle_commandnode(traces: Traces,
                     t_failure = trace_map(t_precond,
                                           lambda s: s.add_pathcond(spec.failure_postcond)\
                                                      .update_fs(spec.failure_postcond)\
+                                                     .update_known_commands(spec.failure_postcond)\
                                                      .set_last_exit_code(SymStr(("1",)),
                                                                          Confidence.SPECULATIVE,
                                                                          spec.failure_postcond))

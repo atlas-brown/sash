@@ -683,6 +683,24 @@ echo "$a"
     report = reset_and_run_main(script, solver=True)
     assert_expected_report(report, [])
 
+def test_env_invokes_nonexistent_command(tmp_path):
+    """Test that `env` invoking a nonexistent command produces an error."""
+    script = write_script(tmp_path, """
+env NONEXISTENT_COMMAND
+""")
+    report = reset_and_run_main(script, solver=True)
+    expected_error = reporter.NotACommand("NONEXISTENT_COMMAND", 0)
+    assert_expected_report(report, [expected_error])
+
+def test_env_invokes_nonexistent_command_with_env_vars_assigned_in_between(tmp_path):
+    """Test that `env` invoking a nonexistent command with env vars assigned in between produces an error."""
+    script = write_script(tmp_path, """
+env VAR1=value1 VAR2=value2 NONEXISTENT_COMMAND
+""")
+    report = reset_and_run_main(script, solver=True)
+    expected_error = reporter.NotACommand("NONEXISTENT_COMMAND", 0)
+    assert_expected_report(report, [expected_error])
+
 # def test_function_call_multipath(tmp_path):
 #     # A function that is called should not produce unbound variable errors for its parameters
 #     script = write_script(tmp_path, """

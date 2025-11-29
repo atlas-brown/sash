@@ -1148,6 +1148,7 @@ class Env(Cmd):
         io = IOType.NONE
 
         def _is_env_assignment(field: Field) -> bool:
+            """Helper to check if a `Field` is of the form `VAR=VALUE`."""
             if not isinstance(field.content, SymStr):
                 return False
             parts = field.content.parts
@@ -1179,5 +1180,7 @@ class Env(Cmd):
             if isinstance(subcmd_name, str):
                 if spec := get_spec(subcmd_name, tuple(operands[start_idx:])):
                     return spec
+                # Since the sub-command has no spec, it might not exist.
+                return CmdSpec(check, success_postcond, ~CommandExists(subcmd), io)
 
         return CmdSpec(check, success_postcond, failure_postcond, io)
