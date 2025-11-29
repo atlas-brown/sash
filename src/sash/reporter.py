@@ -30,6 +30,7 @@ class Code(Enum):
     UNSATISFIED_PRECONDITION = "unsat_precond"
     UNEXPECTED_STDIN = "unexpected_stdin"
     COMMAND_CAN_ONLY_FAIL = "command_can_only_fail"
+    CAPTURING_EMPTY_OUTPUT = "capturing_empty_output"
 
 
 @dataclass(frozen=True)
@@ -151,6 +152,10 @@ class UnexpectedStdin(Issue):
 class CommandCanOnlyFail(Issue):
     def __init__(self, command: str, line):
         super().__init__(Code.COMMAND_CAN_ONLY_FAIL, f"command '{command}' can only fail", Severity.WARNING, line)
+
+class CapturingEmptyOutput(Issue):
+    def __init__(self, command: str, line):
+        super().__init__(Code.CAPTURING_EMPTY_OUTPUT, f"command '{command}' captures empty output", Severity.WARNING, line)
 
 class Report(NamedTuple):
     filename: str

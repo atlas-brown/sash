@@ -688,6 +688,21 @@ def expand_simple(stuff: list[AST.ArgChar],
                     logging.info("expansion: treating backquote argchar %s as completely arbitrary field", b.pretty())
                     # todo use the trace: this case suggests we should really generalize the interface of `expand_simple` to be from one trace to many, instead of one state to many
                     t = guarded_interp_node([Trace((self.state,))], b.node, config)
+                    if isinstance(b.node, AST.CommandNode):
+                        _, expanded_args = expand_args_dumb(t, b.node.arguments, config)
+                        if expanded_args:
+                            cmd_name = expanded_args[0].try_to_str()
+                            if isinstance(cmd_name, str):
+                                # If the command is `mkdir` and the verbose flag is not present, the output is empty, which implies a command substitution capturing empty output.
+                                if cmd_name == "mkdir":
+                                    literal_args = [f.try_to_str() for f in expanded_args[1:] if f.try_to_str() is not None]
+                                    if "-v" not in literal_args:
+                                        Reporter.add_issue(reporter.CapturingEmptyOutput(cmd_name, context_line))
+                                # Otherwise, check the spec to see if the command has no stdout. If it does, report the same issue.
+                                else:
+                                    if spec := get_spec(cmd_name, tuple(expanded_args)):
+                                        if spec.io in {IOType.NONE, IOType.STDIN}:
+                                            Reporter.add_issue(reporter.CapturingEmptyOutput(cmd_name, context_line))
                     self.add_a_field(arbitrary_field(b, ArbitraryType.APPROXIMATION, self.state))
                 case _:
                     logging.error("argchar: %s %s", argchar.pretty(), type(argchar))

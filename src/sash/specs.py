@@ -535,6 +535,7 @@ def mkdir_spec(cmd: CmdInvocation) -> CmdSpec:
 
     flags.discard("-m") # -m is used to control permissions, which we do not model
     io = IOType.NONE
+    io = IOType.add_stdout(io) if "-v" in flags else io
 
     if flags == set(["-p"]): # mkdir [-m mode] -p dir...
         # check:
@@ -545,6 +546,18 @@ def mkdir_spec(cmd: CmdInvocation) -> CmdSpec:
         #   (1) none (maybe permission issue, etc.)
 
         check = And.from_field_iter(operands, lambda op: ~IsFile(op))
+        success_postcond = And.from_field_iter(operands, IsDir)
+        failure_postcond = Empty()
+
+    elif flags == set(["-v"]): # mkdir [-m mode] -v dir...
+        # check:
+        #   (1) all operands must not be files or directories
+        # z-postcond:
+        #   (1) all operands are directories
+        # nz-postcond:
+        #   (1) none (maybe permission issue, etc.)
+
+        check = And.from_field_iter(operands, lambda op: ~(IsFile(op) | IsDir(op)))
         success_postcond = And.from_field_iter(operands, IsDir)
         failure_postcond = Empty()
 

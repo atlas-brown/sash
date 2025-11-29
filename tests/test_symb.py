@@ -662,6 +662,27 @@ mkdir $1
     expected_error = reporter.CommandCanOnlyFail("mkdir", 0)
     assert_expected_report(report, [expected_error])
 
+def test_mkdir_produces_empty_output(tmp_path):
+    """Test that `mkdir` with no verbose flag produces empty output if the argument is not empty."""
+    script = write_script(tmp_path, """
+path=/tmp/test
+a=`mkdir $path`
+echo "$a"
+""")
+    report = reset_and_run_main(script, solver=True)
+    expected_error = reporter.CapturingEmptyOutput("mkdir", 0)
+    assert_expected_report(report, [expected_error])
+
+def test_mkdir_produces_nonempty_output_with_verbose(tmp_path):
+    """Test that `mkdir` with the verbose flag produces output if the argument is not empty."""
+    script = write_script(tmp_path, """
+path=/tmp/test
+a=`mkdir -v $path`
+echo "$a"
+""")
+    report = reset_and_run_main(script, solver=True)
+    assert_expected_report(report, [])
+
 # def test_function_call_multipath(tmp_path):
 #     # A function that is called should not produce unbound variable errors for its parameters
 #     script = write_script(tmp_path, """
