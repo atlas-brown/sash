@@ -534,7 +534,6 @@ def mkdir_spec(cmd: CmdInvocation) -> CmdSpec:
     flags, operands = extract_flags_naively("mkdir", operands)
 
     flags.discard("-m") # -m is used to control permissions, which we do not model
-    flags.discard("--") # -- is used to indicate the end of flags
     io = IOType.NONE
     io = IOType.add_stdout(io) if "-v" in flags else io
 
@@ -707,6 +706,12 @@ def file_spec(cmd: CmdInvocation) -> CmdSpec:
         return handle_non_posix(cmd)
 
     return CmdSpec(check, success_postcond, failure_postcond, io)
+
+
+def env_spec(cmd: CmdInvocation) -> CmdSpec:
+    # https://pubs.opengroup.org/onlinepubs/9799919799/utilities/env.html
+
+    return Env.handle_invocation(cmd)
 
 # -- Specs end here --
 # Do not define specs below this line, they will not be registered!
@@ -1122,5 +1127,57 @@ class Test(Cmd):
 
         if negated:
             (success_postcond, failure_postcond) = (failure_postcond, success_postcond)
+
+        return CmdSpec(check, success_postcond, failure_postcond, io)
+
+
+class Env(Cmd):
+    name = "env"
+    posix_flags     = set()
+    supported_flags = set()
+
+    @classmethod
+    def _handle_supported(cls, cmd: CmdInvocation) -> CmdSpec:
+        (name, flags, options, operands) = (cmd.cmd_name, cmd.flags, cmd.options, cmd.operands)
+        assert name == SymStr((cls.name,)), f"Expected env command, got: {name}"
+        assert len(flags) == 0 and len(options) == 0, f"The current parsing function does not produce flags/options for env; something changed?"
+
+        check = Empty()
+        success_postcond = Empty()
+        failure_postcond = Empty()
+        io = IOType.NONE
+
+        def _is_env_assignment(field: Field) -> bool:
+            if not isinstance(field.content, SymStr):
+                return False
+            parts = field.content.parts
+            if len(parts) != 1 or not isinstance(parts[0], str):
+                return False
+            s = parts[0]
+            if "=" not in s:
+                return False
+            var_name, _ = s.split("=", 1)
+            if var_name == "":
+                return False
+            # https://stackoverflow.com/a/2821183
+            # https://pubs.opengroup.org/onlinepubs/9699919799/
+            if not (var_name[0].isalpha() or var_name[0] == "_"):
+                return False
+            for ch in var_name[1:]:
+                if not (ch.isalnum() or ch == "_"):
+                    return False
+            return True
+
+        # Skip leading `VAR=VALUE` assignments that appear before the subcommand, if any.
+        start_idx = 0
+        while start_idx < len(operands) and _is_env_assignment(operands[start_idx]):
+            start_idx += 1
+
+        if start_idx < len(operands):
+            subcmd = operands[start_idx]
+            subcmd_name = parse_command((subcmd,)).cmd_name.parts[0]
+            if isinstance(subcmd_name, str):
+                if spec := get_spec(subcmd_name, tuple(operands[start_idx:])):
+                    return spec
 
         return CmdSpec(check, success_postcond, failure_postcond, io)
