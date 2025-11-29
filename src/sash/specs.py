@@ -534,6 +534,7 @@ def mkdir_spec(cmd: CmdInvocation) -> CmdSpec:
     flags, operands = extract_flags_naively("mkdir", operands)
 
     flags.discard("-m") # -m is used to control permissions, which we do not model
+    flags.discard("--") # -- is used to indicate the end of flags
     io = IOType.NONE
     io = IOType.add_stdout(io) if "-v" in flags else io
 
