@@ -155,10 +155,10 @@ def main():
         ran += 1
 
         if report.timed_out:
-            print_warn(f"Analysis timed out; exec time: {report.time}s, sover time: {report.solver_time}s", file=sys.stderr)
+            print_warn(f"Analysis timed out; exec time: {report.time}s, solver time: {report.solver_time}s", file=sys.stderr)
             timed_out += 1
         else:
-            print_info(f"Analysis completed; exec time: {report.time}s, sover time: {report.solver_time}s", file=sys.stderr)
+            print_info(f"Analysis completed; exec time: {report.time}s, solver time: {report.solver_time}s", file=sys.stderr)
 
         actual_results: list[CheckResult] = [CheckResult(code=issue.code.value, line=issue.source_line) for issue in report.issues if issue.code.value not in out_of_scope_codes]
         detected_issues_expected += len([e for e in expected_results if e in actual_results])
