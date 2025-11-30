@@ -8,20 +8,55 @@ from pathlib import Path
 import sash.main
 
 
+def run_shellcheck(path, timeout, verbose):
+    """Run ShellCheck on one file and return a report-like dict."""
+
+    try:
+        proc = subprocess.run(
+            ["shellcheck", "-f", "json", path],
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+        )
+    except subprocess.TimeoutExpired:
+        return {"timed_out": True, "crashed": False, "time": None, "raw": None}
+
+    timed_out = False
+    crashed = proc.returncode != 0  # shellcheck returns 1 if warnings exist
+
+    raw = proc.stdout.strip()
+
+    if verbose:
+        print(raw)
+
+    return {
+        "timed_out": timed_out,
+        "crashed": crashed,
+        "time": None,
+        "raw": raw,
+    }
+
+
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("directory", type=Path,
-                        help="Directory to search recursively for .sh files")
+    parser.add_argument(
+        "directory", type=Path,
+        help="Directory to search recursively for .sh files"
+    )
     parser.add_argument("-t", "--timeout", type=float, default=None,
-                        help="Timeout for symbolic execution")
+                        help="Timeout for symbolic execution or ShellCheck")
     parser.add_argument("-T", "--solver-timeout", type=float, default=None,
-                        help="Solver timeout")
+                        help="Solver timeout (SaSh only)")
     parser.add_argument("-V", "--verbose", action="store_true",
                         help="Print full reports")
     parser.add_argument("-D", "--enable-dfs", action="store_true",
-                        help="Enable DFS branch policy")
+                        help="Enable DFS for SaSh")
+    parser.add_argument(
+        "--shellcheck", action="store_true",
+        help="Run ShellCheck instead of SaSh"
+    )
     parser.add_argument("-e", "--error-log", type=Path, default=Path("/dev/null"),
-                        help="Where to write error logs")
+                        help="Where to write error logs (SaSh only)")
     args = parser.parse_args()
 
     directory = args.directory.resolve()
@@ -39,35 +74,56 @@ def main():
     succeeded = 0
 
     for path in directory.rglob("*.sh"):
+        if not "scripts" in path.parts:
+            continue
         ran += 1
-
         print()
-        print(f"=== Running SaSh on: {path} ===", file=sys.stderr)
+        print(f"=== Running on: {path} ===", file=sys.stderr)
 
-        try:
-            report = sash.main.main(
+        if args.shellcheck:
+            # Run ShellCheck
+            report = run_shellcheck(
                 path.as_posix(),
                 timeout=args.timeout,
-                solver_timeout=args.solver_timeout,
-                log_file=args.error_log,
-                log_level="error",
-                enable_dfs=args.enable_dfs,
+                verbose=args.verbose
             )
-        except Exception as e:
-            crashed += 1
-            print(f"[CRASH] SaSh crashed on {path}: {e}", file=sys.stderr)
-            continue
 
-        if report.timed_out:
-            timed_out += 1
-            print(f"[TIMEOUT] exec={report.time}s solver={report.solver_time}s", file=sys.stderr)
+            if report["timed_out"]:
+                timed_out += 1
+                print("[TIMEOUT] ShellCheck", file=sys.stderr)
+            elif report["crashed"]:
+                crashed += 1
+                print("[CRASH] ShellCheck exited nonzero", file=sys.stderr)
+            else:
+                succeeded += 1
+                print("[DONE] ShellCheck ok", file=sys.stderr)
+
         else:
-            succeeded += 1
-            print(f"[DONE] exec={report.time}s solver={report.solver_time}s", file=sys.stderr)
+            # Run SaSh
+            try:
+                report = sash.main.main(
+                    path.as_posix(),
+                    timeout=args.timeout,
+                    solver_timeout=args.solver_timeout,
+                    log_file=args.error_log,
+                    log_level="error",
+                    enable_dfs=args.enable_dfs,
+                )
+            except Exception as e:
+                crashed += 1
+                print(f"[CRASH] SaSh crashed on {path}: {e}", file=sys.stderr)
+                continue
 
-        if args.verbose:
-            import json
-            print(json.dumps(report.to_dict(), indent=2))
+            if report.timed_out:
+                timed_out += 1
+                print(f"[TIMEOUT] exec={report.time}s solver={report.solver_time}s", file=sys.stderr)
+            else:
+                succeeded += 1
+                print(f"[DONE] exec={report.time}s solver={report.solver_time}s", file=sys.stderr)
+
+            if args.verbose:
+                import json
+                print(json.dumps(report.to_dict(), indent=2))
 
     # Summary
     print("\n=== Summary ===", file=sys.stderr)

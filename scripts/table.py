@@ -42,15 +42,15 @@ sources = {
 descriptions = {
     "high_profile/c00-steam": r"Failed path traversal leads to \sh{rm /*}",
     "high_profile/c01-bumblebee": r"Deletion of \sh{/usr}",
-    "high_profile/w00-itunes": r"Variable expansion deletes arbitrary files",
+    "high_profile/w00-itunes": r"Dangerous variable expansion",
     "high_profile/w01-squid": r"Externally-set variable used in \sh{rm}",
     "high_profile/c02-n": r"Loop deletes \sh{/usr/local/*}",
-    "high_profile/c03-backup_manager": r"Data loss due to wrong exit status check",
+    "high_profile/c03-backup_manager": r"Data loss from bad \sh{$?} check",
 
     "milestone_1/const_loop": r"Constant \sh{while} loop condition",
-    "milestone_1/loop_once-useless_test": r"Single loop iteration",
+    "milestone_1/loop_once-useless_test": r"Run-once \sh{for} loop",
     "milestone_1/unset_var_1": r"Unset variable used in \sh{echo}",
-    "milestone_2/rm_root": r"Typo in invocation causes database loss",
+    "milestone_2/rm_root": r"Typo causes DB loss",
     "web_forums/rm_root_2": r"Failed \sh{mktemp} causes data loss",
 }
 
@@ -211,8 +211,6 @@ print(r"""
 # Print some stats about the benchmarks
 total_benchmarks = len(results)
 # Total bugs
-# benchmark,missing_gt,crashed,timed_out,time,detected_all,expected_results,actual_results,shellcheck_codes,line_numbers
-# benchmarks/commits/unset_var_set_u_2/posix.sh,False,False,False,0.04071833333000541,True,unbound_setu,unbound_setu,,15
 total_bugs = (
     results["expected_results"]
     .fillna("")
@@ -236,3 +234,9 @@ bugs_max = n_bugs.max()
 print(f"% Total benchmarks: {total_benchmarks}", file=sys.stderr)
 print(f"% Total bugs: {total_bugs}", file=sys.stderr)
 print(f"% Bugs per benchmark: {bugs_min}--{bugs_max}", file=sys.stderr)
+
+# Averages
+avg_loc = sum(get_loc(r["benchmark"]) for r in results.to_dict(orient="records")) / total_benchmarks
+avg_time = sum(r["time"] for r in results.to_dict(orient="records")) / total_benchmarks
+print(f"% Average LoC: {avg_loc:.2f}", file=sys.stderr)
+print(f"% Average time: {avg_time:.2f}s", file=sys.stderr)

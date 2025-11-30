@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 import os
 from io import StringIO
+import sys
 
 import matplotlib.pyplot as plt
 from matplotlib_set_diagrams import EulerDiagram
@@ -27,48 +28,66 @@ def get_loc(path):
 
 def get_bm_name(path):
     subpath = os.path.dirname(path)
-    parts = subpath.split(os.sep)[1:]
+    parts = subpath.split(os.sep)[2:]
     result = os.path.join(*parts)
-    return result[-10:]
+    return result
 
 sysname = "SaSh"
-figsize = (7, 4)
-figsize_small = (4.2, 1)
+figsize = (9, 3)
+figsize_small = (4.2, 1.15)
 color_scheme = ["#AA4465", "#FFA69E", "#998650", "#93E1D8"]
 
 def _get_bug_sets(data):
     sash_detected = set()
     shellcheck_detected = set()
-
-    sash_detected = set()
-    shellcheck_detected = set()
+    all_bugs_expected = set()
 
     for _, row in data.iterrows():
         bench = row["benchmark"]
 
         sash_bugs = (str(row["actual_results"]).split(";")) if pd.notna(row["actual_results"]) else []
         shell_bugs = (str(row["shellcheck_codes"]).split(";")) if pd.notna(row["shellcheck_codes"]) else []
+        all_bugs = (str(row["expected_results"]).split(";")) if pd.notna(row["expected_results"]) else []
 
-        if "" in sash_bugs:
-            sash_bugs.remove("")
-        if "" in shell_bugs:
-            shell_bugs.remove("")
+        # strip out empty entries
+        sash_bugs = [b.strip() for b in sash_bugs if b.strip()]
+        shell_bugs = [b.strip() for b in shell_bugs if b.strip()]
+        all_bugs = [b.strip() for b in all_bugs if b.strip()]
+
+        # per-row occurrence counters, per bug code
+        sash_counts = {}
+        shell_counts = {}
+        expected_counts = {}
 
         for bug in sash_bugs:
-            sash_detected.add(bench + "_" + bug)
+            idx = sash_counts.get(bug, 0)
+            sash_counts[bug] = idx + 1
+            sash_detected.add(f"{bench}_{bug}_{idx}")
 
         for bug in shell_bugs:
-            shellcheck_detected.add(bench + "_" + bug)
-    return sash_detected, shellcheck_detected
+            idx = shell_counts.get(bug, 0)
+            shell_counts[bug] = idx + 1
+            shellcheck_detected.add(f"{bench}_{bug}_{idx}")
+
+        for bug in all_bugs:
+            idx = expected_counts.get(bug, 0)
+            expected_counts[bug] = idx + 1
+            all_bugs_expected.add(f"{bench}_{bug}_{idx}")
+
+    # Add sash detected but without the false positives
+    sash_detected = sash_detected & all_bugs_expected
+    shellcheck_detected = shellcheck_detected & all_bugs_expected
+
+    return sash_detected, shellcheck_detected, all_bugs_expected
 
 
 def plot_bug_detection_euler(data, output_path):
-    sash_detected, shellcheck_detected = _get_bug_sets(data)
+    sash_detected, shellcheck_detected, all_bugs_expected = _get_bug_sets(data)
 
     only_sash = len(sash_detected - shellcheck_detected)
     both = len(sash_detected & shellcheck_detected)
     only_shell = len(shellcheck_detected - sash_detected)
-    # neither = len(data) - (only_sash + both + only_shell)
+    # neither = len(all_bugs_expected - (sash_detected | shellcheck_detected))
 
     combination_counts = {
         (1, 0): only_sash,          # Only SaSh
@@ -85,19 +104,22 @@ def plot_bug_detection_euler(data, output_path):
     plt.close()
 
 def plot_bug_detection_bars(data, output_path):
-    sash_detected, shellcheck_detected = _get_bug_sets(data)
+    sash_detected, shellcheck_detected, all_bugs_expected = _get_bug_sets(data)
+    missed = len(all_bugs_expected - (sash_detected | shellcheck_detected))
     both_detected = len(sash_detected & shellcheck_detected)
     sash_detected = len(sash_detected)
     shellcheck_detected = len(shellcheck_detected)
+    all_expected = len(all_bugs_expected)
 
     # create a single horizontal bar with 3 segments: sash only, both, shellcheck only
     plt.figure(figsize=figsize_small)
     labels = [sysname, "Both", "ShellCheck"]
-    sizes = [sash_detected - both_detected, both_detected, shellcheck_detected - both_detected]
+    sizes = [sash_detected - both_detected, both_detected, shellcheck_detected - both_detected, missed]
     colors = color_scheme[:3]
     plt.barh(0, sizes[0], color=colors[0], label=labels[0])
     plt.barh(0, sizes[1], left=sizes[0], color=colors[1], label=labels[1])
     plt.barh(0, sizes[2], left=sizes[0] + sizes[1], color=colors[2], label=labels[2])
+    plt.barh(0, sizes[3], left=sizes[0] + sizes[1] + sizes[2], color="lightgray", label="Missed")
     plt.xlabel("Detected Bugs", loc="right")
     plt.yticks([])
     plt.legend(
@@ -105,6 +127,7 @@ def plot_bug_detection_bars(data, output_path):
         loc="upper left",
         frameon=True,
     )
+    plt.xlim(0, all_expected)
     plt.tight_layout()
     plt.savefig(output_path, format="pdf")
     plt.close()
@@ -117,12 +140,15 @@ def plot_runtime(data, output_path):
     times = data["time"]
     locs = data["loc"]
     bars = plt.bar(benchmarks, times, color=color_scheme[0])
-    plt.xticks(rotation=45, ha="right")
+    plt.margins(x=0)  # remove gap left/right
+
+    # plt.xticks(rotation=45, ha="right")
+    plt.xticks([], [])
     plt.ylabel("Time (s)")
     plt.yscale("log")
     for bar, loc in zip(bars, locs):
         height = bar.get_height()
-        plt.text(bar.get_x() + bar.get_width() / 2, height, f"{loc}", ha='center', va='bottom', fontsize=4)
+        plt.text(bar.get_x() + bar.get_width() / 2, height, f"{loc}", ha='center', va='bottom', fontsize=7)
     plt.tight_layout()
     plt.savefig(output_path, format="pdf")
     plt.close()
@@ -156,6 +182,18 @@ def main():
     plot_bug_detection_euler(results_data, os.path.join(args.output_dir, "bug-detection-euler.pdf"))
     plot_bug_detection_bars(results_data, os.path.join(args.output_dir, "bug-detection-bars.pdf"))
     plot_runtime(results_data, os.path.join(args.output_dir, "runtime.pdf"))
+
+    # Print bug stats
+    total_benchmarks = len(results_data)
+    sash_detected, shellcheck_detected, all_bugs_expected = _get_bug_sets(results_data)
+    print(all_bugs_expected, file=sys.stderr)
+    total_bugs = len(all_bugs_expected)
+    print(f"% Total benchmarks: {total_benchmarks}", file=sys.stderr)
+    print(f"% Total bugs: {total_bugs}", file=sys.stderr)
+    print(f"% {sysname} detected bugs: {len(sash_detected)}", file=sys.stderr)
+    print(f"% ShellCheck detected bugs: {len(shellcheck_detected)}", file=sys.stderr)
+    print(f"% Both detected bugs: {len(sash_detected & shellcheck_detected)}", file=sys.stderr)
+    print(f"% Missed bugs: {len(all_bugs_expected - (sash_detected | shellcheck_detected))}", file=sys.stderr)
 
 if __name__ == "__main__":
     main()
