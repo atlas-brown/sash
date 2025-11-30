@@ -185,8 +185,8 @@ class Reporter:
     @classmethod
     def initialize(cls, filename:str):
         if cls._initialized:
-            logging.warning("Reporter is already initialized")
-            return
+            logging.warning("Reporter is already initialized; resetting")
+            cls.reset()
 
         cls._filename = filename
         cls._issues = set()
