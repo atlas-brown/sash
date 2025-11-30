@@ -5,7 +5,7 @@ from io import StringIO
 
 EPSILON = 1e-3
 
-results_path = "scripts/results.csv"
+results_path = "results/results.csv"
 results = pd.read_csv(results_path)
 
 names = {
@@ -40,18 +40,33 @@ sources = {
 
 
 descriptions = {
-    "high_profile/c00-steam": r"Failed path traversal leads to \ttt{rm /*}",
+    "high_profile/c00-steam": r"Failed path traversal leads to \sh{rm /*}",
     "high_profile/c01-bumblebee": r"Deletion of \sh{/usr}",
     "high_profile/w00-itunes": r"Variable expansion deletes arbitrary files",
     "high_profile/w01-squid": r"Externally-set variable used in \sh{rm}",
     "high_profile/c02-n": r"Loop deletes \sh{/usr/local/*}",
-    "high_profile/c03-backup_manager": r"Wrong exit status check causes file deletion",
+    "high_profile/c03-backup_manager": r"Data loss due to wrong exit status check",
 
     "milestone_1/const_loop": r"Constant \sh{while} loop condition",
     "milestone_1/loop_once-useless_test": r"Single loop iteration",
     "milestone_1/unset_var_1": r"Unset variable used in \sh{echo}",
     "milestone_2/rm_root": r"Typo in invocation causes database loss",
     "web_forums/rm_root_2": r"Failed \sh{mktemp} causes data loss",
+}
+
+features = {
+    "high_profile/c00-steam": ["WE", "CS"],
+    "high_profile/c01-bumblebee": ["CS"],
+    "high_profile/w00-itunes": ["WE", "CS"],
+    "high_profile/w01-squid": ["CS"],
+    "high_profile/c02-n": ["WE", "FS", "CS"],
+    "high_profile/c03-backup_manager": ["CS"],
+
+    "milestone_1/const_loop": ["WE", "SE"], # SE is symbolic execution
+    "milestone_1/loop_once-useless_test": ["CS", "SE"],
+    "milestone_1/unset_var_1": ["WE"],
+    "milestone_2/rm_root": ["CS", "WE"],
+    "web_forums/rm_root_2": ["WE", "CS"],
 }
 
 
@@ -72,7 +87,7 @@ def get_loc(path):
     return loc
 
 def create_table_line(result):
-    path, time, detected = result["benchmark"], result["time"], result["detected"]
+    path, time, detected = result["benchmark"], result["time"], result["detected_all"]
     # Grab just the folder and benchmark subfolder
     bm_name = get_bm_name(path)
     name = names.get(bm_name, None)
@@ -84,7 +99,15 @@ def create_table_line(result):
     loc = get_loc(path)
     source = sources.get(bm_name, "")
     detected = r"\checkmark" if bool(detected) else ""
-    return f"{name} & {loc}  & {description} & {detected} & {time} &  &  &  & {source}  \\\\"
+    we_feature = "WE" in features.get(bm_name, [])
+    cs_feature = "CS" in features.get(bm_name, [])
+    fs_feature = "FS" in features.get(bm_name, [])
+
+    we_mark = r"\checkmark" if we_feature else ""
+    cs_mark = r"\checkmark" if cs_feature else ""
+    fs_mark = r"\checkmark" if fs_feature else ""
+
+    return f"{name} & {loc}  & {description} & {detected} & {time} & {we_mark}  & {cs_mark}  & {fs_mark}  & {source}  \\\\"
 
 rest_of_benchmarks = []
 
@@ -103,7 +126,6 @@ for result in results.to_dict(orient="records"):
     else:
         rest_of_benchmarks.append(result)
 
-
 # find time range for rest_of_benchmarks
 min_time = min(r["time"] for r in rest_of_benchmarks)
 max_time = max(r["time"] for r in rest_of_benchmarks)
@@ -114,13 +136,69 @@ min_loc = min(locs)
 max_loc = max(locs)
 loc_range = f"{min_loc}--{max_loc}"
 
-detected = sum(1 for r in rest_of_benchmarks if r["detected"])
+detected = sum(1 for r in rest_of_benchmarks if r["detected_all"])
 total = len(rest_of_benchmarks)
 detection_rate = f"{detected}/{total}"
 
-print(rf"""\emph{{More buggy scripts}} & {loc_range} &  & {detection_rate} & {time_range} & \xxx & \xxx & \xxx & \cf{{sec:full-ds}} \\""")
+we_count = sum(1 for r in rest_of_benchmarks if "WE" in features.get(get_bm_name(r["benchmark"]), []))
+cs_count = sum(1 for r in rest_of_benchmarks if "CS" in features.get(get_bm_name(r["benchmark"]), []))
+fs_count = sum(1 for r in rest_of_benchmarks if "FS" in features.get(get_bm_name(r["benchmark"]), []))
+
+print(rf"""\emph{{More buggy scripts}} & {loc_range} &  & {detection_rate} & {time_range} & {we_count} & {cs_count} & {fs_count} & \cf{{sec:full-ds}} \\""")
 print(r"\hspace{.5em}\dots & & & & & & & & \\")
+
+# Print summary line across all benchmarks
+locs = [get_loc(r["benchmark"]) for r in results.to_dict(orient="records")]
+min_loc = min(locs)
+max_loc = max(locs)
+loc_range = f"{min_loc}--{max_loc}"
+
+detected = sum(1 for r in results.to_dict(orient="records") if r["detected_all"])
+total = len(results)
+detection_rate = f"{detected}/{total}"
+times = [r["time"] for r in results.to_dict(orient="records")]
+min_time = min(times)
+max_time = max(times)
+time_range = f"{min_time:.2f}--{max_time:.2f}s"
+
+we_count = sum(1 for r in results.to_dict(orient="records") if "WE" in features.get(get_bm_name(r["benchmark"]), []))
+cs_count = sum(1 for r in results.to_dict(orient="records") if "CS" in features.get(get_bm_name(r["benchmark"]), []))
+fs_count = sum(1 for r in results.to_dict(orient="records") if "FS" in features.get(get_bm_name(r["benchmark"]), []))
+
+print(rf"""
+\midrule
+\textbf{{Total}} & {loc_range} &  & {detection_rate} & {time_range} & {we_count} & {cs_count} & {fs_count} &  \\ """)
+
 print(r"""
 \bottomrule
 \end{tabular}
 """)
+
+# Print some stats about the benchmarks
+total_benchmarks = len(results)
+# Total bugs
+# benchmark,missing_gt,crashed,timed_out,time,detected_all,expected_results,actual_results,shellcheck_codes,line_numbers
+# benchmarks/commits/unset_var_set_u_2/posix.sh,False,False,False,0.04071833333000541,True,unbound_setu,unbound_setu,,15
+total_bugs = (
+    results["expected_results"]
+    .fillna("")
+    .where(lambda s: s != "")
+    .dropna()
+    .str.split(";")
+    .map(len)
+    .sum()
+)
+n_bugs = (
+    results["expected_results"]
+    .fillna("")
+    .where(lambda s: s != "")
+    .dropna()
+    .str.split(";")
+    .map(len)
+)
+bugs_min = n_bugs.min()
+bugs_max = n_bugs.max()
+
+print(f"% Total benchmarks: {total_benchmarks}", file=sys.stderr)
+print(f"% Total bugs: {total_bugs}", file=sys.stderr)
+print(f"% Bugs per benchmark: {bugs_min}--{bugs_max}", file=sys.stderr)
