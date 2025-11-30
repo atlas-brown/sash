@@ -98,7 +98,7 @@ features = {
 
     "web_forums/capturing_empty_output": ["CS", "SE"], # SE to reason about the subshell, CS to reason about mkdir not having output
     "web_forums/rm_root_2": ["WE", "CS"], # WE to reason about unbound variable, CS to reason about rm
-    "web_forums/unexpected_stdin": [], # Really not sure about that, the current way to detect is extremely ad-hoc and not generalizable
+    "web_forums/unexpected_stdin": ["CS", "SE"], # CS to reason about grep, SE to compare specs across traces
     "web_forums/unset_var": ["WE"], # WE to reason about unbound variable
     "web_forums/unset_var-cmd_always_fails": ["WE", "CS"], # WE to reason about unbound variable, CS to reason about test command and mkdir command
 }
