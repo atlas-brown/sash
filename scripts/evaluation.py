@@ -37,6 +37,7 @@ def main():
     parser.add_argument('-N', '--no-color', action='store_true', help='Disable colored output to stderr (default: false)')
     parser.add_argument('-e', '--error-log', type=Path, default=Path("/dev/null"), help='File to write error logs to (default: /dev/null)')
     parser.add_argument('-D', '--enable-dfs', action='store_true', help='Enable depth-first symbolic execution passes (default: false)')
+    parser.add_argument('-f', '--fixed', action='store_true', help='Run the evaluation on the fixed versions of the benchmarks (default: false)')
     args = parser.parse_args()
 
     if args.no_color:
@@ -59,6 +60,7 @@ def main():
     verbose: bool = args.verbose
     error_log: Path = args.error_log.resolve()
     enable_dfs: bool = args.enable_dfs
+    fixed: bool = args.fixed
 
     top = get_git_toplevel()
     if args.benchmarks:
@@ -92,6 +94,9 @@ def main():
     for benchmark in find_benchmarks(bench_dir):
         if benchmark_filter and not benchmark_filter.search(benchmark.as_posix()):
             continue
+
+        if fixed:
+            benchmark = benchmark.parent / "fixed.sh"
 
         print(file=sys.stderr)
         print(f"Benchmark: {MAGENTA}{benchmark.relative_to(top)}{RESET} (found in {top})", file=sys.stderr)
