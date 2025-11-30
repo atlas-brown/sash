@@ -170,6 +170,10 @@ class Assertion:
     source_str: str
     source_line: int
 
+    # exclude the state from repr to avoid large prints
+    def __repr__(self):
+        return f"Assertion(state<{hash(self.producing_state)}>, constraint={repr(self.constraint)}, source_str={repr(self.source_str)}, source_line={self.source_line})"
+
 class Confidence(Enum):
     DEFINITE = 0
     SPECULATIVE = 1
@@ -192,17 +196,12 @@ class State:
 
     external_data: Any = None # ASSUMPTION: must be hashable
 
-    # # NOTE: (and beware) intentionally ignoring pathcond in equality and hash
     _hash: int = None
     def __post_init__(self):
         object.__setattr__(self, '_hash',
                            hash(tuple(getattr(self, field.name) for field in fields(self))))
     def __hash__(self):
         return self._hash
-    # def __eq__(self, other):
-    #     return isinstance(other, State) and \
-    #         all(getattr(self, field.name) == getattr(other, field.name)
-    #             for field in fields(self) if field.name != "pathcond")
 
     def set_env(self, var: str, value: ShellVar) -> 'State':
         return replace(self, env=self.env.set(var, value))
