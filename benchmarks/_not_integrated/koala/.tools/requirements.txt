@@ -1,0 +1,15 @@
+# parsing
+shasta
+libdash
+
+# visualiztion
+pandas
+seaborn
+matplotlib
+psutil
+
+# embeddings
+openai
+python-dotenv
+scikit-learn
+adjustText

@@ -1,0 +1,51 @@
+{
+    "analytics": {
+        "scripts": ["analytics/scripts/*.sh"]
+    },
+    "bio": {
+	    "scripts": ["bio/scripts/*.sh"]
+    },
+    "ci-cd": {
+        "scripts": ["ci-cd/makeself/makeself.sh",
+            "ci-cd/makeself/makeself-header.sh",
+		    "ci-cd/makeself/test/*/*.sh",
+            "ci-cd/riker/*/build.sh"]
+    },
+    "covid": {
+        "scripts": ["covid/scripts/*.sh"]
+    },
+    "file-mod": {
+        "scripts": ["file-mod/scripts/*.sh"]
+    },
+    "inference": {
+        "scripts": ["inference/scripts/*.sh"]
+    },
+    "ml": {
+        "scripts": ["ml/scripts/*.sh"]
+    },
+    "nlp": {
+        "scripts": ["nlp/scripts/*.sh"]
+    },
+    "oneliners": {
+        "scripts": ["oneliners/scripts/*.sh"]
+    },
+    "unixfun": {
+        "scripts": ["unixfun/scripts/*.sh"]
+    },
+    "pkg": {
+        "scripts": ["pkg/scripts/*.sh"]
+    },
+    "repl": {
+        "scripts": ["repl/scripts/*.sh"]
+    },
+    "weather": {
+        "scripts": ["weather/scripts/*.sh"]
+    },
+    "web-search": {
+        "scripts": ["web-search/scripts/crawl.sh",
+         "web-search/scripts/engine.sh",
+         "web-search/scripts/index.sh",
+         "web-search/scripts/query.sh",
+         "web-search/scripts/c/*.sh"]
+    }
+}
