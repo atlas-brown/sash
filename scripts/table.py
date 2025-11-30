@@ -59,6 +59,18 @@ descriptions = {
 # FS: file system
 # SE: symbolic execution
 features = {
+    "commits/const_cond": ["SE"], # SE to reason about set -e, the test semantics and condition being constant
+    "commits/debootstrap": ["WE", "CS"], # WE to reason about the various parameter expansions, CS to reason about rm
+    "commits/debootstrap_2": ["WE", "CS"], # WE to reason about the various parameter expansions, CS to reason about rm
+    "commits/ignored_command_v": ["CS"], # CS to reason about command -v and env
+    "commits/makefile": ["WE", "CS"], # WE to reason about variable expansion, CS to reason about rm
+    "commits/unset_func": ["SE"], # SE to reason about the unset function call
+    "commits/unset_var_2": ["WE"], # WE to reason about the unset variable
+    "commits/unset_var_3": ["WE"], # WE to reason about the unset variable
+    "commits/unset_var_5": ["WE"], # WE to reason about the unset variable
+    "commits/unset_var_set_u_1": ["WE"], # WE to reason about the unset variable
+    "commits/unset_var_set_u_2": ["WE"], # WE to reason about the unset variable
+
     "high_profile/c00-steam": ["WE", "CS"],
     "high_profile/c01-bumblebee": ["CS"],
     "high_profile/w00-itunes": ["WE", "CS"],
@@ -84,7 +96,11 @@ features = {
     "simple_fs/overwrite_file_3": ["SE", "CS", "FS"], # SE to reason about the pipeline and the while loop, CS to reason about cp, FS to reason about overwrites
     "simple_fs/overwrite_file_4": ["WE", "SE", "FS"], # WE to reason about the expansion of the filename, SE to reason about redirection and about all expansions being the same file, FS to reason about overwrites
 
-    "web_forums/rm_root_2": ["WE", "CS"],
+    "web_forums/capturing_empty_output": ["CS", "SE"], # SE to reason about the subshell, CS to reason about mkdir not having output
+    "web_forums/rm_root_2": ["WE", "CS"], # WE to reason about unbound variable, CS to reason about rm
+    "web_forums/unexpected_stdin": [], # Really not sure about that, the current way to detect is extremely ad-hoc and not generalizable
+    "web_forums/unset_var": ["WE"], # WE to reason about unbound variable
+    "web_forums/unset_var-cmd_always_fails": ["WE", "CS"], # WE to reason about unbound variable, CS to reason about test command and mkdir command
 }
 
 
