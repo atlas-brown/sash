@@ -108,15 +108,19 @@ def state_to_z3(s: State) -> z3.ExprRef:
 
     return z3.And(fs_state_formula, pathcond_formula, env_formula)
 
-def assertion_to_z3(assertion: Assertion) -> tuple[z3.BoolRef, z3.ExprRef]:
+def assertion_to_z3(assertion: Assertion) -> tuple[z3.BoolRef, # assertion var
+                                                   z3.ExprRef, # state formula
+                                                   z3.ExprRef]: # assertion constraint formula
+    """
+    Convert an assertion to a tracked Z3 formula.
+    Returns a tuple of (assertion tracking var, state formula, assertion constraint formula).
+    """
     assertion_var = z3.FreshBool('assertion')
     tracked_assertions[assertion_var] = assertion
     constraint_formula = constraint_to_z3(assertion.constraint, assertion.producing_state)
     state_formula = state_to_z3(assertion.producing_state)
 
-    assertion_formula = z3.And(state_formula, constraint_formula)
-
-    return assertion_var, assertion_formula
+    return assertion_var, state_formula, constraint_formula
 
 
 def model_to_reports(core: list[z3.BoolRef]):
@@ -162,7 +166,7 @@ def run_solver(traces: list[Trace], config: InterpConfig, stop: threading.Event 
         logging.debug("Checking %d assertions", len(assertions))
         for assertion in assertions:
             if logging.getLogger().isEnabledFor(logging.DEBUG):
-                logging.debug("Checking assertion from line %s :: %s", assertion.source_str, pformat(assertion))
+                logging.debug("Checking assertion id %s from line %s :: %s", id(assertion), assertion.source_str, pformat(assertion))
 
             if stop and stop.is_set():
                 logging.warning("Solver timed out")
@@ -170,16 +174,23 @@ def run_solver(traces: list[Trace], config: InterpConfig, stop: threading.Event 
                 return
             solver = z3.Solver()
             solver.set(unsat_core=True)
-            assertion_var, assertion_formula = assertion_to_z3(assertion)
+            assertion_var, state_formula, assertion_formula = assertion_to_z3(assertion)
+            solver.add(state_formula)
+
+            if solver.check() == z3.unsat:
+                logging.debug("Path condition is unsat, skipping assertion check")
+                continue
+
             solver.assert_and_track(assertion_formula, assertion_var)
 
             if logging.getLogger().isEnabledFor(logging.DEBUG):
                 logging.debug("Arb z3 map: %s", pformat(arbitrary_to_z3_var))
 
-            #logging.debug("Current solver state: %s", solver)
             result = solver.check()
-            logging.debug("Assertion:\n%s", assertion_formula)
-            logging.debug("Assertion must be violated?: %s (ie %s)", result == z3.unsat, result)
+            if logging.getLogger().isEnabledFor(logging.DEBUG):
+                logging.debug("State:\n%s", state_formula)
+                logging.debug("Assertion:\n%s", assertion_formula)
+                logging.debug("Assertion must be violated?: %s (ie %s)", result == z3.unsat, result)
             if result == z3.unsat:
                 core = solver.unsat_core()
                 logging.debug("Unsat core: %s", core)

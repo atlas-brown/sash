@@ -221,11 +221,13 @@ class State:
         new_pathcond = self.pathcond + (cond,)
         return replace(self, pathcond=new_pathcond)
 
-    def add_assertion(self, assertion: Constraint, source_str: str | None = None, source_line: int | None = None) -> 'State':
-        if assertion == Empty():
+    def add_assertion(self, assertion_constraint: Constraint, source_str: str | None = None, source_line: int | None = None) -> 'State':
+        if assertion_constraint == Empty():
             logging.debug("Skipping empty assertion from %s at line %s", source_str, source_line)
             return self
-        new_assertions = self.assertions + (Assertion(producing_state=self, constraint=assertion, source_str=source_str, source_line=source_line),)
+        assertion = Assertion(producing_state=self, constraint=assertion_constraint, source_str=source_str, source_line=source_line)
+        logging.debug(f"Added assertion id: {id(assertion)}")
+        new_assertions = self.assertions + (assertion,)
         return replace(self, assertions=new_assertions)
 
     def lookup(self, var: str) -> ShellVar | None:
