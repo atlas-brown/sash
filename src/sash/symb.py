@@ -1093,7 +1093,7 @@ def interp_node(traces: Traces,
                 t_current = t1
                 for i in range(config.max_loop_unroll):
                     logging.debug("For loop unrolling iteration %d/%d", i+1, config.max_loop_unroll)
-                    t2 = [record_assignment(t, var_name, arbitrary_field(node.argument,
+                    t2 = [record_assignment(t, var_name, arbitrary_field(node.variable,
                                                                         ArbitraryType.APPROXIMATION,
                                                                         t.latest_state)) \
                         for t in t_current]

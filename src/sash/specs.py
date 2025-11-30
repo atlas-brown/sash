@@ -963,7 +963,6 @@ class Mv(Cmd):
                     ((IsDir(src) | IsDir(dst)) >> ~StringEq(src, dst)) # src and dst cannot be the same directory
                 )
                 success_postcond = (
-                    IsRead(src) &
                     IsDeleted(src) &            # src is deleted
                     (IsFile(dst) | IsDir(dst))  # dst is a file or dir
                 )
