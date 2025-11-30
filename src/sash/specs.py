@@ -383,8 +383,8 @@ def cp_spec(cmd: CmdInvocation) -> CmdSpec:
 
         success_postcond = (
             # TODO: decide whether target should be considered unread by default or inherit from source
-            IsRead(s) &                             # (4)
             IsFile(s) &                             # (1)
+            IsRead(s) &                             # (4)
             ~StringEq(s, t) &                       # (2)
             ((IsFile(t) & IsUnread(t)) | IsDir(t))) # (3)
                                                 # & IsFile(ConcatPath(t, s)) & IsUnread(ConcatPath(t, s))
