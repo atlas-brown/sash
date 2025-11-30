@@ -1171,26 +1171,30 @@ def interp_node(traces: Traces,
         case AST.FileRedirNode():
             res = []
             for t, redir_args in expand(traces, node.arg, config):
-                if node.redir_type == "To": # >
-                    # Check: all known-file args are read
-                    t_precond = t.extend(t.latest_state.add_assertion(And.from_field_iter(redir_args, lambda f: IsFile(f) >> IsRead(f)), source_str=node.pretty(), source_line=context_line))
-                    # On success: all args are files
-                    t_postcond = t_precond.extend(t_precond.latest_state.update_fs(And.from_field_iter(redir_args, lambda f: IsFile(f))))
-                    res.append(t_postcond)
-                if node.redir_type == "From": # <
-                    # Check: all args are files
-                    t_precond = t.extend(t.latest_state.add_assertion(And.from_field_iter(redir_args, lambda f: IsFile(f)), source_str=node.pretty(), source_line=context_line))
-                    # On success: all args are files and are read
-                    t_postcond = t_precond.extend(t_precond.latest_state.update_fs(And.from_field_iter(redir_args, lambda f: IsFile(f) & IsRead(f))))
-                    res.append(t_postcond)
+                t_precond = t
+                if node.redir_type in ["To", "Clobber"]: # >, >|
+                    t_precond = t.extend(t.latest_state.add_assertion(And.from_field_iter(redir_args, lambda op: IsRead(op) | IsDeleted(op)), source_str=node.pretty(), source_line=context_line))
+                    t_postcond = t_precond.extend(t_precond.latest_state.update_fs(And.from_field_iter(redir_args, IsFile)))
+
                 elif node.redir_type == "Append": # >>
-                    # Check: -
-                    # On success: all args are files and are now unread
-                    t_postcond = t.extend(t.latest_state.update_fs(And.from_field_iter(redir_args, lambda f: IsFile(f) & IsUnread(f))))
-                    res.append(t_postcond)
+                    # NOTE: asserting IsFile also implicitly asserts that the file is *unread*
+                    t_precond = t.extend(t.latest_state.add_assertion(And.from_field_iter(redir_args, lambda op: ~IsDir(op)), source_str=node.pretty(), source_line=context_line))
+                    t_postcond = t_precond.extend(t_precond.latest_state.update_fs(And.from_field_iter(redir_args, IsFile)))
+
+                elif node.redir_type == "From": # <
+                    # The targets of the redirection were read from
+                    t_precond = t.extend(t.latest_state.add_assertion(And.from_field_iter(redir_args, IsFile), source_str=node.pretty(), source_line=context_line))
+                    t_postcond = t_precond.extend(t_precond.latest_state.update_fs(And.from_field_iter(redir_args, IsRead)))
+
+                elif node.redir_type == "FromTo":
+                    # Conservatively assume the file is opened for reading
+                    t_precond = t.extend(t.latest_state.add_assertion(And.from_field_iter(redir_args, lambda op: ~IsDir(op)), source_str=node.pretty(), source_line=context_line))
+                    t_postcond = t_precond.extend(t_precond.latest_state.update_fs(And.from_field_iter(redir_args, IsRead)))
+
                 else:
-                    logging.debug("Unhandled redirection type: %s", node.redir_type)
-                    res.append(t)
+                    assert False, f"Unexpected redirection type: {node.redir_type}"
+
+                res.append(t_postcond)
 
                 match redir_args:
                     case [Field(SymStr([something]), WordCount(1, 1))]:
