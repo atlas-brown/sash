@@ -165,6 +165,75 @@ def test_expand_undefined_var_default():
     assert expanded[1][0] == [constant_field("default")]
 
 
+def test_expand_question_var():
+    script = parse_script("""${A:?error message}""")
+    assert len(script) == 1
+    assert isinstance(script[0], AST.CommandNode)
+
+    state = starting_state()
+
+    expanded = expand_simple(script[0].arguments[0], state, config)
+    assert len(expanded) == 1
+    # Unknown variables with ':?' do not fork paths (because if they are unset the script exits)
+    assert all(len(expansion[1].pathcond) == 0 for expansion in expanded)
+    # Unknown variables with ':?' expand to non-empty arbitrary values
+    assert expanded[0][0] == [Field(CompletelyArbitrary(freeze(script[0].arguments[0][0]),
+                                                  ArbitraryType.ENVIRONMENT,
+                                                  state),
+                              WordCount(1, float('inf')))]
+
+
+def test_expand_question_var_bound():
+    script = parse_script("""${A:?error message}""")
+    assert len(script) == 1
+    assert isinstance(script[0], AST.CommandNode)
+
+    state = starting_state()
+
+    state = state.set_env("A", ShellVar(constant_field("value")))
+    expanded = expand_simple_r(script[0].arguments[0], state, config)
+    assert expanded == [constant_field("value")] # ':?' should be completely irrelevant here
+
+
+def test_expand_question_var_bound_unknown():
+    script = parse_script("""${A:?error message}""")
+    assert len(script) == 1
+    assert isinstance(script[0], AST.CommandNode)
+
+    state = starting_state()
+
+    state = state.set_env("A", ShellVar(Field(CompletelyArbitrary(freeze(script[0].arguments[0][0]),
+                                                                 ArbitraryType.ENVIRONMENT,
+                                                                 state),
+                                              WordCount(0, float('inf')))))
+    expanded = expand_simple_r(script[0].arguments[0], state, config)
+    assert expanded == [Field(CompletelyArbitrary(freeze(script[0].arguments[0][0]),
+                                                 ArbitraryType.APPROXIMATION,
+                                                 state),
+                             WordCount(1, float('inf')))]
+
+
+def test_expand_question_var_empty():
+    script = parse_script("""${A:?error message}""")
+    assert len(script) == 1
+    assert isinstance(script[0], AST.CommandNode)
+
+    reporter.Reporter.reset()
+    reporter.Reporter.initialize("<test>")
+    state = starting_state()
+
+    state = state.set_env("A", ShellVar(constant_field("", 0)))
+    expanded = expand_simple_r(script[0].arguments[0], state, config)
+    # Currently, we report a dead code issue and then assume the variable is non-empty
+    assert expanded == [Field(CompletelyArbitrary(freeze(script[0].arguments[0][0]),
+                                                 ArbitraryType.APPROXIMATION,
+                                                 state),
+                             WordCount(1, float('inf')))]
+    report = reporter.Reporter.get_report()
+    assert len(report.issues) == 1 # Dead Code
+    assert isinstance(report.issues[0], reporter.DeadCode)
+
+
 def test_expand_cmdsubst():
     script = parse_script("""echo $(foo bar)""")
     assert len(script) == 1

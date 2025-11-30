@@ -634,10 +634,13 @@ def expand_simple(stuff: list[AST.ArgChar],
                                                                        self.state),
                                              WordCount(1, 1)))
                     elif (v := self.state.lookup(var.var)):
-                        if var.fmt == "Normal" or (var.fmt == "Minus" and not var.null and not v.ghost):
+                        if var.fmt == "Normal" \
+                            or (var.fmt == "Minus" and not var.null and not v.ghost) \
+                            or (var.fmt == "Question" and not var.null and not v.ghost):
                             # explanation of the minus case: the POSIX spec says that for
                             # ${VAR-default} the result is the value of $VAR as long as $VAR is set -- whether it's empty ("null") or not
                             # ^^ this corresponds to the second part of the condition above (var.null false means no `:`)
+                            # same explanation for the question case (which corresponds to ${VAR?errmessage})
                             self.add_a_field(v.value)
                         elif var.fmt == "Minus" and (var.null or v.ghost):
                             # This is the case that it's ${VAR:-default}:
@@ -663,6 +666,23 @@ def expand_simple(stuff: list[AST.ArgChar],
                                     self.add_a_field(Field(SymStr(("0",)), WordCount(1, 1)))
                                 case "TrimR" | "TrimRMax" | "TrimL" | "TrimLMax":
                                     self.add_a_field(Field(SymStr(("",)), WordCount(0, 0)))
+                        elif var.fmt == "Question" and (var.null or v.ghost):
+                            # This is the case of ${VAR:?errmessage}
+                            match v.value:
+                                case Field(_, WordCount(0, 0)):
+                                    # If $VAR is empty, we need to report dead code (since the script would exit here)
+                                    logging.debug("expansion: reporting dead code due to ${%s:?} with definitely empty value", var.var)
+                                    Reporter.add_issue(reporter.DeadCode(var, context_line))
+                                    # todo: what to do here? for now assume not empty to continue analysis
+                                    self.add_a_field(arbitrary_field(var, ArbitraryType.APPROXIMATION, self.state, min_words=1))
+                                case Field(SymStr(stuff), _) if all(isinstance(thing, str) for thing in stuff):
+                                    # If $VAR cannot be empty, just use its value
+                                    logging.debug("expansion: treating ${%s:?} with definitely non-empty value as normal", var.var)
+                                    self.add_a_field(v.value)
+                                case something_not_constant:
+                                    # If $VAR _might_ be empty we treat it as if it can't be, because in the case where it's empty the script would not continue execution
+                                    # We do not report dead code here, because it's not definite (and that's the whole point of using ':?')
+                                    self.add_a_field(arbitrary_field(var, ArbitraryType.APPROXIMATION, self.state, min_words=1))
                         else:
                             logging.info("expansion: treating var %s with unhandled fmt %s as completely arbitrary field", var.pretty(), var.fmt)
                             self.add_a_field(arbitrary_field(var, ArbitraryType.APPROXIMATION, self.state))
@@ -682,6 +702,16 @@ def expand_simple(stuff: list[AST.ArgChar],
                             non_default.state = non_default.state.extend_localenv({var.var: ShellVar(arbitrary_for_this_var, ghost=True)})
                             non_default.add_a_field(arbitrary_for_this_var)
                             return [non_default, default]
+                    elif var.fmt == "Question":
+                        # This is the case that $VAR is unset
+                        if config.unbound_policy == UnboundVariablePolicy.EMPTY:
+                            # Report dead code, since the script would exit here
+                            logging.debug("expansion: reporting dead code due to unset var %s with ${:?} and empty unbound policy", var.var)
+                            Reporter.add_issue(reporter.DeadCode(var, context_line))
+                            # todo: what to do here?
+                        else:
+                            logging.info("expansion: treating unset var %s with ${:?} as completely arbitrary with min_words=1", var.pretty())
+                            self.add_a_field(arbitrary_field(var, ArbitraryType.ENVIRONMENT, self.state, min_words=1))
                     else:
                         # todo we should report path information
                         if not is_special_var(var.var):
@@ -818,9 +848,9 @@ def expand_assuming_single_constant_word(traces: Traces,
 #  Field manipulation
 # =====================
 
-def arbitrary_field(ast: AST.AstNode, kind: ArbitraryType, producing_state: State | None) -> Field:
+def arbitrary_field(ast: AST.AstNode, kind: ArbitraryType, producing_state: State | None, min_words = 0) -> Field:
     return Field(CompletelyArbitrary(freeze_thing(ast), kind, producing_state),
-                 WordCount(0, inf))
+                 WordCount(min_words, inf))
 
 def join_fields(fields: list[Field]) -> Field:
     """Join a list of fields into one field that approximates all of them."""
