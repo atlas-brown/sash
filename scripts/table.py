@@ -54,6 +54,10 @@ descriptions = {
     "web_forums/rm_root_2": r"Failed \sh{mktemp} causes data loss",
 }
 
+# WE: word expansion
+# CS: command specs
+# FS: file system
+# SE: symbolic execution
 features = {
     "high_profile/c00-steam": ["WE", "CS"],
     "high_profile/c01-bumblebee": ["CS"],
@@ -62,10 +66,24 @@ features = {
     "high_profile/c02-n": ["WE", "FS", "CS"],
     "high_profile/c03-backup_manager": ["CS"],
 
-    "milestone_1/const_loop": ["WE", "SE"], # SE is symbolic execution
-    "milestone_1/loop_once-useless_test": ["CS", "SE"],
-    "milestone_1/unset_var_1": ["WE"],
-    "milestone_2/rm_root": ["CS", "WE"],
+    "milestone_1/const_loop": ["WE", "SE"], # WE to determine what the condition is, SE to determine that it's const
+    "milestone_1/loop_once-useless_test": ["WE", "SE"], # WE to determine what the iteree is, SE to determine that it causes a for to loop once
+    "milestone_1/redir_to_func-redir_to_func": ["SE"], # SE to determine that the redirection is to a function
+    "milestone_1/unset_var_1": ["WE"], # WE to determine that the variable is unset
+
+    "milestone_2/loop_once": ["WE", "SE"], # WE to determine what the iteree is, SE to determine that it causes a for to loop once
+    "milestone_2/loop_once-loop_once": ["WE", "SE"], # WE to determine what the iteree is, SE to determine that it causes a for to loop once
+    "milestone_2/rm_root": ["CS", "WE"], # CS to determine dangerous rm, WE to determine unbound variables
+    "milestone_2/unset_var-const_if-dead_code": ["WE"], # WE to detect unbound (the other bugs are oos)
+
+    "simple_fs/access_after_mv": ["CS", "FS"], # CS to reason about mv, FS to reason about file access
+    "simple_fs/access_del_resource": ["WE", "CS", "FS", "SE"], # WE to reason about the loop condition, SE to reason about the loop, CS to reason about rm, FS to reason about file access
+    "simple_fs/cd_into_file": ["CS", "FS"], # CS to reason about cd, FS to reason about the file
+    "simple_fs/overwrite_file": ["SE", "FS"], # SE to reason about redirection, FS to reason about the file
+    "simple_fs/overwrite_file_2": ["WE", "SE", "CS", "FS"], # WE to reason about the iteree, SE to reason about the for loop, CS to reason about rm, FS to reason about overwrites
+    "simple_fs/overwrite_file_3": ["SE", "CS", "FS"], # SE to reason about the pipeline and the while loop, CS to reason about cp, FS to reason about overwrites
+    "simple_fs/overwrite_file_4": ["WE", "SE", "FS"], # WE to reason about the expansion of the filename, SE to reason about redirection and about all expansions being the same file, FS to reason about overwrites
+
     "web_forums/rm_root_2": ["WE", "CS"],
 }
 
