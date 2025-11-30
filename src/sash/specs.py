@@ -895,12 +895,12 @@ class Mv(Cmd):
     # https://pubs.opengroup.org/onlinepubs/9799919799/utilities/mv.html
 
     name = "mv"
-    posix_flags     = {"-f", "-i"}
-    supported_flags = {"-f", "-i"}
+    posix_flags     = {"-f", "-i", "-t"}
+    supported_flags = {"-f", "-i", "-t"}
 
     @classmethod
     def _handle_supported(cls, cmd: CmdInvocation) -> CmdSpec:
-        (name, flags, _, operands) = (cmd.cmd_name, cmd.flags, cmd.options, cmd.operands)
+        (name, flags, options, operands) = (cmd.cmd_name, cmd.flags, cmd.options, cmd.operands)
         io = IOType.NONE
         io = IOType.add_stdin(io) if "-i" in flags else io
 
@@ -911,12 +911,19 @@ class Mv(Cmd):
         flags.discard("-i")
         flags.discard("-f") # ignore -f flag, i think it does not affect preconds/postconds
 
+        operands = [o for o in operands if o != Field(content=SymStr(parts=('--',)), count=WordCount(min=1, max=1))]
+
         assert name == SymStr((cls.name,)), f"Expected mv command, got: {name}"
 
-        if len(operands) < 2:
+        if len(operands) < (2 if "-t" not in options else 1):
             logging.error("mv command with less than 2 operands is invalid; treating as no-op")
             return CmdSpec(Empty(), Empty(), Empty(), IOType.UNKNOWN)
-
+        elif "-t" in options:
+            dst = options["-t"]
+            srcs = operands
+            check = And.from_field_iter(srcs, lambda path: ~IsDeleted(path)) & IsDir(dst)
+            success_postcond = And.from_field_iter(srcs, IsDeleted)
+            failure_postcond = Empty()
         elif len(operands) == 2: # mv src dst (dst can be a file or a dir)
             src, dst = operands[0], operands[1]
             if isinstance(dst.content, SymStr) and \
