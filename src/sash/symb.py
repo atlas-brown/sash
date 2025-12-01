@@ -1119,9 +1119,27 @@ def interp_node(traces: Traces,
         case AST.FileRedirNode():
             res = []
             for t, redir_args in expand(traces, node.arg, config):
-                t_precond = t.extend(t.latest_state.add_assertion(And.from_field_iter(redir_args, lambda f: IsRead(f)), source_str=node.pretty(), source_line=context_line))
-                t_postcond = t_precond.extend(t_precond.latest_state.update_fs(And.from_field_iter(redir_args, lambda f: IsFile(f))))
-                res.append(t_postcond)
+                if node.redir_type == "To": # >
+                    # Check: all known-file args are read
+                    t_precond = t.extend(t.latest_state.add_assertion(And.from_field_iter(redir_args, lambda f: IsFile(f) >> IsRead(f)), source_str=node.pretty(), source_line=context_line))
+                    # On success: all args are files
+                    t_postcond = t_precond.extend(t_precond.latest_state.update_fs(And.from_field_iter(redir_args, lambda f: IsFile(f))))
+                    res.append(t_postcond)
+                if node.redir_type == "From": # <
+                    # Check: all args are files
+                    t_precond = t.extend(t.latest_state.add_assertion(And.from_field_iter(redir_args, lambda f: IsFile(f)), source_str=node.pretty(), source_line=context_line))
+                    # On success: all args are files and are read
+                    t_postcond = t_precond.extend(t_precond.latest_state.update_fs(And.from_field_iter(redir_args, lambda f: IsFile(f) & IsRead(f))))
+                    res.append(t_postcond)
+                elif node.redir_type == "Append": # >>
+                    # Check: -
+                    # On success: all args are files and are now unread
+                    t_postcond = t.extend(t.latest_state.update_fs(And.from_field_iter(redir_args, lambda f: IsFile(f) & IsUnread(f))))
+                    res.append(t_postcond)
+                else:
+                    logging.debug("Unhandled redirection type: %s", node.redir_type)
+                    res.append(t)
+
                 match redir_args:
                     case [Field(SymStr([something]), WordCount(1, 1))]:
                         if isinstance(something, str) and something in t.latest_state.fundefs:
