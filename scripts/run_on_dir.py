@@ -1,6 +1,5 @@
 #!/usr/bin/env -S uv run python3
 import argparse
-import pathlib
 import subprocess
 import sys
 from pathlib import Path
@@ -59,7 +58,7 @@ def main():
                         help="Where to write error logs (SaSh only)")
     args = parser.parse_args()
 
-    directory = args.directory.resolve()
+    directory: Path = args.directory.resolve()
 
     if not directory.is_dir():
         print(f"Not a directory: {directory}", file=sys.stderr)
@@ -77,8 +76,14 @@ def main():
         if not "scripts" in path.parts:
             continue
         ran += 1
-        print()
+        print(file=sys.stderr)
         print(f"=== Running on: {path} ===", file=sys.stderr)
+
+        # Get the part of the path just before "scripts", e.g. /path/to/scripts/lol should yield 'to'
+        part_before_scripts = path.parent.parts[path.parent.parts.index("scripts") - 1]
+        filepath = Path("./results") / part_before_scripts / (path.stem + ".jsonc")
+        filepath.parent.mkdir(parents=True, exist_ok=True)
+        file = filepath.open("w")
 
         if args.shellcheck:
             # Run ShellCheck
@@ -90,13 +95,13 @@ def main():
 
             if report["timed_out"]:
                 timed_out += 1
-                print("[TIMEOUT] ShellCheck", file=sys.stderr)
+                print("[TIMEOUT] ShellCheck", file=file)
             elif report["crashed"]:
                 crashed += 1
-                print("[CRASH] ShellCheck exited nonzero", file=sys.stderr)
+                print("[CRASH] ShellCheck exited nonzero", file=file)
             else:
                 succeeded += 1
-                print("[DONE] ShellCheck ok", file=sys.stderr)
+                print("[DONE] ShellCheck ok", file=file)
 
         else:
             # Run SaSh
@@ -109,21 +114,27 @@ def main():
                     log_level="error",
                     enable_dfs=args.enable_dfs,
                 )
+            except SystemExit as e:
+                crashed += 1
+                print(f"// [CRASH] SaSh assertion failed on {path}: {e}", file=file)
+                continue
             except Exception as e:
                 crashed += 1
-                print(f"[CRASH] SaSh crashed on {path}: {e}", file=sys.stderr)
+                print(f"// [CRASH] SaSh crashed on {path}: {e}", file=file)
                 continue
 
             if report.timed_out:
                 timed_out += 1
-                print(f"[TIMEOUT] exec={report.time}s solver={report.solver_time}s", file=sys.stderr)
+                print(f"// [TIMEOUT] exec={report.time}s solver={report.solver_time}s", file=file)
             else:
                 succeeded += 1
-                print(f"[DONE] exec={report.time}s solver={report.solver_time}s", file=sys.stderr)
+                print(f"// [DONE] exec={report.time}s solver={report.solver_time}s", file=file)
 
             if args.verbose:
                 import json
-                print(json.dumps(report.to_dict(), indent=2))
+                print(json.dumps(report.to_dict(), indent=2), file=file)
+
+        file.close()
 
     # Summary
     print("\n=== Summary ===", file=sys.stderr)
