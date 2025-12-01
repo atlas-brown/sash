@@ -167,3 +167,35 @@ def test_state_to_z3_fs_more():
                            fs_formula_compressed,
                            z3_fs_var(0),
                            z3_fs_var(10))
+
+def test_state_to_z3_intermediate_fs_state_pathcond():
+    reset_z3cache()
+
+    state = starting_state(FSModelSimple(lambda f: field_content_to_z3(f.content)))
+    s = state.set_env("A", ShellVar(Field.create_constant("value1")))\
+        .update_fs(IsDeleted(Field.create_constant("somefile.txt")))\
+        .add_pathcond(IsDeleted(Field.create_constant("somefile.txt")))\
+        .update_fs(IsFile(Field.create_constant("somefile.txt")))\
+        .update_fs(IsRead(Field.create_constant("somefile.txt")))\
+        .add_pathcond(IsRead(Field.create_constant("somefile.txt")))
+
+    fs_formula = z3.And(z3_fs_var(0) == z3.K(z3.StringSort(), FileInfo.mk_pair(Unknown, Unread)),
+                        z3_fs_var(1) == z3.Store(z3_fs_var(0), z3.StringVal("somefile.txt"), FileInfo.mk_pair(Del, Unread)),
+                        z3_fs_var(2) == z3.Store(z3_fs_var(1), z3.StringVal("somefile.txt"), FileInfo.mk_pair(File, Unread)),
+                        z3_fs_var(3) == z3.Store(z3_fs_var(2), z3.StringVal("somefile.txt"), FileInfo.mk_pair(File, Read)))
+    fs_formula_compressed = z3.And(z3_fs_var(10) == z3.K(z3.StringSort(), FileInfo.mk_pair(Unknown, Unread)),
+                                   z3_fs_var(13) == z3.Store(z3_fs_var(0), z3.StringVal("somefile.txt"), FileInfo.mk_pair(File, Read)))
+
+    pathcond_formula = z3.And(z3.Select(z3_fs_var(1), z3.StringVal("somefile.txt")) == FileInfo.mk_pair(Del, Unread),
+                              z3.Select(z3_fs_var(3), z3.StringVal("somefile.txt")) == FileInfo.mk_pair(File, Read),)
+
+    env_formula = make_env_constraints_z3(s,
+                                          {"A": z3.StringVal("value1")})
+
+    formula = state_to_z3(s)
+    assert_equiv_formulas(formula,
+                          z3.And(fs_formula, pathcond_formula, env_formula))
+    assert_equiv_fs_states(s.fs_model.state_to_z3(),
+                           fs_formula_compressed,
+                           z3_fs_var(0),
+                           z3_fs_var(10))

@@ -179,13 +179,17 @@ class Assertion:
     def __repr__(self):
         return f"Assertion(state<{hash(self.producing_state)}>, constraint={repr(self.constraint)}, source_str={repr(self.source_str)}, source_line={self.source_line})"
 
+@dataclass(frozen=True)
+class Condition(Assertion):
+    pass
+
 class Confidence(Enum):
     DEFINITE = 0
     SPECULATIVE = 1
 
 @dataclass(frozen=True)
 class State:
-    pathcond:                    tuple[Constraint, ...]      = field(default_factory=tuple)
+    pathcond:                    tuple[Condition, ...]       = field(default_factory=tuple)
     env:                         FrozenDict[str, ShellVar]   = field(default_factory=FrozenDict)
     localenv:                    FrozenDict[str, ShellVar]   = field(default_factory=FrozenDict)
     call_stack:                  tuple[str, ...]             = field(default_factory=tuple)
@@ -217,8 +221,8 @@ class State:
     def extend_localenv(self, new_vars: dict[str, ShellVar]) -> 'State':
         return replace(self, localenv=(self.localenv | new_vars))
 
-    def add_pathcond(self, cond: Constraint) -> 'State':
-        new_pathcond = self.pathcond + (cond,)
+    def add_pathcond(self, cond: Constraint, source_str: str | None = None, source_line: int | None = None) -> 'State':
+        new_pathcond = self.pathcond + (Condition(self, cond, source_str, source_line),)
         return replace(self, pathcond=new_pathcond)
 
     def add_assertion(self, assertion_constraint: Constraint, source_str: str | None = None, source_line: int | None = None) -> 'State':

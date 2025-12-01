@@ -88,7 +88,7 @@ def constraint_to_z3(constraint: Constraint, s: State) -> z3.ExprRef:
 def state_to_z3(s: State) -> z3.ExprRef:
     if logging.getLogger().isEnabledFor(logging.DEBUG):
         logging.debug("Path condition constraints: %s", pformat(s.pathcond))
-    pathcond_formula = z3.And([constraint_to_z3(pc, s) for pc in s.pathcond]) if s.pathcond else z3.BoolVal(True)
+    pathcond_formula = z3.And([constraint_to_z3(pc.constraint, pc.producing_state) for pc in s.pathcond]) if s.pathcond else z3.BoolVal(True)
 
     if logging.getLogger().isEnabledFor(logging.DEBUG):
         logging.debug("Path condition formula: %s", pformat(pathcond_formula))
