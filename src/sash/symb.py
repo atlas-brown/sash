@@ -612,7 +612,8 @@ def expand_simple(stuff: list[AST.ArgChar],
             default_expansions = expand_inner(var.arg, Partial(False, who.state))
             assert len(default_expansions) == 1, "default value expansion forking not implemented"
             default_fields, default_state = default_expansions[0].finish()
-            assert default_state == who.state, "default value expansion should not change state"
+            #assert default_state == who.state, "default value expansion should not change state"
+            who.state = default_state # if the default value contains previously unknown variables, the state gets updated
             for default_field in default_fields:
                 who.add_a_field(default_field)
 
