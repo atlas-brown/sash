@@ -202,7 +202,11 @@ def handle_unknown_command(name: str,
     if name.endswith("/") or any(name in t.latest_state.known_nonexistent_commands for t in traces):
         Reporter.add_issue(reporter.NotACommand(name, context_line))
 
-    logging.debug("Unknown command %s, optimistically treating as no-op", name)
+    logging.debug("Unknown command %s, optimistically treating as no-op", name) # that reads its operands", name)
+    # mark all args as being read
+    #t = trace_map(traces, lambda s: s.update_fs(And.from_field_iter(arg_fields, lambda f: IsFile(f) >> IsRead(f))))
+    #return t
+    # this makes execution significantly slower, so for now leave it commented out
     return traces
 
 def handle_function_call(name: str,
