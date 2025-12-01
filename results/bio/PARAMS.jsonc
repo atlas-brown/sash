@@ -1,0 +1,15 @@
+// [DONE] exec=0.0143697909952607s solver=6.741701508872211e-05s
+{
+  "filename": "/Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/bio/scripts/PARAMS.sh",
+  "issues": [
+    {
+      "line": 13,
+      "code": "unbound",
+      "severity": "error",
+      "message": "no definition found for ${SIZE}"
+    }
+  ],
+  "time": 0.0143697909952607,
+  "solver_time": 6.741701508872211e-05,
+  "timed_out": false
+}

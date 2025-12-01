@@ -1,0 +1,8 @@
+// [DONE] exec=0.004958042001817375s solver=4.329101648181677e-05s
+{
+  "filename": "/Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/oneliners/scripts/opt-parallel.sh",
+  "issues": [],
+  "time": 0.004958042001817375,
+  "solver_time": 4.329101648181677e-05,
+  "timed_out": false
+}

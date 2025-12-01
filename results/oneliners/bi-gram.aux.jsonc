@@ -1,0 +1,75 @@
+// [DONE] exec=0.05912874999921769s solver=0.10210950000328012s
+{
+  "filename": "/Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/oneliners/scripts/bi-gram.aux.sh",
+  "issues": [
+    {
+      "line": 12,
+      "code": "word_split",
+      "severity": "warning",
+      "message": "Frozen(<shasta.ast_node.BArgChar object at 0x101a76320>) could be split in a dangerous position, leading to unexpected arguments to dangerous commands"
+    },
+    {
+      "line": 61,
+      "code": "word_split",
+      "severity": "warning",
+      "message": "Frozen(<shasta.ast_node.BArgChar object at 0x101aa56c0>) could be split in a dangerous position, leading to unexpected arguments to dangerous commands"
+    },
+    {
+      "line": 62,
+      "code": "word_split",
+      "severity": "warning",
+      "message": "Frozen(<shasta.ast_node.BArgChar object at 0x101a779d0>) could be split in a dangerous position, leading to unexpected arguments to dangerous commands"
+    },
+    {
+      "line": 62,
+      "code": "unsat_precond",
+      "severity": "error",
+      "message": "precondition for 'rm ${s2}' 'And(lhs=IsFile(path=Field(content=CompletelyArbitrary(s`Frozen(<shasta.ast_node.BArgCh`, ArbitraryType.APPROXIMATION, state<-8413383937474091620>, pre:None, suf:None), count=WordCount(min=0, max=inf))), rhs=Not(constraint=IsUnread(path=Field(content=CompletelyArbitrary(s`Frozen(<shasta.ast_node.BArgCh`, ArbitraryType.APPROXIMATION, state<-8413383937474091620>, pre:None, suf:None), count=WordCount(min=0, max=inf)))))' might not hold"
+    },
+    {
+      "line": 63,
+      "code": "word_split",
+      "severity": "warning",
+      "message": "Frozen(<shasta.ast_node.BArgChar object at 0x101a45c00>) could be split in a dangerous position, leading to unexpected arguments to dangerous commands"
+    },
+    {
+      "line": 63,
+      "code": "unsat_precond",
+      "severity": "error",
+      "message": "precondition for 'rm ${aux1}' 'And(lhs=IsFile(path=Field(content=CompletelyArbitrary(s`Frozen(<shasta.ast_node.BArgCh`, ArbitraryType.APPROXIMATION, state<-2713783762344936424>, pre:None, suf:None), count=WordCount(min=0, max=inf))), rhs=Not(constraint=IsUnread(path=Field(content=CompletelyArbitrary(s`Frozen(<shasta.ast_node.BArgCh`, ArbitraryType.APPROXIMATION, state<-2713783762344936424>, pre:None, suf:None), count=WordCount(min=0, max=inf)))))' might not hold"
+    },
+    {
+      "line": 64,
+      "code": "unsat_precond",
+      "severity": "error",
+      "message": "precondition for 'rm ${aux2}' 'And(lhs=IsFile(path=Field(content=CompletelyArbitrary(s`Frozen(<shasta.ast_node.BArgCh`, ArbitraryType.APPROXIMATION, state<4374605777119622463>, pre:None, suf:None), count=WordCount(min=0, max=inf))), rhs=Not(constraint=IsUnread(path=Field(content=CompletelyArbitrary(s`Frozen(<shasta.ast_node.BArgCh`, ArbitraryType.APPROXIMATION, state<4374605777119622463>, pre:None, suf:None), count=WordCount(min=0, max=inf)))))' might not hold"
+    },
+    {
+      "line": 64,
+      "code": "word_split",
+      "severity": "warning",
+      "message": "Frozen(<shasta.ast_node.BArgChar object at 0x101a45cc0>) could be split in a dangerous position, leading to unexpected arguments to dangerous commands"
+    },
+    {
+      "line": 65,
+      "code": "unsat_precond",
+      "severity": "error",
+      "message": "precondition for 'rm ${aux3}' 'And(lhs=IsFile(path=Field(content=CompletelyArbitrary(s`Frozen(<shasta.ast_node.BArgCh`, ArbitraryType.APPROXIMATION, state<2224206753258127341>, pre:None, suf:None), count=WordCount(min=0, max=inf))), rhs=Not(constraint=IsUnread(path=Field(content=CompletelyArbitrary(s`Frozen(<shasta.ast_node.BArgCh`, ArbitraryType.APPROXIMATION, state<2224206753258127341>, pre:None, suf:None), count=WordCount(min=0, max=inf)))))' might not hold"
+    },
+    {
+      "line": 65,
+      "code": "word_split",
+      "severity": "warning",
+      "message": "Frozen(<shasta.ast_node.BArgChar object at 0x101a47b80>) could be split in a dangerous position, leading to unexpected arguments to dangerous commands"
+    },
+    {
+      "line": 91,
+      "code": "word_split",
+      "severity": "warning",
+      "message": "Frozen(<shasta.ast_node.BArgChar object at 0x101ae2380>) could be split in a dangerous position, leading to unexpected arguments to dangerous commands"
+    }
+  ],
+  "time": 0.05912874999921769,
+  "solver_time": 0.10210950000328012,
+  "timed_out": false
+}

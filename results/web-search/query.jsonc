@@ -1,0 +1,15 @@
+// [DONE] exec=0.013343375001568347s solver=0.007835291005903855s
+{
+  "filename": "/Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/web-search/scripts/query.sh",
+  "issues": [
+    {
+      "line": 20,
+      "code": "unexpected_stdin",
+      "severity": "error",
+      "message": "command 'grep' expects input from stdin if the first argument is empty"
+    }
+  ],
+  "time": 0.013343375001568347,
+  "solver_time": 0.007835291005903855,
+  "timed_out": false
+}

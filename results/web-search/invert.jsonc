@@ -1,0 +1,8 @@
+// [DONE] exec=0.004279624990886077s solver=5.141599103808403e-05s
+{
+  "filename": "/Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/web-search/scripts/c/invert.sh",
+  "issues": [],
+  "time": 0.004279624990886077,
+  "solver_time": 5.141599103808403e-05,
+  "timed_out": false
+}

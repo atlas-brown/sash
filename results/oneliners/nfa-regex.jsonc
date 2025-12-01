@@ -1,0 +1,8 @@
+// [DONE] exec=0.0036250829871278256s solver=0.0018429160118103027s
+{
+  "filename": "/Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/oneliners/scripts/nfa-regex.sh",
+  "issues": [],
+  "time": 0.0036250829871278256,
+  "solver_time": 0.0018429160118103027,
+  "timed_out": false
+}

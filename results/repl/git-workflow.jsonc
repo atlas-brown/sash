@@ -1,0 +1,15 @@
+// [DONE] exec=0.357488541980274s solver=1.56244754200452s
+{
+  "filename": "/Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/repl/scripts/git-workflow.sh",
+  "issues": [
+    {
+      "line": 40,
+      "code": "unsat_precond",
+      "severity": "error",
+      "message": "precondition for '0< \"${commit_file}\"' 'IsRead(path=Field(content=CompletelyArbitrary(s`Frozen(<shasta.ast_node.TArgCh`, ArbitraryType.APPROXIMATION, state<4049843310192045946>, pre:None, suf:SymStr(parts=('/commit_list.txt',))), count=WordCount(min=0, max=1)))' might not hold"
+    }
+  ],
+  "time": 0.357488541980274,
+  "solver_time": 1.56244754200452,
+  "timed_out": false
+}

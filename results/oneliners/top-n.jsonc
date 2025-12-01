@@ -1,0 +1,8 @@
+// [DONE] exec=0.007074041990563273s solver=0.002046290988801047s
+{
+  "filename": "/Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/oneliners/scripts/top-n.sh",
+  "issues": [],
+  "time": 0.007074041990563273,
+  "solver_time": 0.002046290988801047,
+  "timed_out": false
+}

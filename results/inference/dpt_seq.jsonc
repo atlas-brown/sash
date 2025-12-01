@@ -1,0 +1,51 @@
+// [DONE] exec=0.04458775001694448s solver=0.05214579202583991s
+{
+  "filename": "/Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/inference/scripts/dpt_seq.sh",
+  "issues": [
+    {
+      "line": 19,
+      "code": "unsat_precond",
+      "severity": "error",
+      "message": "precondition for 'cat \"${img}\"' 'IsFile(path=Field(content=CompletelyArbitrary(s`Frozen(V(Normal,False,1,[]))`, ArbitraryType.APPROXIMATION, state<-2217289871912186455>, pre:None, suf:None), count=WordCount(min=0, max=1)))' might not hold"
+    },
+    {
+      "line": 19,
+      "code": "unsat_precond",
+      "severity": "error",
+      "message": "precondition for '> \"${tmp_boxes}\"' 'IsRead(path=Field(content=CompletelyArbitrary(s`Frozen(<shasta.ast_node.BArgCh`, ArbitraryType.APPROXIMATION, state<2265823574275516995>, pre:None, suf:None), count=WordCount(min=0, max=1)))' might not hold"
+    },
+    {
+      "line": 20,
+      "code": "unsat_precond",
+      "severity": "error",
+      "message": "precondition for '0< \"${tmp_boxes}\"' 'IsRead(path=Field(content=CompletelyArbitrary(s`Frozen(<shasta.ast_node.BArgCh`, ArbitraryType.APPROXIMATION, state<7877283254227217924>, pre:None, suf:None), count=WordCount(min=0, max=1)))' might not hold"
+    },
+    {
+      "line": 20,
+      "code": "unsat_precond",
+      "severity": "error",
+      "message": "precondition for '0< \"${tmp_boxes}\"' 'IsRead(path=Field(content=CompletelyArbitrary(s`Frozen(<shasta.ast_node.BArgCh`, ArbitraryType.APPROXIMATION, state<2265823574275516995>, pre:None, suf:None), count=WordCount(min=0, max=1)))' might not hold"
+    },
+    {
+      "line": 24,
+      "code": "unsat_precond",
+      "severity": "error",
+      "message": "precondition for 'rm \"${tmp_boxes}\"' 'And(lhs=IsFile(path=Field(content=CompletelyArbitrary(s`Frozen(<shasta.ast_node.BArgCh`, ArbitraryType.APPROXIMATION, state<2265823574275516995>, pre:None, suf:None), count=WordCount(min=0, max=1))), rhs=Not(constraint=IsUnread(path=Field(content=CompletelyArbitrary(s`Frozen(<shasta.ast_node.BArgCh`, ArbitraryType.APPROXIMATION, state<2265823574275516995>, pre:None, suf:None), count=WordCount(min=0, max=1)))))' might not hold"
+    },
+    {
+      "line": 24,
+      "code": "unsat_precond",
+      "severity": "error",
+      "message": "precondition for 'rm \"${tmp_boxes}\"' 'And(lhs=IsFile(path=Field(content=CompletelyArbitrary(s`Frozen(<shasta.ast_node.BArgCh`, ArbitraryType.APPROXIMATION, state<7877283254227217924>, pre:None, suf:None), count=WordCount(min=0, max=1))), rhs=Not(constraint=IsUnread(path=Field(content=CompletelyArbitrary(s`Frozen(<shasta.ast_node.BArgCh`, ArbitraryType.APPROXIMATION, state<7877283254227217924>, pre:None, suf:None), count=WordCount(min=0, max=1)))))' might not hold"
+    },
+    {
+      "line": 30,
+      "code": "unsat_precond",
+      "severity": "error",
+      "message": "precondition for '>> \"${OUT}\"' 'IsRead(path=Field(content=CompletelyArbitrary(s`Frozen(V(Normal,False,2,[]))`, ArbitraryType.APPROXIMATION, state<5478972428824975064>, pre:None, suf:None), count=WordCount(min=0, max=1)))' might not hold"
+    }
+  ],
+  "time": 0.04458775001694448,
+  "solver_time": 0.05214579202583991,
+  "timed_out": false
+}

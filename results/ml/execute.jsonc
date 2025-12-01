@@ -1,0 +1,21 @@
+// [DONE] exec=0.3897145829978399s solver=0.00012870901264250278s
+{
+  "filename": "/Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/ml/scripts/execute.sh",
+  "issues": [
+    {
+      "line": 18,
+      "code": "unbound",
+      "severity": "error",
+      "message": "no definition found for ${DIR}"
+    },
+    {
+      "line": 61,
+      "code": "unbound",
+      "severity": "error",
+      "message": "no definition found for ${RESULT}"
+    }
+  ],
+  "time": 0.3897145829978399,
+  "solver_time": 0.00012870901264250278,
+  "timed_out": false
+}

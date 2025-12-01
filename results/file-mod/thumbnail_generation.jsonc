@@ -1,0 +1,8 @@
+// [DONE] exec=0.003809874993748963s solver=6.11250288784504e-05s
+{
+  "filename": "/Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/file-mod/scripts/thumbnail_generation.sh",
+  "issues": [],
+  "time": 0.003809874993748963,
+  "solver_time": 6.11250288784504e-05,
+  "timed_out": false
+}

@@ -1,0 +1,8 @@
+// [DONE] exec=0.033050958008971065s solver=0.0930152919900138s
+{
+  "filename": "/Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/pkg/scripts/proginf.sh",
+  "issues": [],
+  "time": 0.033050958008971065,
+  "solver_time": 0.0930152919900138,
+  "timed_out": false
+}

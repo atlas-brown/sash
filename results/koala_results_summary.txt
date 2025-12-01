@@ -1,0 +1,247 @@
+Walking directory: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/oneliners/scripts/bi-grams.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/oneliners/scripts/diff.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/oneliners/scripts/bi-gram.aux.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/oneliners/scripts/spell.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/oneliners/scripts/sort-sort.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/oneliners/scripts/set-diff.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/oneliners/scripts/top-n.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/oneliners/scripts/comm.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/oneliners/scripts/uniq-ips.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/oneliners/scripts/wf.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/oneliners/scripts/nfa-regex.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/oneliners/scripts/sort.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/oneliners/scripts/opt-parallel.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/bio/scripts/run_5TERA.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/bio/scripts/data.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/bio/scripts/PARAMS.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/bio/scripts/run_dRNASeq.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/bio/scripts/bio.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/bio/scripts/adapter.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/unixfun/scripts/4.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/unixfun/scripts/29.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/unixfun/scripts/19.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/unixfun/scripts/1.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/unixfun/scripts/18.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/unixfun/scripts/5.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/unixfun/scripts/28.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/unixfun/scripts/33.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/unixfun/scripts/17.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/unixfun/scripts/23.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/unixfun/scripts/27.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/unixfun/scripts/13.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/unixfun/scripts/36.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/unixfun/scripts/26.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/unixfun/scripts/12.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/unixfun/scripts/32.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/unixfun/scripts/16.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/unixfun/scripts/22.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/unixfun/scripts/8.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/unixfun/scripts/35.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/unixfun/scripts/25.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/unixfun/scripts/11.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/unixfun/scripts/31.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/unixfun/scripts/15.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/unixfun/scripts/21.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/unixfun/scripts/30.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/unixfun/scripts/14.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/unixfun/scripts/20.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/unixfun/scripts/9.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/unixfun/scripts/34.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/unixfun/scripts/24.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/unixfun/scripts/10.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/unixfun/scripts/2.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/unixfun/scripts/6.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/unixfun/scripts/7.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/unixfun/scripts/3.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/file-mod/scripts/encrypt_files.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/file-mod/scripts/compress_files.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/file-mod/scripts/to_mp3.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/file-mod/scripts/img_convert.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/file-mod/scripts/thumbnail_generation.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/repl/scripts/vps-audit.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/repl/scripts/git-workflow.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/repl/scripts/vps-audit-negate.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/ml/scripts/execute.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/web-search/scripts/engine.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/web-search/scripts/crawl.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/web-search/scripts/query.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/web-search/scripts/index.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/web-search/scripts/c/process.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/web-search/scripts/c/invert.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/web-search/scripts/c/combine.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/nlp/scripts/syllable_words_2.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/nlp/scripts/bigrams.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/nlp/scripts/sort_words_by_rhyming.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/nlp/scripts/merge_upper.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/nlp/scripts/find_anagrams.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/nlp/scripts/count_words.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/nlp/scripts/uppercase_by_token.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/nlp/scripts/letter_words.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/nlp/scripts/trigram_rec.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/nlp/scripts/count_morphs.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/nlp/scripts/count_trigrams.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/nlp/scripts/count_consonant_seq.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/nlp/scripts/compare_exodus_genesis.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/nlp/scripts/words_no_vowels.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/nlp/scripts/verses_2om_3om_2instances.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/nlp/scripts/uppercase_by_type.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/nlp/scripts/bigrams_appear_twice.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/nlp/scripts/vowel_sequencies_gr_1K.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/nlp/scripts/sort_words_by_folding.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/nlp/scripts/sort.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/nlp/scripts/sort_words_by_num_of_syllables.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/nlp/scripts/syllable_words_1.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/nlp/scripts/count_vowel_seq.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/inference/scripts/playlist-creation.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/inference/scripts/dpt_seq.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/inference/scripts/image-annotation.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/weather/scripts/tuft-weather.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/weather/scripts/temp-analytics.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/.tools/standards/sleep/scripts/main.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/.tools/standards/100-files/scripts/main.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/.tools/standards/write-only/scripts/main.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/.tools/standards/user-time/scripts/main.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/.tools/standards/read-write/scripts/sub.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/.tools/standards/read-write/scripts/main.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/.tools/standards/time-in-shell-subprocess/scripts/sub.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/.tools/standards/time-in-shell-subprocess/scripts/main.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/.tools/standards/user-time-in-shell/scripts/main.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/.tools/standards/shell-memory/scripts/main.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/covid/scripts/4.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/covid/scripts/1.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/covid/scripts/5.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/covid/scripts/2.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/covid/scripts/3.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/analytics/scripts/nginx.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/analytics/scripts/pcaps.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/analytics/scripts/port-scan.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/analytics/scripts/ray-tracing.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/pkg/scripts/proginf.sh ===
+
+=== Running on: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/pkg/scripts/pacaur.sh ===
+
+=== Summary ===
+  Files scanned: 120
+  Succeeded:     91
+  Crashed:       23
+  Timed out:     6

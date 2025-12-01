@@ -1,0 +1,27 @@
+// [DONE] exec=0.010234833986032754s solver=0.010192458983510733s
+{
+  "filename": "/Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/web-search/scripts/crawl.sh",
+  "issues": [
+    {
+      "line": 3,
+      "code": "unbound",
+      "severity": "error",
+      "message": "no definition found for ${OUT}"
+    },
+    {
+      "line": 13,
+      "code": "unbound",
+      "severity": "error",
+      "message": "no definition found for ${!}"
+    },
+    {
+      "line": 15,
+      "code": "unbound",
+      "severity": "error",
+      "message": "no definition found for ${WIKI}"
+    }
+  ],
+  "time": 0.010234833986032754,
+  "solver_time": 0.010192458983510733,
+  "timed_out": false
+}

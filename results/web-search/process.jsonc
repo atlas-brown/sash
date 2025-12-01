@@ -1,0 +1,15 @@
+// [DONE] exec=0.004826541000511497s solver=0.00348287500673905s
+{
+  "filename": "/Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/web-search/scripts/c/process.sh",
+  "issues": [
+    {
+      "line": 10,
+      "code": "unbound",
+      "severity": "error",
+      "message": "no definition found for ${IN}"
+    }
+  ],
+  "time": 0.004826541000511497,
+  "solver_time": 0.00348287500673905,
+  "timed_out": false
+}

@@ -1,0 +1,15 @@
+// [DONE] exec=0.06876600001123734s solver=0.06235433401889168s
+{
+  "filename": "/Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/inference/scripts/image-annotation.sh",
+  "issues": [
+    {
+      "line": 22,
+      "code": "unsat_precond",
+      "severity": "error",
+      "message": "precondition for 'cp \"${img}\" \"${OUT}/${filename}\"' 'And(lhs=And(lhs=IsFile(path=Field(content=CompletelyArbitrary(s`Frozen(Command: [[r, e, a, d],`, ArbitraryType.ENVIRONMENT, state<790023095615033911>, pre:None, suf:None), count=WordCount(min=0, max=1))), rhs=Not(constraint=StringEq(lhs=Field(content=CompletelyArbitrary(s`Frozen(Command: [[r, e, a, d],`, ArbitraryType.ENVIRONMENT, state<790023095615033911>, pre:None, suf:None), count=WordCount(min=0, max=1)), rhs=Field(content=CompletelyArbitrary(s`(Frozen(V(Normal,False,2,[])),`, ArbitraryType.APPROXIMATION, state<6141954032084355647>, pre:None, suf:None), count=WordCount(min=0, max=1))))), rhs=Implies(premise=IsFile(path=Field(content=CompletelyArbitrary(s`(Frozen(V(Normal,False,2,[])),`, ArbitraryType.APPROXIMATION, state<6141954032084355647>, pre:None, suf:None), count=WordCount(min=0, max=1))), conclusion=IsRead(path=Field(content=CompletelyArbitrary(s`(Frozen(V(Normal,False,2,[])),`, ArbitraryType.APPROXIMATION, state<6141954032084355647>, pre:None, suf:None), count=WordCount(min=0, max=1)))))' might not hold"
+    }
+  ],
+  "time": 0.06876600001123734,
+  "solver_time": 0.06235433401889168,
+  "timed_out": false
+}
