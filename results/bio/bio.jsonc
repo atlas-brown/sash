@@ -1,8 +1,8 @@
-// [DONE] exec=0.4854577079822775s solver=1.3616400829923805s
+// [DONE] exec=0.4208989170147106s solver=1.2368994579883292s
 {
   "filename": "/Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/bio/scripts/bio.sh",
   "issues": [],
-  "time": 0.4854577079822775,
-  "solver_time": 1.3616400829923805,
+  "time": 0.4208989170147106,
+  "solver_time": 1.2368994579883292,
   "timed_out": false
 }

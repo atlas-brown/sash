@@ -1,4 +1,4 @@
-// [TIMEOUT] exec=0.2425690410018433s solver=3.049774957995396s
+// [TIMEOUT] exec=0.21501829201588407s solver=3.058428999996977s
 {
   "filename": "/Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/bio/scripts/run_5TERA.sh",
   "issues": [
@@ -18,25 +18,25 @@
       "line": 105,
       "code": "unsat_precond",
       "severity": "error",
-      "message": "precondition for '>> ${sdir}/align/reads.1.sanitize.toRibosomal.sorted.sam' 'IsRead(path=Field(content=CompletelyArbitrary(s`Frozen(<shasta.ast_node.BArgCh`, ArbitraryType.APPROXIMATION, state<3400318581516949965>, pre:None, suf:SymStr(parts=('/bio/outputs/teraseq', '/hsa.dRNASeq.HeLa.polyA.CIP.decap.REL5.long.1 hsa.dRNASeq.HeLa.polyA.decap.REL5.long.1 hsa.dRNASeq.HeLa.polyA.REL5.long.1 hsa.dRNASeq.HeLa.polyA.REL5OH.long.1', '/align/reads.1.sanitize.toRibosomal.sorted.sam'))), count=WordCount(min=3, max=inf)))' might not hold"
+      "message": "precondition for '>> ${sdir}/align/reads.1.sanitize.toRibosomal.sorted.sam' 'IsRead(path=Field(content=CompletelyArbitrary(s`Frozen(<shasta.ast_node.BArgCh`, ArbitraryType.APPROXIMATION, state<8940785667901386300>, pre:None, suf:SymStr(parts=('/bio/outputs/teraseq', '/hsa.dRNASeq.HeLa.polyA.CIP.decap.REL5.long.1 hsa.dRNASeq.HeLa.polyA.decap.REL5.long.1 hsa.dRNASeq.HeLa.polyA.REL5.long.1 hsa.dRNASeq.HeLa.polyA.REL5OH.long.1', '/align/reads.1.sanitize.toRibosomal.sorted.sam'))), count=WordCount(min=3, max=inf)))' might not hold"
     },
     {
       "line": 106,
       "code": "unsat_precond",
       "severity": "error",
-      "message": "precondition for 'rm ${sdir}/align/reads.1.sanitize.toEnsembl-transcripts-wRibo.sorted.bam' 'And(lhs=IsFile(path=Field(content=CompletelyArbitrary(s`Frozen(<shasta.ast_node.BArgCh`, ArbitraryType.APPROXIMATION, state<3400318581516949965>, pre:None, suf:SymStr(parts=('/bio/outputs/teraseq', '/hsa.dRNASeq.HeLa.polyA.CIP.decap.REL5.long.1 hsa.dRNASeq.HeLa.polyA.decap.REL5.long.1 hsa.dRNASeq.HeLa.polyA.REL5.long.1 hsa.dRNASeq.HeLa.polyA.REL5OH.long.1', '/align/reads.1.sanitize.toEnsembl-transcripts-wRibo.sorted.bam'))), count=WordCount(min=3, max=inf))), rhs=Not(constraint=IsUnread(path=Field(content=CompletelyArbitrary(s`Frozen(<shasta.ast_node.BArgCh`, ArbitraryType.APPROXIMATION, state<3400318581516949965>, pre:None, suf:SymStr(parts=('/bio/outputs/teraseq', '/hsa.dRNASeq.HeLa.polyA.CIP.decap.REL5.long.1 hsa.dRNASeq.HeLa.polyA.decap.REL5.long.1 hsa.dRNASeq.HeLa.polyA.REL5.long.1 hsa.dRNASeq.HeLa.polyA.REL5OH.long.1', '/align/reads.1.sanitize.toEnsembl-transcripts-wRibo.sorted.bam'))), count=WordCount(min=3, max=inf)))))' might not hold"
+      "message": "precondition for 'rm ${sdir}/align/reads.1.sanitize.toEnsembl-transcripts-wRibo.sorted.bam' 'And(lhs=IsFile(path=Field(content=CompletelyArbitrary(s`Frozen(<shasta.ast_node.BArgCh`, ArbitraryType.APPROXIMATION, state<8940785667901386300>, pre:None, suf:SymStr(parts=('/bio/outputs/teraseq', '/hsa.dRNASeq.HeLa.polyA.CIP.decap.REL5.long.1 hsa.dRNASeq.HeLa.polyA.decap.REL5.long.1 hsa.dRNASeq.HeLa.polyA.REL5.long.1 hsa.dRNASeq.HeLa.polyA.REL5OH.long.1', '/align/reads.1.sanitize.toEnsembl-transcripts-wRibo.sorted.bam'))), count=WordCount(min=3, max=inf))), rhs=Not(constraint=IsUnread(path=Field(content=CompletelyArbitrary(s`Frozen(<shasta.ast_node.BArgCh`, ArbitraryType.APPROXIMATION, state<8940785667901386300>, pre:None, suf:SymStr(parts=('/bio/outputs/teraseq', '/hsa.dRNASeq.HeLa.polyA.CIP.decap.REL5.long.1 hsa.dRNASeq.HeLa.polyA.decap.REL5.long.1 hsa.dRNASeq.HeLa.polyA.REL5.long.1 hsa.dRNASeq.HeLa.polyA.REL5OH.long.1', '/align/reads.1.sanitize.toEnsembl-transcripts-wRibo.sorted.bam'))), count=WordCount(min=3, max=inf)))))' might not hold"
     },
     {
       "line": 106,
       "code": "word_split",
       "severity": "warning",
-      "message": "Frozen(<shasta.ast_node.BArgChar object at 0x101ae0fd0>) could be split in a dangerous position, leading to unexpected arguments to dangerous commands"
+      "message": "Frozen(<shasta.ast_node.BArgChar object at 0x102b90550>) could be split in a dangerous position, leading to unexpected arguments to dangerous commands"
     },
     {
       "line": 115,
       "code": "word_split",
       "severity": "warning",
-      "message": "Frozen(<shasta.ast_node.BArgChar object at 0x101ae0fd0>) could be split in a dangerous position, leading to unexpected arguments to dangerous commands"
+      "message": "Frozen(<shasta.ast_node.BArgChar object at 0x102b90550>) could be split in a dangerous position, leading to unexpected arguments to dangerous commands"
     },
     {
       "line": 137,
@@ -48,7 +48,7 @@
       "line": 151,
       "code": "unsat_precond",
       "severity": "error",
-      "message": "precondition for '> ${sdir}/align/reads.1.sanitize.noribo.toTranscriptome-polya.sorted.bam' 'IsRead(path=Field(content=CompletelyArbitrary(s`Frozen(<shasta.ast_node.BArgCh`, ArbitraryType.APPROXIMATION, state<3400318581516949965>, pre:None, suf:SymStr(parts=('/bio/outputs/teraseq', '/hsa.dRNASeq.HeLa.polyA.CIP.decap.REL5.long.1 hsa.dRNASeq.HeLa.polyA.decap.REL5.long.1 hsa.dRNASeq.HeLa.polyA.REL5.long.1 hsa.dRNASeq.HeLa.polyA.REL5OH.long.1', '/align/reads.1.sanitize.noribo.toTranscriptome-polya.sorted.bam'))), count=WordCount(min=3, max=inf)))' might not hold"
+      "message": "precondition for '> ${sdir}/align/reads.1.sanitize.noribo.toTranscriptome-polya.sorted.bam' 'IsRead(path=Field(content=CompletelyArbitrary(s`Frozen(<shasta.ast_node.BArgCh`, ArbitraryType.APPROXIMATION, state<8940785667901386300>, pre:None, suf:SymStr(parts=('/bio/outputs/teraseq', '/hsa.dRNASeq.HeLa.polyA.CIP.decap.REL5.long.1 hsa.dRNASeq.HeLa.polyA.decap.REL5.long.1 hsa.dRNASeq.HeLa.polyA.REL5.long.1 hsa.dRNASeq.HeLa.polyA.REL5OH.long.1', '/align/reads.1.sanitize.noribo.toTranscriptome-polya.sorted.bam'))), count=WordCount(min=3, max=inf)))' might not hold"
     },
     {
       "line": 165,
@@ -60,34 +60,34 @@
       "line": 179,
       "code": "unsat_precond",
       "severity": "error",
-      "message": "precondition for '> ${sdir}/align/reads.1.sanitize.toGenome.sorted.bam' 'IsRead(path=Field(content=CompletelyArbitrary(s`Frozen(<shasta.ast_node.BArgCh`, ArbitraryType.APPROXIMATION, state<3400318581516949965>, pre:None, suf:SymStr(parts=('/bio/outputs/teraseq', '/hsa.dRNASeq.HeLa.polyA.CIP.decap.REL5.long.1 hsa.dRNASeq.HeLa.polyA.decap.REL5.long.1 hsa.dRNASeq.HeLa.polyA.REL5.long.1 hsa.dRNASeq.HeLa.polyA.REL5OH.long.1', '/align/reads.1.sanitize.toGenome.sorted.bam'))), count=WordCount(min=3, max=inf)))' might not hold"
+      "message": "precondition for '> ${sdir}/align/reads.1.sanitize.toGenome.sorted.bam' 'IsRead(path=Field(content=CompletelyArbitrary(s`Frozen(<shasta.ast_node.BArgCh`, ArbitraryType.APPROXIMATION, state<8940785667901386300>, pre:None, suf:SymStr(parts=('/bio/outputs/teraseq', '/hsa.dRNASeq.HeLa.polyA.CIP.decap.REL5.long.1 hsa.dRNASeq.HeLa.polyA.decap.REL5.long.1 hsa.dRNASeq.HeLa.polyA.REL5.long.1 hsa.dRNASeq.HeLa.polyA.REL5OH.long.1', '/align/reads.1.sanitize.toGenome.sorted.bam'))), count=WordCount(min=3, max=inf)))' might not hold"
     },
     {
       "line": 205,
       "code": "unsat_precond",
       "severity": "error",
-      "message": "precondition for 'cat ${sdir}/align/reads.1.sanitize.noribo.toTranscriptome.sorted.bam' 'IsFile(path=Field(content=CompletelyArbitrary(s`Frozen(<shasta.ast_node.BArgCh`, ArbitraryType.APPROXIMATION, state<3400318581516949965>, pre:None, suf:SymStr(parts=('/bio/outputs/teraseq', '/hsa.dRNASeq.HeLa.polyA.CIP.decap.REL5.long.1 hsa.dRNASeq.HeLa.polyA.decap.REL5.long.1 hsa.dRNASeq.HeLa.polyA.REL5.long.1 hsa.dRNASeq.HeLa.polyA.REL5OH.long.1', '/align/reads.1.sanitize.noribo.toTranscriptome.sorted.bam'))), count=WordCount(min=3, max=inf)))' might not hold"
+      "message": "precondition for 'cat ${sdir}/align/reads.1.sanitize.noribo.toTranscriptome.sorted.bam' 'IsFile(path=Field(content=CompletelyArbitrary(s`Frozen(<shasta.ast_node.BArgCh`, ArbitraryType.APPROXIMATION, state<8940785667901386300>, pre:None, suf:SymStr(parts=('/bio/outputs/teraseq', '/hsa.dRNASeq.HeLa.polyA.CIP.decap.REL5.long.1 hsa.dRNASeq.HeLa.polyA.decap.REL5.long.1 hsa.dRNASeq.HeLa.polyA.REL5.long.1 hsa.dRNASeq.HeLa.polyA.REL5OH.long.1', '/align/reads.1.sanitize.noribo.toTranscriptome.sorted.bam'))), count=WordCount(min=3, max=inf)))' might not hold"
     },
     {
       "line": 283,
       "code": "unsat_precond",
       "severity": "error",
-      "message": "precondition for 'cat ${sdir}/align/reads.1.sanitize.toGenome.sorted.bam' 'IsFile(path=Field(content=CompletelyArbitrary(s`Frozen(<shasta.ast_node.BArgCh`, ArbitraryType.APPROXIMATION, state<3400318581516949965>, pre:None, suf:SymStr(parts=('/bio/outputs/teraseq', '/hsa.dRNASeq.HeLa.polyA.CIP.decap.REL5.long.1 hsa.dRNASeq.HeLa.polyA.decap.REL5.long.1 hsa.dRNASeq.HeLa.polyA.REL5.long.1 hsa.dRNASeq.HeLa.polyA.REL5OH.long.1', '/align/reads.1.sanitize.toGenome.sorted.bam'))), count=WordCount(min=3, max=inf)))' might not hold"
+      "message": "precondition for 'cat ${sdir}/align/reads.1.sanitize.toGenome.sorted.bam' 'IsFile(path=Field(content=CompletelyArbitrary(s`Frozen(<shasta.ast_node.BArgCh`, ArbitraryType.APPROXIMATION, state<8940785667901386300>, pre:None, suf:SymStr(parts=('/bio/outputs/teraseq', '/hsa.dRNASeq.HeLa.polyA.CIP.decap.REL5.long.1 hsa.dRNASeq.HeLa.polyA.decap.REL5.long.1 hsa.dRNASeq.HeLa.polyA.REL5.long.1 hsa.dRNASeq.HeLa.polyA.REL5OH.long.1', '/align/reads.1.sanitize.toGenome.sorted.bam'))), count=WordCount(min=3, max=inf)))' might not hold"
+    },
+    {
+      "line": 345,
+      "code": "unsat_precond",
+      "severity": "error",
+      "message": "precondition for '> ${sdir}/align/reads.1.sanitize.noribo.toTranscriptome.sorted.polya.tab' 'IsRead(path=Field(content=CompletelyArbitrary(s`Frozen(<shasta.ast_node.BArgCh`, ArbitraryType.APPROXIMATION, state<8940785667901386300>, pre:None, suf:SymStr(parts=('/bio/outputs/teraseq', '/hsa.dRNASeq.HeLa.polyA.CIP.decap.REL5.long.1 hsa.dRNASeq.HeLa.polyA.decap.REL5.long.1 hsa.dRNASeq.HeLa.polyA.REL5.long.1 hsa.dRNASeq.HeLa.polyA.REL5OH.long.1', '/align/reads.1.sanitize.noribo.toTranscriptome.sorted.polya.tab'))), count=WordCount(min=3, max=inf)))' might not hold"
     },
     {
       "line": 345,
       "code": "unbound",
       "severity": "error",
       "message": "no definition found for ${DATA_DIR}"
-    },
-    {
-      "line": 345,
-      "code": "unsat_precond",
-      "severity": "error",
-      "message": "precondition for '> ${sdir}/align/reads.1.sanitize.noribo.toTranscriptome.sorted.polya.tab' 'IsRead(path=Field(content=CompletelyArbitrary(s`Frozen(<shasta.ast_node.BArgCh`, ArbitraryType.APPROXIMATION, state<3400318581516949965>, pre:None, suf:SymStr(parts=('/bio/outputs/teraseq', '/hsa.dRNASeq.HeLa.polyA.CIP.decap.REL5.long.1 hsa.dRNASeq.HeLa.polyA.decap.REL5.long.1 hsa.dRNASeq.HeLa.polyA.REL5.long.1 hsa.dRNASeq.HeLa.polyA.REL5OH.long.1', '/align/reads.1.sanitize.noribo.toTranscriptome.sorted.polya.tab'))), count=WordCount(min=3, max=inf)))' might not hold"
     }
   ],
-  "time": 0.2425690410018433,
-  "solver_time": 3.049774957995396,
+  "time": 0.21501829201588407,
+  "solver_time": 3.058428999996977,
   "timed_out": true
 }

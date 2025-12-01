@@ -1,4 +1,4 @@
-// [DONE] exec=0.3897145829978399s solver=0.00012870901264250278s
+// [DONE] exec=0.3634278330137022s solver=9.4832998001948e-05s
 {
   "filename": "/Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/ml/scripts/execute.sh",
   "issues": [
@@ -15,7 +15,7 @@
       "message": "no definition found for ${RESULT}"
     }
   ],
-  "time": 0.3897145829978399,
-  "solver_time": 0.00012870901264250278,
+  "time": 0.3634278330137022,
+  "solver_time": 9.4832998001948e-05,
   "timed_out": false
 }

@@ -1,4 +1,4 @@
-// [DONE] exec=0.06051224999828264s solver=0.14946637500543147s
+// [DONE] exec=0.09406295799999498s solver=0.15676124999299645s
 {
   "filename": "/Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/web-search/scripts/engine.sh",
   "issues": [
@@ -18,7 +18,7 @@
       "line": 6,
       "code": "unsat_precond",
       "severity": "error",
-      "message": "precondition for '0< \"${OUT}/urls.txt\"' 'IsRead(path=Field(content=CompletelyArbitrary(s`Frozen(V(Normal,False,OUT,[]))`, ArbitraryType.ENVIRONMENT, state<6392492977690283524>, pre:None, suf:SymStr(parts=('/urls.txt',))), count=WordCount(min=0, max=1)))' might not hold"
+      "message": "precondition for '0< \"${OUT}/urls.txt\"' 'IsRead(path=Field(content=CompletelyArbitrary(s`Frozen(V(Normal,False,OUT,[]))`, ArbitraryType.ENVIRONMENT, state<4896556362800837426>, pre:None, suf:SymStr(parts=('/urls.txt',))), count=WordCount(min=0, max=1)))' might not hold"
     },
     {
       "line": 10,
@@ -30,7 +30,7 @@
       "line": 11,
       "code": "unsat_precond",
       "severity": "error",
-      "message": "precondition for '> ${OUT}/content.txt' 'IsRead(path=Field(content=CompletelyArbitrary(s`Frozen(V(Normal,False,OUT,[]))`, ArbitraryType.ENVIRONMENT, state<6392492977690283524>, pre:None, suf:SymStr(parts=('/content.txt',))), count=WordCount(min=0, max=inf)))' might not hold"
+      "message": "precondition for '> ${OUT}/content.txt' 'IsRead(path=Field(content=CompletelyArbitrary(s`Frozen(V(Normal,False,OUT,[]))`, ArbitraryType.ENVIRONMENT, state<4896556362800837426>, pre:None, suf:SymStr(parts=('/content.txt',))), count=WordCount(min=0, max=inf)))' might not hold"
     },
     {
       "line": 12,
@@ -39,7 +39,7 @@
       "message": "precondition for '> /dev/stderr' 'IsRead(path=Field(content=SymStr(parts=('/dev/stderr',)), count=WordCount(min=1, max=1)))' might not hold"
     }
   ],
-  "time": 0.06051224999828264,
-  "solver_time": 0.14946637500543147,
+  "time": 0.09406295799999498,
+  "solver_time": 0.15676124999299645,
   "timed_out": false
 }

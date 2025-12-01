@@ -1,4 +1,4 @@
-// [DONE] exec=0.013385958998696879s solver=0.005513624986633658s
+// [DONE] exec=0.013196000014431775s solver=0.005521625018445775s
 {
   "filename": "/Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/.tools/standards/write-only/scripts/main.sh",
   "issues": [
@@ -9,7 +9,7 @@
       "message": "precondition for '>> /dev/null' 'IsRead(path=Field(content=SymStr(parts=('/dev/null',)), count=WordCount(min=1, max=1)))' might not hold"
     }
   ],
-  "time": 0.013385958998696879,
-  "solver_time": 0.005513624986633658,
+  "time": 0.013196000014431775,
+  "solver_time": 0.005521625018445775,
   "timed_out": false
 }

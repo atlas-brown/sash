@@ -1,1 +1,21 @@
-// [CRASH] SaSh assertion failed on /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/nlp/scripts/syllable_words_1.sh: 1
+// [DONE] exec=0.3567296249966603s solver=0.913889499992365s
+{
+  "filename": "/Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/nlp/scripts/syllable_words_1.sh",
+  "issues": [
+    {
+      "line": 5,
+      "code": "unbound",
+      "severity": "error",
+      "message": "no definition found for ${SUITE_DIR}"
+    },
+    {
+      "line": 6,
+      "code": "unbound",
+      "severity": "error",
+      "message": "no definition found for ${SUITE_DIR}"
+    }
+  ],
+  "time": 0.3567296249966603,
+  "solver_time": 0.913889499992365,
+  "timed_out": false
+}

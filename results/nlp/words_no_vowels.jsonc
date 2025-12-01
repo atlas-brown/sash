@@ -1,1 +1,21 @@
-// [CRASH] SaSh assertion failed on /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/nlp/scripts/words_no_vowels.sh: 1
+// [DONE] exec=0.2739073749980889s solver=0.6887360419787001s
+{
+  "filename": "/Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/nlp/scripts/words_no_vowels.sh",
+  "issues": [
+    {
+      "line": 5,
+      "code": "unbound",
+      "severity": "error",
+      "message": "no definition found for ${SUITE_DIR}"
+    },
+    {
+      "line": 6,
+      "code": "unbound",
+      "severity": "error",
+      "message": "no definition found for ${SUITE_DIR}"
+    }
+  ],
+  "time": 0.2739073749980889,
+  "solver_time": 0.6887360419787001,
+  "timed_out": false
+}

@@ -1,8 +1,8 @@
-// [DONE] exec=0.011766334006097168s solver=0.023560125002404675s
+// [DONE] exec=0.011760166991734877s solver=0.02753858399228193s
 {
   "filename": "/Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/file-mod/scripts/compress_files.sh",
   "issues": [],
-  "time": 0.011766334006097168,
-  "solver_time": 0.023560125002404675,
+  "time": 0.011760166991734877,
+  "solver_time": 0.02753858399228193,
   "timed_out": false
 }

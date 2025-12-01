@@ -1,8 +1,8 @@
-// [DONE] exec=0.017529250006191432s solver=0.04871608299436048s
+// [DONE] exec=0.014386041992111132s solver=0.04529379200539552s
 {
   "filename": "/Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/analytics/scripts/port-scan.sh",
   "issues": [],
-  "time": 0.017529250006191432,
-  "solver_time": 0.04871608299436048,
+  "time": 0.014386041992111132,
+  "solver_time": 0.04529379200539552,
   "timed_out": false
 }

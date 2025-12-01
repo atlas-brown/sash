@@ -1,4 +1,4 @@
-// [DONE] exec=0.05657624997547828s solver=0.10230766597669572s
+// [DONE] exec=0.049543125001946464s solver=0.08933141699526459s
 {
   "filename": "/Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/weather/scripts/temp-analytics.sh",
   "issues": [
@@ -16,18 +16,18 @@
     },
     {
       "line": 4,
-      "code": "unbound",
-      "severity": "error",
-      "message": "no definition found for ${statistics_dir}"
-    },
-    {
-      "line": 4,
       "code": "dead_code",
       "severity": "warning",
       "message": "Command: [[e, c, h, o], [Q([s, c, r, i, p, t,  , w, a, s,  , n, o, t,  , p, r, o, v, i, d, e, d,  , w, i, t, h,  , \\$, s, t, a, t, i, s, t, i, c, s, _, d, i, r])]] is unreachable and will never be executed"
+    },
+    {
+      "line": 4,
+      "code": "unbound",
+      "severity": "error",
+      "message": "no definition found for ${statistics_dir}"
     }
   ],
-  "time": 0.05657624997547828,
-  "solver_time": 0.10230766597669572,
+  "time": 0.049543125001946464,
+  "solver_time": 0.08933141699526459,
   "timed_out": false
 }

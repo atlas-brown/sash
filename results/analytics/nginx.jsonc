@@ -1,4 +1,4 @@
-// [DONE] exec=0.06965733299148269s solver=0.0460142090159934s
+// [DONE] exec=0.06514404198969714s solver=0.04007095898850821s
 {
   "filename": "/Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/analytics/scripts/nginx.sh",
   "issues": [
@@ -6,10 +6,10 @@
       "line": 27,
       "code": "word_split",
       "severity": "warning",
-      "message": "Frozen(<shasta.ast_node.BArgChar object at 0x104493bb0>) could be split in a dangerous position, leading to unexpected arguments to dangerous commands"
+      "message": "Frozen(<shasta.ast_node.BArgChar object at 0x1054b3190>) could be split in a dangerous position, leading to unexpected arguments to dangerous commands"
     }
   ],
-  "time": 0.06965733299148269,
-  "solver_time": 0.0460142090159934,
+  "time": 0.06514404198969714,
+  "solver_time": 0.04007095898850821,
   "timed_out": false
 }

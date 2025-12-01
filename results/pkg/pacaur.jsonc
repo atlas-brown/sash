@@ -1,4 +1,4 @@
-// [TIMEOUT] exec=1.1430880000116304s solver=3.0875805410032626s
+// [TIMEOUT] exec=1.0372441670042463s solver=3.0104919159784913s
 {
   "filename": "/Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/pkg/scripts/pacaur.sh",
   "issues": [
@@ -18,10 +18,10 @@
       "line": 26,
       "code": "unsat_precond",
       "severity": "error",
-      "message": "precondition for '> \"../${pkg}.txt\"' 'IsRead(path=Field(content=CompletelyArbitrary(s`Frozen(V(Normal,False,1,[]))`, ArbitraryType.APPROXIMATION, state<-2217289871912186455>, pre:SymStr(parts=('../',)), suf:SymStr(parts=('.txt',))), count=WordCount(min=0, max=1)))' might not hold"
+      "message": "precondition for '> \"../${pkg}.txt\"' 'IsRead(path=Field(content=CompletelyArbitrary(s`Frozen(V(Normal,False,1,[]))`, ArbitraryType.APPROXIMATION, state<-1493408280731606145>, pre:SymStr(parts=('../',)), suf:SymStr(parts=('.txt',))), count=WordCount(min=0, max=1)))' might not hold"
     }
   ],
-  "time": 1.1430880000116304,
-  "solver_time": 3.0875805410032626,
+  "time": 1.0372441670042463,
+  "solver_time": 3.0104919159784913,
   "timed_out": true
 }

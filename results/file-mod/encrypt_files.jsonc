@@ -1,8 +1,8 @@
-// [DONE] exec=0.017978667019633576s solver=0.023631125019164756s
+// [DONE] exec=0.015645792009308934s solver=0.01945062499726191s
 {
   "filename": "/Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/file-mod/scripts/encrypt_files.sh",
   "issues": [],
-  "time": 0.017978667019633576,
-  "solver_time": 0.023631125019164756,
+  "time": 0.015645792009308934,
+  "solver_time": 0.01945062499726191,
   "timed_out": false
 }

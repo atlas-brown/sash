@@ -1,4 +1,4 @@
-// [TIMEOUT] exec=1.5957523329998367s solver=3.0262356250023004s
+// [TIMEOUT] exec=1.4008904579968657s solver=3.016083916008938s
 {
   "filename": "/Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/bio/scripts/data.sh",
   "issues": [
@@ -78,7 +78,7 @@
       "line": 89,
       "code": "unsat_precond",
       "severity": "error",
-      "message": "precondition for 'cd \"${DATA_DIR}/silva/\"' 'IsDir(path=Field(content=CompletelyArbitrary(s`Frozen(V(Normal,False,DATA_DIR`, ArbitraryType.ENVIRONMENT, state<-9021239844274555201>, pre:None, suf:SymStr(parts=('/silva/',))), count=WordCount(min=0, max=1)))' might not hold"
+      "message": "precondition for 'cd \"${DATA_DIR}/silva/\"' 'IsDir(path=Field(content=CompletelyArbitrary(s`Frozen(V(Normal,False,DATA_DIR`, ArbitraryType.ENVIRONMENT, state<3620446779786836486>, pre:None, suf:SymStr(parts=('/silva/',))), count=WordCount(min=0, max=1)))' might not hold"
     },
     {
       "line": 92,
@@ -90,13 +90,13 @@
       "line": 98,
       "code": "unsat_precond",
       "severity": "error",
-      "message": "precondition for 'mkdir -p \"${DATA_DIR}/${assembly}/genome\"' 'Not(constraint=IsFile(path=Field(content=CompletelyArbitrary(s`Frozen(V(Normal,False,DATA_DIR`, ArbitraryType.ENVIRONMENT, state<-9021239844274555201>, pre:None, suf:SymStr(parts=('/mm10/genome',))), count=WordCount(min=0, max=1))))' might not hold"
+      "message": "precondition for 'mkdir -p \"${DATA_DIR}/${assembly}/genome\"' 'Not(constraint=IsFile(path=Field(content=CompletelyArbitrary(s`Frozen(V(Normal,False,DATA_DIR`, ArbitraryType.ENVIRONMENT, state<3620446779786836486>, pre:None, suf:SymStr(parts=('/mm10/genome',))), count=WordCount(min=0, max=1))))' might not hold"
     },
     {
       "line": 99,
       "code": "unsat_precond",
       "severity": "error",
-      "message": "precondition for 'cd \"${DATA_DIR}/${assembly}/\"' 'IsDir(path=Field(content=CompletelyArbitrary(s`Frozen(V(Normal,False,DATA_DIR`, ArbitraryType.ENVIRONMENT, state<-9021239844274555201>, pre:None, suf:SymStr(parts=('/mm10/',))), count=WordCount(min=0, max=1)))' might not hold"
+      "message": "precondition for 'cd \"${DATA_DIR}/${assembly}/\"' 'IsDir(path=Field(content=CompletelyArbitrary(s`Frozen(V(Normal,False,DATA_DIR`, ArbitraryType.ENVIRONMENT, state<3620446779786836486>, pre:None, suf:SymStr(parts=('/mm10/',))), count=WordCount(min=0, max=1)))' might not hold"
     },
     {
       "line": 104,
@@ -114,7 +114,7 @@
       "line": 111,
       "code": "unsat_precond",
       "severity": "error",
-      "message": "precondition for 'cd \"${DATA_DIR}/${assembly}\"' 'IsDir(path=Field(content=CompletelyArbitrary(s`Frozen(V(Normal,False,DATA_DIR`, ArbitraryType.ENVIRONMENT, state<-9021239844274555201>, pre:None, suf:SymStr(parts=('/hg38',))), count=WordCount(min=0, max=1)))' might not hold"
+      "message": "precondition for 'cd \"${DATA_DIR}/${assembly}\"' 'IsDir(path=Field(content=CompletelyArbitrary(s`Frozen(V(Normal,False,DATA_DIR`, ArbitraryType.ENVIRONMENT, state<3620446779786836486>, pre:None, suf:SymStr(parts=('/hg38',))), count=WordCount(min=0, max=1)))' might not hold"
     },
     {
       "line": 121,
@@ -136,15 +136,15 @@
     },
     {
       "line": 128,
-      "code": "unbound",
-      "severity": "error",
-      "message": "no definition found for ${threads}"
-    },
-    {
-      "line": 128,
       "code": "unsat_precond",
       "severity": "error",
       "message": "precondition for '> ribosomal.hsa.gmap-summary.txt' 'IsRead(path=Field(content=SymStr(parts=('ribosomal.hsa.gmap-summary.txt',)), count=WordCount(min=1, max=1)))' might not hold"
+    },
+    {
+      "line": 128,
+      "code": "unbound",
+      "severity": "error",
+      "message": "no definition found for ${threads}"
     },
     {
       "line": 133,
@@ -228,13 +228,13 @@
       "line": 171,
       "code": "unsat_precond",
       "severity": "error",
-      "message": "precondition for '> rRNA_tRNA.bed' 'IsRead(path=Field(content=SymStr(parts=('rRNA_tRNA.bed',)), count=WordCount(min=1, max=1)))' might not hold"
+      "message": "precondition for 'cat tRNA.bed rRNA.bed > rRNA_tRNA.bed' 'And(lhs=IsFile(path=Field(content=SymStr(parts=('tRNA.bed',)), count=WordCount(min=1, max=1))), rhs=IsFile(path=Field(content=SymStr(parts=('rRNA.bed',)), count=WordCount(min=1, max=1))))' might not hold"
     },
     {
       "line": 171,
       "code": "unsat_precond",
       "severity": "error",
-      "message": "precondition for 'cat tRNA.bed rRNA.bed > rRNA_tRNA.bed' 'And(lhs=IsFile(path=Field(content=SymStr(parts=('tRNA.bed',)), count=WordCount(min=1, max=1))), rhs=IsFile(path=Field(content=SymStr(parts=('rRNA.bed',)), count=WordCount(min=1, max=1))))' might not hold"
+      "message": "precondition for '> rRNA_tRNA.bed' 'IsRead(path=Field(content=SymStr(parts=('rRNA_tRNA.bed',)), count=WordCount(min=1, max=1)))' might not hold"
     },
     {
       "line": 181,
@@ -246,37 +246,31 @@
       "line": 182,
       "code": "unsat_precond",
       "severity": "error",
+      "message": "precondition for '> tmp.${RND}' 'IsRead(path=Field(content=CompletelyArbitrary(s`Frozen(V(Normal,False,RANDOM,[`, ArbitraryType.ENVIRONMENT, state<8375435501208941190>, pre:SymStr(parts=('tmp.',)), suf:None), count=WordCount(min=0, max=inf)))' might not hold"
+    },
+    {
+      "line": 182,
+      "code": "unsat_precond",
+      "severity": "error",
+      "message": "precondition for 'mv tmp.${RND} fantom5/HeLa.rep1.hg38.ctss_chr.bed' 'And(lhs=And(lhs=And(lhs=And(lhs=IsRead(path=Field(content=SymStr(parts=('fantom5/HeLa.rep1.hg38.ctss_chr.bed',)), count=WordCount(min=1, max=1))), rhs=Not(constraint=IsDeleted(path=Field(content=CompletelyArbitrary(s`Frozen(V(Normal,False,RANDOM,[`, ArbitraryType.ENVIRONMENT, state<8375435501208941190>, pre:SymStr(parts=('tmp.',)), suf:None), count=WordCount(min=0, max=inf))))), rhs=Implies(premise=IsDir(path=Field(content=CompletelyArbitrary(s`Frozen(V(Normal,False,RANDOM,[`, ArbitraryType.ENVIRONMENT, state<8375435501208941190>, pre:SymStr(parts=('tmp.',)), suf:None), count=WordCount(min=0, max=inf))), conclusion=Not(constraint=IsFile(path=Field(content=SymStr(parts=('fantom5/HeLa.rep1.hg38.ctss_chr.bed',)), count=WordCount(min=1, max=1)))))), rhs=Implies(premise=IsFile(path=Field(content=SymStr(parts=('fantom5/HeLa.rep1.hg38.ctss_chr.bed',)), count=WordCount(min=1, max=1))), conclusion=Not(constraint=IsUnread(path=Field(content=SymStr(parts=('fantom5/HeLa.rep1.hg38.ctss_chr.bed',)), count=WordCount(min=1, max=1)))))), rhs=Implies(premise=Or(lhs=IsDir(path=Field(content=CompletelyArbitrary(s`Frozen(V(Normal,False,RANDOM,[`, ArbitraryType.ENVIRONMENT, state<8375435501208941190>, pre:SymStr(parts=('tmp.',)), suf:None), count=WordCount(min=0, max=inf))), rhs=IsDir(path=Field(content=SymStr(parts=('fantom5/HeLa.rep1.hg38.ctss_chr.bed',)), count=WordCount(min=1, max=1)))), conclusion=Not(constraint=StringEq(lhs=Field(content=CompletelyArbitrary(s`Frozen(V(Normal,False,RANDOM,[`, ArbitraryType.ENVIRONMENT, state<8375435501208941190>, pre:SymStr(parts=('tmp.',)), suf:None), count=WordCount(min=0, max=inf)), rhs=Field(content=SymStr(parts=('fantom5/HeLa.rep1.hg38.ctss_chr.bed',)), count=WordCount(min=1, max=1))))))' might not hold"
+    },
+    {
+      "line": 182,
+      "code": "unsat_precond",
+      "severity": "error",
+      "message": "precondition for '> tmp.${RND}' 'IsRead(path=Field(content=CompletelyArbitrary(s`Frozen(V(Normal,False,RANDOM,[`, ArbitraryType.ENVIRONMENT, state<8616124404659511294>, pre:SymStr(parts=('tmp.',)), suf:None), count=WordCount(min=0, max=inf)))' might not hold"
+    },
+    {
+      "line": 182,
+      "code": "unsat_precond",
+      "severity": "error",
       "message": "precondition for 'cat fantom5/HeLa.rep1.hg38.ctss_chr.bed' 'IsFile(path=Field(content=SymStr(parts=('fantom5/HeLa.rep1.hg38.ctss_chr.bed',)), count=WordCount(min=1, max=1)))' might not hold"
     },
     {
-      "line": 182,
-      "code": "unsat_precond",
-      "severity": "error",
-      "message": "precondition for '> tmp.${RND}' 'IsRead(path=Field(content=CompletelyArbitrary(s`Frozen(V(Normal,False,RANDOM,[`, ArbitraryType.ENVIRONMENT, state<5850932531230987210>, pre:SymStr(parts=('tmp.',)), suf:None), count=WordCount(min=0, max=inf)))' might not hold"
-    },
-    {
-      "line": 182,
-      "code": "unsat_precond",
-      "severity": "error",
-      "message": "precondition for 'mv tmp.${RND} fantom5/HeLa.rep1.hg38.ctss_chr.bed' 'And(lhs=And(lhs=And(lhs=And(lhs=IsRead(path=Field(content=SymStr(parts=('fantom5/HeLa.rep1.hg38.ctss_chr.bed',)), count=WordCount(min=1, max=1))), rhs=Not(constraint=IsDeleted(path=Field(content=CompletelyArbitrary(s`Frozen(V(Normal,False,RANDOM,[`, ArbitraryType.ENVIRONMENT, state<7771909833001711263>, pre:SymStr(parts=('tmp.',)), suf:None), count=WordCount(min=0, max=inf))))), rhs=Implies(premise=IsDir(path=Field(content=CompletelyArbitrary(s`Frozen(V(Normal,False,RANDOM,[`, ArbitraryType.ENVIRONMENT, state<7771909833001711263>, pre:SymStr(parts=('tmp.',)), suf:None), count=WordCount(min=0, max=inf))), conclusion=Not(constraint=IsFile(path=Field(content=SymStr(parts=('fantom5/HeLa.rep1.hg38.ctss_chr.bed',)), count=WordCount(min=1, max=1)))))), rhs=Implies(premise=IsFile(path=Field(content=SymStr(parts=('fantom5/HeLa.rep1.hg38.ctss_chr.bed',)), count=WordCount(min=1, max=1))), conclusion=Not(constraint=IsUnread(path=Field(content=SymStr(parts=('fantom5/HeLa.rep1.hg38.ctss_chr.bed',)), count=WordCount(min=1, max=1)))))), rhs=Implies(premise=Or(lhs=IsDir(path=Field(content=CompletelyArbitrary(s`Frozen(V(Normal,False,RANDOM,[`, ArbitraryType.ENVIRONMENT, state<7771909833001711263>, pre:SymStr(parts=('tmp.',)), suf:None), count=WordCount(min=0, max=inf))), rhs=IsDir(path=Field(content=SymStr(parts=('fantom5/HeLa.rep1.hg38.ctss_chr.bed',)), count=WordCount(min=1, max=1)))), conclusion=Not(constraint=StringEq(lhs=Field(content=CompletelyArbitrary(s`Frozen(V(Normal,False,RANDOM,[`, ArbitraryType.ENVIRONMENT, state<7771909833001711263>, pre:SymStr(parts=('tmp.',)), suf:None), count=WordCount(min=0, max=inf)), rhs=Field(content=SymStr(parts=('fantom5/HeLa.rep1.hg38.ctss_chr.bed',)), count=WordCount(min=1, max=1))))))' might not hold"
-    },
-    {
-      "line": 182,
-      "code": "unsat_precond",
-      "severity": "error",
-      "message": "precondition for '> tmp.${RND}' 'IsRead(path=Field(content=CompletelyArbitrary(s`Frozen(V(Normal,False,RANDOM,[`, ArbitraryType.ENVIRONMENT, state<7771909833001711263>, pre:SymStr(parts=('tmp.',)), suf:None), count=WordCount(min=0, max=inf)))' might not hold"
-    },
-    {
       "line": 183,
       "code": "unsat_precond",
       "severity": "error",
-      "message": "precondition for 'mv tmp.${RND} fantom5/HeLa.rep2.hg38.ctss_chr.bed' 'And(lhs=And(lhs=And(lhs=And(lhs=IsRead(path=Field(content=SymStr(parts=('fantom5/HeLa.rep2.hg38.ctss_chr.bed',)), count=WordCount(min=1, max=1))), rhs=Not(constraint=IsDeleted(path=Field(content=CompletelyArbitrary(s`Frozen(V(Normal,False,RANDOM,[`, ArbitraryType.ENVIRONMENT, state<7771909833001711263>, pre:SymStr(parts=('tmp.',)), suf:None), count=WordCount(min=0, max=inf))))), rhs=Implies(premise=IsDir(path=Field(content=CompletelyArbitrary(s`Frozen(V(Normal,False,RANDOM,[`, ArbitraryType.ENVIRONMENT, state<7771909833001711263>, pre:SymStr(parts=('tmp.',)), suf:None), count=WordCount(min=0, max=inf))), conclusion=Not(constraint=IsFile(path=Field(content=SymStr(parts=('fantom5/HeLa.rep2.hg38.ctss_chr.bed',)), count=WordCount(min=1, max=1)))))), rhs=Implies(premise=IsFile(path=Field(content=SymStr(parts=('fantom5/HeLa.rep2.hg38.ctss_chr.bed',)), count=WordCount(min=1, max=1))), conclusion=Not(constraint=IsUnread(path=Field(content=SymStr(parts=('fantom5/HeLa.rep2.hg38.ctss_chr.bed',)), count=WordCount(min=1, max=1)))))), rhs=Implies(premise=Or(lhs=IsDir(path=Field(content=CompletelyArbitrary(s`Frozen(V(Normal,False,RANDOM,[`, ArbitraryType.ENVIRONMENT, state<7771909833001711263>, pre:SymStr(parts=('tmp.',)), suf:None), count=WordCount(min=0, max=inf))), rhs=IsDir(path=Field(content=SymStr(parts=('fantom5/HeLa.rep2.hg38.ctss_chr.bed',)), count=WordCount(min=1, max=1)))), conclusion=Not(constraint=StringEq(lhs=Field(content=CompletelyArbitrary(s`Frozen(V(Normal,False,RANDOM,[`, ArbitraryType.ENVIRONMENT, state<7771909833001711263>, pre:SymStr(parts=('tmp.',)), suf:None), count=WordCount(min=0, max=inf)), rhs=Field(content=SymStr(parts=('fantom5/HeLa.rep2.hg38.ctss_chr.bed',)), count=WordCount(min=1, max=1))))))' might not hold"
-    },
-    {
-      "line": 183,
-      "code": "unsat_precond",
-      "severity": "error",
-      "message": "precondition for '> tmp.${RND}' 'IsRead(path=Field(content=CompletelyArbitrary(s`Frozen(V(Normal,False,RANDOM,[`, ArbitraryType.ENVIRONMENT, state<7771909833001711263>, pre:SymStr(parts=('tmp.',)), suf:None), count=WordCount(min=0, max=inf)))' might not hold"
+      "message": "precondition for 'mv tmp.${RND} fantom5/HeLa.rep2.hg38.ctss_chr.bed' 'And(lhs=And(lhs=And(lhs=And(lhs=IsRead(path=Field(content=SymStr(parts=('fantom5/HeLa.rep2.hg38.ctss_chr.bed',)), count=WordCount(min=1, max=1))), rhs=Not(constraint=IsDeleted(path=Field(content=CompletelyArbitrary(s`Frozen(V(Normal,False,RANDOM,[`, ArbitraryType.ENVIRONMENT, state<8375435501208941190>, pre:SymStr(parts=('tmp.',)), suf:None), count=WordCount(min=0, max=inf))))), rhs=Implies(premise=IsDir(path=Field(content=CompletelyArbitrary(s`Frozen(V(Normal,False,RANDOM,[`, ArbitraryType.ENVIRONMENT, state<8375435501208941190>, pre:SymStr(parts=('tmp.',)), suf:None), count=WordCount(min=0, max=inf))), conclusion=Not(constraint=IsFile(path=Field(content=SymStr(parts=('fantom5/HeLa.rep2.hg38.ctss_chr.bed',)), count=WordCount(min=1, max=1)))))), rhs=Implies(premise=IsFile(path=Field(content=SymStr(parts=('fantom5/HeLa.rep2.hg38.ctss_chr.bed',)), count=WordCount(min=1, max=1))), conclusion=Not(constraint=IsUnread(path=Field(content=SymStr(parts=('fantom5/HeLa.rep2.hg38.ctss_chr.bed',)), count=WordCount(min=1, max=1)))))), rhs=Implies(premise=Or(lhs=IsDir(path=Field(content=CompletelyArbitrary(s`Frozen(V(Normal,False,RANDOM,[`, ArbitraryType.ENVIRONMENT, state<8375435501208941190>, pre:SymStr(parts=('tmp.',)), suf:None), count=WordCount(min=0, max=inf))), rhs=IsDir(path=Field(content=SymStr(parts=('fantom5/HeLa.rep2.hg38.ctss_chr.bed',)), count=WordCount(min=1, max=1)))), conclusion=Not(constraint=StringEq(lhs=Field(content=CompletelyArbitrary(s`Frozen(V(Normal,False,RANDOM,[`, ArbitraryType.ENVIRONMENT, state<8375435501208941190>, pre:SymStr(parts=('tmp.',)), suf:None), count=WordCount(min=0, max=inf)), rhs=Field(content=SymStr(parts=('fantom5/HeLa.rep2.hg38.ctss_chr.bed',)), count=WordCount(min=1, max=1))))))' might not hold"
     },
     {
       "line": 183,
@@ -285,22 +279,28 @@
       "message": "precondition for 'cat fantom5/HeLa.rep2.hg38.ctss_chr.bed' 'IsFile(path=Field(content=SymStr(parts=('fantom5/HeLa.rep2.hg38.ctss_chr.bed',)), count=WordCount(min=1, max=1)))' might not hold"
     },
     {
+      "line": 183,
+      "code": "unsat_precond",
+      "severity": "error",
+      "message": "precondition for '> tmp.${RND}' 'IsRead(path=Field(content=CompletelyArbitrary(s`Frozen(V(Normal,False,RANDOM,[`, ArbitraryType.ENVIRONMENT, state<8375435501208941190>, pre:SymStr(parts=('tmp.',)), suf:None), count=WordCount(min=0, max=inf)))' might not hold"
+    },
+    {
+      "line": 184,
+      "code": "unsat_precond",
+      "severity": "error",
+      "message": "precondition for 'mv tmp.${RND} fantom5/HeLa.rep3.hg38.ctss_chr.bed' 'And(lhs=And(lhs=And(lhs=And(lhs=IsRead(path=Field(content=SymStr(parts=('fantom5/HeLa.rep3.hg38.ctss_chr.bed',)), count=WordCount(min=1, max=1))), rhs=Not(constraint=IsDeleted(path=Field(content=CompletelyArbitrary(s`Frozen(V(Normal,False,RANDOM,[`, ArbitraryType.ENVIRONMENT, state<8375435501208941190>, pre:SymStr(parts=('tmp.',)), suf:None), count=WordCount(min=0, max=inf))))), rhs=Implies(premise=IsDir(path=Field(content=CompletelyArbitrary(s`Frozen(V(Normal,False,RANDOM,[`, ArbitraryType.ENVIRONMENT, state<8375435501208941190>, pre:SymStr(parts=('tmp.',)), suf:None), count=WordCount(min=0, max=inf))), conclusion=Not(constraint=IsFile(path=Field(content=SymStr(parts=('fantom5/HeLa.rep3.hg38.ctss_chr.bed',)), count=WordCount(min=1, max=1)))))), rhs=Implies(premise=IsFile(path=Field(content=SymStr(parts=('fantom5/HeLa.rep3.hg38.ctss_chr.bed',)), count=WordCount(min=1, max=1))), conclusion=Not(constraint=IsUnread(path=Field(content=SymStr(parts=('fantom5/HeLa.rep3.hg38.ctss_chr.bed',)), count=WordCount(min=1, max=1)))))), rhs=Implies(premise=Or(lhs=IsDir(path=Field(content=CompletelyArbitrary(s`Frozen(V(Normal,False,RANDOM,[`, ArbitraryType.ENVIRONMENT, state<8375435501208941190>, pre:SymStr(parts=('tmp.',)), suf:None), count=WordCount(min=0, max=inf))), rhs=IsDir(path=Field(content=SymStr(parts=('fantom5/HeLa.rep3.hg38.ctss_chr.bed',)), count=WordCount(min=1, max=1)))), conclusion=Not(constraint=StringEq(lhs=Field(content=CompletelyArbitrary(s`Frozen(V(Normal,False,RANDOM,[`, ArbitraryType.ENVIRONMENT, state<8375435501208941190>, pre:SymStr(parts=('tmp.',)), suf:None), count=WordCount(min=0, max=inf)), rhs=Field(content=SymStr(parts=('fantom5/HeLa.rep3.hg38.ctss_chr.bed',)), count=WordCount(min=1, max=1))))))' might not hold"
+    },
+    {
+      "line": 184,
+      "code": "unsat_precond",
+      "severity": "error",
+      "message": "precondition for '> tmp.${RND}' 'IsRead(path=Field(content=CompletelyArbitrary(s`Frozen(V(Normal,False,RANDOM,[`, ArbitraryType.ENVIRONMENT, state<8375435501208941190>, pre:SymStr(parts=('tmp.',)), suf:None), count=WordCount(min=0, max=inf)))' might not hold"
+    },
+    {
       "line": 184,
       "code": "unsat_precond",
       "severity": "error",
       "message": "precondition for 'cat fantom5/HeLa.rep3.hg38.ctss_chr.bed' 'IsFile(path=Field(content=SymStr(parts=('fantom5/HeLa.rep3.hg38.ctss_chr.bed',)), count=WordCount(min=1, max=1)))' might not hold"
-    },
-    {
-      "line": 184,
-      "code": "unsat_precond",
-      "severity": "error",
-      "message": "precondition for '> tmp.${RND}' 'IsRead(path=Field(content=CompletelyArbitrary(s`Frozen(V(Normal,False,RANDOM,[`, ArbitraryType.ENVIRONMENT, state<7771909833001711263>, pre:SymStr(parts=('tmp.',)), suf:None), count=WordCount(min=0, max=inf)))' might not hold"
-    },
-    {
-      "line": 184,
-      "code": "unsat_precond",
-      "severity": "error",
-      "message": "precondition for 'mv tmp.${RND} fantom5/HeLa.rep3.hg38.ctss_chr.bed' 'And(lhs=And(lhs=And(lhs=And(lhs=IsRead(path=Field(content=SymStr(parts=('fantom5/HeLa.rep3.hg38.ctss_chr.bed',)), count=WordCount(min=1, max=1))), rhs=Not(constraint=IsDeleted(path=Field(content=CompletelyArbitrary(s`Frozen(V(Normal,False,RANDOM,[`, ArbitraryType.ENVIRONMENT, state<7771909833001711263>, pre:SymStr(parts=('tmp.',)), suf:None), count=WordCount(min=0, max=inf))))), rhs=Implies(premise=IsDir(path=Field(content=CompletelyArbitrary(s`Frozen(V(Normal,False,RANDOM,[`, ArbitraryType.ENVIRONMENT, state<7771909833001711263>, pre:SymStr(parts=('tmp.',)), suf:None), count=WordCount(min=0, max=inf))), conclusion=Not(constraint=IsFile(path=Field(content=SymStr(parts=('fantom5/HeLa.rep3.hg38.ctss_chr.bed',)), count=WordCount(min=1, max=1)))))), rhs=Implies(premise=IsFile(path=Field(content=SymStr(parts=('fantom5/HeLa.rep3.hg38.ctss_chr.bed',)), count=WordCount(min=1, max=1))), conclusion=Not(constraint=IsUnread(path=Field(content=SymStr(parts=('fantom5/HeLa.rep3.hg38.ctss_chr.bed',)), count=WordCount(min=1, max=1)))))), rhs=Implies(premise=Or(lhs=IsDir(path=Field(content=CompletelyArbitrary(s`Frozen(V(Normal,False,RANDOM,[`, ArbitraryType.ENVIRONMENT, state<7771909833001711263>, pre:SymStr(parts=('tmp.',)), suf:None), count=WordCount(min=0, max=inf))), rhs=IsDir(path=Field(content=SymStr(parts=('fantom5/HeLa.rep3.hg38.ctss_chr.bed',)), count=WordCount(min=1, max=1)))), conclusion=Not(constraint=StringEq(lhs=Field(content=CompletelyArbitrary(s`Frozen(V(Normal,False,RANDOM,[`, ArbitraryType.ENVIRONMENT, state<7771909833001711263>, pre:SymStr(parts=('tmp.',)), suf:None), count=WordCount(min=0, max=inf)), rhs=Field(content=SymStr(parts=('fantom5/HeLa.rep3.hg38.ctss_chr.bed',)), count=WordCount(min=1, max=1))))))' might not hold"
     },
     {
       "line": 187,
@@ -342,49 +342,49 @@
       "line": 218,
       "code": "unsat_precond",
       "severity": "error",
-      "message": "precondition for '> \"${base}.hg38.ctss_chr.bed\"' 'IsRead(path=Field(content=CompletelyArbitrary(s`Frozen(V(TrimR,False,gz,[., b,`, ArbitraryType.APPROXIMATION, state<-2516658776104275868>, pre:None, suf:SymStr(parts=('.hg38.ctss_chr.bed',))), count=WordCount(min=0, max=1)))' might not hold"
+      "message": "precondition for '> \"${base}.hg38.ctss_chr.bed\"' 'IsRead(path=Field(content=CompletelyArbitrary(s`Frozen(V(TrimR,False,gz,[., b,`, ArbitraryType.APPROXIMATION, state<8161615083131660093>, pre:None, suf:SymStr(parts=('.hg38.ctss_chr.bed',))), count=WordCount(min=0, max=1)))' might not hold"
     },
     {
       "line": 218,
       "code": "unsat_precond",
       "severity": "error",
-      "message": "precondition for '> \"${base}.hg38.ctss_chr.bed\"' 'IsRead(path=Field(content=CompletelyArbitrary(s`Frozen(V(TrimR,False,gz,[., b,`, ArbitraryType.APPROXIMATION, state<-4713887736358307952>, pre:None, suf:SymStr(parts=('.hg38.ctss_chr.bed',))), count=WordCount(min=0, max=1)))' might not hold"
+      "message": "precondition for '> \"${base}.hg38.ctss_chr.bed\"' 'IsRead(path=Field(content=CompletelyArbitrary(s`Frozen(V(TrimR,False,gz,[., b,`, ArbitraryType.APPROXIMATION, state<5240649976989023201>, pre:None, suf:SymStr(parts=('.hg38.ctss_chr.bed',))), count=WordCount(min=0, max=1)))' might not hold"
     },
     {
       "line": 218,
       "code": "unsat_precond",
       "severity": "error",
-      "message": "precondition for '> \"${base}.hg38.ctss_chr.bed\"' 'IsRead(path=Field(content=CompletelyArbitrary(s`Frozen(V(TrimR,False,gz,[., b,`, ArbitraryType.APPROXIMATION, state<-6615086615968828280>, pre:None, suf:SymStr(parts=('.hg38.ctss_chr.bed',))), count=WordCount(min=0, max=1)))' might not hold"
+      "message": "precondition for '> \"${base}.hg38.ctss_chr.bed\"' 'IsRead(path=Field(content=CompletelyArbitrary(s`Frozen(V(TrimR,False,gz,[., b,`, ArbitraryType.APPROXIMATION, state<-5901321594202490752>, pre:None, suf:SymStr(parts=('.hg38.ctss_chr.bed',))), count=WordCount(min=0, max=1)))' might not hold"
     },
     {
       "line": 218,
       "code": "unsat_precond",
       "severity": "error",
-      "message": "precondition for '> \"${base}.hg38.ctss_chr.bed\"' 'IsRead(path=Field(content=CompletelyArbitrary(s`Frozen(V(TrimR,False,gz,[., b,`, ArbitraryType.APPROXIMATION, state<-946593490429795833>, pre:None, suf:SymStr(parts=('.hg38.ctss_chr.bed',))), count=WordCount(min=0, max=1)))' might not hold"
+      "message": "precondition for '> \"${base}.hg38.ctss_chr.bed\"' 'IsRead(path=Field(content=CompletelyArbitrary(s`Frozen(V(TrimR,False,gz,[., b,`, ArbitraryType.APPROXIMATION, state<-1951757551613522487>, pre:None, suf:SymStr(parts=('.hg38.ctss_chr.bed',))), count=WordCount(min=0, max=1)))' might not hold"
     },
     {
       "line": 221,
       "code": "unsat_precond",
       "severity": "error",
-      "message": "precondition for 'rm \"${base}.hg38.ctss_chr.raw.bed\"' 'And(lhs=IsFile(path=Field(content=CompletelyArbitrary(s`Frozen(V(TrimR,False,gz,[., b,`, ArbitraryType.APPROXIMATION, state<-2516658776104275868>, pre:None, suf:SymStr(parts=('.hg38.ctss_chr.raw.bed',))), count=WordCount(min=0, max=1))), rhs=Not(constraint=IsUnread(path=Field(content=CompletelyArbitrary(s`Frozen(V(TrimR,False,gz,[., b,`, ArbitraryType.APPROXIMATION, state<-2516658776104275868>, pre:None, suf:SymStr(parts=('.hg38.ctss_chr.raw.bed',))), count=WordCount(min=0, max=1)))))' might not hold"
+      "message": "precondition for 'rm \"${base}.hg38.ctss_chr.raw.bed\"' 'And(lhs=IsFile(path=Field(content=CompletelyArbitrary(s`Frozen(V(TrimR,False,gz,[., b,`, ArbitraryType.APPROXIMATION, state<8161615083131660093>, pre:None, suf:SymStr(parts=('.hg38.ctss_chr.raw.bed',))), count=WordCount(min=0, max=1))), rhs=Not(constraint=IsUnread(path=Field(content=CompletelyArbitrary(s`Frozen(V(TrimR,False,gz,[., b,`, ArbitraryType.APPROXIMATION, state<8161615083131660093>, pre:None, suf:SymStr(parts=('.hg38.ctss_chr.raw.bed',))), count=WordCount(min=0, max=1)))))' might not hold"
     },
     {
       "line": 221,
       "code": "unsat_precond",
       "severity": "error",
-      "message": "precondition for 'rm \"${base}.hg38.ctss_chr.raw.bed\"' 'And(lhs=IsFile(path=Field(content=CompletelyArbitrary(s`Frozen(V(TrimR,False,gz,[., b,`, ArbitraryType.APPROXIMATION, state<-946593490429795833>, pre:None, suf:SymStr(parts=('.hg38.ctss_chr.raw.bed',))), count=WordCount(min=0, max=1))), rhs=Not(constraint=IsUnread(path=Field(content=CompletelyArbitrary(s`Frozen(V(TrimR,False,gz,[., b,`, ArbitraryType.APPROXIMATION, state<-946593490429795833>, pre:None, suf:SymStr(parts=('.hg38.ctss_chr.raw.bed',))), count=WordCount(min=0, max=1)))))' might not hold"
-    },
-    {
-      "line": 237,
-      "code": "unsat_precond",
-      "severity": "error",
-      "message": "precondition for '> meth/tmp' 'IsRead(path=Field(content=SymStr(parts=('meth/tmp',)), count=WordCount(min=1, max=1)))' might not hold"
+      "message": "precondition for 'rm \"${base}.hg38.ctss_chr.raw.bed\"' 'And(lhs=IsFile(path=Field(content=CompletelyArbitrary(s`Frozen(V(TrimR,False,gz,[., b,`, ArbitraryType.APPROXIMATION, state<-5901321594202490752>, pre:None, suf:SymStr(parts=('.hg38.ctss_chr.raw.bed',))), count=WordCount(min=0, max=1))), rhs=Not(constraint=IsUnread(path=Field(content=CompletelyArbitrary(s`Frozen(V(TrimR,False,gz,[., b,`, ArbitraryType.APPROXIMATION, state<-5901321594202490752>, pre:None, suf:SymStr(parts=('.hg38.ctss_chr.raw.bed',))), count=WordCount(min=0, max=1)))))' might not hold"
     },
     {
       "line": 237,
       "code": "unsat_precond",
       "severity": "error",
       "message": "precondition for 'cat meth/encodeCcreHela.bed' 'IsFile(path=Field(content=SymStr(parts=('meth/encodeCcreHela.bed',)), count=WordCount(min=1, max=1)))' might not hold"
+    },
+    {
+      "line": 237,
+      "code": "unsat_precond",
+      "severity": "error",
+      "message": "precondition for '> meth/tmp' 'IsRead(path=Field(content=SymStr(parts=('meth/tmp',)), count=WordCount(min=1, max=1)))' might not hold"
     },
     {
       "line": 239,
@@ -402,7 +402,7 @@
       "line": 251,
       "code": "unsat_precond",
       "severity": "error",
-      "message": "precondition for 'cd \"${DATA_DIR}/spikein/sirv/\"' 'IsDir(path=Field(content=CompletelyArbitrary(s`Frozen(V(Normal,False,DATA_DIR`, ArbitraryType.ENVIRONMENT, state<-9021239844274555201>, pre:None, suf:SymStr(parts=('/spikein/sirv/',))), count=WordCount(min=0, max=1)))' might not hold"
+      "message": "precondition for 'cd \"${DATA_DIR}/spikein/sirv/\"' 'IsDir(path=Field(content=CompletelyArbitrary(s`Frozen(V(Normal,False,DATA_DIR`, ArbitraryType.ENVIRONMENT, state<3620446779786836486>, pre:None, suf:SymStr(parts=('/spikein/sirv/',))), count=WordCount(min=0, max=1)))' might not hold"
     },
     {
       "line": 258,
@@ -462,7 +462,7 @@
       "line": 284,
       "code": "unsat_precond",
       "severity": "error",
-      "message": "precondition for 'cd \"${DATA_DIR}/${assembly}/\"' 'IsDir(path=Field(content=CompletelyArbitrary(s`Frozen(V(Normal,False,DATA_DIR`, ArbitraryType.ENVIRONMENT, state<-9021239844274555201>, pre:None, suf:SymStr(parts=('/hg38/',))), count=WordCount(min=0, max=1)))' might not hold"
+      "message": "precondition for 'cd \"${DATA_DIR}/${assembly}/\"' 'IsDir(path=Field(content=CompletelyArbitrary(s`Frozen(V(Normal,False,DATA_DIR`, ArbitraryType.ENVIRONMENT, state<3620446779786836486>, pre:None, suf:SymStr(parts=('/hg38/',))), count=WordCount(min=0, max=1)))' might not hold"
     },
     {
       "line": 286,
@@ -480,7 +480,7 @@
       "line": 309,
       "code": "unsat_precond",
       "severity": "error",
-      "message": "precondition for 'cd \"${DATA_DIR}/${assembly}/\"' 'IsDir(path=Field(content=CompletelyArbitrary(s`Frozen(V(Normal,False,DATA_DIR`, ArbitraryType.ENVIRONMENT, state<-9021239844274555201>, pre:None, suf:SymStr(parts=('/mm10/',))), count=WordCount(min=0, max=1)))' might not hold"
+      "message": "precondition for 'cd \"${DATA_DIR}/${assembly}/\"' 'IsDir(path=Field(content=CompletelyArbitrary(s`Frozen(V(Normal,False,DATA_DIR`, ArbitraryType.ENVIRONMENT, state<3620446779786836486>, pre:None, suf:SymStr(parts=('/mm10/',))), count=WordCount(min=0, max=1)))' might not hold"
     },
     {
       "line": 315,
@@ -546,7 +546,7 @@
       "line": 334,
       "code": "unsat_precond",
       "severity": "error",
-      "message": "precondition for 'cat genome/genome.fa \"${DATA_DIR}/spikein/sirv/SIRV_Set1_Sequences_170612a/SIRVome_isoforms_170612a.fasta\" > genome/genome_sirv1.fa' 'And(lhs=IsFile(path=Field(content=SymStr(parts=('genome/genome.fa',)), count=WordCount(min=1, max=1))), rhs=IsFile(path=Field(content=CompletelyArbitrary(s`Frozen(V(Normal,False,DATA_DIR`, ArbitraryType.ENVIRONMENT, state<-9021239844274555201>, pre:None, suf:SymStr(parts=('/spikein/sirv/SIRV_Set1_Sequences_170612a/SIRVome_isoforms_170612a.fasta',))), count=WordCount(min=0, max=1))))' might not hold"
+      "message": "precondition for 'cat genome/genome.fa \"${DATA_DIR}/spikein/sirv/SIRV_Set1_Sequences_170612a/SIRVome_isoforms_170612a.fasta\" > genome/genome_sirv1.fa' 'And(lhs=IsFile(path=Field(content=SymStr(parts=('genome/genome.fa',)), count=WordCount(min=1, max=1))), rhs=IsFile(path=Field(content=CompletelyArbitrary(s`Frozen(V(Normal,False,DATA_DIR`, ArbitraryType.ENVIRONMENT, state<3620446779786836486>, pre:None, suf:SymStr(parts=('/spikein/sirv/SIRV_Set1_Sequences_170612a/SIRVome_isoforms_170612a.fasta',))), count=WordCount(min=0, max=1))))' might not hold"
     },
     {
       "line": 334,
@@ -558,13 +558,13 @@
       "line": 336,
       "code": "unsat_precond",
       "severity": "error",
-      "message": "precondition for 'cat genes.gtf \"${DATA_DIR}/spikein/sirv/SIRV_Set1_Sequences_170612a/SIRVome_isoforms_C_170612a.E2.gtf\" > genes_sirv1.gtf' 'And(lhs=IsFile(path=Field(content=SymStr(parts=('genes.gtf',)), count=WordCount(min=1, max=1))), rhs=IsFile(path=Field(content=CompletelyArbitrary(s`Frozen(V(Normal,False,DATA_DIR`, ArbitraryType.ENVIRONMENT, state<-9021239844274555201>, pre:None, suf:SymStr(parts=('/spikein/sirv/SIRV_Set1_Sequences_170612a/SIRVome_isoforms_C_170612a.E2.gtf',))), count=WordCount(min=0, max=1))))' might not hold"
+      "message": "precondition for '> genes_sirv1.gtf' 'IsRead(path=Field(content=SymStr(parts=('genes_sirv1.gtf',)), count=WordCount(min=1, max=1)))' might not hold"
     },
     {
       "line": 336,
       "code": "unsat_precond",
       "severity": "error",
-      "message": "precondition for '> genes_sirv1.gtf' 'IsRead(path=Field(content=SymStr(parts=('genes_sirv1.gtf',)), count=WordCount(min=1, max=1)))' might not hold"
+      "message": "precondition for 'cat genes.gtf \"${DATA_DIR}/spikein/sirv/SIRV_Set1_Sequences_170612a/SIRVome_isoforms_C_170612a.E2.gtf\" > genes_sirv1.gtf' 'And(lhs=IsFile(path=Field(content=SymStr(parts=('genes.gtf',)), count=WordCount(min=1, max=1))), rhs=IsFile(path=Field(content=CompletelyArbitrary(s`Frozen(V(Normal,False,DATA_DIR`, ArbitraryType.ENVIRONMENT, state<3620446779786836486>, pre:None, suf:SymStr(parts=('/spikein/sirv/SIRV_Set1_Sequences_170612a/SIRVome_isoforms_C_170612a.E2.gtf',))), count=WordCount(min=0, max=1))))' might not hold"
     },
     {
       "line": 341,
@@ -582,7 +582,7 @@
       "line": 350,
       "code": "unsat_precond",
       "severity": "error",
-      "message": "precondition for 'cat ensembl_genes.gtf \"${DATA_DIR}/spikein/sirv/SIRV_Set1_Sequences_170612a/SIRVome_isoforms_C_170612a.E2.gtf\" > ensembl_genes_sirv1.gtf' 'And(lhs=IsFile(path=Field(content=SymStr(parts=('ensembl_genes.gtf',)), count=WordCount(min=1, max=1))), rhs=IsFile(path=Field(content=CompletelyArbitrary(s`Frozen(V(Normal,False,DATA_DIR`, ArbitraryType.ENVIRONMENT, state<-9021239844274555201>, pre:None, suf:SymStr(parts=('/spikein/sirv/SIRV_Set1_Sequences_170612a/SIRVome_isoforms_C_170612a.E2.gtf',))), count=WordCount(min=0, max=1))))' might not hold"
+      "message": "precondition for 'cat ensembl_genes.gtf \"${DATA_DIR}/spikein/sirv/SIRV_Set1_Sequences_170612a/SIRVome_isoforms_C_170612a.E2.gtf\" > ensembl_genes_sirv1.gtf' 'And(lhs=IsFile(path=Field(content=SymStr(parts=('ensembl_genes.gtf',)), count=WordCount(min=1, max=1))), rhs=IsFile(path=Field(content=CompletelyArbitrary(s`Frozen(V(Normal,False,DATA_DIR`, ArbitraryType.ENVIRONMENT, state<3620446779786836486>, pre:None, suf:SymStr(parts=('/spikein/sirv/SIRV_Set1_Sequences_170612a/SIRVome_isoforms_C_170612a.E2.gtf',))), count=WordCount(min=0, max=1))))' might not hold"
     },
     {
       "line": 350,
@@ -591,7 +591,7 @@
       "message": "precondition for '> ensembl_genes_sirv1.gtf' 'IsRead(path=Field(content=SymStr(parts=('ensembl_genes_sirv1.gtf',)), count=WordCount(min=1, max=1)))' might not hold"
     }
   ],
-  "time": 1.5957523329998367,
-  "solver_time": 3.0262356250023004,
+  "time": 1.4008904579968657,
+  "solver_time": 3.016083916008938,
   "timed_out": true
 }

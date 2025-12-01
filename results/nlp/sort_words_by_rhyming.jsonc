@@ -1,1 +1,21 @@
-// [CRASH] SaSh assertion failed on /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/nlp/scripts/sort_words_by_rhyming.sh: 1
+// [DONE] exec=0.19699129098444246s solver=0.3973216250014957s
+{
+  "filename": "/Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/nlp/scripts/sort_words_by_rhyming.sh",
+  "issues": [
+    {
+      "line": 5,
+      "code": "unbound",
+      "severity": "error",
+      "message": "no definition found for ${SUITE_DIR}"
+    },
+    {
+      "line": 6,
+      "code": "unbound",
+      "severity": "error",
+      "message": "no definition found for ${SUITE_DIR}"
+    }
+  ],
+  "time": 0.19699129098444246,
+  "solver_time": 0.3973216250014957,
+  "timed_out": false
+}

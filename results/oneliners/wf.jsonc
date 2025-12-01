@@ -1,8 +1,8 @@
-// [DONE] exec=0.006095541990362108s solver=0.0018371669866610318s
+// [DONE] exec=0.0062166249845176935s solver=0.001791999995475635s
 {
   "filename": "/Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/oneliners/scripts/wf.sh",
   "issues": [],
-  "time": 0.006095541990362108,
-  "solver_time": 0.0018371669866610318,
+  "time": 0.0062166249845176935,
+  "solver_time": 0.001791999995475635,
   "timed_out": false
 }

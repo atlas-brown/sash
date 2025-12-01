@@ -1,1 +1,27 @@
-// [CRASH] SaSh assertion failed on /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/nlp/scripts/bigrams.sh: 1
+// [TIMEOUT] exec=0.42871712500345893s solver=3.031075208011316s
+{
+  "filename": "/Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/nlp/scripts/bigrams.sh",
+  "issues": [
+    {
+      "line": 6,
+      "code": "unbound",
+      "severity": "error",
+      "message": "no definition found for ${SUITE_DIR}"
+    },
+    {
+      "line": 7,
+      "code": "unbound",
+      "severity": "error",
+      "message": "no definition found for ${SUITE_DIR}"
+    },
+    {
+      "line": 17,
+      "code": "word_split",
+      "severity": "warning",
+      "message": "Frozen(<shasta.ast_node.BArgChar object at 0x1042255d0>) could be split in a dangerous position, leading to unexpected arguments to dangerous commands"
+    }
+  ],
+  "time": 0.42871712500345893,
+  "solver_time": 3.031075208011316,
+  "timed_out": true
+}

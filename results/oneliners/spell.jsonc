@@ -1,4 +1,4 @@
-// [DONE] exec=0.00846670800819993s solver=0.0025128340057563037s
+// [DONE] exec=0.007663208001758903s solver=0.002025916997808963s
 {
   "filename": "/Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/oneliners/scripts/spell.sh",
   "issues": [
@@ -9,7 +9,7 @@
       "message": "no definition found for ${SUITE_DIR}"
     }
   ],
-  "time": 0.00846670800819993,
-  "solver_time": 0.0025128340057563037,
+  "time": 0.007663208001758903,
+  "solver_time": 0.002025916997808963,
   "timed_out": false
 }

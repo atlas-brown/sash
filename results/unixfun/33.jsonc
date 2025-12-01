@@ -1,8 +1,8 @@
-// [DONE] exec=0.003909874998498708s solver=0.0018395829829387367s
+// [DONE] exec=0.004129707987885922s solver=0.0018314170010853559s
 {
   "filename": "/Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/unixfun/scripts/33.sh",
   "issues": [],
-  "time": 0.003909874998498708,
-  "solver_time": 0.0018395829829387367,
+  "time": 0.004129707987885922,
+  "solver_time": 0.0018314170010853559,
   "timed_out": false
 }

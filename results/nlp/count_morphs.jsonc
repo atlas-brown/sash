@@ -1,1 +1,21 @@
-// [CRASH] SaSh assertion failed on /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/nlp/scripts/count_morphs.sh: 1
+// [DONE] exec=0.1934988749853801s solver=0.5622724169807043s
+{
+  "filename": "/Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/nlp/scripts/count_morphs.sh",
+  "issues": [
+    {
+      "line": 5,
+      "code": "unbound",
+      "severity": "error",
+      "message": "no definition found for ${SUITE_DIR}"
+    },
+    {
+      "line": 6,
+      "code": "unbound",
+      "severity": "error",
+      "message": "no definition found for ${SUITE_DIR}"
+    }
+  ],
+  "time": 0.1934988749853801,
+  "solver_time": 0.5622724169807043,
+  "timed_out": false
+}

@@ -1,1 +1,21 @@
-// [CRASH] SaSh assertion failed on /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/nlp/scripts/letter_words.sh: 1
+// [TIMEOUT] exec=1.1309468330000527s solver=3.3393060410162434s
+{
+  "filename": "/Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/nlp/scripts/letter_words.sh",
+  "issues": [
+    {
+      "line": 6,
+      "code": "unbound",
+      "severity": "error",
+      "message": "no definition found for ${SUITE_DIR}"
+    },
+    {
+      "line": 7,
+      "code": "unbound",
+      "severity": "error",
+      "message": "no definition found for ${SUITE_DIR}"
+    }
+  ],
+  "time": 1.1309468330000527,
+  "solver_time": 3.3393060410162434,
+  "timed_out": true
+}

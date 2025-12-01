@@ -1,1 +1,27 @@
-// [CRASH] SaSh assertion failed on /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/nlp/scripts/sort_words_by_num_of_syllables.sh: 1
+// [TIMEOUT] exec=0.48713525000493973s solver=3.0228625829913653s
+{
+  "filename": "/Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/nlp/scripts/sort_words_by_num_of_syllables.sh",
+  "issues": [
+    {
+      "line": 5,
+      "code": "unbound",
+      "severity": "error",
+      "message": "no definition found for ${SUITE_DIR}"
+    },
+    {
+      "line": 6,
+      "code": "unbound",
+      "severity": "error",
+      "message": "no definition found for ${SUITE_DIR}"
+    },
+    {
+      "line": 16,
+      "code": "word_split",
+      "severity": "warning",
+      "message": "Frozen(<shasta.ast_node.BArgChar object at 0x1051fc2b0>) could be split in a dangerous position, leading to unexpected arguments to dangerous commands"
+    }
+  ],
+  "time": 0.48713525000493973,
+  "solver_time": 3.0228625829913653,
+  "timed_out": true
+}

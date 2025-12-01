@@ -1,4 +1,4 @@
-// [DONE] exec=0.08396925000124611s solver=0.18377633398631588s
+// [DONE] exec=0.05667541699949652s solver=0.20012158300960436s
 {
   "filename": "/Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/analytics/scripts/pcaps.sh",
   "issues": [
@@ -28,24 +28,24 @@
     },
     {
       "line": 16,
-      "code": "unsat_precond",
-      "severity": "error",
-      "message": "precondition for 'rm -f ${tempfile}' 'And(lhs=And(lhs=Implies(premise=IsFile(path=Field(content=CompletelyArbitrary(s`Frozen(<shasta.ast_node.BArgCh`, ArbitraryType.APPROXIMATION, state<-8318051799900839784>, pre:None, suf:None), count=WordCount(min=0, max=inf))), conclusion=Not(constraint=IsUnread(path=Field(content=CompletelyArbitrary(s`Frozen(<shasta.ast_node.BArgCh`, ArbitraryType.APPROXIMATION, state<-8318051799900839784>, pre:None, suf:None), count=WordCount(min=0, max=inf))))), rhs=Not(constraint=IsDir(path=Field(content=CompletelyArbitrary(s`Frozen(<shasta.ast_node.BArgCh`, ArbitraryType.APPROXIMATION, state<-8318051799900839784>, pre:None, suf:None), count=WordCount(min=0, max=inf))))), rhs=Not(constraint=IsDeleted(path=Field(content=CompletelyArbitrary(s`Frozen(<shasta.ast_node.BArgCh`, ArbitraryType.APPROXIMATION, state<-8318051799900839784>, pre:None, suf:None), count=WordCount(min=0, max=inf)))))' might not hold"
-    },
-    {
-      "line": 16,
       "code": "word_split",
       "severity": "warning",
-      "message": "Frozen(<shasta.ast_node.BArgChar object at 0x105f4f580>) could be split in a dangerous position, leading to unexpected arguments to dangerous commands"
+      "message": "Frozen(<shasta.ast_node.BArgChar object at 0x1054aa1d0>) could be split in a dangerous position, leading to unexpected arguments to dangerous commands"
     },
     {
       "line": 16,
       "code": "unsat_precond",
       "severity": "error",
-      "message": "precondition for 'rm -f ${tempfile}' 'And(lhs=And(lhs=Implies(premise=IsFile(path=Field(content=CompletelyArbitrary(s`Frozen(<shasta.ast_node.BArgCh`, ArbitraryType.APPROXIMATION, state<1602253311123324474>, pre:None, suf:None), count=WordCount(min=0, max=inf))), conclusion=Not(constraint=IsUnread(path=Field(content=CompletelyArbitrary(s`Frozen(<shasta.ast_node.BArgCh`, ArbitraryType.APPROXIMATION, state<1602253311123324474>, pre:None, suf:None), count=WordCount(min=0, max=inf))))), rhs=Not(constraint=IsDir(path=Field(content=CompletelyArbitrary(s`Frozen(<shasta.ast_node.BArgCh`, ArbitraryType.APPROXIMATION, state<1602253311123324474>, pre:None, suf:None), count=WordCount(min=0, max=inf))))), rhs=Not(constraint=IsDeleted(path=Field(content=CompletelyArbitrary(s`Frozen(<shasta.ast_node.BArgCh`, ArbitraryType.APPROXIMATION, state<1602253311123324474>, pre:None, suf:None), count=WordCount(min=0, max=inf)))))' might not hold"
+      "message": "precondition for 'rm -f ${tempfile}' 'And(lhs=And(lhs=Implies(premise=IsFile(path=Field(content=CompletelyArbitrary(s`Frozen(<shasta.ast_node.BArgCh`, ArbitraryType.APPROXIMATION, state<-7206324640358402088>, pre:None, suf:None), count=WordCount(min=0, max=inf))), conclusion=Not(constraint=IsUnread(path=Field(content=CompletelyArbitrary(s`Frozen(<shasta.ast_node.BArgCh`, ArbitraryType.APPROXIMATION, state<-7206324640358402088>, pre:None, suf:None), count=WordCount(min=0, max=inf))))), rhs=Not(constraint=IsDir(path=Field(content=CompletelyArbitrary(s`Frozen(<shasta.ast_node.BArgCh`, ArbitraryType.APPROXIMATION, state<-7206324640358402088>, pre:None, suf:None), count=WordCount(min=0, max=inf))))), rhs=Not(constraint=IsDeleted(path=Field(content=CompletelyArbitrary(s`Frozen(<shasta.ast_node.BArgCh`, ArbitraryType.APPROXIMATION, state<-7206324640358402088>, pre:None, suf:None), count=WordCount(min=0, max=inf)))))' might not hold"
+    },
+    {
+      "line": 16,
+      "code": "unsat_precond",
+      "severity": "error",
+      "message": "precondition for 'rm -f ${tempfile}' 'And(lhs=And(lhs=Implies(premise=IsFile(path=Field(content=CompletelyArbitrary(s`Frozen(<shasta.ast_node.BArgCh`, ArbitraryType.APPROXIMATION, state<6282961745921668452>, pre:None, suf:None), count=WordCount(min=0, max=inf))), conclusion=Not(constraint=IsUnread(path=Field(content=CompletelyArbitrary(s`Frozen(<shasta.ast_node.BArgCh`, ArbitraryType.APPROXIMATION, state<6282961745921668452>, pre:None, suf:None), count=WordCount(min=0, max=inf))))), rhs=Not(constraint=IsDir(path=Field(content=CompletelyArbitrary(s`Frozen(<shasta.ast_node.BArgCh`, ArbitraryType.APPROXIMATION, state<6282961745921668452>, pre:None, suf:None), count=WordCount(min=0, max=inf))))), rhs=Not(constraint=IsDeleted(path=Field(content=CompletelyArbitrary(s`Frozen(<shasta.ast_node.BArgCh`, ArbitraryType.APPROXIMATION, state<6282961745921668452>, pre:None, suf:None), count=WordCount(min=0, max=inf)))))' might not hold"
     }
   ],
-  "time": 0.08396925000124611,
-  "solver_time": 0.18377633398631588,
+  "time": 0.05667541699949652,
+  "solver_time": 0.20012158300960436,
   "timed_out": false
 }

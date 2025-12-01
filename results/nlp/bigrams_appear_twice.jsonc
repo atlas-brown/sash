@@ -1,1 +1,27 @@
-// [CRASH] SaSh assertion failed on /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/nlp/scripts/bigrams_appear_twice.sh: 1
+// [TIMEOUT] exec=0.4747872500156518s solver=3.0472194160101935s
+{
+  "filename": "/Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/nlp/scripts/bigrams_appear_twice.sh",
+  "issues": [
+    {
+      "line": 6,
+      "code": "unbound",
+      "severity": "error",
+      "message": "no definition found for ${SUITE_DIR}"
+    },
+    {
+      "line": 7,
+      "code": "unbound",
+      "severity": "error",
+      "message": "no definition found for ${SUITE_DIR}"
+    },
+    {
+      "line": 18,
+      "code": "unsat_precond",
+      "severity": "error",
+      "message": "precondition for 'rm -rf {TEMPDIR}' 'And(lhs=Implies(premise=IsFile(path=Field(content=SymStr(parts=('{TEMPDIR}',)), count=WordCount(min=1, max=1))), conclusion=Not(constraint=IsUnread(path=Field(content=SymStr(parts=('{TEMPDIR}',)), count=WordCount(min=1, max=1))))), rhs=Not(constraint=IsDeleted(path=Field(content=SymStr(parts=('{TEMPDIR}',)), count=WordCount(min=1, max=1)))))' might not hold"
+    }
+  ],
+  "time": 0.4747872500156518,
+  "solver_time": 3.0472194160101935,
+  "timed_out": true
+}

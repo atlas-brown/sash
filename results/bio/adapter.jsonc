@@ -1,4 +1,4 @@
-// [DONE] exec=0.1976738750236109s solver=0.14866858400637284s
+// [DONE] exec=0.17187599997851066s solver=0.12651433298015036s
 {
   "filename": "/Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/bio/scripts/adapter.sh",
   "issues": [
@@ -18,25 +18,25 @@
       "line": 59,
       "code": "word_split",
       "severity": "warning",
-      "message": "Frozen(<shasta.ast_node.BArgChar object at 0x101ae3940>) could be split in a dangerous position, leading to unexpected arguments to dangerous commands"
+      "message": "Frozen(<shasta.ast_node.BArgChar object at 0x102d4d5a0>) could be split in a dangerous position, leading to unexpected arguments to dangerous commands"
     },
     {
       "line": 71,
       "code": "loop_once",
       "severity": "warning",
-      "message": "loop for [s, a, m, p, l, e] in [[V(Normal,False,samples,[])]]; do (Command: [], ass[[sdir=[V(Normal,False,RES_DIR,[]), /, V(Normal,False,sample,[]), /, c, u, t, a, d, a, p, t]]] ; Command: [[m, k, d, i, r], [-, p], [V(Normal,False,sdir,[]), /, l, o, g, f, i, l, e, s]] ; Command: [], ass[[err=[1, 5]]] ; <shasta.ast_node.WhileNode object at 0x1041563b0>) runs only once"
+      "message": "loop for [s, a, m, p, l, e] in [[V(Normal,False,samples,[])]]; do (Command: [], ass[[sdir=[V(Normal,False,RES_DIR,[]), /, V(Normal,False,sample,[]), /, c, u, t, a, d, a, p, t]]] ; Command: [[m, k, d, i, r], [-, p], [V(Normal,False,sdir,[]), /, l, o, g, f, i, l, e, s]] ; Command: [], ass[[err=[1, 5]]] ; <shasta.ast_node.WhileNode object at 0x103d73b80>) runs only once"
     },
     {
       "line": 71,
       "code": "unsat_precond",
       "severity": "error",
-      "message": "precondition for '> ${RES_DIR}/cmds.txt' 'IsRead(path=Field(content=CompletelyArbitrary(s`Frozen(<shasta.ast_node.BArgCh`, ArbitraryType.APPROXIMATION, state<-2217289871912186455>, pre:None, suf:SymStr(parts=('/bio/outputs/teraseq', '/adapter/results', '/cmds.txt'))), count=WordCount(min=0, max=inf)))' might not hold"
+      "message": "precondition for '> ${RES_DIR}/cmds.txt' 'IsRead(path=Field(content=CompletelyArbitrary(s`Frozen(<shasta.ast_node.BArgCh`, ArbitraryType.APPROXIMATION, state<-1493408280731606145>, pre:None, suf:SymStr(parts=('/bio/outputs/teraseq', '/adapter/results', '/cmds.txt'))), count=WordCount(min=0, max=inf)))' might not hold"
     },
     {
       "line": 73,
       "code": "unsat_precond",
       "severity": "error",
-      "message": "precondition for 'mkdir -p ${sdir}/logfiles' 'Not(constraint=IsFile(path=Field(content=CompletelyArbitrary(s`Frozen(<shasta.ast_node.BArgCh`, ArbitraryType.APPROXIMATION, state<-2217289871912186455>, pre:None, suf:SymStr(parts=('/bio/outputs/teraseq', '/adapter/results', '/hsa.dRNASeq.HeLa.polyA.CIP.decap.REL5.long.1/cutadapt', '/logfiles'))), count=WordCount(min=0, max=inf))))' might not hold"
+      "message": "precondition for 'mkdir -p ${sdir}/logfiles' 'Not(constraint=IsFile(path=Field(content=CompletelyArbitrary(s`Frozen(<shasta.ast_node.BArgCh`, ArbitraryType.APPROXIMATION, state<-1493408280731606145>, pre:None, suf:SymStr(parts=('/bio/outputs/teraseq', '/adapter/results', '/hsa.dRNASeq.HeLa.polyA.CIP.decap.REL5.long.1/cutadapt', '/logfiles'))), count=WordCount(min=0, max=inf))))' might not hold"
     },
     {
       "line": 82,
@@ -48,19 +48,19 @@
       "line": 114,
       "code": "unsat_precond",
       "severity": "error",
-      "message": "precondition for 'cat ${RES_DIR}/cmds.txt' 'IsFile(path=Field(content=CompletelyArbitrary(s`Frozen(<shasta.ast_node.BArgCh`, ArbitraryType.APPROXIMATION, state<-2217289871912186455>, pre:None, suf:SymStr(parts=('/bio/outputs/teraseq', '/adapter/results', '/cmds.txt'))), count=WordCount(min=0, max=inf)))' might not hold"
-    },
-    {
-      "line": 115,
-      "code": "unsat_precond",
-      "severity": "error",
-      "message": "precondition for 'rm ${RES_DIR}/cmds.txt' 'And(lhs=IsFile(path=Field(content=CompletelyArbitrary(s`Frozen(<shasta.ast_node.BArgCh`, ArbitraryType.APPROXIMATION, state<-2217289871912186455>, pre:None, suf:SymStr(parts=('/bio/outputs/teraseq', '/adapter/results', '/cmds.txt'))), count=WordCount(min=0, max=inf))), rhs=Not(constraint=IsUnread(path=Field(content=CompletelyArbitrary(s`Frozen(<shasta.ast_node.BArgCh`, ArbitraryType.APPROXIMATION, state<-2217289871912186455>, pre:None, suf:SymStr(parts=('/bio/outputs/teraseq', '/adapter/results', '/cmds.txt'))), count=WordCount(min=0, max=inf)))))' might not hold"
+      "message": "precondition for 'cat ${RES_DIR}/cmds.txt' 'IsFile(path=Field(content=CompletelyArbitrary(s`Frozen(<shasta.ast_node.BArgCh`, ArbitraryType.APPROXIMATION, state<-1493408280731606145>, pre:None, suf:SymStr(parts=('/bio/outputs/teraseq', '/adapter/results', '/cmds.txt'))), count=WordCount(min=0, max=inf)))' might not hold"
     },
     {
       "line": 115,
       "code": "word_split",
       "severity": "warning",
-      "message": "Frozen(<shasta.ast_node.BArgChar object at 0x101ae3940>) could be split in a dangerous position, leading to unexpected arguments to dangerous commands"
+      "message": "Frozen(<shasta.ast_node.BArgChar object at 0x102d4d5a0>) could be split in a dangerous position, leading to unexpected arguments to dangerous commands"
+    },
+    {
+      "line": 115,
+      "code": "unsat_precond",
+      "severity": "error",
+      "message": "precondition for 'rm ${RES_DIR}/cmds.txt' 'And(lhs=IsFile(path=Field(content=CompletelyArbitrary(s`Frozen(<shasta.ast_node.BArgCh`, ArbitraryType.APPROXIMATION, state<-1493408280731606145>, pre:None, suf:SymStr(parts=('/bio/outputs/teraseq', '/adapter/results', '/cmds.txt'))), count=WordCount(min=0, max=inf))), rhs=Not(constraint=IsUnread(path=Field(content=CompletelyArbitrary(s`Frozen(<shasta.ast_node.BArgCh`, ArbitraryType.APPROXIMATION, state<-1493408280731606145>, pre:None, suf:SymStr(parts=('/bio/outputs/teraseq', '/adapter/results', '/cmds.txt'))), count=WordCount(min=0, max=inf)))))' might not hold"
     },
     {
       "line": 124,
@@ -72,7 +72,7 @@
       "line": 127,
       "code": "unsat_precond",
       "severity": "error",
-      "message": "precondition for 'mkdir -p ${sdir}' 'Not(constraint=IsFile(path=Field(content=CompletelyArbitrary(s`Frozen(<shasta.ast_node.BArgCh`, ArbitraryType.APPROXIMATION, state<-2217289871912186455>, pre:None, suf:SymStr(parts=('/bio/outputs/teraseq', '/adapter/results', '/hsa.dRNASeq.HeLa.polyA.CIP.decap.REL5.long.1'))), count=WordCount(min=0, max=inf))))' might not hold"
+      "message": "precondition for 'mkdir -p ${sdir}' 'Not(constraint=IsFile(path=Field(content=CompletelyArbitrary(s`Frozen(<shasta.ast_node.BArgCh`, ArbitraryType.APPROXIMATION, state<-1493408280731606145>, pre:None, suf:SymStr(parts=('/bio/outputs/teraseq', '/adapter/results', '/hsa.dRNASeq.HeLa.polyA.CIP.decap.REL5.long.1'))), count=WordCount(min=0, max=inf))))' might not hold"
     },
     {
       "line": 140,
@@ -81,7 +81,7 @@
       "message": "precondition for 'mkdir tmp' 'Not(constraint=Or(lhs=IsFile(path=Field(content=SymStr(parts=('tmp',)), count=WordCount(min=1, max=1))), rhs=IsDir(path=Field(content=SymStr(parts=('tmp',)), count=WordCount(min=1, max=1)))))' might not hold"
     }
   ],
-  "time": 0.1976738750236109,
-  "solver_time": 0.14866858400637284,
+  "time": 0.17187599997851066,
+  "solver_time": 0.12651433298015036,
   "timed_out": false
 }

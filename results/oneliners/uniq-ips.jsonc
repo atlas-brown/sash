@@ -1,8 +1,8 @@
-// [DONE] exec=0.0024847080057952553s solver=0.0018792909977491945s
+// [DONE] exec=0.0025136670155916363s solver=0.0018808330059982836s
 {
   "filename": "/Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/oneliners/scripts/uniq-ips.sh",
   "issues": [],
-  "time": 0.0024847080057952553,
-  "solver_time": 0.0018792909977491945,
+  "time": 0.0025136670155916363,
+  "solver_time": 0.0018808330059982836,
   "timed_out": false
 }

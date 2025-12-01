@@ -242,6 +242,6 @@ Walking directory: /Users/george/Work/repo_resash/benchmarks/_not_integrated/koa
 
 === Summary ===
   Files scanned: 120
-  Succeeded:     91
-  Crashed:       23
-  Timed out:     6
+  Succeeded:     105
+  Crashed:       0
+  Timed out:     15

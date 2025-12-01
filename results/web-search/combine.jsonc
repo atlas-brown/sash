@@ -1,4 +1,4 @@
-// [DONE] exec=0.0400147499749437s solver=0.01753050001570955s
+// [DONE] exec=0.056538542005000636s solver=0.024712624988751486s
 {
   "filename": "/Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/web-search/scripts/c/combine.sh",
   "issues": [
@@ -6,19 +6,7 @@
       "line": 32,
       "code": "unbound",
       "severity": "error",
-      "message": "no definition found for ${p1}"
-    },
-    {
-      "line": 32,
-      "code": "unbound",
-      "severity": "error",
-      "message": "no definition found for ${pbi}"
-    },
-    {
-      "line": 32,
-      "code": "unbound",
-      "severity": "error",
-      "message": "no definition found for ${p3}"
+      "message": "no definition found for ${p2}"
     },
     {
       "line": 32,
@@ -30,7 +18,7 @@
       "line": 32,
       "code": "unbound",
       "severity": "error",
-      "message": "no definition found for ${p2}"
+      "message": "no definition found for ${pbi}"
     },
     {
       "line": 32,
@@ -39,13 +27,25 @@
       "message": "no definition found for ${ptri}"
     },
     {
+      "line": 32,
+      "code": "unbound",
+      "severity": "error",
+      "message": "no definition found for ${p3}"
+    },
+    {
+      "line": 32,
+      "code": "unbound",
+      "severity": "error",
+      "message": "no definition found for ${p1}"
+    },
+    {
       "line": 37,
       "code": "unbound",
       "severity": "error",
       "message": "no definition found for ${!}"
     }
   ],
-  "time": 0.0400147499749437,
-  "solver_time": 0.01753050001570955,
+  "time": 0.056538542005000636,
+  "solver_time": 0.024712624988751486,
   "timed_out": false
 }

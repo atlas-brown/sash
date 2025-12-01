@@ -1,4 +1,4 @@
-// [DONE] exec=0.005604000005405396s solver=0.0019036669982597232s
+// [DONE] exec=0.006986207998124883s solver=0.0022938339971005917s
 {
   "filename": "/Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/web-search/scripts/index.sh",
   "issues": [
@@ -9,7 +9,7 @@
       "message": "no definition found for ${OUT}"
     }
   ],
-  "time": 0.005604000005405396,
-  "solver_time": 0.0019036669982597232,
+  "time": 0.006986207998124883,
+  "solver_time": 0.0022938339971005917,
   "timed_out": false
 }

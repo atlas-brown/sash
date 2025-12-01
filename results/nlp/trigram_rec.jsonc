@@ -1,1 +1,27 @@
-// [CRASH] SaSh assertion failed on /Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/nlp/scripts/trigram_rec.sh: 1
+// [TIMEOUT] exec=1.2106417090108152s solver=3.058745375019498s
+{
+  "filename": "/Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/nlp/scripts/trigram_rec.sh",
+  "issues": [
+    {
+      "line": 5,
+      "code": "unbound",
+      "severity": "error",
+      "message": "no definition found for ${SUITE_DIR}"
+    },
+    {
+      "line": 6,
+      "code": "unbound",
+      "severity": "error",
+      "message": "no definition found for ${SUITE_DIR}"
+    },
+    {
+      "line": 17,
+      "code": "word_split",
+      "severity": "warning",
+      "message": "Frozen(<shasta.ast_node.BArgChar object at 0x104682590>) could be split in a dangerous position, leading to unexpected arguments to dangerous commands"
+    }
+  ],
+  "time": 1.2106417090108152,
+  "solver_time": 3.058745375019498,
+  "timed_out": true
+}

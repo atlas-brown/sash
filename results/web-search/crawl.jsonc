@@ -1,4 +1,4 @@
-// [DONE] exec=0.010234833986032754s solver=0.010192458983510733s
+// [DONE] exec=0.017066625005099922s solver=0.012452708004275337s
 {
   "filename": "/Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/web-search/scripts/crawl.sh",
   "issues": [
@@ -21,7 +21,7 @@
       "message": "no definition found for ${WIKI}"
     }
   ],
-  "time": 0.010234833986032754,
-  "solver_time": 0.010192458983510733,
+  "time": 0.017066625005099922,
+  "solver_time": 0.012452708004275337,
   "timed_out": false
 }
