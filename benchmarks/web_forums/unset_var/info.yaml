@@ -11,4 +11,5 @@ ground_truth:
     code: unbound
     shellcheck:
       detects: true
+      fixed_false_positive: false
       code: SC2031

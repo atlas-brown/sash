@@ -16,4 +16,5 @@ ground_truth:
     note: only along the path where the default value of N_PREFIX is used, is del_sys_file valid
     shellcheck:
       detects: false
+      fixed_false_positive: false
       note: Warns about deleting '/', which is not the case here.

@@ -15,14 +15,17 @@ ground_truth:
     code: unbound
     shellcheck:
       detects: true
+      fixed_false_positive: false
       code: SC2154
   - line: 6
     code: conc_const_cond
     note: this is only relevant for an environment concretization mode (maybe "assume environment is empty")
     shellcheck:
       detects: false
+      fixed_false_positive: false
   - line: 10
     code: conc_dead_code
     note: this is only relevant for an environment concretization mode
     shellcheck:
       detects: false
+      fixed_false_positive: false

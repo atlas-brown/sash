@@ -14,4 +14,5 @@ ground_truth:
     code: const_cond
     shellcheck:
       detects: true
+      fixed_false_positive: true
       code: SC2181

@@ -14,4 +14,5 @@ ground_truth:
     note: we only expect one report, first unbound occurence
     shellcheck:
       detects: true
+      fixed_false_positive: false
       code: SC2153

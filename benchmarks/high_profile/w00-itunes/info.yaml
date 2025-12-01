@@ -13,4 +13,5 @@ ground_truth:
     code: word_split
     shellcheck:
       detects: true
+      fixed_false_positive: false
       code: SC2086

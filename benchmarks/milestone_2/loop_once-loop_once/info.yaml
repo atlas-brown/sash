@@ -12,8 +12,10 @@ ground_truth:
   - line: 8
     code: loop_once
     shellcheck:
-      detects: false
+      detects: true
+      fixed_false_positive: false
   - line: 15
     code: loop_once
     shellcheck:
-      detects: false
+      detects: true
+      fixed_false_positive: false

@@ -14,8 +14,10 @@ ground_truth:
     code: unsat_precond
     shellcheck:
       detects: false
+      fixed_false_positive: false
   - line: 8
     #code: file_overwrite
     code: unsat_precond
     shellcheck:
       detects: false
+      fixed_false_positive: false

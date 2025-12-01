@@ -27,18 +27,21 @@ ground_truth:
     code: unbound
     shellcheck:
       detects: true
+      fixed_false_positive: false
       code: SC2154
       note: Needs --enable=check-unassigned-uppercase
   - line: 57
     code: unbound
     shellcheck:
       detects: true
+      fixed_false_positive: false
       code: SC2154
       note: Needs --enable=check-unassigned-uppercase
   - line: 60
     code: unbound
     shellcheck:
       detects: true
+      fixed_false_positive: false
       code: SC2154
       note: Needs --enable=check-unassigned-uppercase
   - line: 61
@@ -46,6 +49,7 @@ ground_truth:
     duplicate: true
     shellcheck:
       detects: true
+      fixed_false_positive: false
       code: SC2154
       note: Needs --enable=check-unassigned-uppercase
   - line: 62
@@ -53,6 +57,7 @@ ground_truth:
     duplicate: true
     shellcheck:
       detects: true
+      fixed_false_positive: false
       code: SC2154
       note: Needs --enable=check-unassigned-uppercase
   - line: 63
@@ -60,6 +65,7 @@ ground_truth:
     duplicate: true
     shellcheck:
       detects: true
+      fixed_false_positive: false
       code: SC2154
       note: Needs --enable=check-unassigned-uppercase
   - line: 64
@@ -67,6 +73,7 @@ ground_truth:
     duplicate: true
     shellcheck:
       detects: true
+      fixed_false_positive: false
       code: SC2154
       note: Needs --enable=check-unassigned-uppercase
   - line: 65
@@ -74,5 +81,6 @@ ground_truth:
     duplicate: true
     shellcheck:
       detects: true
+      fixed_false_positive: false
       code: SC2154
       note: Needs --enable=check-unassigned-uppercase

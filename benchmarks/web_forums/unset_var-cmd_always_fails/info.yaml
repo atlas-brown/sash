@@ -13,9 +13,11 @@ ground_truth:
     line: 9
     shellcheck:
       detects: true
+      fixed_false_positive: false
       code: SC2153
       note: Detects that it's probably a misspelling of $OPTARG
   - code: command_can_only_fail
     line: 16
     shellcheck:
       detects: false
+      fixed_false_positive: false

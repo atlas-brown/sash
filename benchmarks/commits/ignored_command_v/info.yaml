@@ -11,6 +11,7 @@ ground_truth:
     code: not_a_command
     shellcheck:
       detects: false
+      fixed_false_positive: false
 
     note: 'todo let''s get consensus: I think this is essentially the same error as
       the `//` command bug (milestone_2/rm_root)'

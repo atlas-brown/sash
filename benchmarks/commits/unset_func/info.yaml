@@ -11,8 +11,5 @@ ground_truth:
     code: function_use_before_def
     shellcheck:
       detects: true
+      fixed_false_positive: false
       code: SC2218
-
-    note: 'todo for implementation: catching this bug requires either two passes over
-      the script, or tracking of every command executed (how to know that git_compare_version
-      is not just a command?)'

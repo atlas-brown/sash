@@ -14,4 +14,5 @@ ground_truth:
     code: word_split_del_sys_file
     shellcheck:
       detects: true
+      fixed_false_positive: false
       code: SC2115
