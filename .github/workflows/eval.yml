@@ -20,4 +20,4 @@ jobs:
           uv sync
       - name: Run the evaluation
         run: |
-          uv run scripts/evaluation.py --timeout 10
+          uv run scripts/evaluation.py --timeout 5 --solver-timeout 5
