@@ -149,6 +149,8 @@ def main():
                 crashed=True,
                 timed_out=None,
                 time=None,
+                exec_time=None,
+                solver_time=None,
                 detected_all=None,
                 expected_results=[e.code for e in expected_results],
                 actual_results=None,
@@ -190,6 +192,8 @@ def main():
             crashed=False,
             timed_out=report.timed_out,
             time=report.time + report.solver_time,
+            exec_time=report.time,
+            solver_time=report.solver_time,
             detected_all=gt_exists and all(code in actual_results for code in expected_results),
             expected_results=[e.code for e in expected_results],
             actual_results=[a.code for a in actual_results],
@@ -229,6 +233,8 @@ def main():
               f"{r.crashed},"
               f"{r.timed_out},"
               f"{r.time},"
+              f"{r.exec_time},"
+              f"{r.solver_time},"
               f"{r.detected_all},"
               f"{';'.join(r.expected_results) if r.expected_results else ''},"
               f"{';'.join(r.actual_results) if r.actual_results else ''},"
@@ -276,6 +282,8 @@ class RunResult(NamedTuple):
     crashed: bool | None
     timed_out: bool | None
     time: float | None
+    exec_time: float | None
+    solver_time: float | None
     detected_all: bool | None
     expected_results: list[str] | None
     actual_results: list[str] | None
