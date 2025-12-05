@@ -66,7 +66,7 @@ def main(file: str,
          timeout: float | None = None,
          solver_timeout: float | None = None,
          enable_dfs: bool = False) -> Report:
-    Config.set("DEBUG", log_level.lower() == "debug")
+
     logging.basicConfig(
         format="[%(asctime)s %(filename)s:%(lineno)d] %(message)s",
         level=getattr(logging, log_level.upper()) if log_level.lower() != "disabled" else logging.CRITICAL + 10,
@@ -148,6 +148,7 @@ def parse_cli():
 
     # solver timeout
     parser.add_argument(
+        "-T",
         "--solver-timeout",
         type=float,
         default=None,
