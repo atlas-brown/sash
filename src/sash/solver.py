@@ -51,7 +51,7 @@ def _command_exists_to_z3(field: Field, s: State) -> z3.ExprRef:
 def constraint_to_z3(constraint: Constraint, s: State) -> z3.ExprRef:
     def norm_constraint_to_z3(constraint: Constraint, s: State):
         match constraint:
-            case Empty() | HasStdout() | ExpectsStdin() | IsWritten():
+            case Empty() | IsWritten():
                 return z3.BoolVal(True)
             case CommandExists(name):
                 return _command_exists_to_z3(name, s)

@@ -111,12 +111,12 @@ class IsDeleted(Constraint):
 
 
 @dataclass(frozen=True)
-class IsUnread(Constraint):
+class IsRead(Constraint):
     path: Field
 
 
 @dataclass(frozen=True)
-class IsRead(Constraint):
+class IsUnread(Constraint):
     path: Field
 
 
@@ -179,16 +179,6 @@ class IOType(Enum):
 
 
 @dataclass(frozen=True)
-class HasStdout(Constraint):
-    command: Field
-
-
-@dataclass(frozen=True)
-class ExpectsStdin(Constraint):
-    command: Field
-
-
-@dataclass(frozen=True)
 class Description(Constraint):
     text: str
 
@@ -209,6 +199,8 @@ def normalize_fs_constraints(constraints: Constraint) -> Constraint:
             return IsDeleted(path) | IsDir(path)
         case Not(IsDir(path)):
             return IsDeleted(path) | IsFile(path)
+        case Not(IsUnread(path)):
+            return IsRead(path)
         case Not(Or(lhs, rhs)):
             return normalize_fs_constraints(Not(lhs)) & normalize_fs_constraints(Not(rhs))
         case Not(And(lhs, rhs)):
@@ -222,7 +214,10 @@ def normalize_fs_constraints(constraints: Constraint) -> Constraint:
             normalized_lhs = lhs.without_trailing_slash()
             normalized_rhs = rhs.without_trailing_slash()
             return StringEq(normalized_lhs, normalized_rhs)
+        case Empty():
+            return constraints
         case _:
+            assert False, f"Unhandled constraint: {constraints}"
             return constraints
 
 
@@ -354,7 +349,7 @@ class FSModelSimple(FSModel):
             case IsWritten(path):
                 # For simplicity, say that writing creates an unread file
                 return self._create_file(path)
-            case StringEq() | Not(StringEq()) | CommandExists() | HasStdout() | ExpectsStdin() | Description() | IsUnread():
+            case StringEq() | Not(StringEq()) | CommandExists() | Description() | IsUnread():
                 # These constraints do not affect the FS model
                 return self
             case Implies(premise, conclusion):
