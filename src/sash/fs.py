@@ -17,7 +17,6 @@ from sash.constraints import (
     IsFile,
     IsRead,
     IsUnread,
-    IsWritten,
     NormalizedConstraint,
     Not,
     Or,
@@ -142,9 +141,6 @@ class FSModelSimple(FSModel):
                 return self._delete(path)
             case IsRead(path):
                 return self._create_file(path, Read)
-            case IsWritten(path):
-                # For simplicity, say that writing creates an unread file
-                return self._create_file(path)
             case StringEq() | Not(StringEq()) | CommandExists() | Description() | IsUnread():
                 # These constraints do not affect the FS model
                 return self

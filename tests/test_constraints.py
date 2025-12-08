@@ -7,7 +7,6 @@ from sash.constraints import (
     IsUnread,
     IsRead,
     StringEq,
-    IsWritten,
 )
 
 
@@ -25,8 +24,6 @@ def test_constraint_normalization():
     unr2 = IsUnread(path2)
     read1 = IsRead(path1)
     read2 = IsRead(path2)
-    write1 = IsWritten(path1)
-    write2 = IsWritten(path2)
     eqs = StringEq(path1, path2)
 
     norm_file1 = file1.normalized()
@@ -39,8 +36,6 @@ def test_constraint_normalization():
     norm_unr2 = unr2.normalized()
     norm_read1 = read1.normalized()
     norm_read2 = read2.normalized()
-    norm_write1 = write1.normalized()
-    norm_write2 = write2.normalized()
     norm_eqs = eqs.normalized()
 
     assert file1 != file2
@@ -53,6 +48,4 @@ def test_constraint_normalization():
     assert norm_unr1 == norm_unr2
     assert read1 != read2
     assert norm_read1 == norm_read2
-    assert write1 != write2
-    assert norm_write1 == norm_write2
     assert eqs != norm_eqs
