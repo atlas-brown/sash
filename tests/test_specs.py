@@ -4,10 +4,11 @@ from pprint import pformat
 import z3
 from hypothesis import assume, given, settings
 from hypothesis import strategies as st
+import sash.symbolic.strings
+from sash.symbolic.strings import Field
 from util import create_field, create_symstr
 
 import sash.specs as specs
-import sash.symb as symb
 from sash.constraints import (
     And,
     Empty,
@@ -20,7 +21,7 @@ from sash.constraints import (
     Or,
 )
 from sash.solver import assertion_to_z3
-from sash.state import Assertion, Field, FSModelSimple, State
+from sash.symbolic.state import Assertion, FSModelSimple, State
 
 # Nice little message for copilot:
 #   check: (essentially) the precondition that must hold for a command to succeed, but not exactly
@@ -195,7 +196,7 @@ def test_test_spec__postconds_are_negations_of_each_other():
         sanity_check_spec_constraints(s)
 
 
-def create_cmd_inv(cmd_name: symb.SymStr, flags: set[str], options: dict[str, symb.Field], operands: list[symb.Field]) -> specs.CmdInvocation:
+def create_cmd_inv(cmd_name: sash.symbolic.strings.SymStr, flags: set[str], options: dict[str, sash.symbolic.strings.Field], operands: list[sash.symbolic.strings.Field]) -> specs.CmdInvocation:
     return specs.CmdInvocation(
         cmd_name=cmd_name,
         flags=flags,

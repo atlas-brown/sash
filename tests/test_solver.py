@@ -2,6 +2,7 @@
 Tests for SMT solver integration.
 """
 import z3
+from sash.symbolic.strings import ArbitraryType, CompletelyArbitrary, Field, WordCount
 from util import *
 
 import sash.reporter as reporter
@@ -17,7 +18,7 @@ from sash.solver import (
     reset_z3cache,
     state_to_z3,
 )
-from sash.state import ArbitraryType, CompletelyArbitrary, Field, ShellVar, WordCount
+from sash.symbolic.state import ShellVar
 from sash.symb import starting_state
 
 reporter.Reporter.initialize("<test>")

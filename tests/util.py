@@ -8,9 +8,9 @@ import shasta.ast_node as AST
 
 import sash.parser as parser
 import sash.reporter as reporter
-import sash.specs as specs
 import sash.symb as symb
 import sash.main as main
+import sash.symbolic.strings
 
 
 def write_script(tmp_path, content: str) -> str:
@@ -45,7 +45,7 @@ def parse_script(script_content: str) -> list[AST.AstNode]:
             res.append(wrapped_ast.ast_node)
         return res
 
-def create_field(val: str) -> specs.Field:
+def create_field(val: str) -> sash.symbolic.strings.Field:
     min_words = 0
     max_words = 0
 
@@ -58,13 +58,13 @@ def create_field(val: str) -> specs.Field:
             min_words += 1
         previously_space = c.isspace()
 
-    return specs.Field(
+    return sash.symbolic.strings.Field(
         create_symstr(val),
-        symb.WordCount(min_words, max(min_words, max_words))
+        sash.symbolic.strings.WordCount(min_words, max(min_words, max_words))
     )
 
-def create_symstr(val: str) -> symb.SymStr:
-    return symb.SymStr((val,))
+def create_symstr(val: str) -> sash.symbolic.strings.SymStr:
+    return sash.symbolic.strings.SymStr((val,))
 
 def reset_and_run_main(script: str, solver: bool = False) -> reporter.Report:
     """Helper to reset the reporter and run the main analysis on a script."""

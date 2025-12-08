@@ -1,18 +1,14 @@
 """
 Tests for state utilities.
 """
+from sash.symbolic.strings import ArbitraryType, CompletelyArbitrary, Field, SymStr, WordCount
 from util import *
 from dataclasses import replace
 
 import sash.reporter as reporter
-from sash.state import (
-    ArbitraryType,
-    CompletelyArbitrary,
-    Field,
+from sash.symbolic.state import (
     ShellVar,
-    SymStr,
     Trace,
-    WordCount,
 )
 from sash.symb import collapse_traces, starting_state
 

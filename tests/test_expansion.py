@@ -3,12 +3,13 @@ Tests for the simple symbolic expander.
 """
 import pytest
 import shasta.ast_node as AST
+from sash.symbolic.strings import ArbitraryType, CompletelyArbitrary, Field, SymStr, WordCount
 from util import *
 
 import sash.reporter as reporter
 from sash.frozen import freeze, freeze_thing
 from sash.interpreter_config import InterpConfig
-from sash.state import *
+from sash.symbolic.state import *
 from sash.symb import expand_args, expand_args_dumb, expand_simple, starting_state
 
 reporter.Reporter.initialize("<test>")

@@ -23,13 +23,9 @@ from sash.constraints import (
     IsRead
 )
 from sash.frozen import freeze_thing
-from sash.state import (
-    ArbitraryType,
-    CompletelyArbitrary,
+from sash.symbolic.strings import ArbitraryType, CompletelyArbitrary, SymStr, SymVar, WordCount
+from sash.symbolic.strings import (
     Field,
-    SymStr,
-    SymVar,
-    WordCount,
 )
 
 

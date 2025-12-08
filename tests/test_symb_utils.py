@@ -3,7 +3,8 @@ from collections.abc import Iterable
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
-from sash.state import SymStr, SymVar
+from sash.symbolic.strings import SymVar
+from sash.symbolic.strings import SymStr
 from sash.util import create_fresh_varname
 
 settings.register_profile("default", max_examples=5)

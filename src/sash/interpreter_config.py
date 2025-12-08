@@ -1,9 +1,11 @@
 from dataclasses import dataclass
-from sash.state import Trace, Traces, Field
+from sash.symbolic.state import Trace, Traces
 from dataclasses import field, replace
 from collections.abc import Callable
 import shasta.ast_node as AST
 from enum import Enum
+
+from sash.symbolic.strings import Field
 
 NodeCB = Callable[[Traces, AST.AstNode], list | None]
 ExpandedCmdCB = Callable[[list[Field]], None]

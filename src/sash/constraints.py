@@ -4,7 +4,7 @@ from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from sash.state import Field
+    from sash.symbolic.strings import Field
 
 import functools
 import logging

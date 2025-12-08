@@ -13,6 +13,7 @@ import shasta.ast_node as AST
 
 import sash.parser as parser
 import sash.reporter as reporter
+from sash.symbolic.strings import ArbitraryType, CompletelyArbitrary, Field, SymStr, SymVar, WordCount
 import sash.util as util
 from sash.config import Config
 from sash.constraints import *
@@ -21,7 +22,7 @@ from sash.interpreter_config import InterpConfig, UnboundVariablePolicy
 from sash.reporter import Reporter
 from sash.solver import field_to_z3
 from sash.specs import get_spec
-from sash.state import *
+from sash.symbolic.state import *
 
 
 def handle_commandnode(traces: Traces,
