@@ -1179,3 +1179,17 @@ class Env(Cmd):
                 return CmdSpec(check, success_postcond, ~CommandExists(subcmd), io)
 
         return CmdSpec(check, success_postcond, failure_postcond, io)
+
+
+def is_definitely_dir(field: Field) -> bool:
+    return (
+        isinstance(field.content, SymStr) and
+        isinstance(last_part := field.content.parts[-1], str) and (
+            last_part == "." or
+            last_part == ".." or
+            last_part.endswith("/") or
+            last_part.endswith("/.") or
+            last_part.endswith("/..")
+        )
+    )
+
