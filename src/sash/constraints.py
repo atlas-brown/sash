@@ -207,9 +207,7 @@ def normalize_fs_constraints(constraints: Constraint) -> Constraint:
             normalized_lhs = lhs.try_without_trailing_slash()
             normalized_rhs = rhs.try_without_trailing_slash()
             return StringEq(normalized_lhs, normalized_rhs)
-        case CommandExists() | Description():
-            return constraints
-        case Empty():
+        case Empty() | Description() | CommandExists():
             return constraints
         case _:
             assert False, f"Unhandled constraint: {constraints}"
