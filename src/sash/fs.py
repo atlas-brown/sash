@@ -168,7 +168,7 @@ class FSModelSimple(FSModel):
         return z3.Or(FileInfo.state(z3.Select(self.history[-1][0], path_z3)) == Dir, FileInfo.state(z3.Select(self.history[-1][0], path_z3)) == Unknown)
 
     def is_deleted_z3(self, path_z3) -> 'z3.ExprRef':
-        return FileInfo.state(z3.Select(self.history[-1][0], path_z3)) == Del
+        return z3.Or(FileInfo.state(z3.Select(self.history[-1][0], path_z3)) == Del, FileInfo.state(z3.Select(self.history[-1][0], path_z3)) == Unknown)
 
     def is_read_z3(self, path_z3) -> 'z3.ExprRef':
         is_file_and_read = z3.And(FileInfo.state(z3.Select(self.history[-1][0], path_z3)) == File,
