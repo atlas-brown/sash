@@ -40,11 +40,15 @@ class NormalizedConstraint(Constraint):
                 case Empty() | Description(_) | CommandExists(_):
                     return constraint
 
+                # Unwrap nested normalized constraints
+                case NormalizedConstraint(norm):
+                    return norm
+
                 # Push normalization recursively down the constraint tree
-                case And(lhs, rhs) | Or(lhs, rhs) | Implies(premise=lhs, conclusion=rhs):
-                    norm_lhs = normalize(lhs)
-                    norm_rhs = normalize(rhs)
-                    return type(constraint)(norm_lhs, norm_rhs)
+                case And(c1, c2) | Or(c1, c2) | Implies(premise=c1, conclusion=c2):
+                    norm_c1 = normalize(c1)
+                    norm_c2 = normalize(c2)
+                    return type(constraint)(norm_c1, norm_c2)
 
                 # Double negation elimination
                 case Not(Not(c)):
@@ -52,17 +56,20 @@ class NormalizedConstraint(Constraint):
 
                 # Negation of basic FS constraints
                 case Not(IsDeleted(path)):
-                    return IsFile(path) | IsDir(path)
+                    norm_path = path.try_without_trailing_slash()
+                    return IsFile(norm_path) | IsDir(norm_path)
                 case Not(IsFile(path)):
-                    return IsDir(path) | IsDeleted(path)
+                    norm_path = path.try_without_trailing_slash()
+                    return IsDir(norm_path) | IsDeleted(norm_path)
                 case Not(IsDir(path)):
-                    return IsFile(path) | IsDeleted(path)
+                    norm_path = path.try_without_trailing_slash()
+                    return IsFile(norm_path) | IsDeleted(norm_path)
 
                 # De Morgan's laws
-                case Not(Or(lhs, rhs)):
-                    return normalize(Not(lhs) & Not(rhs))
-                case Not(And(lhs, rhs)):
-                    return normalize(Not(lhs) | Not(rhs))
+                case Not(Or(c1, c2)):
+                    return normalize(Not(c1) & Not(c2))
+                case Not(And(c1, c2)):
+                    return normalize(Not(c1) | Not(c2))
 
                 # Negation of other constraints
                 case Not(c):
@@ -72,10 +79,10 @@ class NormalizedConstraint(Constraint):
                 case IsFile(path) | IsRead(path) | IsDir(path) | IsDeleted(path):
                     norm_path = path.try_without_trailing_slash()
                     return type(constraint)(norm_path)
-                case StringEq(lhs, rhs):
-                    norm_lhs = lhs.try_without_trailing_slash()
-                    norm_rhs = rhs.try_without_trailing_slash()
-                    return StringEq(norm_lhs, norm_rhs)
+                case StringEq(c1, c2):
+                    norm_c1 = c1.try_without_trailing_slash()
+                    norm_c2 = c2.try_without_trailing_slash()
+                    return StringEq(norm_c1, norm_c2)
 
             assert False, f"Unhandled constraint: {constraint}"
 
