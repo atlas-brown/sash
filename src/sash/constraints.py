@@ -69,7 +69,7 @@ class NormalizedConstraint(Constraint):
                     return Not(normalize(c))
 
                 # Normalize paths by removing trailing slashes
-                case IsFile(path) | IsRead(path) | IsUnread(path) | IsDir(path) | IsDeleted(path):
+                case IsFile(path) | IsRead(path) | IsDir(path) | IsDeleted(path):
                     norm_path = path.try_without_trailing_slash()
                     return type(constraint)(norm_path)
                 case StringEq(lhs, rhs):
@@ -159,11 +159,6 @@ class IsDeleted(Constraint):
 
 @dataclass(frozen=True)
 class IsRead(Constraint):
-    path: Field
-
-
-@dataclass(frozen=True)
-class IsUnread(Constraint):
     path: Field
 
 

@@ -73,8 +73,6 @@ def constraint_to_z3(constraint: Constraint, s: State) -> z3.ExprRef:
                 return s.fs_model.is_dir_z3(field_content_to_z3(path.content))
             case IsDeleted(path):
                 return s.fs_model.is_deleted_z3(field_content_to_z3(path.content))
-            case IsUnread(path):
-                return s.fs_model.is_unread_z3(field_content_to_z3(path.content))
             case Not(c):
                 return z3.Not(norm_constraint_to_z3(c, s))
             case Implies(premise, conclusion):

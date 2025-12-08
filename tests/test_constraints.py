@@ -4,7 +4,6 @@ from sash.constraints import (
     IsDeleted,
     IsDir,
     IsFile,
-    IsUnread,
     IsRead,
     StringEq,
 )
@@ -20,8 +19,6 @@ def test_constraint_normalization():
     dir2 = IsDir(path2)
     del1 = IsDeleted(path1)
     del2 = IsDeleted(path2)
-    unr1 = IsUnread(path1)
-    unr2 = IsUnread(path2)
     read1 = IsRead(path1)
     read2 = IsRead(path2)
     eqs = StringEq(path1, path2)
@@ -32,8 +29,6 @@ def test_constraint_normalization():
     norm_dir2 = dir2.normalized()
     norm_del1 = del1.normalized()
     norm_del2 = del2.normalized()
-    norm_unr1 = unr1.normalized()
-    norm_unr2 = unr2.normalized()
     norm_read1 = read1.normalized()
     norm_read2 = read2.normalized()
     norm_eqs = eqs.normalized()
@@ -44,8 +39,6 @@ def test_constraint_normalization():
     assert norm_dir1 == norm_dir2
     assert del1 != del2
     assert norm_del1 == norm_del2
-    assert unr1 != unr2
-    assert norm_unr1 == norm_unr2
     assert read1 != read2
     assert norm_read1 == norm_read2
     assert eqs != norm_eqs

@@ -18,7 +18,6 @@ from sash.constraints import (
     IsDeleted,
     IsDir,
     IsFile,
-    IsUnread,
     StringEq,
     IsRead
 )
@@ -374,16 +373,13 @@ def cp_spec(cmd: CmdInvocation) -> CmdSpec:
             IsFile(s) &                 # (1)
             ~StringEq(s, t) &           # (2)
             (IsFile(t) >> IsRead(t)))   # (3a)
-                                        # TODO: how to denote created files like this?
-                                        # & (IsDir(t) >> ~IsUnread(ConcatPath(t, s))),
 
         success_postcond = (
             # TODO: decide whether target should be considered unread by default or inherit from source
             IsFile(s) &                             # (1)
             IsRead(s) &                             # (4)
             ~StringEq(s, t) &                       # (2)
-            ((IsFile(t) & IsUnread(t)) | IsDir(t))) # (3)
-                                                # & IsFile(ConcatPath(t, s)) & IsUnread(ConcatPath(t, s))
+            ((IsFile(t) & ~IsRead(t)) | IsDir(t)))  # (3)
         failure_postcond = Empty()
 
     elif flags == set() and len(operands) >= 2: # cp [-Pfip] source... target
@@ -405,12 +401,10 @@ def cp_spec(cmd: CmdInvocation) -> CmdSpec:
             And.from_field_iter(ss, IsFile) &                    # (1)
             And.from_field_iter(ss, lambda s: ~StringEq(s, t)) & # (2)
             IsDir(t))                                            # (3)
-            # & And.from_field_iter(ss, lambda s: IsFile(ConcatPath(t, s) >> ~IsUnread(ConcatPath(t, s))) # (4)
         success_postcond = (
             And.from_field_iter(ss, IsFile) &                    # (1)
             And.from_field_iter(ss, lambda s: ~StringEq(s, t)) & # (2)
             IsDir(t))                                            # (3)
-            # & And.from_field_iter(ss, lambda path: IsFile(ConcatPath(t, s)) & IsUnread(ConcatPath(t, s))), (4)
         failure_postcond = Empty()
 
     elif "-R" in flags and len(operands) >= 2: # cp -R [-H|-L|-P] [-fip] source... target
@@ -432,12 +426,9 @@ def cp_spec(cmd: CmdInvocation) -> CmdSpec:
         check = (
             And.from_field_iter(ss, lambda s: ~IsDeleted(s)) & # (1)
             IsDir(t))                                          # (2)
-            # & And.from_field_iter(ss, lambda s: IsFile(ConcatPath(t, s) >> ~IsUnread(ConcatPath(t, s))) # (3)
         success_postcond = (
             And.from_field_iter(ss, lambda s: ~IsDeleted(s)) & # (1)
             IsDir(t))                                          # (2)
-            # & And.from_field_iters(ss, lambda s: (IsFile(s) >> IsFile(ConcatPath(t, s)) & (IsDir(s) >> IsDir(ConcatPath(t, s))))) # (3)
-            # & And.from_field_iter(ss, lambda s: IsFile(ConcatPath(t, s) >> ~IsUnread(ConcatPath(t, s))) # (4)
         failure_postcond = Empty()
 
     else:
@@ -955,7 +946,7 @@ class Mv(Cmd):
                     IsRead(dst) &
                     ~IsDeleted(src) &                      # src must exist
                     (IsDir(src) >> ~IsFile(dst)) &         # if src is a dir, dst cannot be a file
-                    (IsFile(dst) >> ~IsUnread(dst)) &      # if dst is a file, it must not be unread
+                    (IsFile(dst) >> IsRead(dst)) &         # if dst is a file, it must not be unread
                     ((IsDir(src) | IsDir(dst)) >> ~StringEq(src, dst)) # src and dst cannot be the same directory
                 )
                 success_postcond = (
@@ -1004,13 +995,13 @@ class Rm(Cmd):
         failure_postcond = Empty() # due to not modeling permissions, we never gain info on failure
 
         if flags == set([]):
-            check = And.from_field_iter(operands, lambda op: IsFile(op) & ~IsUnread(op))
+            check = And.from_field_iter(operands, lambda op: IsFile(op) & IsRead(op))
         elif flags == set(["-f"]):
-            check = And.from_field_iter(operands, lambda op: (IsFile(op) >> ~IsUnread(op)) & ~IsDir(op) & ~IsDeleted(op))
+            check = And.from_field_iter(operands, lambda op: (IsFile(op) >> IsRead(op)) & ~IsDir(op) & ~IsDeleted(op))
         elif flags == set(["-r"]):
-            check = And.from_field_iter(operands, lambda op: (IsFile(op) & ~IsUnread(op)) | IsDir(op))
+            check = And.from_field_iter(operands, lambda op: (IsFile(op) & IsRead(op)) | IsDir(op))
         elif flags == set(["-f", "-r"]):
-            check = And.from_field_iter(operands, lambda op: (IsFile(op) >> ~IsUnread(op)) & ~IsDeleted(op))
+            check = And.from_field_iter(operands, lambda op: (IsFile(op) >> IsRead(op)) & ~IsDeleted(op))
         else:
             assert False, f"unreachable; received flags: {flags}"
 

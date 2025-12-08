@@ -16,7 +16,6 @@ from sash.constraints import (
     IsDir,
     IsFile,
     IsRead,
-    IsUnread,
     NormalizedConstraint,
     Not,
     Or,
@@ -40,9 +39,6 @@ class FSModel():
         return z3.BoolVal(False)
 
     def is_read_z3(self, path_z3) -> 'z3.ExprRef':
-        return z3.BoolVal(False)
-
-    def is_unread_z3(self, path_z3) -> 'z3.ExprRef':
         return z3.BoolVal(False)
 
     def state_to_z3(self) -> 'z3.ExprRef':
@@ -141,7 +137,9 @@ class FSModelSimple(FSModel):
                 return self._delete(path)
             case IsRead(path):
                 return self._create_file(path, Read)
-            case StringEq() | Not(StringEq()) | CommandExists() | Description() | IsUnread():
+            case Not(IsRead(path)):
+                return self._create_file(path, Unread) # treat Not(IsRead) as making the file unreadable
+            case StringEq() | Not(StringEq()) | CommandExists() | Description():
                 # These constraints do not affect the FS model
                 return self
             case Implies(premise, conclusion):
@@ -177,9 +175,6 @@ class FSModelSimple(FSModel):
                       FileInfo.status(z3.Select(self.history[-1][0], path_z3)) == Read)
         is_unknown = FileInfo.state(z3.Select(self.history[-1][0], path_z3)) == Unknown
         return z3.Or(is_file_and_read, is_unknown)
-    def is_unread_z3(self, path_z3) -> 'z3.ExprRef':
-        return z3.And(FileInfo.state(z3.Select(self.history[-1][0], path_z3)) == File,
-                      FileInfo.status(z3.Select(self.history[-1][0], path_z3)) == Unread)
 
     def _fs_constraint_z3(self, constraint: Constraint) -> 'z3.ExprRef':
         match constraint:
@@ -189,8 +184,6 @@ class FSModelSimple(FSModel):
                 return self.is_dir_z3(self.field_to_z3(path))
             case IsDeleted(path):
                 return self.is_deleted_z3(self.field_to_z3(path))
-            case IsUnread(path):
-                return self.is_unread_z3(self.field_to_z3(path))
             case And(lhs, rhs):
                 return z3.And(self._fs_constraint_z3(lhs), self._fs_constraint_z3(rhs))
             case Or(lhs, rhs):

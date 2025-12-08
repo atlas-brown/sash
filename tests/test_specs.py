@@ -16,7 +16,7 @@ from sash.constraints import (
     Implies,
     IsDeleted,
     IsFile,
-    IsUnread,
+    IsRead,
     Not,
     Or,
 )
@@ -68,7 +68,7 @@ def test_rm_spec__check_disallows_deleting_unreadable_files():
     # When -f is provided, the check takes the form of an implication, because operands don't need to be files (can be dirs or deleted)
     # When -f is not provided, the check is a conjunction that requires operands to be files and not unreadable
     expected_checks_per_inv = [
-        [IsFile(f) >> ~IsUnread(f) if "-f" in inv.flags else IsFile(f) & ~IsUnread(f) for f in inv.operands]
+        [IsFile(f) >> IsRead(f) if "-f" in inv.flags else IsFile(f) & IsRead(f) for f in inv.operands]
         for inv in invocations
     ]
 
