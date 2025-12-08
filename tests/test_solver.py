@@ -2,24 +2,20 @@
 Tests for SMT solver integration.
 """
 import z3
+from sash.fs import FSModel, FSModelSimple
 from sash.symbolic.strings import ArbitraryType, CompletelyArbitrary, Field, WordCount
 from util import *
 
 import sash.reporter as reporter
-from sash.constraints import FSModel, FSModelSimple, IsDeleted, IsFile, IsRead, StringEq
+from sash.constraints import IsDeleted, IsFile, IsRead, StringEq
 from sash.solver import (
-    Del,
-    File,
-    FileInfo,
-    Read,
-    Unknown,
-    Unread,
     field_content_to_z3,
     reset_z3cache,
     state_to_z3,
 )
 from sash.symbolic.state import ShellVar
 from sash.symb import starting_state
+from sash.fs import FileInfo, File, Dir, Del, Unknown, Read, Unread
 
 reporter.Reporter.initialize("<test>")
 

@@ -63,16 +63,16 @@ def test_field_normalization():
     path1 = create_field("/a/b/c/")
     path2 = create_field("/a/b/c")
 
-    assert path1.without_trailing_slash() == path2.without_trailing_slash()
+    assert path1.try_without_trailing_slash() == path2.try_without_trailing_slash()
 
 def test_field_normalization_with_glob():
     path1 = create_field("/a/b*/c/")
     path2 = create_field("/a/b*/c")
 
-    assert path1.without_trailing_slash() == path2.without_trailing_slash()
+    assert path1.try_without_trailing_slash() == path2.try_without_trailing_slash()
 
 def test_field_normalization_with_spaces():
     path1 = create_field("   /a/  b/ c/   ")
     path2 = create_field("   /a/  b/ c")
 
-    assert path1.without_trailing_slash() != path2.without_trailing_slash()
+    assert path1.try_without_trailing_slash() != path2.try_without_trailing_slash()

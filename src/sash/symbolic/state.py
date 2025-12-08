@@ -6,14 +6,13 @@ from typing import Any, Optional
 
 import shasta.ast_node as AST
 
+from sash.fs import FSModel, FSModelSimple
 from sash.symbolic.strings import Field, SymStr
 import sash.util as util
 from sash.constraints import (
     CommandExists,
     Constraint,
     Empty,
-    FSModel,
-    FSModelSimple,
     Implies,
     NormalizedFSConstraint,
     Not,

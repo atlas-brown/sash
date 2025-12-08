@@ -29,7 +29,7 @@ class SymStr:
                 last_was_str = False
         return True
 
-    def simplify(self) -> 'SymStr':
+    def simplify(self) -> "SymStr":
         if self.is_simple():
             return self
 
@@ -67,7 +67,7 @@ class ArbitraryType(Enum):
 class CompletelyArbitrary:
     source: FrozenAst
     kind: ArbitraryType
-    producing_state: 'State | None' # shouldn't ever result in cyclic data, because the state that is used to compute an arbitrary value should only ever be an ancester of the state the stores it, but beware
+    producing_state: "State | None" # shouldn't ever result in cyclic data, because the state that is used to compute an arbitrary value should only ever be an ancester of the state the stores it, but beware
     prefix: SymStr | None = None
     suffix: SymStr | None = None
 
@@ -101,7 +101,7 @@ class Field:
     content: SymStr | CompletelyArbitrary
     count: WordCount
 
-    def quote(self) -> 'Field':
+    def quote(self) -> "Field":
         return Field(self.content, WordCount(min(self.count.min, 1),
                                              min(self.count.max, 1)))
 
@@ -115,7 +115,7 @@ class Field:
             case _:
                 return None
 
-    def without_trailing_slash(self) -> 'Field':
+    def try_without_trailing_slash(self) -> "Field":
         if isinstance(self.content, SymStr) and isinstance(self.content.parts[-1], str):
             # only remove trailing slash if it's part of a string literal at the end
             first_parts = self.content.parts[:-1]
@@ -128,5 +128,5 @@ class Field:
         return self
 
     @staticmethod
-    def create_constant(s: str, words: int = 1) -> 'Field':
+    def create_constant(s: str, words: int = 1) -> "Field":
         return Field(SymStr((s,)), WordCount(words, words))

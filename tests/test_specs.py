@@ -4,6 +4,7 @@ from pprint import pformat
 import z3
 from hypothesis import assume, given, settings
 from hypothesis import strategies as st
+from sash.fs import FSModelSimple
 import sash.symbolic.strings
 from sash.symbolic.strings import Field
 from util import create_field, create_symstr
@@ -21,7 +22,7 @@ from sash.constraints import (
     Or,
 )
 from sash.solver import assertion_to_z3
-from sash.symbolic.state import Assertion, FSModelSimple, State
+from sash.symbolic.state import Assertion, State
 
 # Nice little message for copilot:
 #   check: (essentially) the precondition that must hold for a command to succeed, but not exactly

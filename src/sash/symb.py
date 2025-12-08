@@ -11,6 +11,7 @@ from copy import deepcopy
 
 import shasta.ast_node as AST
 
+from sash.fs import FSModel, FSModelSimple
 import sash.parser as parser
 import sash.reporter as reporter
 from sash.symbolic.strings import ArbitraryType, CompletelyArbitrary, Field, SymStr, SymVar, WordCount
