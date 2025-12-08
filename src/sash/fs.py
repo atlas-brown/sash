@@ -29,16 +29,16 @@ class FSModel():
     def apply_postcondition(self, norm_constraints: NormalizedConstraint) -> "FSModel":
         return self
 
-    def is_file_z3(self, path_z3) -> 'z3.ExprRef':
+    def is_file_z3(self, path_z3, strict: bool = False) -> 'z3.ExprRef':
         return z3.BoolVal(False)
 
-    def is_dir_z3(self, path_z3) -> 'z3.ExprRef':
+    def is_dir_z3(self, path_z3, strict: bool = False) -> 'z3.ExprRef':
         return z3.BoolVal(False)
 
-    def is_deleted_z3(self, path_z3) -> 'z3.ExprRef':
+    def is_deleted_z3(self, path_z3, strict: bool = False) -> 'z3.ExprRef':
         return z3.BoolVal(False)
 
-    def is_read_z3(self, path_z3) -> 'z3.ExprRef':
+    def is_read_z3(self, path_z3, strict: bool = False) -> 'z3.ExprRef':
         return z3.BoolVal(False)
 
     def state_to_z3(self) -> 'z3.ExprRef':
@@ -161,19 +161,27 @@ class FSModelSimple(FSModel):
     def apply_postcondition(self, norm_constraints: NormalizedConstraint) -> FSModel:
         return self._apply_postcondition(norm_constraints.constraint)
 
-    def is_file_z3(self, path_z3) -> 'z3.ExprRef':
+    def is_file_z3(self, path_z3, strict: bool = False) -> 'z3.ExprRef':
+        if strict:
+            return FileInfo.state(z3.Select(self.history[-1][0], path_z3)) == File
         return z3.Or(FileInfo.state(z3.Select(self.history[-1][0], path_z3)) == File, FileInfo.state(z3.Select(self.history[-1][0], path_z3)) == Unknown)
 
-    def is_dir_z3(self, path_z3) -> 'z3.ExprRef':
+    def is_dir_z3(self, path_z3, strict: bool = False) -> 'z3.ExprRef':
+        if strict:
+            return FileInfo.state(z3.Select(self.history[-1][0], path_z3)) == Dir
         return z3.Or(FileInfo.state(z3.Select(self.history[-1][0], path_z3)) == Dir, FileInfo.state(z3.Select(self.history[-1][0], path_z3)) == Unknown)
 
-    def is_deleted_z3(self, path_z3) -> 'z3.ExprRef':
+    def is_deleted_z3(self, path_z3, strict: bool = False) -> 'z3.ExprRef':
+        if strict:
+            return FileInfo.state(z3.Select(self.history[-1][0], path_z3)) == Del
         return z3.Or(FileInfo.state(z3.Select(self.history[-1][0], path_z3)) == Del, FileInfo.state(z3.Select(self.history[-1][0], path_z3)) == Unknown)
 
-    def is_read_z3(self, path_z3) -> 'z3.ExprRef':
+    def is_read_z3(self, path_z3, strict: bool = False) -> 'z3.ExprRef':
         is_file_and_read = z3.And(FileInfo.state(z3.Select(self.history[-1][0], path_z3)) == File,
                       FileInfo.status(z3.Select(self.history[-1][0], path_z3)) == Read)
         is_unknown = FileInfo.state(z3.Select(self.history[-1][0], path_z3)) == Unknown
+        if strict:
+            return is_file_and_read
         return z3.Or(is_file_and_read, is_unknown)
 
     def _fs_constraint_z3(self, constraint: Constraint) -> 'z3.ExprRef':
