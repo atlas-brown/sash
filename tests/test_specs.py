@@ -17,7 +17,6 @@ from sash.constraints import (
     IsDeleted,
     IsFile,
     IsUnread,
-    NormalizedFSConstraint,
     Not,
     Or,
 )
@@ -34,8 +33,8 @@ from sash.symbolic.state import Assertion, State
 def sanity_check_spec_constraints(cmd_spec: specs.CmdSpec):
     fs_model = FSModelSimple(lambda _: z3.FreshConst(z3.StringSort(), "field"))
 
-    fs_model.apply_postcondition(NormalizedFSConstraint(cmd_spec.success_postcond))
-    fs_model.apply_postcondition(NormalizedFSConstraint(cmd_spec.failure_postcond))
+    fs_model.apply_postcondition(cmd_spec.success_postcond.normalized())
+    fs_model.apply_postcondition(cmd_spec.failure_postcond.normalized())
 
     assertion_to_z3(Assertion(
         producing_state=State(fs_model=fs_model),

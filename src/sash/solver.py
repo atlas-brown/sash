@@ -84,7 +84,7 @@ def constraint_to_z3(constraint: Constraint, s: State) -> z3.ExprRef:
                               constraint, type(constraint))
                 return z3.BoolVal(True)
 
-    return norm_constraint_to_z3(NormalizedFSConstraint(constraint).constraint, s)
+    return norm_constraint_to_z3(constraint.normalized().constraint, s)
 
 def state_to_z3(s: State) -> z3.ExprRef:
     if logging.getLogger().isEnabledFor(logging.DEBUG):

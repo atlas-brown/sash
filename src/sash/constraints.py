@@ -1,5 +1,3 @@
-from __future__ import annotations  # for postponed evaluation of annotations
-
 import functools
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
@@ -12,20 +10,76 @@ from sash.symbolic.strings import Field
 class Constraint:
 
     # A & B (and)
-    def __and__(self, other: Constraint) -> And:
+    def __and__(self, other: "Constraint") -> "And":
         return And(self, other)
 
     # A | B (or)
-    def __or__(self, other: Constraint) -> Or:
+    def __or__(self, other: "Constraint") -> "Or":
         return Or(self, other)
 
     # ~A (not)
-    def __invert__(self) -> Not:
+    def __invert__(self) -> "Not":
         return Not(self)
 
     # A >> B (implies)
-    def __rshift__(self, other: Constraint) -> Implies:
+    def __rshift__(self, other: "Constraint") -> "Implies":
         return Implies(self, other)
+
+    def normalized(self) -> "NormalizedConstraint":
+        return NormalizedConstraint(self)
+
+
+@dataclass(frozen=True)
+class NormalizedConstraint(Constraint):
+    constraint: Constraint
+
+    def __post_init__(self):
+        def normalize(constraint: Constraint) -> Constraint:
+            match constraint:
+                # Already normalized
+                case Empty() | Description(_) | CommandExists(_):
+                    return constraint
+
+                # Push normalization recursively down the constraint tree
+                case And(lhs, rhs) | Or(lhs, rhs) | Implies(premise=lhs, conclusion=rhs):
+                    norm_lhs = normalize(lhs)
+                    norm_rhs = normalize(rhs)
+                    return type(constraint)(norm_lhs, norm_rhs)
+
+                # Double negation elimination
+                case Not(Not(c)):
+                    return normalize(c)
+
+                # Negation of basic FS constraints
+                case Not(IsDeleted(path)):
+                    return IsFile(path) | IsDir(path)
+                case Not(IsFile(path)):
+                    return IsDir(path) | IsDeleted(path)
+                case Not(IsDir(path)):
+                    return IsFile(path) | IsDeleted(path)
+
+                # De Morgan's laws
+                case Not(Or(lhs, rhs)):
+                    return normalize(Not(lhs) & Not(rhs))
+                case Not(And(lhs, rhs)):
+                    return normalize(Not(lhs) | Not(rhs))
+
+                # Negation of other constraints
+                case Not(c):
+                    return Not(normalize(c))
+
+                # Normalize paths by removing trailing slashes
+                case IsFile(path) | IsRead(path) | IsUnread(path) | IsWritten(path) | IsDir(path) | IsDeleted(path):
+                    norm_path = path.try_without_trailing_slash()
+                    return type(constraint)(norm_path)
+                case StringEq(lhs, rhs):
+                    norm_lhs = lhs.try_without_trailing_slash()
+                    norm_rhs = rhs.try_without_trailing_slash()
+                    return StringEq(norm_lhs, norm_rhs)
+
+            assert False, f"Unhandled constraint: {constraint}"
+
+        object.__setattr__(self, "constraint", normalize(self.constraint))
 
 
 @dataclass(frozen=True)
@@ -131,7 +185,7 @@ class IOType(Enum):
     UNKNOWN = auto()
 
     @staticmethod
-    def add_stdin(io: IOType) -> "IOType":
+    def add_stdin(io: "IOType") -> "IOType":
         match io:
             case IOType.NONE | IOType.UNKNOWN:
                 return IOType.STDIN
@@ -141,7 +195,7 @@ class IOType(Enum):
                 return io
 
     @staticmethod
-    def add_stdout(io: IOType) -> "IOType":
+    def add_stdout(io: "IOType") -> "IOType":
         match io:
             case IOType.NONE | IOType.UNKNOWN:
                 return IOType.STDOUT
@@ -151,7 +205,7 @@ class IOType(Enum):
                 return io
 
     @staticmethod
-    def remove_stdin(io: IOType) -> "IOType":
+    def remove_stdin(io: "IOType") -> "IOType":
         match io:
             case IOType.STDIN:
                 return IOType.NONE
@@ -161,7 +215,7 @@ class IOType(Enum):
                 return io
 
     @staticmethod
-    def remove_stdout(io: IOType) -> "IOType":
+    def remove_stdout(io: "IOType") -> "IOType":
         match io:
             case IOType.STDOUT:
                 return IOType.NONE
@@ -174,50 +228,3 @@ class IOType(Enum):
 @dataclass(frozen=True)
 class Description(Constraint):
     text: str
-
-
-def normalize_fs_constraints(constraints: Constraint) -> Constraint:
-    match constraints:
-        case And(lhs, rhs):
-            return And(normalize_fs_constraints(lhs), normalize_fs_constraints(rhs))
-        case Or(lhs, rhs):
-            return Or(normalize_fs_constraints(lhs), normalize_fs_constraints(rhs))
-        case Implies(premise, conclusion):
-            return Implies(normalize_fs_constraints(premise), normalize_fs_constraints(conclusion))
-        case Not(Not(c)):
-            return normalize_fs_constraints(c)
-        case Not(IsDeleted(path)):
-            return IsFile(path) | IsDir(path)
-        case Not(IsFile(path)):
-            return IsDeleted(path) | IsDir(path)
-        case Not(IsDir(path)):
-            return IsDeleted(path) | IsFile(path)
-        case Not(IsUnread(path)):
-            return IsRead(path)
-        case Not(Or(lhs, rhs)):
-            return normalize_fs_constraints(Not(lhs)) & normalize_fs_constraints(Not(rhs))
-        case Not(And(lhs, rhs)):
-            return normalize_fs_constraints(Not(lhs)) | normalize_fs_constraints(Not(rhs))
-        case Not(c):
-            return Not(normalize_fs_constraints(c))
-        case IsFile() | IsDir() | IsDeleted() | IsUnread() | IsRead() | IsWritten():
-            normalized_path = constraints.path.try_without_trailing_slash()
-            return type(constraints)(normalized_path)
-        case StringEq(lhs, rhs):
-            normalized_lhs = lhs.try_without_trailing_slash()
-            normalized_rhs = rhs.try_without_trailing_slash()
-            return StringEq(normalized_lhs, normalized_rhs)
-        case Empty() | Description() | CommandExists():
-            return constraints
-        case _:
-            assert False, f"Unhandled constraint: {constraints}"
-            return constraints
-
-
-@dataclass(frozen=True)
-class NormalizedFSConstraint(Constraint):
-    constraint: Constraint
-
-    def __post_init__(self):
-        normalized = normalize_fs_constraints(self.constraint)
-        object.__setattr__(self, 'constraint', normalized)

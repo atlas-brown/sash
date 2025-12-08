@@ -14,9 +14,7 @@ from sash.constraints import (
     Constraint,
     Empty,
     Implies,
-    NormalizedFSConstraint,
     Not,
-    normalize_fs_constraints,
 )
 from sash.frozen import FrozenAst, FrozenDict
 @dataclass(frozen=True)
@@ -133,7 +131,7 @@ class State:
         return replace(self, opts=self.opts.set_options(options))
 
     def update_fs(self, constraints: Constraint) -> 'State':
-        return replace(self, fs_model=self.fs_model.apply_postcondition(NormalizedFSConstraint(constraints)))
+        return replace(self, fs_model=self.fs_model.apply_postcondition(constraints.normalized()))
 
     def set_last_exit_code(self, code: SymStr, confidence: Confidence, failure_postcond: Optional[Constraint] = None) -> 'State':
         return replace(self,
@@ -164,7 +162,7 @@ class State:
         return replace(self, known_existing_commands=self.known_existing_commands - {name})
 
     def update_known_commands(self, spec: Constraint) -> 'State':
-        norm_spec = normalize_fs_constraints(spec) # turns ~(a & b) into (~a | ~b), removes double negations, etc.
+        norm_spec = spec.normalized() # turns ~(a & b) into (~a | ~b), removes double negations, etc.
 
         updated_state = self
 

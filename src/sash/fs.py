@@ -18,7 +18,7 @@ from sash.constraints import (
     IsRead,
     IsUnread,
     IsWritten,
-    NormalizedFSConstraint,
+    NormalizedConstraint,
     Not,
     Or,
     StringEq,
@@ -28,7 +28,7 @@ from sash.symbolic.strings import Field
 
 @dataclass(frozen=True)
 class FSModel():
-    def apply_postcondition(self, norm_constraints: NormalizedFSConstraint) -> "FSModel":
+    def apply_postcondition(self, norm_constraints: NormalizedConstraint) -> "FSModel":
         return self
 
     def is_file_z3(self, path_z3) -> 'z3.ExprRef':
@@ -164,7 +164,7 @@ class FSModelSimple(FSModel):
                 assert False, f"Unhandled FS postcondition: {constraints}"
         return self
 
-    def apply_postcondition(self, norm_constraints: NormalizedFSConstraint) -> FSModel:
+    def apply_postcondition(self, norm_constraints: NormalizedConstraint) -> FSModel:
         return self._apply_postcondition(norm_constraints.constraint)
 
     def is_file_z3(self, path_z3) -> 'z3.ExprRef':
