@@ -1192,6 +1192,7 @@ def interp_node(traces: Traces,
                     # Conservatively assume the file is opened for reading
                     t_precond = t.extend(t.latest_state.add_assertion(And.from_field_iter(redir_args, lambda op: ~IsDir(op)), source_str=node.pretty(), source_line=context_line))
                     t_postcond = t_precond.extend(t_precond.latest_state.update_fs(And.from_field_iter(redir_args, IsRead)))
+
                 else:
                     assert False, f"Unexpected redirection type: {node.redir_type}"
 
