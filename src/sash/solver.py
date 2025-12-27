@@ -49,7 +49,7 @@ def _command_exists_to_z3(field: Field, s: State) -> z3.ExprRef:
     return command_exists_predicate(field_to_z3(field))
 
 
-def constraint_to_z3(constraint: Constraint, s: State, suppress_unknown: bool = False) -> z3.ExprRef:
+def constraint_to_z3(constraint: Constraint, s: State) -> z3.ExprRef:
     def norm_constraint_to_z3(constraint: Constraint, s: State):
         match constraint:
             case Empty():
@@ -57,7 +57,7 @@ def constraint_to_z3(constraint: Constraint, s: State, suppress_unknown: bool = 
             case CommandExists(name):
                 return _command_exists_to_z3(name, s)
             case IsRead(path):
-                return s.fs_model.is_read_z3(field_content_to_z3(path.content), suppress_unknown)
+                return s.fs_model.is_read_z3(field_content_to_z3(path.content))
             case Description(text):
                 # A no-op constraint with a message attached to it
                 return z3.FreshBool(f"description: {text}")
@@ -68,11 +68,11 @@ def constraint_to_z3(constraint: Constraint, s: State, suppress_unknown: bool = 
             case StringEq(lhs, rhs):
                 return field_content_to_z3(lhs.content) == field_content_to_z3(rhs.content)
             case IsFile(path):
-                return s.fs_model.is_file_z3(field_content_to_z3(path.content), suppress_unknown)
+                return s.fs_model.is_file_z3(field_content_to_z3(path.content))
             case IsDir(path):
-                return s.fs_model.is_dir_z3(field_content_to_z3(path.content), suppress_unknown)
+                return s.fs_model.is_dir_z3(field_content_to_z3(path.content))
             case IsDeleted(path):
-                return s.fs_model.is_deleted_z3(field_content_to_z3(path.content), suppress_unknown)
+                return s.fs_model.is_deleted_z3(field_content_to_z3(path.content))
             case Not(c):
                 return z3.Not(norm_constraint_to_z3(c, s))
             case Implies(premise, conclusion):
