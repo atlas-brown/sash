@@ -345,7 +345,7 @@ def grep_spec(cmd: CmdInvocation) -> CmdSpec:
     elif flags == set() and len(operands) >= 1: # grep pattern file...
         files = operands[1:]
         check = And.from_field_iter(files, IsFile)
-        success_postcond = And.from_field_iter(files, IsFile)
+        success_postcond = And.from_field_iter(files, IsRead)
         failure_postcond = Empty()
 
     else:
@@ -441,7 +441,7 @@ def touch_spec(cmd: CmdInvocation) -> CmdSpec:
     if flags == set(): # touch file...
         # NOTE: Touch does not create unread files since they are empty upon creation
         assertion    = Empty()
-        succ         = And.from_field_iter(operands, lambda p: IsDeleted(p) >> (IsFile(p) & IsRead(p)))
+        succ         = And.from_field_iter(operands, lambda p: IsDeleted(p) >> IsRead(p))
         succ_no_impl = And.from_field_iter(operands, lambda p: IsFile(p) | IsDir(p))
 
     elif flags == set(["-c"]): # touch -c file...
@@ -467,7 +467,7 @@ def cat_spec(cmd: CmdInvocation) -> CmdSpec:
 
     if flags == set(): # cat file...
         check            = And.from_field_iter(operands, IsFile)
-        success_postcond = And.from_field_iter(operands, lambda op: IsFile(op) & IsRead(op))
+        success_postcond = And.from_field_iter(operands, IsRead)
 
     else:
         return handle_non_posix(cmd)

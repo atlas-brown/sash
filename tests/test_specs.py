@@ -44,7 +44,7 @@ def sanity_check_spec_constraints(cmd_spec: specs.CmdSpec):
     ))
 
 
-def test_rm_spec__check_disallows_deleting_unreadable_files():
+def test_rm_spec__check_disallows_deleting_unread_files():
     cmd_name = create_symstr("rm")
     permutations_of_filenames = [
         [create_field(f"file{i}_{j}") for i in range(j)] for j in [1, 2, 10]
@@ -64,11 +64,9 @@ def test_rm_spec__check_disallows_deleting_unreadable_files():
         for filenames in permutations_of_filenames
     ]
 
-    # Every possible check that rm produces must disallow deleting unreadable files
-    # When -f is provided, the check takes the form of an implication, because operands don't need to be files (can be dirs or deleted)
-    # When -f is not provided, the check is a conjunction that requires operands to be files and not unreadable
+    # Every possible check that rm produces must disallow deleting unread files
     expected_checks_per_inv = [
-        [IsFile(f) >> IsRead(f) if "-f" in inv.flags else IsFile(f) & IsRead(f) for f in inv.operands]
+        [IsRead(f) for f in inv.operands]
         for inv in invocations
     ]
 
@@ -250,8 +248,6 @@ def constraint_contains(constraint, subconstraint) -> bool:
     ),
 )
 def test_hypothesis_specs_to_constraints_do_not_crash(cmd_name: str, args: list[str]):
-    import z3
-
     # Build Fields (first token is the command name)
     fields = tuple([Field.create_constant(cmd_name)] + [Field.create_constant(a) for a in args])
     cmd_spec = specs.get_spec(cmd_name, fields)
