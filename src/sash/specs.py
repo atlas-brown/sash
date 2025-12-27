@@ -675,6 +675,7 @@ def Field_trimR(f: Field, suffix: str) -> Field:
         case Field(SymStr(parts), wc) if len(parts) >= 1 and isinstance(parts[-1], str) and parts[-1].endswith(suffix):
             return Field(SymStr(parts[:-1] + (parts[-1][:-len(suffix)],)), wc)
         case _:
+            return f
             assert False, f"Attempted to trimr {suffix} from {f}, which doesn't have that suffix"
 
 
@@ -709,6 +710,8 @@ class Mv(Cmd):
 
         if "-t" in options or len(operands) > 2 or is_definitely_dir(dst) or any(will_definitely_expand(op) for op in srcs): # Todo: what if dst expands?
             # Moving to a directory
+            srcs = [Field_trimR(s, "/*") for s in srcs]
+
             assertion    = IsDir(dst) & And.from_field_iter(srcs, lambda src: ~IsDeleted(src))
             succ         = IsDir(dst) & And.from_field_iter(srcs, IsDeleted)
             succ_no_impl = succ
@@ -722,9 +725,6 @@ class Mv(Cmd):
                                (IsFile(srcs[0]) >> IsFile(dst)) & \
                                (IsDir(srcs[0]) >> IsDir(dst)))
             succ_no_impl = IsDeleted(srcs[0]) & (IsFile(dst) | IsDir(dst))
-
-            # Todo: Maybe handle case where path ends with '/*' (e.g. src/*) by "learning" that src is a dir?
-            #       Not necessarily correct though; consider 'mv src/* src dst' which would lead to a contradiction, where src is deleted and a directory at the same time
 
         return CmdSpec(assertion, succ, Empty(), io)
 
