@@ -180,6 +180,8 @@ class FSModelSimple(FSModel):
         match constraint:
             case IsFile(path):
                 return self.is_file_z3(self.field_to_z3(path))
+            case IsRead(path):
+                return self.is_read_z3(self.field_to_z3(path))
             case IsDir(path):
                 return self.is_dir_z3(self.field_to_z3(path))
             case IsDeleted(path):
