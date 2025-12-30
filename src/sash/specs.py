@@ -63,8 +63,11 @@ def parse_command(cmd_inv: tuple[Field, ...]) -> CmdInvocation:
     """
     logging.debug("Parsing command from fields: %s", cmd_inv)
 
+    str_field_map = {}
+
     stringified_cmd = ""
     for field in cmd_inv:
+        curr_field = ""
         match field.content:
             case SymStr(parts):
                 part_strs = []
@@ -77,13 +80,18 @@ def parse_command(cmd_inv: tuple[Field, ...]) -> CmdInvocation:
                                 s = f'"{s}"'
                             part_strs.append(s)
                         case SymVar(name):
+                            assert False
                             # TODO: This might not work when we handle SymVars
                             part_strs.append(f"${{{name}}}__idx__{cmd_inv.index(field)}")
-                stringified_cmd += f" {''.join(part_strs)}"
+                curr_field = "".join(part_strs)
             case CompletelyArbitrary():
-                stringified_cmd += f" $arbitrary__idx__{cmd_inv.index(field)}"
-            case _:
-                stringified_cmd += " $UNKNOWN"
+                curr_field = f"$arbitrary__idx__{cmd_inv.index(field)}"
+
+        if curr_field in str_field_map:
+            assert str_field_map[curr_field] == field, "Same argument appeared twice in command but with a different corresponding field"
+
+        str_field_map[curr_field] = field
+        stringified_cmd += " " + curr_field
 
     cmd_parsed = pash_annot_parser.parse(stringified_cmd.strip())
     logging.debug("Parsed command: %s", cmd_parsed)
@@ -92,10 +100,14 @@ def parse_command(cmd_inv: tuple[Field, ...]) -> CmdInvocation:
     cmd_operands = []
 
     def get_corresponding_field(s: str) -> Field:
+        assert str_field_map[s] is not None, "Argument after parsing missing from map?"
+        return str_field_map[s]
+
         if "__idx__" in s:
             idx = int(s.split("__idx__")[-1])
             return cmd_inv[idx]
-        return Field(SymStr((s,)), WordCount(1,1))
+
+        return Field(SymStr((s,)), WordCount(1, 1))
 
     for flag_option in cmd_parsed.flag_option_list:
         match flag_option:
