@@ -128,7 +128,7 @@ stop() {
 		fi
 		echo
 	fi
-	rm -rf ${SQUID_PIDFILE_DIR:?}/*
+	rm -rf "${SQUID_PIDFILE_DIR:?}"/*
 	return $RETVAL
 }
 
@@ -141,7 +141,7 @@ restart() {
 	stop
 	RETVAL=$?
 	if [ $RETVAL -eq 0 ] ; then
-		rm -rf ${SQUID_PIDFILE_DIR:?}/*
+		rm -rf "${SQUID_PIDFILE_DIR:?}"/*
 		start
 	else
 		echo "Failure stopping squid or stopping squid took too long. Please check before restarting."
