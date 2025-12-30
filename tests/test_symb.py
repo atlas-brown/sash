@@ -479,12 +479,29 @@ myfunc foo
     assert_expected_report(report, [])
 
 def test_param_expansion_question_nonempty_no_error(tmp_path):
-    """Test that ${VAR:?} terminates execution when the variable is unset."""
+    """Test that ${VAR:?} continues when unset in symbolic mode and reports word-split."""
     script = write_script(tmp_path, """
 rm -rf ${SQUID_PIDFILE_DIR:?}/*
 """)
     report = reset_and_run_main(script)
-    assert_expected_report(report, [])
+    expected_error1 = reporter.WordSplitCouldDeleteSystemFile("/*", 0)
+    expected_error2 = reporter.DangerousWordSplit(None, 0)
+    assert_expected_report(report, [expected_error1, expected_error2])
+
+def test_param_expansion_question_empty_policy_exits(tmp_path):
+    """Test that ${VAR:?} exits early under EMPTY unbound policy without rm warnings."""
+    script = write_script(tmp_path, """
+rm -rf ${SQUID_PIDFILE_DIR:?}/*
+rm -rf /usr
+""")
+    reporter.Reporter.reset()
+    reporter.Reporter.initialize(script)
+    config = symb.InterpConfig(unbound_policy=symb.UnboundVariablePolicy.EMPTY, DFS_first=False)
+    res = symb.symbexec_file(script, config, stop=None)
+    assert res.status == symb.SymbexecStatus.COMPLETED
+    report = reporter.Reporter.get_report()
+    expected_error = reporter.DeadCode(None, 0)
+    assert_expected_report(report, [expected_error])
 
 def test_param_expansion_question_terminates_empty(tmp_path):
     """Test that ${VAR:?} terminates execution if the variable is empty or unset."""
@@ -504,7 +521,7 @@ def test_question_nonempty(tmp_path):
     rm -rf /usr
     """)
     report = reset_and_run_main(script)
-    expected_error1 = reporter.DeadCode(None, 0)
+    expected_error1 = reporter.DeleteSystemFile("/usr", 0)
     assert_expected_report(report, [expected_error1])
 
 

@@ -174,8 +174,10 @@ def test_expand_question_var():
 
     expanded = expand_simple(script[0].arguments[0], state, config)
     assert len(expanded) == 1
-    # Unknown variables with ':?' terminate execution when unset
-    assert expanded[0][0] == []
+    assert expanded[0][0] == [Field(CompletelyArbitrary(freeze(script[0].arguments[0][0]),
+                                                  ArbitraryType.ENVIRONMENT,
+                                                  state),
+                              WordCount(1, float('inf')))]
 
 
 def test_expand_question_var_bound():
@@ -201,11 +203,12 @@ def test_expand_question_var_bound_unknown():
                                                                  ArbitraryType.ENVIRONMENT,
                                                                  state),
                                               WordCount(0, float('inf')))))
-    expanded = expand_simple_r(script[0].arguments[0], state, config)
-    assert expanded == [Field(CompletelyArbitrary(freeze(script[0].arguments[0][0]),
-                                                 ArbitraryType.ENVIRONMENT,
-                                                 state),
-                             WordCount(1, float('inf')))]
+    expanded = expand_simple(script[0].arguments[0], state, config)
+    assert len(expanded) == 1
+    assert expanded[0][0] == [Field(CompletelyArbitrary(freeze(script[0].arguments[0][0]),
+                                                      ArbitraryType.ENVIRONMENT,
+                                                      state),
+                                  WordCount(1, float('inf')))]
 
 
 def test_expand_question_var_empty():
@@ -430,7 +433,8 @@ def test_expand_undefined_quoted_glob_var():
     assert expanded == [Field(CompletelyArbitrary(freeze(script[0].arguments[1][0].arg[0]), # type: ignore
                                                  ArbitraryType.ENVIRONMENT,
                                                  state,
-                                                 suffix=SymStr(("*",))),
+                                                 suffix=SymStr(("*",)),
+                                                 quoted=True),
                              WordCount(0, 1))]
 
 

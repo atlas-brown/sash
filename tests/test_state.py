@@ -2,6 +2,7 @@
 Tests for state utilities.
 """
 from util import *
+from dataclasses import replace
 
 import sash.reporter as reporter
 from sash.state import (
@@ -43,11 +44,22 @@ def test_quote():
     assert Field(SymStr(("why hello there",)), WordCount(3, 3)).quote() == Field(SymStr(("why hello there",)), WordCount(1, 1))
     assert Field(SymStr(("singleword",)), WordCount(1, 1)).quote() == Field(SymStr(("singleword",)), WordCount(1, 1))
     arb = CompletelyArbitrary(None, ArbitraryType.APPROXIMATION, None)
-    assert Field(arb, WordCount(2, 5)).quote() == Field(arb, WordCount(1, 1))
-    assert Field(arb, WordCount(1, 1)).quote() == Field(arb, WordCount(1, 1))
-    assert Field(arb, WordCount(0, 5)).quote() == Field(arb, WordCount(0, 1))
-    assert Field(arb, WordCount(0, float('inf'))).quote() == Field(arb, WordCount(0, 1))
-    assert Field(arb, WordCount(0, 0)).quote() == Field(arb, WordCount(0, 0))
+    quoted = Field(arb, WordCount(2, 5)).quote()
+    assert quoted.count == WordCount(1, 1)
+    assert isinstance(quoted.content, CompletelyArbitrary)
+    assert quoted.content.quoted is True
+    quoted = Field(arb, WordCount(1, 1)).quote()
+    assert quoted.count == WordCount(1, 1)
+    assert quoted.content.quoted is True
+    quoted = Field(arb, WordCount(0, 5)).quote()
+    assert quoted.count == WordCount(0, 1)
+    assert quoted.content.quoted is True
+    quoted = Field(arb, WordCount(0, float('inf'))).quote()
+    assert quoted.count == WordCount(0, 1)
+    assert quoted.content.quoted is True
+    quoted = Field(arb, WordCount(0, 0)).quote()
+    assert quoted.count == WordCount(0, 0)
+    assert quoted.content.quoted is True
 
 
 
