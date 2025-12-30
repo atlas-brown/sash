@@ -4,10 +4,11 @@ from pprint import pformat
 import z3
 from hypothesis import assume, given, settings
 from hypothesis import strategies as st
+from sash import reporter
 from sash.fs import FSModelSimple
 import sash.symbolic.strings
 from sash.symbolic.strings import Field
-from util import create_field, create_symstr
+from util import assert_expected_report, create_field, create_symstr, reset_and_run_main, write_script
 
 import sash.specs as specs
 from sash.constraints import (
@@ -255,3 +256,26 @@ def test_hypothesis_specs_to_constraints_do_not_crash(cmd_name: str, args: list[
 
     assume(cmd_spec.success_postcond != Empty() or cmd_spec.failure_postcond != Empty())
     sanity_check_spec_constraints(cmd_spec)
+
+
+def test_access_after_mv_core(tmp_path):
+    script = write_script(tmp_path, """
+    mv /opt/actualbudget /opt/actualbudget_bak
+    mv actualbudget-actual-server-*/* /opt/actualbudget/
+    """)
+
+    report = reset_and_run_main(script, solver=True)
+    expected_report = reporter.UnsatisfiedPrecondition(None, "mv actualbudget-actual-server-*/* /opt/actualbudget/", None)
+    assert_expected_report(report, [expected_report])
+
+
+def test_access_after_mv_core_fixed(tmp_path):
+    script = write_script(tmp_path, """
+    mv /opt/actualbudget /opt/actualbudget_bak
+    mkdir /opt/actualbudget
+    mv actualbudget-actual-server-*/* /opt/actualbudget/
+    """)
+
+    report = reset_and_run_main(script, solver=True)
+    assert_expected_report(report, [])
+
