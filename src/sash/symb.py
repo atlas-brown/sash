@@ -156,10 +156,10 @@ def handle_rm(expanded_args: tuple[Field], trace: Trace, node: AST.CommandNode) 
         if (path := arg_field.try_to_str()) and is_protected(path):
             Reporter.add_issue(reporter.DeleteSystemFile(path, context_line))
         match arg_field:
-            case Field(CompletelyArbitrary(source=source), WordCount(max=m)) if m > 1:
+            case Field(CompletelyArbitrary(source=source, quoted=False), WordCount(max=m)) if m > 1:
                 Reporter.add_issue(reporter.DangerousWordSplit(source, context_line))
         match arg_field:
-            case Field(CompletelyArbitrary(prefix=pre, suffix=suf), WordCount(min, max)) if min == 0 or max > 1:
+            case Field(CompletelyArbitrary(prefix=pre, suffix=suf, quoted=q), WordCount(min, max)) if min == 0 or (max > 1 and not q):
                 if pre is not None and (path := pre.try_to_str()) and is_protected(path):
                     Reporter.add_issue(reporter.WordSplitCouldDeleteSystemFile(path, context_line))
                 if suf is not None and (path := suf.try_to_str()) and is_protected(path):
@@ -706,11 +706,10 @@ def expand_simple(stuff: list[AST.ArgChar],
                                     logging.debug("expansion: treating ${%s:?} with definitely non-empty value as normal", var.var)
                                     self.add_a_field(v.value)
                                 case something_not_constant:
-                                    # If $VAR might be empty, assume non-empty to continue (empty would terminate).
-                                    # NOTE: We do not fork on empty vs non-empty here; we only force min>=1.
-                                    logging.debug("expansion: treating ${%s:?} as non-empty to continue", var.var)
+                                    # If $VAR might be empty, force min>=1 to continue.
                                     match v.value:
                                         case Field(content, WordCount(min_words, max_words)):
+                                            logging.debug("expansion: treating ${%s:?} as non-empty to continue", var.var)
                                             self.add_a_field(Field(content,
                                                                    WordCount(max(min_words, 1), max_words)))
                                         case _:
@@ -739,10 +738,18 @@ def expand_simple(stuff: list[AST.ArgChar],
                             return [non_default, default]
                     elif var.fmt == "Question":
                         # This is the case that $VAR is unset
-                        # Script would exit here
-                        logging.debug("expansion: terminating due to unset var %s with ${:?}", var.var)
-                        self.state = self.state.terminate()
-                        return [self]
+                        if config.unbound_policy == UnboundVariablePolicy.EMPTY:
+                            # In the EMPTY pass, treat unset as definitely empty, so ${:?} terminates.
+                            logging.debug("expansion: terminating due to unset var %s with ${:?} (EMPTY policy)", var.var)
+                            self.state = self.state.terminate()
+                            return [self]
+                        else:
+                            # In the SYMBOLIC pass, assume it might be set and non-empty; do not terminate.
+                            logging.debug("expansion: treating unset var %s with ${:?} as non-empty to continue", var.var)
+                            self.add_a_field(Field(CompletelyArbitrary(freeze_thing(var),
+                                                                      ArbitraryType.ENVIRONMENT,
+                                                                      self.state),
+                                                   WordCount(1, inf)))
                     else:
                         # todo we should report path information
                         if not is_special_var(var.var):
@@ -944,9 +951,11 @@ def merge_partial_fields(fields: list[Field], sep: str | None = " ", state: Stat
         # multiple arbitraries -- give up and return a new arbitrary field
         arbitraries = [field for field in fields if isinstance(field.content, CompletelyArbitrary)]
         prefix, suffix = collect_prefixes_suffixes(fields)
+        quoted = all(a.content.quoted for a in arbitraries)
         arbitrary = Field(CompletelyArbitrary(freeze_thing([a.content.source for a in arbitraries]), # type: ignore
                                               ArbitraryType.APPROXIMATION,
-                                              state),
+                                              state,
+                                              quoted=quoted),
                           WordCount(0, inf))
         if prefix is not None:
             arbitrary = add_prefix(arbitrary, prefix)

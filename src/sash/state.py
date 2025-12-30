@@ -80,6 +80,7 @@ class CompletelyArbitrary:
     producing_state: 'State | None' # shouldn't ever result in cyclic data, because the state that is used to compute an arbitrary value should only ever be an ancester of the state the stores it, but beware
     prefix: SymStr | None = None
     suffix: SymStr | None = None
+    quoted: bool = False
 
     def __eq__(self, other):
         # If the state producing this is unknown, conservatively say it can't be equal to any other
@@ -91,13 +92,14 @@ class CompletelyArbitrary:
             and (self.kind == ArbitraryType.ENVIRONMENT or self.producing_state == other.producing_state) \
             and self.producing_state is not None \
             and self.prefix == other.prefix \
-            and self.suffix == other.suffix
+            and self.suffix == other.suffix \
+            and self.quoted == other.quoted
 
     def __hash__(self):
-        return hash((self.source, self.kind, self.producing_state if self.kind == ArbitraryType.APPROXIMATION else None, self.prefix, self.suffix))
+        return hash((self.source, self.kind, self.producing_state if self.kind == ArbitraryType.APPROXIMATION else None, self.prefix, self.suffix, self.quoted))
 
     def __repr__(self):
-        return f"CompletelyArbitrary(s`{repr(self.source)[:30]}`, {self.kind}, state<{hash(self.producing_state)}>, pre:{self.prefix}, suf:{self.suffix})"
+        return f"CompletelyArbitrary(s`{repr(self.source)[:30]}`, {self.kind}, state<{hash(self.producing_state)}>, pre:{self.prefix}, suf:{self.suffix}, q:{self.quoted})"
 
 @dataclass(frozen=True)
 class WordCount:
@@ -110,6 +112,9 @@ class Field:
     count: WordCount
 
     def quote(self) -> 'Field':
+        if isinstance(self.content, CompletelyArbitrary):
+            return Field(replace(self.content, quoted=True),
+                         WordCount(min(self.count.min, 1), min(self.count.max, 1)))
         return Field(self.content, WordCount(min(self.count.min, 1),
                                              min(self.count.max, 1)))
 
