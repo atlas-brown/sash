@@ -30,7 +30,13 @@ def handle_commandnode(traces: Traces,
     if logging.getLogger().isEnabledFor(logging.DEBUG):
         logging.debug("Handling command node %s with %d traces", trim_string_for_logging(node.pretty()), len(traces))
 
+    # Handle variable expansion before we evaluate the command itself
     t1, expanded_args = expand_args_dumb(traces, node.arguments, config)
+    t1_active = drop_terminated_traces(t1)
+    if not t1_active:
+        logging.debug("All traces terminated during expansion of %s", trim_string_for_logging(node.pretty()))
+        return t1
+    t1 = t1_active
     logging.debug("Expanded cmd to %s", expanded_args)
 
     if expanded_args and len(node.arguments) >= 2:
@@ -46,7 +52,7 @@ def handle_commandnode(traces: Traces,
         match expanded_args[0].try_to_str():
             case "rm":
                 logging.debug("Exploring all possible expansions of rm args")
-                expansions = expand_args(traces, node.arguments, config)
+                expansions = expand_args(t1, node.arguments, config)
                 simplified_expansions = collapse_equiv_trace_expansions(expansions)
                 cmd_traces = []
                 for arg_fields, traces in simplified_expansions.items():
@@ -690,19 +696,28 @@ def expand_simple(stuff: list[AST.ArgChar],
                             # This is the case of ${VAR:?errmessage}
                             match v.value:
                                 case Field(_, WordCount(0, 0)):
-                                    # If $VAR is empty, we need to report dead code (since the script would exit here)
-                                    logging.debug("expansion: reporting dead code due to ${%s:?} with definitely empty value", var.var)
-                                    Reporter.add_issue(reporter.DeadCode(var, context_line))
-                                    # todo: what to do here? for now assume not empty to continue analysis
-                                    self.add_a_field(arbitrary_field(var, ArbitraryType.APPROXIMATION, self.state, min_words=1))
+                                    # If $VAR is empty, the script would exit here
+                                    logging.debug("expansion: terminating due to ${%s:?} with definitely empty value", var.var)
+                                    # terminate trace; script would exit here
+                                    self.state = self.state.terminate()
+                                    return [self]
                                 case Field(SymStr(stuff), _) if all(isinstance(thing, str) for thing in stuff):
                                     # If $VAR cannot be empty, just use its value
                                     logging.debug("expansion: treating ${%s:?} with definitely non-empty value as normal", var.var)
                                     self.add_a_field(v.value)
                                 case something_not_constant:
-                                    # If $VAR _might_ be empty we treat it as if it can't be, because in the case where it's empty the script would not continue execution
-                                    # We do not report dead code here, because it's not definite (and that's the whole point of using ':?')
-                                    self.add_a_field(arbitrary_field(var, ArbitraryType.APPROXIMATION, self.state, min_words=1))
+                                    # If $VAR might be empty, assume non-empty to continue (empty would terminate).
+                                    # NOTE: We do not fork on empty vs non-empty here; we only force min>=1.
+                                    logging.debug("expansion: treating ${%s:?} as non-empty to continue", var.var)
+                                    match v.value:
+                                        case Field(content, WordCount(min_words, max_words)):
+                                            self.add_a_field(Field(content,
+                                                                   WordCount(max(min_words, 1), max_words)))
+                                        case _:
+                                            self.add_a_field(Field(CompletelyArbitrary(freeze_thing(var),
+                                                                                      ArbitraryType.APPROXIMATION,
+                                                                                      self.state),
+                                                                   WordCount(1, inf)))
                         else:
                             logging.info("expansion: treating var %s with unhandled fmt %s as completely arbitrary field", var.pretty(), var.fmt)
                             self.add_a_field(arbitrary_field(var, ArbitraryType.APPROXIMATION, self.state))
@@ -724,14 +739,10 @@ def expand_simple(stuff: list[AST.ArgChar],
                             return [non_default, default]
                     elif var.fmt == "Question":
                         # This is the case that $VAR is unset
-                        if config.unbound_policy == UnboundVariablePolicy.EMPTY:
-                            # Report dead code, since the script would exit here
-                            logging.debug("expansion: reporting dead code due to unset var %s with ${:?} and empty unbound policy", var.var)
-                            Reporter.add_issue(reporter.DeadCode(var, context_line))
-                            # todo: what to do here?
-                        else:
-                            logging.info("expansion: treating unset var %s with ${:?} as completely arbitrary with min_words=1", var.pretty())
-                            self.add_a_field(arbitrary_field(var, ArbitraryType.ENVIRONMENT, self.state, min_words=1))
+                        # Script would exit here
+                        logging.debug("expansion: terminating due to unset var %s with ${:?}", var.var)
+                        self.state = self.state.terminate()
+                        return [self]
                     else:
                         # todo we should report path information
                         if not is_special_var(var.var):
@@ -808,10 +819,15 @@ def expand_args_dumb(traces: Traces,
     """
     expanded_args: list[Field] = []
     res_traces = traces
+    terminated_traces: Traces = []
     for arg in args:
         expansions = expand(res_traces, arg, config)
         res_traces = [expansion[0] for expansion in expansions]
-        expanded_fields = [expansion[1] for expansion in expansions]
+        active_expansions = [expansion for expansion in expansions if not expansion[0].latest_state.terminated]
+        terminated_traces.extend([expansion[0] for expansion in expansions if expansion[0].latest_state.terminated])
+        if not active_expansions:
+            return terminated_traces, []
+        expanded_fields = [expansion[1] for expansion in active_expansions]
         # for each trace, we have a list of fields that this arg expands to
 
         # # Design 1: collapse each field individually across all traces
@@ -829,7 +845,7 @@ def expand_args_dumb(traces: Traces,
         else:
             # todo could be smarter about the ranges of word counts and prefix/suffix preservation, but wont do unless needed
             expanded_args.append(arbitrary_field(arg, ArbitraryType.APPROXIMATION, None))
-    return res_traces, expanded_args
+    return res_traces + terminated_traces, expanded_args
 
 def expand_args(traces: Traces,
                 args: list[list[AST.ArgChar]],

@@ -174,13 +174,8 @@ def test_expand_question_var():
 
     expanded = expand_simple(script[0].arguments[0], state, config)
     assert len(expanded) == 1
-    # Unknown variables with ':?' do not fork paths (because if they are unset the script exits)
-    assert all(len(expansion[1].pathcond) == 0 for expansion in expanded)
-    # Unknown variables with ':?' expand to non-empty arbitrary values
-    assert expanded[0][0] == [Field(CompletelyArbitrary(freeze(script[0].arguments[0][0]),
-                                                  ArbitraryType.ENVIRONMENT,
-                                                  state),
-                              WordCount(1, float('inf')))]
+    # Unknown variables with ':?' terminate execution when unset
+    assert expanded[0][0] == []
 
 
 def test_expand_question_var_bound():
@@ -208,7 +203,7 @@ def test_expand_question_var_bound_unknown():
                                               WordCount(0, float('inf')))))
     expanded = expand_simple_r(script[0].arguments[0], state, config)
     assert expanded == [Field(CompletelyArbitrary(freeze(script[0].arguments[0][0]),
-                                                 ArbitraryType.APPROXIMATION,
+                                                 ArbitraryType.ENVIRONMENT,
                                                  state),
                              WordCount(1, float('inf')))]
 
@@ -224,14 +219,10 @@ def test_expand_question_var_empty():
 
     state = state.set_env("A", ShellVar(constant_field("", 0)))
     expanded = expand_simple_r(script[0].arguments[0], state, config)
-    # Currently, we report a dead code issue and then assume the variable is non-empty
-    assert expanded == [Field(CompletelyArbitrary(freeze(script[0].arguments[0][0]),
-                                                 ArbitraryType.APPROXIMATION,
-                                                 state),
-                             WordCount(1, float('inf')))]
+    # If the variable is empty, expansion terminates and yields no fields
+    assert expanded == []
     report = reporter.Reporter.get_report()
-    assert len(report.issues) == 1 # Dead Code
-    assert isinstance(report.issues[0], reporter.DeadCode)
+    assert len(report.issues) == 0
 
 
 def test_expand_cmdsubst():

@@ -478,6 +478,35 @@ myfunc foo
     report = reset_and_run_main(script)
     assert_expected_report(report, [])
 
+def test_param_expansion_question_nonempty_no_error(tmp_path):
+    """Test that ${VAR:?} terminates execution when the variable is unset."""
+    script = write_script(tmp_path, """
+rm -rf ${SQUID_PIDFILE_DIR:?}/*
+""")
+    report = reset_and_run_main(script)
+    assert_expected_report(report, [])
+
+def test_param_expansion_question_terminates_empty(tmp_path):
+    """Test that ${VAR:?} terminates execution if the variable is empty or unset."""
+    script = write_script(tmp_path, """
+FOO=""
+rm -rf ${FOO:?}/*
+rm -rf /usr
+""")
+    report = reset_and_run_main(script)
+    expected_error1 = reporter.DeadCode(None, 0)
+    assert_expected_report(report, [expected_error1])
+
+def test_question_nonempty(tmp_path):
+    """Test that ${VAR:?} halts execution if VAR is unset."""
+    script = write_script(tmp_path, """
+    echo ${UNSET_VAR:?}
+    rm -rf /usr
+    """)
+    report = reset_and_run_main(script)
+    expected_error1 = reporter.DeadCode(None, 0)
+    assert_expected_report(report, [expected_error1])
+
 
 def test_double_rm(tmp_path):
     """Test that deleting the same file twice is reported."""
@@ -630,7 +659,8 @@ xargs -I thing rm somefile.txt thing
     assert len(res.traces) == 1
     assert len(res.traces[0].latest_state.assertions) == 2
     expected_warning = reporter.UnsatisfiedPrecondition(None, "rm somefile.txt thing", 0)
-    assert_expected_report(report, [expected_warning])
+    expected_warning2 = reporter.DangerousWordSplit(None, 0)
+    assert_expected_report(report, [expected_warning, expected_warning2])
 
 def test_grep_no_pattern(tmp_path):
     """Test that `grep` with no pattern is reported as an unexpected stdin issue."""
