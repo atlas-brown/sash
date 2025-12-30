@@ -1,0 +1,18 @@
+bugs:
+- line: 42
+  description: Branching on pipeline exit status with set -e
+
+notes:
+- In the "fixed" script, the condition is still constant, but for a different reason
+
+sources:
+- https://github.com/babun/babun/commit/4e49aebca73ff7d6ecb587a417945d21c4974a3f
+
+ground_truth:
+  errors:
+  - line: 42
+    code: const_cond
+    shellcheck:
+      detects: true
+      fixed_false_positive: true
+      code: SC2181

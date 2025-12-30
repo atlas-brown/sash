@@ -39,8 +39,8 @@ apply_git_config() {
 
 	for configKey in ${configMap}
 	do
-		git config --list | grep -q "$configKey" # fix: remove -e
-		if [ $? -ne 0 ]; then
+		git config --list | grep -q "$configKey"
+		if [ $? -ne 0 ]; then # bug here (still): due to `|| true`, this can never be true
 			configValue="${configKey}"
 			git config --global "$configKey" "$configValue"
 		fi
