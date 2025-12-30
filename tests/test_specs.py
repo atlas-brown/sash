@@ -279,3 +279,55 @@ def test_access_after_mv_core_fixed(tmp_path):
     report = reset_and_run_main(script, solver=True)
     assert_expected_report(report, [])
 
+
+def test_access_del_resource_core(tmp_path):
+    script = write_script(tmp_path, """
+    mkdir workingfolder
+    mv -f workingfolder/* /storage/sort_tv
+    rm -rf workingfolder
+    mv -f workingfolder/* /storage/sort_tv
+    """)
+
+    report = reset_and_run_main(script, solver=True)
+    expected_report = reporter.UnsatisfiedPrecondition(None, "mv -f workingfolder/* /storage/sort_tv", None)
+    assert_expected_report(report, [expected_report])
+
+
+def test_access_del_resource_core_fixed(tmp_path):
+    script = write_script(tmp_path, """
+    mkdir workingfolder
+    mv -f workingfolder/* /storage/sort_tv
+    mv -f workingfolder/* /storage/sort_tv
+    rm -rf workingfolder
+    """)
+
+    report = reset_and_run_main(script, solver=True)
+    assert_expected_report(report, [])
+
+
+def test_overwrite_file_4_core(tmp_path):
+    script = write_script(tmp_path, """
+    x=$0 # To suppress unbound variable error
+    echo "libname sasdata '$x';" > $x/chk.sas
+    echo "proc print data=sasdata.data ;" > $x/chk.sas
+    echo "run;" > $x/chk.sas
+    """)
+
+    report = reset_and_run_main(script, solver=True)
+    expected_reports: list[reporter.Issue] = [
+        reporter.UnsatisfiedPrecondition(None, 'echo "proc print data=sasdata.data ;" > $x/chk.sas', None),
+        reporter.UnsatisfiedPrecondition(None, 'echo "run;" > $x/chk.sas', None),
+    ]
+    assert_expected_report(report, expected_reports)
+
+
+def test_overwrite_file_4_core_fixed(tmp_path):
+    script = write_script(tmp_path, """
+    x=$0 # To suppress unbound variable error
+    echo "libname sasdata '$x';" > $x/chk.sas
+    echo "proc print data=sasdata.data ;" >> $x/chk.sas
+    echo "run;" >> $x/chk.sas
+    """)
+
+    report = reset_and_run_main(script, solver=True)
+    assert_expected_report(report, [])
