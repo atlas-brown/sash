@@ -60,6 +60,12 @@ def test_unbound_variable_setu(tmp_path):
     expected_error = reporter.UnboundIDSetU(foo_var.pretty(), 0)
     assert_expected_report(report, [expected_error])
 
+def test_unbound_variable_with_plus(tmp_path):
+    # Using an unset variable with `${VAR:+...}` should not produce an unbound error.
+    script = write_script(tmp_path, "echo ${FOO:+x}\n")
+    report = reset_and_run_main(script)
+    assert_expected_report(report, [])
+
 def test_delete_system_file(tmp_path):
     # Deleting a system file should produce a DeleteSystemFile error
     script = write_script(tmp_path, "rm /usr\n")

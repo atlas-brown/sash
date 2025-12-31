@@ -750,6 +750,10 @@ def expand_simple(stuff: list[AST.ArgChar],
                                                                       ArbitraryType.ENVIRONMENT,
                                                                       self.state),
                                                    WordCount(1, inf)))
+                    elif var.fmt == "Plus":
+                        # This is the case that $VAR is unset.
+                        logging.info("expansion: treating unset var %s with ${%s+...} as an empty string", var.pretty(), var.fmt)
+                        self.add_a_field(Field(SymStr(("", )), WordCount(0, 0)))
                     else:
                         # todo we should report path information
                         if not is_special_var(var.var):
