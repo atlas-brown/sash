@@ -94,8 +94,8 @@ def handle_commandnode(traces: Traces,
                         Reporter.add_issue(reporter.CommandCanOnlyFail(cmd_name, context_line))
                 t_precond = trace_map(t1, lambda s: s.add_assertion(spec.check, source_str=node.pretty(), source_line=context_line).update_known_commands(spec.check))
                 t_success = trace_map(t_precond,
-                                      lambda s: s.add_pathcond(spec.success_postcond)\
-                                                 .update_fs(spec.success_postcond)\
+                                      lambda s: s.update_fs(spec.success_postcond)\
+                                                 .add_pathcond(spec.success_postcond)\
                                                  .update_known_commands(spec.success_postcond)\
                                                  .set_last_exit_code(SymStr(("0",)),
                                                                      Confidence.DEFINITE if s.opts.is_set(SetOptions.NOFAIL) and not config.in_checked_position else Confidence.SPECULATIVE,
@@ -103,8 +103,8 @@ def handle_commandnode(traces: Traces,
                 t_failure = []
                 if config.in_checked_position:
                     t_failure = trace_map(t_precond,
-                                          lambda s: s.add_pathcond(spec.failure_postcond)\
-                                                     .update_fs(spec.failure_postcond)\
+                                          lambda s: s.update_fs(spec.failure_postcond)\
+                                                     .add_pathcond(spec.failure_postcond)\
                                                      .update_known_commands(spec.failure_postcond)\
                                                      .set_last_exit_code(SymStr(("1",)),
                                                                          Confidence.SPECULATIVE,
@@ -172,11 +172,11 @@ def handle_rm(expanded_args: tuple[Field], trace: Trace, node: AST.CommandNode) 
                         Reporter.add_issue(reporter.WordSplitCouldDeleteSystemFile(literal_path, context_line))
 
     return (
-        trace.extend(lambda s: s.add_pathcond(spec.success_postcond)\
-                                .update_fs(spec.success_postcond)\
+        trace.extend(lambda s: s.update_fs(spec.success_postcond)\
+                                .add_pathcond(spec.success_postcond)\
                                 .set_last_exit_code(SymStr(("0",)), Confidence.SPECULATIVE, spec.failure_postcond)),
-        trace.extend(lambda s: s.add_pathcond(spec.failure_postcond)\
-                                .update_fs(spec.failure_postcond)\
+        trace.extend(lambda s: s.update_fs(spec.failure_postcond)\
+                                .add_pathcond(spec.failure_postcond)\
                                 .set_last_exit_code(SymStr(("1",)), Confidence.SPECULATIVE, spec.failure_postcond))
     )
 
