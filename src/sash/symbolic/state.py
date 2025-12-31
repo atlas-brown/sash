@@ -15,6 +15,7 @@ from sash.constraints import (
     Empty,
     Implies,
     Not,
+    NormalizedConstraint,
 )
 from sash.frozen import FrozenAst, FrozenDict
 @dataclass(frozen=True)
@@ -163,6 +164,8 @@ class State:
 
     def update_known_commands(self, spec: Constraint) -> 'State':
         norm_spec = spec.normalized() # turns ~(a & b) into (~a | ~b), removes double negations, etc.
+        if isinstance(norm_spec, NormalizedConstraint):
+            norm_spec = norm_spec.constraint
 
         updated_state = self
 
