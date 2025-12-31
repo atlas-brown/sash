@@ -717,6 +717,25 @@ def expand_simple(stuff: list[AST.ArgChar],
                                                                                       ArbitraryType.APPROXIMATION,
                                                                                       self.state),
                                                                    WordCount(1, inf)))
+                        elif var.fmt == "Plus" and not var.null:
+                            # This is the case of `${VAR+word}`, where `VAR` is set: just expand to `word`.
+                            logging.debug("expansion: ${%s+word} with VAR set (non-colon form), expanding to word", var.var)
+                            Partial.add_the_default(self, var)
+                        elif var.fmt == "Plus" and var.null:
+                            # This is the case of `${VAR:+word}`, where `VAR` is set, we need to check whether it's empty or not and expand accordingly.
+                            match v.value:
+                                case Field(_, WordCount(0, 0)):
+                                    logging.debug("expansion: ${%s:+word} with VAR empty, returning empty", var.var)
+                                    self.add_a_field(Field(SymStr(("",)), WordCount(0, 0)))
+                                case Field(SymStr(stuff), _) if all(isinstance(thing, str) for thing in stuff):
+                                    logging.debug("expansion: ${%s:+word} with VAR non-empty, expanding to word", var.var)
+                                    Partial.add_the_default(self, var)
+                                case _:
+                                    logging.debug("expansion: forking on ${%s:+word} with potentially empty VAR", var.var)
+                                    empty_case, word_case = self.fork(Description(f"{var.var} is non-empty for :+ expansion"))
+                                    empty_case.add_a_field(Field(SymStr(("",)), WordCount(0, 0)))
+                                    Partial.add_the_default(word_case, var)
+                                    return [empty_case, word_case]
                         else:
                             logging.info("expansion: treating var %s with unhandled fmt %s as completely arbitrary field", var.pretty(), var.fmt)
                             self.add_a_field(arbitrary_field(var, ArbitraryType.APPROXIMATION, self.state))
@@ -751,9 +770,9 @@ def expand_simple(stuff: list[AST.ArgChar],
                                                                       self.state),
                                                    WordCount(1, inf)))
                     elif var.fmt == "Plus":
-                        # This is the case that $VAR is unset.
+                        # This is the case where $VAR is unset.
                         logging.info("expansion: treating unset var %s with ${%s+...} as an empty string", var.pretty(), var.fmt)
-                        self.add_a_field(Field(SymStr(("", )), WordCount(0, 0)))
+                        self.add_a_field(Field(SymStr(("",)), WordCount(0, 0)))
                     else:
                         # todo we should report path information
                         if not is_special_var(var.var):

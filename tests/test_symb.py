@@ -60,8 +60,14 @@ def test_unbound_variable_setu(tmp_path):
     expected_error = reporter.UnboundIDSetU(foo_var.pretty(), 0)
     assert_expected_report(report, [expected_error])
 
-def test_unbound_variable_with_plus(tmp_path):
-    # Using an unset variable with `${VAR:+...}` should not produce an unbound error.
+def test_unbound_variable_setu_with_plus(tmp_path):
+    # Using an unset variable with 'set -u' and `${VAR+word}` should not produce an unbound error.
+    script = write_script(tmp_path, "echo ${FOO+x}\n")
+    report = reset_and_run_main(script)
+    assert_expected_report(report, [])
+
+def test_unbound_variable_setu_with_plus_colon(tmp_path):
+    # Using an unset variable with 'set -u' and `${VAR:+word}` should not produce an unbound error.
     script = write_script(tmp_path, "echo ${FOO:+x}\n")
     report = reset_and_run_main(script)
     assert_expected_report(report, [])
