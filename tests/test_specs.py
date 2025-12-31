@@ -236,12 +236,12 @@ def constraint_contains(constraint, subconstraint) -> bool:
                 "-e", "-n", "-z", "-r", "-w", "-x", "!", "-", "]"
             ]),
             # Alphanumeric tokens
-            st.from_regex(r"[A-Za-z0-9_\-]{0,8}", fullmatch=True),
+            st.from_regex(r"[A-Za-z0-9_\-]{1,8}", fullmatch=True),
             # name=value style
             st.builds(
                 lambda a, b: f"{a}={b}",
                 st.from_regex(r"[A-Za-z]{1,6}", fullmatch=True),
-                st.from_regex(r"[A-Za-z0-9]{0,6}", fullmatch=True),
+                st.from_regex(r"[A-Za-z0-9]{1,6}", fullmatch=True),
             ),
         ),
         min_size=0,

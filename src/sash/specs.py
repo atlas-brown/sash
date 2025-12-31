@@ -5,6 +5,8 @@ from abc import ABC, abstractmethod
 from collections.abc import Callable
 from dataclasses import dataclass
 from math import inf
+import shlex
+from dataclasses import replace
 
 import shasta.ast_node as AST
 from pash_annotations.parser import parser as pash_annot_parser
@@ -64,7 +66,8 @@ def parse_command(cmd_inv: tuple[Field, ...]) -> CmdInvocation:
     logging.debug("Parsing command from fields: %s", cmd_inv)
 
     stringified_cmd = ""
-    for field in cmd_inv:
+    for i, field in enumerate(cmd_inv):
+        curr_field = ""
         match field.content:
             case SymStr(parts):
                 part_strs = []
@@ -79,11 +82,15 @@ def parse_command(cmd_inv: tuple[Field, ...]) -> CmdInvocation:
                         case SymVar(name):
                             # TODO: This might not work when we handle SymVars
                             part_strs.append(f"${{{name}}}__idx__{cmd_inv.index(field)}")
-                stringified_cmd += f" {''.join(part_strs)}"
+                curr_field = "".join(part_strs)
             case CompletelyArbitrary():
-                stringified_cmd += f" $arbitrary__idx__{cmd_inv.index(field)}"
-            case _:
-                stringified_cmd += " $UNKNOWN"
+                curr_field = f"$arbitrary__idx__{cmd_inv.index(field)}"
+
+        stringified_cmd += " " + curr_field
+
+    shlex_map = {}
+    for i, tok in enumerate(shlex.split(stringified_cmd)):
+        shlex_map[tok] = i
 
     cmd_parsed = pash_annot_parser.parse(stringified_cmd.strip())
     logging.debug("Parsed command: %s", cmd_parsed)
@@ -95,6 +102,7 @@ def parse_command(cmd_inv: tuple[Field, ...]) -> CmdInvocation:
         if "__idx__" in s:
             idx = int(s.split("__idx__")[-1])
             return cmd_inv[idx]
+        return cmd_inv[shlex_map[s]]
         return Field(SymStr((s,)), WordCount(1,1))
 
     for flag_option in cmd_parsed.flag_option_list:
