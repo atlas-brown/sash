@@ -1,4 +1,4 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from enum import Enum
 from typing import TYPE_CHECKING
 
@@ -70,6 +70,7 @@ class CompletelyArbitrary:
     producing_state: "State | None" # shouldn't ever result in cyclic data, because the state that is used to compute an arbitrary value should only ever be an ancester of the state the stores it, but beware
     prefix: SymStr | None = None
     suffix: SymStr | None = None
+    quoted: bool = False
 
     def __eq__(self, other):
         # If the state producing this is unknown, conservatively say it can't be equal to any other
@@ -81,13 +82,14 @@ class CompletelyArbitrary:
             and (self.kind == ArbitraryType.ENVIRONMENT or self.producing_state == other.producing_state) \
             and self.producing_state is not None \
             and self.prefix == other.prefix \
-            and self.suffix == other.suffix
+            and self.suffix == other.suffix \
+            and self.quoted == other.quoted
 
     def __hash__(self):
-        return hash((self.source, self.kind, self.producing_state if self.kind == ArbitraryType.APPROXIMATION else None, self.prefix, self.suffix))
+        return hash((self.source, self.kind, self.producing_state if self.kind == ArbitraryType.APPROXIMATION else None, self.prefix, self.suffix, self.quoted))
 
     def __repr__(self):
-        return f"CompletelyArbitrary(s`{repr(self.source)[:30]}`, {self.kind}, state<{hash(self.producing_state)}>, pre:{self.prefix}, suf:{self.suffix})"
+        return f"CompletelyArbitrary(s`{repr(self.source)[:30]}`, {self.kind}, state<{hash(self.producing_state)}>, pre:{self.prefix}, suf:{self.suffix}, quoted:{self.quoted})"
 
 
 @dataclass(frozen=True)
@@ -102,8 +104,15 @@ class Field:
     count: WordCount
 
     def quote(self) -> "Field":
-        return Field(self.content, WordCount(min(self.count.min, 1),
-                                             min(self.count.max, 1)))
+        content = self.content
+        if isinstance(content, CompletelyArbitrary) and not content.quoted:
+            content = replace(content, quoted=True)
+        max_words = min(self.count.max, 1)
+        min_words = min(self.count.min, 1)
+        if isinstance(content, CompletelyArbitrary) and content.quoted:
+            if max_words > 0:
+                min_words = max(min_words, 1)
+        return Field(content, WordCount(min_words, max_words))
 
     def is_constant(self) -> bool:
         return isinstance(self.content, SymStr) and all(isinstance(p, str) for p in self.content.parts) and self.count.min == self.count.max

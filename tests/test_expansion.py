@@ -436,7 +436,7 @@ def test_expand_undefined_quoted_glob_var():
                                                  state,
                                                  suffix=SymStr(("*",)),
                                                  quoted=True),
-                             WordCount(0, 1))]
+                             WordCount(1, 1))]
 
 
 # TODO: we need to keep track of the decisions about whether an unbound var is set or not (e.g. the below should only have 2 expansions, not 4)
