@@ -718,10 +718,19 @@ class Mv(Cmd):
 
         if "-t" in options or len(operands) > 2 or is_definitely_dir(dst) or any(will_definitely_expand(op) for op in srcs): # Todo: what if dst expands?
             # Moving to a directory
-            srcs = [Field_trimR(s, "/*") for s in srcs]
+            #srcs = [Field_trimR(s, "/*") for s in srcs]
+            glob_srcs = []
+            other_srcs = []
+            for src in srcs:
+                match src:
+                    case Field(SymStr(parts), wc) if len(parts) >= 1 and isinstance(parts[-1], str) and parts[-1].endswith("/*"):
+                        trimmed = Field_trimR(replace(src, count=WordCount(1 ,1)), "*")
+                        glob_srcs.append(trimmed)
+                    case _:
+                        other_srcs.append(src)
 
-            assertion    = IsDir(dst) & And.from_field_iter(srcs, lambda src: ~IsDeleted(src))
-            succ         = IsDir(dst) & And.from_field_iter(srcs, IsDeleted)
+            assertion    = IsDir(dst) & And.from_field_iter(other_srcs, lambda src: ~IsDeleted(src)) & And.from_field_iter(glob_srcs, IsDir)
+            succ         = IsDir(dst) & And.from_field_iter(other_srcs, IsDeleted)
             succ_no_impl = succ
         else:
             # Moving to a file or directory
