@@ -740,6 +740,19 @@ fi
     expected_errors = [reporter.CommandCanOnlyFail("mkdir", 0), reporter.UnboundID("FOO", 0)]
     assert_expected_report(report, expected_errors)
 
+def test_mkdir_always_fails_with_positional_dirname(tmp_path):
+    """Test that `mkdir` always fails when used with a positional parameter as the directory name."""
+    script = write_script(tmp_path, """
+dirName=$1
+if [ ! "$1" ]
+then
+    mkdir $1 || echo "error while creating dir"
+fi
+""")
+    report = reset_and_run_main(script, solver=True)
+    expected_error = reporter.CommandCanOnlyFail("mkdir", 0)
+    assert_expected_report(report, [expected_error])
+
 def test_mkdir_does_not_always_fail_with_conditional_dirname(tmp_path):
     """Test that `mkdir` does not always fail when used in a conditional with a check for directory existence."""
     script = write_script(tmp_path, """
@@ -752,6 +765,18 @@ fi
     report = reset_and_run_main(script, solver=True)
     expected_error = reporter.UnboundID("FOO", 0)
     assert_expected_report(report, [expected_error])
+
+def test_mkdir_does_not_always_fail_with_conditional_positional_dirname(tmp_path):
+    """Test that `mkdir` does not always fail when used in a conditional with a check for directory existence."""
+    script = write_script(tmp_path, """
+dirName=$1
+if [ ! -d "$1" ]
+then
+    mkdir $1 || echo "error while creating dir"
+fi
+""")
+    report = reset_and_run_main(script, solver=True)
+    assert_expected_report(report, [])
 
 def test_mkdir_produces_empty_output(tmp_path):
     """Test that `mkdir` with no verbose flag produces empty output if the argument is not empty."""

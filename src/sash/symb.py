@@ -99,14 +99,6 @@ def handle_commandnode(traces: Traces,
                             case _:
                                 return False
 
-                    def has_special_var():
-                        """Check if any operand of the command uses a special variable."""
-                        for arg in node.arguments[1:]:
-                            for char in arg:
-                                if isinstance(char, AST.VArgChar) and is_special_var(char.var):
-                                    return True
-                        return False
-
                     for trace, trace_expanded_args in trace_expansions:
                         if len(trace_expanded_args) > 0:
                             total_min_words = sum(f.count.min for f in trace_expanded_args[1:])
@@ -131,9 +123,6 @@ def handle_commandnode(traces: Traces,
                             if has_inf:
                                 # Prevent false positives when there are constraints that force some arguments to be empty.
                                 if any(check_if_constrained_to_empty(cond.constraint) for cond in trace.latest_state.pathcond):
-                                    continue
-                                # Prevent false positives when special variables are used.
-                                if has_special_var():
                                     continue
                                 has_sufficient_operands = True
                                 break
