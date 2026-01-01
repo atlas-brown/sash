@@ -191,26 +191,34 @@ def handle_rm(expanded_args: tuple[Field], trace: Trace, node: AST.CommandNode) 
     trace = trace.extend(lambda s: s.add_assertion(spec.check, source_str=node.pretty(), source_line=context_line))
 
     def is_protected(path):
-        return any(path in [p, p + "/", p + "/*"] for p in Config.get("PROTECTED_PATHS"))
+        protected_paths = [p for p in Config.get("PROTECTED_PATHS") if p != "/"] # TODO: Discuss this, `rm -rf /` does not do anything (depending on implementation), but we may want to flag it anyway
+        return any(path in [p, p + "/", p + "/*"] for p in protected_paths)
 
     for arg_idx, arg_field in enumerate(expanded_args[1:], start=1):
         if (path := arg_field.try_to_str()) and is_protected(path):
             Reporter.add_issue(reporter.DeleteSystemFile(path, context_line))
-        match arg_field:
-            case Field(CompletelyArbitrary(source=source, quoted=False), WordCount(max=m)) if m > 1:
-                Reporter.add_issue(reporter.DangerousWordSplit(source, context_line))
-        match arg_field:
-            case Field(CompletelyArbitrary(prefix=pre, suffix=suf, quoted=q), WordCount(min, max)) if min == 0 or (max > 1 and not q):
-                if pre is not None and (path := pre.try_to_str()) and is_protected(path):
+        def maybe_report_protected_split(content: CompletelyArbitrary, max_words: int | float) -> None:
+            maybe_empty = content.maybe_empty
+            if maybe_empty or (max_words > 1 and not content.quoted):
+                if content.prefix is not None and (path := content.prefix.try_to_str()) and is_protected(path):
                     Reporter.add_issue(reporter.WordSplitCouldDeleteSystemFile(path, context_line))
-                if suf is not None and (path := suf.try_to_str()) and is_protected(path):
+                if content.suffix is not None and (path := content.suffix.try_to_str()) and is_protected(path):
                     Reporter.add_issue(reporter.WordSplitCouldDeleteSystemFile(path, context_line))
                 # Handle cases like "${DESTDIR}${LIBDIR}/${CAMLP5N}" where the literal "/" is embedded between the prefixes and suffixes
                 # and gets untracked during merging (in `collect_prefixes_suffixes`).
-                if min == 0 and arg_idx < len(node.arguments):
+                if arg_idx < len(node.arguments):
                     literal_path = extract_literal_strings_from_arg(node.arguments[arg_idx])
                     if literal_path and is_protected(literal_path):
                         Reporter.add_issue(reporter.WordSplitCouldDeleteSystemFile(literal_path, context_line))
+
+        match arg_field:
+            case Field(CompletelyArbitrary() as content, WordCount(_, max_words)) if not content.quoted and max_words > 1:
+                Reporter.add_issue(reporter.DangerousWordSplit(content.source, context_line))
+                maybe_report_protected_split(content, max_words)
+            case Field(CompletelyArbitrary() as content, WordCount(_, max_words)):
+                maybe_report_protected_split(content, max_words)
+            case _:
+                pass
 
     return (
         trace.extend(lambda s: s.update_fs(spec.success_postcond)\

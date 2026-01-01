@@ -71,6 +71,7 @@ class CompletelyArbitrary:
     prefix: SymStr | None = None
     suffix: SymStr | None = None
     quoted: bool = False
+    maybe_empty: bool = False
 
     def __eq__(self, other):
         # If the state producing this is unknown, conservatively say it can't be equal to any other
@@ -83,13 +84,14 @@ class CompletelyArbitrary:
             and self.producing_state is not None \
             and self.prefix == other.prefix \
             and self.suffix == other.suffix \
-            and self.quoted == other.quoted
+            and self.quoted == other.quoted \
+            and self.maybe_empty == other.maybe_empty
 
     def __hash__(self):
-        return hash((self.source, self.kind, self.producing_state if self.kind == ArbitraryType.APPROXIMATION else None, self.prefix, self.suffix, self.quoted))
+        return hash((self.source, self.kind, self.producing_state if self.kind == ArbitraryType.APPROXIMATION else None, self.prefix, self.suffix, self.quoted, self.maybe_empty))
 
     def __repr__(self):
-        return f"CompletelyArbitrary(s`{repr(self.source)[:30]}`, {self.kind}, state<{hash(self.producing_state)}>, pre:{self.prefix}, suf:{self.suffix}, quoted:{self.quoted})"
+        return f"CompletelyArbitrary(s`{repr(self.source)[:30]}`, {self.kind}, state<{hash(self.producing_state)}>, pre:{self.prefix}, suf:{self.suffix}, quoted:{self.quoted}, maybe_empty:{self.maybe_empty})"
 
 
 @dataclass(frozen=True)
@@ -107,6 +109,8 @@ class Field:
         content = self.content
         if isinstance(content, CompletelyArbitrary) and not content.quoted:
             content = replace(content, quoted=True)
+        if isinstance(content, CompletelyArbitrary) and self.count.min == 0:
+            content = replace(content, maybe_empty=True)
         max_words = min(self.count.max, 1)
         min_words = min(self.count.min, 1)
         if isinstance(content, CompletelyArbitrary) and content.quoted:
