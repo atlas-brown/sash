@@ -82,8 +82,8 @@ install_nvm_as_script() {
   else
     echo "=> Downloading nvm as script to '$NVM_DIR'"
   fi
-  nvm_download -s "$NVM_SOURCE" -o "$NVM_DIR/nvm.sh" || {
-    echo >&2 "Failed to download '$NVM_SOURCE'.."
+  nvm_download -s "$local_NVM_SOURCE" -o "$NVM_DIR/nvm.sh" || {
+    echo >&2 "Failed to download '$local_NVM_SOURCE'.."
     unset local_NVM_SOURCE
     return 1
   }
