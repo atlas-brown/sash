@@ -436,36 +436,47 @@ def test_fundef_before_call__infunc_def_infunc_call_no_error(tmp_path):
     assert_expected_report(report, [])
 
 
-def test_const_cond_triggered_by_exit_code_simple(tmp_path):
-    """Test that a constant condition in an if statement based on exit code is detected."""
+def test_const_cond_triggered_by_exit_code_top_level(tmp_path):
+    """
+    Test that a constant condition in an if-statement,
+    based on the exit code of the immediately preceding command,
+    is detected.
+    """
     script = write_script(tmp_path, """
-echo "test" > /dev/null
+tempout=$($non-existent-command 2>$logfile)
 result="success"
 if [ $? -gt 0 ]; then
-    echo "This should never run"
+    echo "This is unreachable"
 fi
 """)
     report = reset_and_run_main(script)
-    expected_error1 = reporter.ConstantCondition(None, 0)
-    expected_error2 = reporter.DeadCode('echo "This should never run"', 0)
-    assert_expected_report(report, [expected_error1, expected_error2])
+    expected_error1 = reporter.UnboundID("non-existent-command", 0)
+    expected_error2 = reporter.UnboundID("logfile", 0)
+    expected_error3 = reporter.ConstantCondition(None, 0)
+    expected_error4 = reporter.DeadCode('echo "This is unreachable"', 0)
+    assert_expected_report(report, [expected_error1, expected_error2, expected_error3, expected_error4])
 
 
 def test_const_cond_triggered_by_exit_code_nested_if(tmp_path):
-    """Test that a constant condition in an if statement based on exit code is detected."""
+    """
+    Test that a constant condition in an if-statement,
+    based on the exit code of the immediately preceding command,
+    is detected.
+    """
     script = write_script(tmp_path, """
-if [ -e "var" ]; then
-    command1 | command2
-    status="done"
+if [ -e "file" ]; then
+    mkdir ""
+    status="all good (actually not)"
     if [ $? -gt 0 ]; then
-        echo "This should never run either"
+        echo "This is unreachable"
     fi
 fi
 """)
     report = reset_and_run_main(script)
-    expected_error1 = reporter.ConstantCondition(None, 0)
-    expected_error2 = reporter.DeadCode('echo "This should never run"', 0)
-    assert_expected_report(report, [expected_error1, expected_error2])
+    expected_error1 = reporter.CommandCanOnlyFail("mkdir", 0)
+    expected_error2 = reporter.ConstantCondition(None, 0)
+    expected_error3 = reporter.DeadCode('echo "This is unreachable"', 0)
+    assert_expected_report(report, [expected_error1, expected_error2, expected_error3])
 
 def test_const_cond_arg_eq(tmp_path):
     """Test that a constant condition in an if statement based on argument equality is detected."""
