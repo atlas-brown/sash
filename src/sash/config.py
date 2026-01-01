@@ -19,6 +19,7 @@ class Config:
     "PROTECTED_PATHS" : ["/", "/*",
                          "/bin",
                          "/etc","/sbin","/var","/lib","/lib64","/home"] + [usr_path + thing for usr_path in ["/usr", "/usr/local"] for thing in ["", "/bin","/sbin","/lib","/share", "/include"]],
+    "SAFE_OVERWRITE_PATHS": ["/dev/null", "/dev/stdout", "/dev/stderr"],
     }
     __setters = ["DEBUG","CREATE_Z3"]
 

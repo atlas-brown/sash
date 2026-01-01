@@ -648,6 +648,25 @@ def test_redirection_to_read_file(tmp_path):
     report = reset_and_run_main(script, solver=True)
     assert_expected_report(report, [])
 
+def test_redirection_to_safe_path_no_error(tmp_path):
+    """Test that redirecting output to safe paths like /dev/null does not error."""
+    script = write_script(tmp_path, """
+    echo "Hello" > /dev/null
+    echo "bug" > /dev/null
+    """)
+    report = reset_and_run_main(script, solver=True)
+    assert_expected_report(report, [])
+
+def test_redirection_to_normal_path_still_checked(tmp_path):
+    """Test that redirecting output to normal paths still enforces overwrite checks."""
+    script = write_script(tmp_path, """
+    echo "Hello" > /tmp/output.txt
+    echo "bug" > /tmp/output.txt
+    """)
+    report = reset_and_run_main(script, solver=True)
+    expected_error = reporter.UnsatisfiedPrecondition(None, 'echo "bug" > /tmp/output.txt', 0)
+    assert_expected_report(report, [expected_error])
+
 def test_mv_unread_file(tmp_path):
     """Test that moving a file that was not read produces an error."""
     script = write_script(tmp_path, """

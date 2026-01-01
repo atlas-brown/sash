@@ -1175,7 +1175,15 @@ def interp_node(traces: Traces,
             for t, redir_args in expand(traces, node.arg, config):
                 t_precond = t
                 if node.redir_type in ["To", "Clobber"]: # >, >|
-                    t_precond = t.extend(t.latest_state.add_assertion(And.from_field_iter(redir_args, lambda op: IsRead(op) | IsDeleted(op)), source_str=node.pretty(), source_line=context_line))
+                    safe_paths = Config.get("SAFE_OVERWRITE_PATHS")
+                    def not_safe_path(op: Field) -> Constraint:
+                        return And.from_iter(Not(StringEq(op, Field.create_constant(p, 1))) for p in safe_paths)
+
+                    t_precond = t.extend(t.latest_state.add_assertion(
+                        And.from_field_iter(redir_args, lambda op: Implies(not_safe_path(op), IsRead(op) | IsDeleted(op))),
+                        source_str=node.pretty(),
+                        source_line=context_line
+                    ))
                     t_postcond = t_precond.extend(t_precond.latest_state.update_fs(And.from_field_iter(redir_args, IsFile)))
 
                 elif node.redir_type == "Append": # >>
