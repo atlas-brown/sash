@@ -435,7 +435,8 @@ def test_expand_undefined_quoted_glob_var():
                                                  ArbitraryType.ENVIRONMENT,
                                                  state,
                                                  suffix=SymStr(("*",)),
-                                                 quoted=True),
+                                                 quoted=True,
+                                                 maybe_empty=True),
                              WordCount(1, 1))]
 
 

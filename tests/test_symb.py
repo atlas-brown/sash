@@ -109,9 +109,9 @@ if [ "$FOO" = "yes" ]; then
     A=yes
 else
     A=no
-fi
-rm -rf "$FOO/"
-""")
+    fi
+    rm -rf "$FOO/"
+    """)
     report = reset_and_run_main(script)
     expected_error = reporter.UnboundID(foo_var.pretty(), 0)
     assert_expected_report(report, [expected_error])
@@ -133,6 +133,14 @@ rm -rf "${DESTDIR}${LIBDIR}/${CAMLP5N}"
     expected_error2 = reporter.UnboundID("LIBDIR", 0)
     expected_error3 = reporter.UnboundID("CAMLP5N", 0)
     assert_expected_report(report, [expected_error1, expected_error2, expected_error3])
+
+    script = write_script(tmp_path, """
+STEAMROOT="$(cd /nope && echo $PWD)"
+rm -rf "$STEAMROOT/"*
+""")
+    report = reset_and_run_main(script)
+    expected_error = reporter.WordSplitCouldDeleteSystemFile("/*", 0)
+    assert_expected_report(report, [expected_error])
 
 def test_delete_splitting(tmp_path):
     script = write_script(tmp_path, "rm $UNQUOTED\n")
