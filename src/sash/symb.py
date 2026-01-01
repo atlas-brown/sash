@@ -88,11 +88,61 @@ def handle_commandnode(traces: Traces,
                                 if should_report:
                                     Reporter.add_issue(reporter.NotACommand(non_existent_cmd_name, context_line))
                 if spec.min_operands > 0:
-                    assert isinstance(cmd_name, str), "cmd_name should be str when a spec is found"
-                    total_min_words = sum(f.count.min for f in expanded_args[1:])
-                    # If the total minimum word count of operands is less than the minimum number of operands required for the command to succeed,
-                    # it means that the command can only fail (due to, for instance, empty or invalid arguments).
-                    if total_min_words < spec.min_operands:
+                    trace_expansions = expand_args(t1, node.arguments, config)
+                    has_sufficient_operands = False
+
+                    def check_if_constrained_to_empty(c: Constraint):
+                        """Check if a constraint constrains a field to be empty."""
+                        match c:
+                            case StringEq(_, rhs):
+                                return rhs == Field(SymStr(("",)), WordCount(0, 0)) or (isinstance(rhs.content, SymStr) and rhs.content.parts == ("",))
+                            case _:
+                                return False
+
+                    def has_special_var():
+                        """Check if any operand of the command uses a special variable."""
+                        for arg in node.arguments[1:]:
+                            for char in arg:
+                                if isinstance(char, AST.VArgChar) and is_special_var(char.var):
+                                    return True
+                        return False
+
+                    for trace, trace_expanded_args in trace_expansions:
+                        if len(trace_expanded_args) > 0:
+                            total_min_words = sum(f.count.min for f in trace_expanded_args[1:])
+                            # Short-circuit: if the minimum number of words is already sufficient, there is no need to check further.
+                            if spec.min_operands <= total_min_words:
+                                has_sufficient_operands = True
+                                break
+                            total_max_words: int | float = 0
+                            has_inf = False
+                            all_definitely_empty = True
+                            for f in trace_expanded_args[1:]:
+                                if f.count.max == inf:
+                                    has_inf = True
+                                    all_definitely_empty = False
+                                    break
+                                if f.count.max > 0:
+                                    all_definitely_empty = False
+                                total_max_words += f.count.max
+                            # If all operands are definitely empty, skip this trace.
+                            if all_definitely_empty:
+                                continue
+                            if has_inf:
+                                # Prevent false positives when there are constraints that force some arguments to be empty.
+                                if any(check_if_constrained_to_empty(cond.constraint) for cond in trace.latest_state.pathcond):
+                                    continue
+                                # Prevent false positives when special variables are used.
+                                if has_special_var():
+                                    continue
+                                has_sufficient_operands = True
+                                break
+                            # If the total maximum number of words is sufficient, then we should not report a `command_can_only_fail` issue.
+                            if total_max_words >= spec.min_operands:
+                                has_sufficient_operands = True
+                                break
+                    if not has_sufficient_operands:
+                        assert isinstance(cmd_name, str), "cmd_name should be str when a spec is found"
                         Reporter.add_issue(reporter.CommandCanOnlyFail(cmd_name, context_line))
                 t_precond = trace_map(t1, lambda s: s.add_assertion(spec.check, source_str=node.pretty(), source_line=context_line).update_known_commands(spec.check))
                 t_success = trace_map(t_precond,

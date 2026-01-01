@@ -727,13 +727,30 @@ echo $FOO
     expected_error1 = reporter.UnboundID(foo_var.pretty(), 1)
     assert_expected_report(report, [expected_error1])
 
-def test_mkdir_can_only_fail(tmp_path):
-    """Test that `mkdir` can only fail if the argument is empty."""
+def test_mkdir_always_fails_with_unbound_dirname(tmp_path):
+    """Test that `mkdir` always fails when used with an unbound variable as the directory name."""
     script = write_script(tmp_path, """
-mkdir $1
+dirName="$FOO"
+if [ ! "$dirName" ]
+then
+    mkdir $dirName || echo "error while creating dir"
+fi
 """)
     report = reset_and_run_main(script, solver=True)
-    expected_error = reporter.CommandCanOnlyFail("mkdir", 0)
+    expected_errors = [reporter.CommandCanOnlyFail("mkdir", 0), reporter.UnboundID("FOO", 0)]
+    assert_expected_report(report, expected_errors)
+
+def test_mkdir_does_not_always_fail_with_conditional_dirname(tmp_path):
+    """Test that `mkdir` does not always fail when used in a conditional with a check for directory existence."""
+    script = write_script(tmp_path, """
+dirName="$FOO"
+if [ ! -d "$dirName" ]
+then
+    mkdir $dirName || echo "error while creating dir"
+fi
+""")
+    report = reset_and_run_main(script, solver=True)
+    expected_error = reporter.UnboundID("FOO", 0)
     assert_expected_report(report, [expected_error])
 
 def test_mkdir_produces_empty_output(tmp_path):
