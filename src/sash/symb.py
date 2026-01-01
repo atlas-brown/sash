@@ -652,6 +652,17 @@ def expand_simple(stuff: list[AST.ArgChar],
                         res.append(continuing_partial)
                     return res
                 case AST.VArgChar() as var:
+                    def expand_default_value(partial: 'Partial') -> tuple[list[Field], State]:
+                        default_expansions = expand_inner(var.arg, Partial(False, partial.state))
+                        assert len(default_expansions) == 1, "default value expansion forking not implemented"
+                        default_fields, default_state = default_expansions[0].finish()
+                        return default_fields, default_state
+
+                    def assign_default_value(partial: 'Partial', default_fields: list[Field], default_state: State) -> None:
+                        partial.state = default_state.set_env(var.var, ShellVar(join_fields(default_fields)))
+                        for default_field in default_fields:
+                            partial.add_a_field(default_field)
+
                     if var.var == "?":
                         if self.state.last_exit_code[1] == Confidence.DEFINITE:
                             logging.debug("expansion: treating special var $? as constant due to definite confidence")
@@ -694,6 +705,28 @@ def expand_simple(stuff: list[AST.ArgChar],
                                     self.add_a_field(Field(SymStr(("0",)), WordCount(1, 1)))
                                 case "TrimR" | "TrimRMax" | "TrimL" | "TrimLMax":
                                     self.add_a_field(Field(SymStr(("",)), WordCount(0, 0)))
+                        elif var.fmt == "Assign":
+                            # This is the case of `${VAR:=word}` with VAR set.
+                            if not var.null:
+                                self.add_a_field(v.value)
+                            else:
+                                match v.value:
+                                    case Field(_, WordCount(0, 0)):
+                                        logging.debug("expansion: ${%s:=word} with VAR empty, assigning default", var.var)
+                                        default_fields, default_state = expand_default_value(self)
+                                        assign_default_value(self, default_fields, default_state)
+                                    case Field(SymStr(stuff), _) if all(isinstance(thing, str) for thing in stuff):
+                                        logging.debug("expansion: ${%s:=word} with VAR non-empty, using current value", var.var)
+                                        self.add_a_field(v.value)
+                                    case Field(content, WordCount(min_words, max_words)):
+                                        logging.debug("expansion: forking on ${%s:=word} with potentially empty VAR", var.var)
+                                        empty_case, non_empty = self.fork(Description(f"{var.var} is non-empty for := expansion"))
+                                        default_fields, default_state = expand_default_value(empty_case)
+                                        assign_default_value(empty_case, default_fields, default_state)
+                                        non_empty.add_a_field(Field(content, WordCount(max(min_words, 1), max_words)))
+                                        return [non_empty, empty_case]
+                                    case _:
+                                        self.add_a_field(v.value)
                         elif var.fmt == "Question" and (var.null or v.ghost):
                             # This is the case of ${VAR:?errmessage}
                             match v.value:
@@ -775,6 +808,11 @@ def expand_simple(stuff: list[AST.ArgChar],
                         # This is the case where $VAR is unset.
                         logging.info("expansion: treating unset var %s with ${%s+...} as an empty string", var.pretty(), var.fmt)
                         self.add_a_field(Field(SymStr(("",)), WordCount(0, 0)))
+                    elif var.fmt == "Assign":
+                        # This is the case where $VAR is unset and ${VAR:=word} assigns the default.
+                        logging.debug("expansion: ${%s:=word} with VAR unset, assigning default", var.var)
+                        default_fields, default_state = expand_default_value(self)
+                        assign_default_value(self, default_fields, default_state)
                     else:
                         # todo we should report path information
                         if not is_special_var(var.var):

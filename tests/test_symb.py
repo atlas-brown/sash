@@ -724,9 +724,8 @@ echo $FOO
 """)
     report = reset_and_run_main(script, solver=True)
     foo_assign_var = AST.VArgChar(fmt="Normal", null=True, var="FOO", arg=[])
-    expected_error1 = reporter.UnboundID(foo_assign_var.pretty(), 0)
-    expected_error2 = reporter.UnboundID(foo_var.pretty(), 1)
-    assert_expected_report(report, [expected_error1, expected_error2])
+    expected_error1 = reporter.UnboundID(foo_var.pretty(), 1)
+    assert_expected_report(report, [expected_error1])
 
 def test_mkdir_can_only_fail(tmp_path):
     """Test that `mkdir` can only fail if the argument is empty."""
