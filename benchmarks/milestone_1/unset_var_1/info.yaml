@@ -25,6 +25,7 @@ ground_truth:
   errors:
   - line: 37
     code: unbound
+    fix_clears: false
     shellcheck:
       detects: true
       fixed_false_positive: false

@@ -29,6 +29,7 @@ UNDERLINE = '\033[4m'
 class CheckResult(NamedTuple):
     code: str
     line: int | None
+    fix_clears: bool | None = None
 
     def __str__(self):
         return f"L{self.line}:{self.code}"
@@ -276,7 +277,9 @@ def process_benchmark(benchmark: Path, top: Path, symbexec_timeout: float | None
     shellcheck_results = []
     unknown_codes: list[str] = []
     if gt_exists:
-        expected_results = [r for r in load_expected_results(gt_path) if r.code not in out_of_scope_codes]
+        expected_results = [r for r in load_expected_results(gt_path) \
+                            if r.code not in out_of_scope_codes \
+                               and (r.fix_clears is not False if fixed_mode else True)]
         unknown_codes = [e.code for e in expected_results if e.code not in known_codes]
         shellcheck_results = load_shellcheck_results(gt_path)
 
@@ -407,13 +410,14 @@ def load_expected_results(gt_path) -> list[CheckResult]:
     for entry in data.get("ground_truth", []).get("errors", []):
         code = entry.get("code")
         line = entry.get("line")
+        fix_clears = entry.get("fix_clears", None)
         if entry.get("duplicate", False):
             continue
 
         if isinstance(code, str) and line is not None:
-            results.append(CheckResult(code=code, line=int(line)))
+            results.append(CheckResult(code=code, line=int(line), fix_clears=fix_clears))
         elif isinstance(code, list) and isinstance(line, list):
-            results.extend(CheckResult(code=c, line=int(l)) for c, l in zip(code, line))
+            results.extend(CheckResult(code=c, line=int(l), fix_clears=fix_clears) for c, l in zip(code, line))
     return results
 
 
