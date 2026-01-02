@@ -142,6 +142,11 @@ rm -rf "$STEAMROOT/"*
     expected_error = reporter.WordSplitCouldDeleteSystemFile("/*", 0)
     assert_expected_report(report, [expected_error])
 
+    script = write_script(tmp_path, 'rm -rf "$(echo `pwd`/)"\n')
+    report = reset_and_run_main(script)
+    expected_error = reporter.DeleteSystemFile("/home/", 0)
+    assert_expected_report(report, [expected_error])
+
 def test_delete_splitting(tmp_path):
     script = write_script(tmp_path, "rm $UNQUOTED\n")
     report = reset_and_run_main(script)

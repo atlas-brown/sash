@@ -181,6 +181,35 @@ def extract_literal_strings_from_arg(arg: list[AST.ArgChar]) -> str:
                 pass
     return "".join(result)
 
+# Case where the output string can be determined
+def word_count_from_output(output: str) -> WordCount:
+    if output == "":
+        return WordCount(0, 0)
+    words = output.split()
+    return WordCount(len(words), len(words))
+
+def command_substitution_output(cmd_name: str,
+                                operands: list[Field],
+                                state: State) -> Field | None:
+    if cmd_name == "pwd":
+        pwd_var = state.lookup("PWD")
+        if pwd_var is not None and (pwd_value := pwd_var.value.try_to_str()) is not None:
+            return Field(SymStr((pwd_value,)), word_count_from_output(pwd_value))
+        if Config.get("CONCRETE_CWD"):
+            cwd_path = Config.get("CWD_PATH")
+            return Field(SymStr((cwd_path,)), word_count_from_output(cwd_path))
+        return None
+
+    if cmd_name == "echo":
+        output_field = merge_partial_fields(operands, sep=" ", state=state) # TODO: sep should be from IFS
+        if (output_str := output_field.try_to_str()) is not None:
+            return Field(SymStr((output_str,)), word_count_from_output(output_str))
+        if isinstance(output_field.content, CompletelyArbitrary) and output_field.count.min == 0:
+            output_field = Field(replace(output_field.content, maybe_empty=True), output_field.count)
+        return output_field
+
+    return None
+
 def handle_rm(expanded_args: tuple[Field], trace: Trace, node: AST.CommandNode) -> tuple[Trace, Trace]:
     logging.debug("Checking rm command with expansion possibility: %s", expanded_args)
     spec = get_spec("rm", expanded_args)
@@ -879,6 +908,7 @@ def expand_simple(stuff: list[AST.ArgChar],
                     logging.info("expansion: treating backquote argchar %s as completely arbitrary field", b.pretty())
                     # todo use the trace: this case suggests we should really generalize the interface of `expand_simple` to be from one trace to many, instead of one state to many
                     t = guarded_interp_node([Trace((self.state,))], b.node, config)
+                    output_field = None
                     if isinstance(b.node, AST.CommandNode):
                         _, expanded_args = expand_args_dumb(t, b.node.arguments, config)
                         if expanded_args:
@@ -887,7 +917,15 @@ def expand_simple(stuff: list[AST.ArgChar],
                                 # Check the spec to see if the command has no stdout. If it does, report an issue.
                                 if spec.io in {IOType.NONE, IOType.STDIN}:
                                     Reporter.add_issue(reporter.CapturingEmptyOutput(cmd_name, context_line))
-                    self.add_a_field(arbitrary_field(b, ArbitraryType.APPROXIMATION, self.state))
+                            if isinstance(cmd_name, str):
+                                # Specific logic for a few key built-in commands whose output we can reason about
+                                output_field = command_substitution_output(cmd_name, expanded_args[1:], self.state)
+                    # We found one of our special commands with known output
+                    if output_field is not None:
+                        self.add_a_field(output_field)
+                    # Everything else is completely arbitrary
+                    else:
+                        self.add_a_field(arbitrary_field(b, ArbitraryType.APPROXIMATION, self.state))
                 case _:
                     logging.error("argchar: %s %s", argchar.pretty(), type(argchar))
                     logging.info("expansion: treating unhandled argchar as completely arbitrary field: %s", argchar.pretty())
