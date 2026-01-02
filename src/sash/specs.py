@@ -844,6 +844,8 @@ class Test(Cmd):
                         succ = IsFile(op) | IsDir(op)
                         fail = Empty()
                     case "-z":
+                        # TODO: (false positives) this test is often used to check if an env var is set, and if not to set it
+                        # to reason about this kind of usage, we should add a failure postcondition if `op` is a var capturing that it is defined and has a value
                         succ = StringEq(op, empty_str_var)
                         # nz-postcond is the negation of z-postcond
                     case _:

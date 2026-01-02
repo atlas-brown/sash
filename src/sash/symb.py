@@ -896,7 +896,9 @@ def expand_simple(stuff: list[AST.ArgChar],
                             Reporter.add_issue(error_code(var.pretty(), context_line))
                         if config.unbound_policy == UnboundVariablePolicy.EMPTY:
                             logging.info("expansion: treating unbound var %s as empty string due to config", var.pretty())
-                            self.add_a_field(Field(SymStr(("",)), WordCount(0, 0)))
+                            empty_str_field = Field(SymStr(("",)), WordCount(0, 0))
+                            self.add_a_field(empty_str_field)
+                            self.state = self.state.extend_localenv({var.var: ShellVar(empty_str_field, ghost=True)})
                         else:
                             arbitrary_for_this_var = arbitrary_field(var,
                                                                     ArbitraryType.APPROXIMATION if is_special_var(var.var) else ArbitraryType.ENVIRONMENT,
