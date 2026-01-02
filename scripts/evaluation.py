@@ -133,7 +133,7 @@ def main():
 
     # Process benchmarks in parallel
     num_cores = args.jobs if args.jobs else multiprocessing.cpu_count()
-    print(f"Running {len(benchmarks_to_run)} benchmarks in parallel using {num_cores} cores", file=sys.stderr)
+    print(f"Running {len(benchmarks_to_run)} benchmarks in parallel using {num_cores} core(s)", file=sys.stderr)
 
     with multiprocessing.Pool(processes=num_cores) as pool:
         run_results = pool.starmap(
