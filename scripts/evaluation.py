@@ -1,6 +1,7 @@
 #!/usr/bin/env -S uv run python3
 import argparse
 import json
+import multiprocessing
 import pathlib
 import re
 import subprocess
@@ -25,19 +26,45 @@ BOLD = '\033[1m'
 UNDERLINE = '\033[4m'
 
 
+class CheckResult(NamedTuple):
+    code: str
+    line: int | None
+
+    def __str__(self):
+        return f"L{self.line}:{self.code}"
+
+class RunResult(NamedTuple):
+    benchmark: str
+    missing_gt: bool | None
+    crashed: bool | None
+    timed_out: bool | None
+    time: float | None
+    exec_time: float | None
+    solver_time: float | None
+    detected_all: bool | None
+    expected_results: list[str] | None
+    actual_results: list[str] | None
+    shellcheck_codes: list[str] | None
+    line_numbers: list[int | None] | None
+    unknown_codes: list[str] | None = None
+    exception_traceback: str | None = None
+    report_issues: list | None = None
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('-t', '--timeout', type=float, default=None, help='Timeout in seconds for symbolic execution in each benchmark (default: no timeout)')
     parser.add_argument('-T', '--solver-timeout', type=float, default=None, help='Timeout in seconds for solving in each benchmark (default: no timeout)')
     parser.add_argument('-b', '--benchmarks', type=Path, default=None, help='Path to the benchmarks directory, relative to the git toplevel (default: <git_toplevel>/benchmarks)')
     parser.add_argument('-O', '--only', type=str, default=None, help='Regex to filter benchmarks to run (default: run all)')
-    parser.add_argument('-o', '--output', type=Path, default=None, help='File to write output to (default: stdout)')
+    parser.add_argument('-o', '--output', type=Path, default=None, help='CSV file to write results table to (default: stdout)')
     parser.add_argument('-G', '--ground-truth-only', action='store_true', help='Only run benchmarks that have ground truth defined (default: run all)')
     parser.add_argument('-V', '--verbose', action='store_true', help='Enable printing of error reports or exceptions that occur, and raw output when ground truth is missing (default: false)')
     parser.add_argument('-N', '--no-color', action='store_true', help='Disable colored output to stderr (default: false)')
     parser.add_argument('-e', '--error-log', type=Path, default=Path("/dev/null"), help='File to write error logs to (default: /dev/null)')
     parser.add_argument('-D', '--enable-dfs', action='store_true', help='Enable depth-first symbolic execution passes (default: false)')
     parser.add_argument('-f', '--fixed', action='store_true', help='Run the evaluation on the fixed versions of the benchmarks (default: false)')
+    parser.add_argument('-j', '--jobs', type=int, default=None, help='Number of parallel jobs (default: all available CPU cores)')
     args = parser.parse_args()
 
     if args.no_color:
@@ -89,117 +116,91 @@ def main():
     tota_exec_time = 0.0
     total_solver_time = 0.0
 
-    run_results = []
-
+    # Collect all benchmarks to run
+    benchmarks_to_run = []
     for benchmark in find_benchmarks(bench_dir):
         if benchmark_filter and not benchmark_filter.search(benchmark.as_posix()):
             continue
-
         if fixed:
             benchmark = benchmark.parent / "fixed.sh"
+        benchmarks_to_run.append(benchmark)
 
+    # Process benchmarks in parallel
+    num_cores = args.jobs if args.jobs else multiprocessing.cpu_count()
+    print(f"Running {len(benchmarks_to_run)} benchmarks in parallel using {num_cores} cores", file=sys.stderr)
+
+    with multiprocessing.Pool(processes=num_cores) as pool:
+        run_results = pool.starmap(
+            process_benchmark,
+            [(benchmark, top, symbexec_timeout, solver_timeout, error_log,
+              enable_dfs, out_of_scope_codes, known_codes, ground_truth_only, verbose, fixed)
+             for benchmark in benchmarks_to_run]
+        )
+
+    # Aggregate results
+    run_results = [r for r in run_results if r is not None]  # Filter out skipped benchmarks
+
+    for result in run_results:
         print(file=sys.stderr)
-        print(f"Benchmark: {MAGENTA}{benchmark.relative_to(top)}{RESET} (found in {top})", file=sys.stderr)
+        print(f"Benchmark: {MAGENTA}{result.benchmark}{RESET} (found in {top})", file=sys.stderr)
 
-        gt_path = benchmark.parent / "info.yaml"
-        gt_exists = gt_path.is_file()
-        if not gt_exists:
+        # Log unknown codes warning
+        if result.unknown_codes:
+            print_warn(f"Unknown in-scope codes in ground truth: {result.unknown_codes}", file=sys.stderr)
+
+        # Log no ground truth warning
+        if result.missing_gt:
             print_warn("No ground truth found", file=sys.stderr)
-            if ground_truth_only:
-                skipped += 1
-                continue
 
-        expected_results: list[CheckResult] = []
-        shellcheck_results = []
-        if gt_exists:
-            expected_results = [r for r in load_expected_results(gt_path) if r.code not in out_of_scope_codes]
-            unknown_codes = [e.code for e in expected_results if e.code not in known_codes]
-            if len(unknown_codes) > 0:
-                print_warn(f"Unknown in-scope codes in ground truth: {unknown_codes}", file=sys.stderr)
-
-            total_issues += len(expected_results)
-
-            shellcheck_results = load_shellcheck_results(gt_path)
-
-        try:
-            sash.reporter.Reporter.reset()
-            report = sash.main.main(benchmark.as_posix(),
-                                    timeout=symbexec_timeout, solver_timeout=solver_timeout,
-                                    log_level="error", log_file=error_log,
-                                    enable_dfs=enable_dfs)
-            tota_exec_time += report.time
-            total_solver_time += report.solver_time
-        except (AssertionError, BaseException) as e: # catch EVERYTHING, including KeyboardInterrupt
-            err_type = "AssertionError" if isinstance(e, AssertionError) else "Exception"
-
-            if isinstance(e, KeyboardInterrupt):
-                print_fail("KeyboardInterrupt received, exiting...", file=sys.stderr)
-                raise SystemExit(1)
-
-            print_fail(f"{err_type} raised during analysis{f': {e}' if verbose else ''}", file=sys.stderr)
+        # Process crash or exception
+        if result.crashed:
+            print_fail(f"Exception raised during analysis", file=sys.stderr)
+            if result.exception_traceback:
+                print(result.exception_traceback, file=sys.stderr)
             failed += 1
-
-            if verbose:
-                import traceback
-                traceback.print_exc(file=sys.stderr)
-
-            run_results.append(RunResult(
-                benchmark=benchmark.relative_to(top).as_posix(),
-                missing_gt=not gt_exists,
-                crashed=True,
-                timed_out=None,
-                time=None,
-                exec_time=None,
-                solver_time=None,
-                detected_all=None,
-                expected_results=[e.code for e in expected_results],
-                actual_results=None,
-                shellcheck_codes=shellcheck_results,
-                line_numbers=None
-            ))
-            continue
-
-        ran += 1
-
-        if report.timed_out:
-            print_warn(f"Analysis timed out; exec time: {report.time}s, solver time: {report.solver_time}s", file=sys.stderr)
-            timed_out += 1
         else:
-            print_info(f"Analysis completed; exec time: {report.time}s, solver time: {report.solver_time}s", file=sys.stderr)
+            ran += 1
 
-        actual_results: list[CheckResult] = [CheckResult(code=issue.code.value, line=issue.source_line) for issue in report.issues if issue.code.value not in out_of_scope_codes]
-        detected_issues_expected += len([e for e in expected_results if e in actual_results])
-        detected_issues_extra += len([a for a in actual_results if a not in expected_results])
-        detected_issues_extra_unsat_preconds += len([a for a in actual_results if a not in expected_results and a.code == "unsat_precond"])
-        detected_issues_extra_unset_vars += len([a for a in actual_results if a not in expected_results and a.code in ["unbound", "unbound_setu"]])
-        if gt_exists and all(e in actual_results for e in expected_results):
-            print_pass("All expected results detected", file=sys.stderr)
-            if verbose:
-                print_issue_details(benchmark.relative_to(top), report.issues, file=sys.stderr)
-        elif gt_exists:
-            print_fail(f"Missing expected results: {[r for r in expected_results if r not in actual_results]}", file=sys.stderr)
-            failed += 1
-            if verbose:
-                print_issue_details(benchmark.relative_to(top), report.issues, file=sys.stderr)
-        else:
-            if verbose:
-                print_info(f"Report: {json.dumps(report.to_dict(), indent=2)}", file=sys.stderr)
-            unknown += 1
+            # Log timeout or completion
+            if result.timed_out:
+                print_warn(f"Analysis timed out; exec time: {result.exec_time}s, solver time: {result.solver_time}s", file=sys.stderr)
+                timed_out += 1
+            else:
+                print_info(f"Analysis completed; exec time: {result.exec_time}s, solver time: {result.solver_time}s", file=sys.stderr)
 
-        run_results.append(RunResult(
-            benchmark=benchmark.relative_to(top).as_posix(),
-            missing_gt=not gt_exists,
-            crashed=False,
-            timed_out=report.timed_out,
-            time=report.time + report.solver_time,
-            exec_time=report.time,
-            solver_time=report.solver_time,
-            detected_all=gt_exists and all(code in actual_results for code in expected_results),
-            expected_results=[e.code for e in expected_results],
-            actual_results=[a.code for a in actual_results],
-            shellcheck_codes=shellcheck_results,
-            line_numbers=[a.line for a in actual_results]
-        ))
+            tota_exec_time += result.exec_time or 0
+            total_solver_time += result.solver_time or 0
+
+            # Count issues and log pass/fail
+            if result.expected_results:
+                expected_set = set(result.expected_results)
+                actual_set = set(result.actual_results) if result.actual_results else set()
+                total_issues += len(expected_set)
+                detected_issues_expected += len([e for e in expected_set if e in actual_set])
+                if result.actual_results:
+                    detected_issues_extra += len([a for a in actual_set if a not in expected_set])
+                    detected_issues_extra_unsat_preconds += len([a for a in actual_set if a not in expected_set and ':unsat_precond' in a])
+                    detected_issues_extra_unset_vars += len([a for a in actual_set if a not in expected_set and (':unbound' in a or ':unbound_setu' in a)])
+
+                # Log pass/fail status
+                if result.missing_gt:
+                    if verbose and result.report_issues:
+                        print_info(f"Report: {json.dumps([{'code': i.code.value, 'line': i.source_line} for i in result.report_issues], indent=2)}", file=sys.stderr)
+                    unknown += 1
+                elif result.detected_all:
+                    print_pass("All expected results detected", file=sys.stderr)
+                    if verbose and result.report_issues:
+                        print_issue_details(Path(result.benchmark), result.report_issues, file=sys.stderr)
+                else:
+                    missing = [r for r in expected_set if r not in actual_set]
+                    print_fail(f"Missing expected results: {missing}", file=sys.stderr)
+                    failed += 1
+                    if verbose and result.report_issues:
+                        print_issue_details(Path(result.benchmark), result.report_issues, file=sys.stderr)
+            elif result.missing_gt:
+                unknown += 1
+
+    skipped = len(benchmarks_to_run) - len(run_results)
 
     print(file=sys.stderr)
     print("Summary", file=sys.stderr)
@@ -245,6 +246,93 @@ def main():
     raise SystemExit(failed > 0)
 
 
+def process_benchmark(benchmark: Path, top: Path, symbexec_timeout: float | None,
+                     solver_timeout: float | None, error_log: Path,
+                     enable_dfs: bool, out_of_scope_codes: list[str],
+                     known_codes: set[str], ground_truth_only: bool,
+                     verbose: bool, fixed_mode: bool) -> RunResult | None:
+    """Process a single benchmark and return its result."""
+    import traceback
+
+    print(f"Processing benchmark: {benchmark}", file=sys.stderr)
+
+    gt_path = benchmark.parent / "info.yaml"
+    gt_exists = gt_path.is_file()
+
+    if not gt_exists and ground_truth_only:
+        return None  # Skip this benchmark
+
+    expected_results: list[CheckResult] = []
+    shellcheck_results = []
+    unknown_codes: list[str] = []
+    if gt_exists:
+        expected_results = [r for r in load_expected_results(gt_path) if r.code not in out_of_scope_codes]
+        unknown_codes = [e.code for e in expected_results if e.code not in known_codes]
+        shellcheck_results = load_shellcheck_results(gt_path)
+
+    exception_traceback_str = None
+    report_issues = None
+
+    try:
+        sash.reporter.Reporter.reset()
+        report = sash.main.main(benchmark.as_posix(),
+                                timeout=symbexec_timeout, solver_timeout=solver_timeout,
+                                log_level="error", log_file=error_log,
+                                enable_dfs=enable_dfs)
+    except (AssertionError, BaseException) as e:
+        if isinstance(e, KeyboardInterrupt):
+            raise  # Re-raise KeyboardInterrupt to stop all processes
+
+        exception_traceback_str = traceback.format_exc() if verbose else None
+
+        return RunResult(
+            benchmark=benchmark.relative_to(top).as_posix(),
+            missing_gt=not gt_exists,
+            crashed=True,
+            timed_out=None,
+            time=None,
+            exec_time=None,
+            solver_time=None,
+            detected_all=None,
+            expected_results=[str(e) for e in expected_results],
+            actual_results=None,
+            shellcheck_codes=shellcheck_results,
+            line_numbers=None,
+            unknown_codes=unknown_codes,
+            exception_traceback=exception_traceback_str,
+            report_issues=None
+        )
+
+    actual_results: list[CheckResult] = [
+        CheckResult(code=issue.code.value, line=issue.source_line)
+        for issue in report.issues
+        if issue.code.value not in out_of_scope_codes
+    ]
+
+    if fixed_mode:
+        detected_all = gt_exists and all(e not in actual_results for e in expected_results)
+    else:
+        detected_all = gt_exists and all(e in actual_results for e in expected_results)
+
+    return RunResult(
+        benchmark=benchmark.relative_to(top).as_posix(),
+        missing_gt=not gt_exists,
+        crashed=False,
+        timed_out=report.timed_out,
+        time=report.time + report.solver_time,
+        exec_time=report.time,
+        solver_time=report.solver_time,
+        detected_all=detected_all,
+        expected_results=[str(e) for e in expected_results],
+        actual_results=[str(a) for a in actual_results],
+        shellcheck_codes=shellcheck_results,
+        line_numbers=[a.line for a in actual_results],
+        unknown_codes=unknown_codes if unknown_codes else None,
+        exception_traceback=None,
+        report_issues=report.issues
+    )
+
+
 def print_pass(msg: str, file = None, indent=2):
     print(f"{' ' * indent}[{GREEN}PASS{RESET}] {msg}", file=file)
 
@@ -270,25 +358,6 @@ def print_issue_details(benchmark: Path, issues: list[sash.reporter.Issue], file
     for issue in issues:
         location = "L" + str(issue.source_line) if issue.source_line is not None else "?"
         print(f"{' ' * (indent + 3)}{location} | {BOLD}{issue.code.value}{RESET} ({issue.severity.value}): {issue.message}", file=file)
-
-
-class CheckResult(NamedTuple):
-    code: str
-    line: int | None
-
-class RunResult(NamedTuple):
-    benchmark: str
-    missing_gt: bool | None
-    crashed: bool | None
-    timed_out: bool | None
-    time: float | None
-    exec_time: float | None
-    solver_time: float | None
-    detected_all: bool | None
-    expected_results: list[str] | None
-    actual_results: list[str] | None
-    shellcheck_codes: list[str] | None
-    line_numbers: list[int | None] | None
 
 
 # Note: if `timeout` supplied, may raise subprocess.TimeoutExpired
