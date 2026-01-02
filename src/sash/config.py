@@ -2,7 +2,7 @@
 class Config:
     __conf = {
     "CONCRETE_CWD": True,
-    "CWD_PATH" : "/",
+    "CWD_PATH" : "/home",
     "ERROR_ON_FAILURE": True,
     "FULL_REPR": False,
     "TIME_LIMIT": 5,
