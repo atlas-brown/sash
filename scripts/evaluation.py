@@ -34,6 +34,9 @@ class CheckResult(NamedTuple):
     def __str__(self):
         return f"L{self.line}:{self.code}"
 
+    def __eq__(self, other):
+        return (self.code, self.line) == (other.code, other.line)
+
 class RunResult(NamedTuple):
     benchmark: str
     missing_gt: bool | None
