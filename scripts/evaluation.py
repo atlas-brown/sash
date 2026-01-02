@@ -58,6 +58,7 @@ def main():
     parser.add_argument('-b', '--benchmarks', type=Path, default=None, help='Path to the benchmarks directory, relative to the git toplevel (default: <git_toplevel>/benchmarks)')
     parser.add_argument('-O', '--only', type=str, default=None, help='Regex to filter benchmarks to run (default: run all)')
     parser.add_argument('-o', '--output', type=Path, default=None, help='CSV file to write results table to (default: stdout)')
+    parser.add_argument('-H', '--html', type=Path, default=None, help='File to write HTML overview to (default: no HTML output)')
     parser.add_argument('-G', '--ground-truth-only', action='store_true', help='Only run benchmarks that have ground truth defined (default: run all)')
     parser.add_argument('-V', '--verbose', action='store_true', help='Enable printing of error reports or exceptions that occur, and raw output when ground truth is missing (default: false)')
     parser.add_argument('-N', '--no-color', action='store_true', help='Disable colored output to stderr (default: false)')
@@ -83,6 +84,7 @@ def main():
     solver_timeout: float | None = args.solver_timeout
     benchmark_filter = re.compile(args.only) if args.only else None
     output_file = args.output.resolve() if isinstance(args.output, Path) else None
+    html_file = args.html.resolve() if isinstance(args.html, Path) else None
     ground_truth_only: bool = args.ground_truth_only
     verbose: bool = args.verbose
     error_log: Path = args.error_log.resolve()
@@ -242,6 +244,14 @@ def main():
               f"{';'.join(r.shellcheck_codes) if r.shellcheck_codes else ''},"
               f"{';'.join('' if line is None else str(line) for line in r.line_numbers) if r.line_numbers else ''}",
               file=output_file)
+
+    if html_file:
+        from report import generate_html_report, RunResult as ReportRunResult
+        generate_html_report(html_file, run_results, ran, skipped, failed, unknown, timed_out,
+                             total_issues, detected_issues_expected,
+                             detected_issues_extra, detected_issues_extra_unsat_preconds, detected_issues_extra_unset_vars,
+                             tota_exec_time, total_solver_time,
+                             SE_timeout=symbexec_timeout, solver_timeout=solver_timeout)
 
     raise SystemExit(failed > 0)
 
