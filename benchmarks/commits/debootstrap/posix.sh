@@ -21,6 +21,26 @@ DEVICES_TARGZ=$DEBOOTSTRAP_DIR/devices.tar.gz
 . $DEBOOTSTRAP_DIR/functions
 exec 4>&1
 
+# ================ $DEBOOTSTRAP_DIR/functions
+error () {
+  # <error code> <name> <string> <args>
+  local err="$1"
+  local name="$2"
+  local fmt="$3"
+  shift; shift; shift
+  if [ "$USE_DEBIANINSTALLER_INTERACTION" ]; then
+    (echo "E: $name"
+    for x in "$@"; do echo "EA: $x"; done
+    echo "EF: $fmt") >&4
+  elif [ "$USE_GETTEXT_INTERACTION" ]; then
+    (printf "E: `LANG=$GETTEXT_LANG gettext debootstrap "$fmt"`\n" "$@") >&4
+  else
+    (printf "E: $fmt\n" "$@") >&4
+  fi
+  exit $err
+}
+# ==================================================
+
 GETTEXT_LANG=$LANG
 LANG=C
 USE_COMPONENTS=main
