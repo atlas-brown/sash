@@ -45,8 +45,8 @@ class FSModel():
         return z3.BoolVal(True)
 
 
-StateSort, (File, Dir, Del, Unknown) = z3.EnumSort(
-    "State", ["File", "Dir", "Del", "Unknown"]
+StateSort, (File, Dir, Del) = z3.EnumSort(
+    "State", ["File", "Dir", "Del"]
 )
 
 
@@ -80,8 +80,7 @@ class FSModelSimple(FSModel):
 
     id: int  = 0
     # history: (z3var for FS at time step `id`, z3 array representing FS at time step `id`)
-    history: tuple[tuple[z3.ArrayRef, z3.ExprRef]] = field(default_factory=lambda: ((z3.Array('fs0', z3.StringSort(), FileInfo),
-                                                                                    z3.K(z3.StringSort(), FileInfo.mk_pair(Unknown, Unread))),))
+    history: tuple[tuple[z3.ArrayRef, z3.ExprRef | None]] = field(default_factory=lambda: ((z3.Array('fs0', z3.StringSort(), FileInfo), None),))
 
     def _rename_fs_var_append(self, var: z3.ArrayRef, suffix: str) -> z3.ExprRef:
         var_name = var.decl().name()
@@ -162,19 +161,18 @@ class FSModelSimple(FSModel):
         return self._apply_postcondition(norm_constraints.constraint)
 
     def is_file_z3(self, path_z3) -> 'z3.ExprRef':
-        return z3.Or(FileInfo.state(z3.Select(self.history[-1][0], path_z3)) == File, FileInfo.state(z3.Select(self.history[-1][0], path_z3)) == Unknown)
+        return FileInfo.state(z3.Select(self.history[-1][0], path_z3)) == File
 
     def is_dir_z3(self, path_z3) -> 'z3.ExprRef':
-        return z3.Or(FileInfo.state(z3.Select(self.history[-1][0], path_z3)) == Dir, FileInfo.state(z3.Select(self.history[-1][0], path_z3)) == Unknown)
+        return FileInfo.state(z3.Select(self.history[-1][0], path_z3)) == Dir
 
     def is_deleted_z3(self, path_z3) -> 'z3.ExprRef':
-        return z3.Or(FileInfo.state(z3.Select(self.history[-1][0], path_z3)) == Del, FileInfo.state(z3.Select(self.history[-1][0], path_z3)) == Unknown)
+        return FileInfo.state(z3.Select(self.history[-1][0], path_z3)) == Del
 
     def is_read_z3(self, path_z3) -> 'z3.ExprRef':
         is_file_and_read = z3.And(FileInfo.state(z3.Select(self.history[-1][0], path_z3)) == File,
                       FileInfo.status(z3.Select(self.history[-1][0], path_z3)) == Read)
-        is_unknown = FileInfo.state(z3.Select(self.history[-1][0], path_z3)) == Unknown
-        return z3.Or(is_file_and_read, is_unknown)
+        return is_file_and_read
 
     def _fs_constraint_z3(self, constraint: Constraint) -> 'z3.ExprRef':
         match constraint:
@@ -200,4 +198,8 @@ class FSModelSimple(FSModel):
                 assert False, f"FSModelSimple cannot evaluate constraint: {constraint}"
 
     def state_to_z3(self) -> 'z3.ExprRef':
-        return z3.And([fsvar == array_expr for fsvar, array_expr in self.history])
+        exprs = []
+        for fsvar, arr_expr in self.history:
+            if arr_expr is not None:
+                exprs.append(fsvar == arr_expr)
+        return z3.And(exprs)
