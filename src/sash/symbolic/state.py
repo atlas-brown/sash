@@ -57,7 +57,9 @@ class Assertion:
 
 @dataclass(frozen=True)
 class Condition(Assertion):
-    pass
+    def __repr__(self):
+        return f"Condition(state<{hash(self.producing_state)}>, constraint={repr(self.constraint)}, source_str={repr(self.source_str)}, source_line={self.source_line})"
+
 
 class Confidence(Enum):
     DEFINITE = 0

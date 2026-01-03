@@ -71,7 +71,7 @@ class CompletelyArbitrary:
     prefix: SymStr | None = None
     suffix: SymStr | None = None
     quoted: bool = False
-    maybe_empty: bool = False
+    maybe_empty: bool = True
 
     def __eq__(self, other):
         # If the state producing this is unknown, conservatively say it can't be equal to any other
@@ -109,8 +109,8 @@ class Field:
         content = self.content
         if isinstance(content, CompletelyArbitrary) and not content.quoted:
             content = replace(content, quoted=True)
-        if isinstance(content, CompletelyArbitrary) and self.count.min == 0:
-            content = replace(content, maybe_empty=True)
+        if isinstance(content, CompletelyArbitrary) and self.count.min > 0:
+            content = replace(content, maybe_empty=False)
         max_words = min(self.count.max, 1)
         min_words = min(self.count.min, 1)
         if isinstance(content, CompletelyArbitrary) and content.quoted:

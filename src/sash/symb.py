@@ -22,7 +22,7 @@ from sash.frozen import FrozenAst, FrozenDict, freeze, freeze_thing
 from sash.interpreter_config import BranchDecision, InterpConfig, UnboundVariablePolicy
 from sash.reporter import Reporter
 from sash.solver import field_to_z3
-from sash.specs import get_spec
+from sash.specs import get_spec, CmdSpec
 from sash.dfs_targeted import *
 from sash.symbolic.state import *
 from sash.debugtools.logger import DebugLogger
@@ -212,26 +212,40 @@ def word_count_from_output(output: str) -> WordCount:
 
 def command_substitution_output(cmd_name: str,
                                 operands: list[Field],
+                                subst_node: AST.BArgChar,
                                 state: State,
+                                spec: CmdSpec | None,
                                 config: InterpConfig) -> tuple[Field | None, State]:
-    if cmd_name == "pwd":
-        pwd_var = state.lookup("PWD")
-        if pwd_var is not None and (pwd_value := pwd_var.value.try_to_str()) is not None:
-            return Field(SymStr((pwd_value,)), word_count_from_output(pwd_value))
-        if Config.get("CONCRETE_CWD"):
-            cwd_path = Config.get("CWD_PATH")
-            return Field(SymStr((cwd_path,)), word_count_from_output(cwd_path))
-        return None
 
-    if cmd_name == "echo":
-        output_field = merge_partial_fields(operands, sep=" ", state=state) # TODO: sep should be from IFS
-        if (output_str := output_field.try_to_str()) is not None:
-            return Field(SymStr((output_str,)), word_count_from_output(output_str))
-        if isinstance(output_field.content, CompletelyArbitrary) and output_field.count.min == 0:
-            output_field = Field(replace(output_field.content, maybe_empty=True), output_field.count)
-        return output_field
+    if spec and spec.io in {IOType.NONE, IOType.STDIN}:
+        Reporter.add_issue(reporter.CapturingEmptyOutput(cmd_name, context_line), config)
 
-    return None
+    match cmd_name:
+        case "pwd":
+            pwd_var = state.lookup("PWD")
+            if pwd_var is not None:
+                return pwd_var.value, state
+            assert False, "PWD should always be defined"
+            if Config.get("CONCRETE_CWD"):
+                cwd_path = Config.get("CWD_PATH")
+                return Field(SymStr((cwd_path,)), word_count_from_output(cwd_path)), state
+            return None, state
+        case "echo":
+            output_field = merge_partial_fields(operands, sep=" ", state=state) # TODO: sep should be from IFS
+            if (output_str := output_field.try_to_str()) is not None:
+                output_field = Field(SymStr((output_str,)), word_count_from_output(output_str))
+            if isinstance(output_field.content, CompletelyArbitrary) and output_field.count.min == 0:
+                output_field = Field(replace(output_field.content, maybe_empty=True), output_field.count)
+            return output_field, state
+        case "mktemp":
+            output_path = arbitrary_field(subst_node, ArbitraryType.APPROXIMATION, state)
+            assert spec is not None and spec.io in {IOType.STDOUT_FILE, IOType.STDOUT_DIR}, f"unexpected spec? {spec}"
+            constraint = IsFile if spec.io == IOType.STDOUT_FILE else IsDir
+            state_with_filetype = state.update_fs(constraint(output_path))
+            return output_path, state_with_filetype
+
+        case _:
+            return None, state
 
 def handle_rm(expanded_args: tuple[Field, ...], trace: Trace, node: AST.CommandNode, config: Config) -> tuple[Trace, Trace]:
     logging.debug("Checking rm command with expansion possibility: %s", expanded_args)
@@ -1158,26 +1172,24 @@ def expand_simple(stuff: list[AST.ArgChar],
                             self.state = self.state.extend_localenv({var.var: ShellVar(arbitrary_for_this_var, ghost=True)})
                             self.add_a_field(arbitrary_for_this_var)
                 case AST.BArgChar() as b:
-                    logging.debug("Expansion: treating backquote argchar '%s' as completely arbitrary", b.pretty())
-                    # todo use the trace: this case suggests we should really generalize the interface of `expand_simple` to be from one trace to many, instead of one state to many
-                    t = guarded_interp_node([Trace((self.state,))], b.node, config)
+                    # TODO use the trace: this case suggests we should really generalize the interface of `expand_simple` to be from one trace to many, instead of one state to many
+                    inner_cmds = []
+                    temp_config = config.add_expanded_command_callback(lambda expanded: inner_cmds.append(expanded))
+                    t = guarded_interp_node([Trace((self.state,))], b.node, temp_config)
                     output_field = None
-                    if isinstance(b.node, AST.CommandNode):
-                        _, expanded_args = expand_args_dumb(t, b.node.arguments, config)
-                        if expanded_args:
-                            cmd_name = expanded_args[0].try_to_str()
-                            if isinstance(cmd_name, str) and (spec := get_spec(cmd_name, tuple(expanded_args))):
-                                # Check the spec to see if the command has no stdout. If it does, report an issue.
-                                if spec.io in {IOType.NONE, IOType.STDIN}:
-                                    Reporter.add_issue(reporter.CapturingEmptyOutput(cmd_name, context_line), config)
-                            if isinstance(cmd_name, str):
-                                # Specific logic for a few key built-in commands whose output we can reason about
-                                output_field = command_substitution_output(cmd_name, expanded_args[1:], self.state, config)
+                    if len(inner_cmds) != 0:
+                        expanded_args = inner_cmds[-1]
+                        if expanded_args and (cmd_name := expanded_args[0].try_to_str()):
+                            spec = get_spec(cmd_name, tuple(expanded_args))
+                            output_field, new_state = command_substitution_output(cmd_name, expanded_args[1:], b, self.state, spec, config)
+                            self.state = new_state
                     # We found one of our special commands with known output
                     if output_field is not None:
+                        logging.info(f"expansion: determined commandsubst output as: {output_field}")
                         self.add_a_field(output_field)
                     # Everything else is completely arbitrary
                     else:
+                        logging.info("expansion: treating backquote argchar %s as completely arbitrary field", b.pretty())
                         self.add_a_field(arbitrary_field(b, ArbitraryType.APPROXIMATION, self.state))
                 case _:
                     logging.error("Unsupported argchar of type '%s': '%s'; treating as completely arbitrary", argchar.NodeName, argchar.pretty())

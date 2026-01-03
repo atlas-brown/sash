@@ -180,6 +180,8 @@ class IOType(Enum):
     STDOUT = auto()
     BOTH = auto()
     UNKNOWN = auto()
+    STDOUT_FILE = auto()
+    STDOUT_DIR = auto()
 
     @staticmethod
     def add_stdin(io: "IOType") -> "IOType":

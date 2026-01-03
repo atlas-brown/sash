@@ -409,6 +409,9 @@ def rm_spec(cmd: CmdInvocation) -> CmdSpec:
 
     return Rm.handle_invocation(cmd)
 
+def mktemp_spec(cmd: CmdInvocation) -> CmdSpec:
+    return Mktemp.handle_invocation(cmd)
+
 
 def sudo_spec(cmd: CmdInvocation) -> CmdSpec | None:
 
@@ -952,6 +955,24 @@ class Env(Cmd):
                 return CmdSpec(check, success_postcond, ~CommandExists(subcmd), io)
 
         return CmdSpec(check, success_postcond, failure_postcond, io)
+
+
+class Mktemp(Cmd):
+    # https://pubs.opengroup.org/onlinepubs/9799919799/utilities/rm.html
+    name = "mktemp"
+    posix_flags     = {"-q", "-d"}
+    supported_flags = posix_flags
+
+    @classmethod
+    def _handle_supported(cls, cmd: CmdInvocation) -> CmdSpec:
+        (name, flags, options, operands) = (cmd.cmd_name, cmd.flags, cmd.options, cmd.operands)
+        flags, operands = extract_flags_naively("mktemp", operands)
+
+        assert name == SymStr((cls.name,)), f"Expected mktemp command, got: {cmd}"
+        assert len(options) == 0, f"Expected no options for mktemp, got: {cmd}"
+
+        io = IOType.STDOUT_DIR if "-d" in flags else IOType.STDOUT_FILE
+        return CmdSpec(Empty(), Empty(), Empty(), io)
 
 
 def is_definitely_dir(field: Field) -> bool:

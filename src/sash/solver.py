@@ -27,7 +27,9 @@ def field_content_to_z3(field_content: SymStr | CompletelyArbitrary) -> z3.ExprR
             assert all(isinstance(part, str) for part in parts), "SymStr with SymVars not supported in Z3 translation yet"
             return z3.StringVal("".join(parts)) # type: ignore
         case CompletelyArbitrary() as arbitrary:
-            arbitrary_no_pfx_sfx = replace(arbitrary, prefix=None, suffix=None)
+            arbitrary_no_pfx_sfx = replace(arbitrary, prefix=None, suffix=None,
+                                           # As far as paths are concerned, whether they're quoted or not is irrelevant
+                                           quoted=False, maybe_empty=False)
             if arbitrary_no_pfx_sfx not in arbitrary_to_z3_var:
                 arbitrary_to_z3_var[arbitrary_no_pfx_sfx] = z3.FreshConst(z3.StringSort(), 'arb-' + shasta_pretty(arbitrary.source))
             z3_var = arbitrary_to_z3_var[arbitrary_no_pfx_sfx]
@@ -217,6 +219,7 @@ def run_solver(traces: list[Trace], config: InterpConfig, stop: threading.Event 
                 logging.debug("State:\n%s", state_formula)
                 logging.debug("Assertion:\n%s", assertion_formula)
                 logging.debug("Assertion must be violated?: %s (ie %s)", result == z3.unsat, result)
+
             if result == z3.unsat:
                 core = solver.unsat_core()
                 logging.debug("Unsat core: %s", core)
