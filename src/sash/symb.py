@@ -220,8 +220,7 @@ def handle_rm(expanded_args: tuple[Field], trace: Trace, node: AST.CommandNode) 
     trace = trace.extend(lambda s: s.add_assertion(spec.check, source_str=node.pretty(), source_line=context_line))
 
     def is_protected(path):
-        protected_paths = [p for p in Config.get("PROTECTED_PATHS") if p != "/"] # TODO: Discuss this, `rm -rf /` does not do anything (depending on implementation), but we may want to flag it anyway
-        return any(path in [p, p + "/", p + "/*"] for p in protected_paths)
+        return any(path in [p, p + "/", p + "/*"] for p in Config.get("PROTECTED_PATHS"))
 
     for arg_idx, arg_field in enumerate(expanded_args[1:], start=1):
         if (path := arg_field.try_to_str()) and is_protected(path):
