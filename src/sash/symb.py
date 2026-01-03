@@ -1510,19 +1510,19 @@ def symbexec_file(input_file: str,
             symb_engine(nodes, replace(config, branch_policy=branch_policy_only_then))
             logging.info("DFS run: only taking ELSE branches")
             symb_engine(nodes, replace(config, branch_policy=branch_policy_only_else))
+            issues_so_far = Reporter._issues.copy()
             logging.info("DFS run: only taking THEN branches with unbound variables as empty strings")
             symb_engine(nodes, replace(config, branch_policy=branch_policy_only_then, unbound_policy=UnboundVariablePolicy.EMPTY))
             logging.info("DFS run: only taking ELSE branches with unbound variables as empty strings")
             symb_engine(nodes, replace(config, branch_policy=branch_policy_only_else, unbound_policy=UnboundVariablePolicy.EMPTY))
-            issues_so_far = Reporter._issues.copy()
             logging.info("DFS run: treating unbound variables solely as empty strings")
             symb_engine(nodes, replace(config, unbound_policy=UnboundVariablePolicy.EMPTY))
-            Reporter.drop_issues({reporter.Code.DELETE_SYSTEM_FILE})
+            Reporter.drop_issues({reporter.Code.DELETE_SYSTEM_FILE, reporter.Code.CONSTANT_CONDITION})
             Reporter._issues = Reporter._issues | issues_so_far # this dance ensures that any del_sys_files found before the last run are kept
             # logging.info("DFS run: exploring the first trace only")
             # symb_engine(nodes, replace(config, trace_collapser = lambda ts: ts[:1]))
             logging.info("DFS_first run complete, proceeding with normal symbolic execution")
-            Reporter.drop_issues({reporter.Code.DEAD_CODE, reporter.Code.CONSTANT_CONDITION}) # unreliable with branch policies
+            Reporter.drop_issues({reporter.Code.DEAD_CODE}) # wholly unreliable with branch policies
 
         traces = symb_engine(nodes, replace(config, branch_policy=branch_policy_half_n_half_if_too_many))
         if Reporter.get_timed_out():
