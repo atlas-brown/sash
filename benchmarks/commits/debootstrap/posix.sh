@@ -24,16 +24,16 @@ exec 4>&1
 # ================ $DEBOOTSTRAP_DIR/functions
 error () {
   # <error code> <name> <string> <args>
-  local err="$1"
-  local name="$2"
-  local fmt="$3"
+  err="$1"
+  name="$2"
+  fmt="$3"
   shift; shift; shift
   if [ "$USE_DEBIANINSTALLER_INTERACTION" ]; then
     (echo "E: $name"
     for x in "$@"; do echo "EA: $x"; done
     echo "EF: $fmt") >&4
   elif [ "$USE_GETTEXT_INTERACTION" ]; then
-    (printf "E: `LANG=$GETTEXT_LANG gettext debootstrap "$fmt"`\n" "$@") >&4
+    (printf "E: $(LANG=$GETTEXT_LANG gettext debootstrap "$fmt")\n" "$@") >&4
   else
     (printf "E: $fmt\n" "$@") >&4
   fi
