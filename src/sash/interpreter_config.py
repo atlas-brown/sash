@@ -17,6 +17,7 @@ class BranchDecision(Enum):
     SECOND = 2
 
 BranchPolicy = Callable[[AST.AstNode, Traces, Traces], tuple[Traces, Traces]]
+BranchDecider = Callable[[AST.AstNode], BranchDecision]
 
 class UnboundVariablePolicy(Enum):
     EMPTY = 0
@@ -32,6 +33,9 @@ class InterpConfig:
     unbound_policy: UnboundVariablePolicy = UnboundVariablePolicy.SYMBOLIC
     DFS_first: bool = True
     branch_policy: BranchPolicy = lambda n, t_then, t_else: (t_then, t_else)
+    branch_decider: BranchDecider | None = None
+    ignore_function_calls: bool = False
+    ignore_function_calls_for: frozenset[str] = field(default_factory=frozenset)
 
     def add_node_callback(self, cb: NodeCB) -> 'InterpConfig':
         return replace(self, node_cbs=(self.node_cbs + [cb]))

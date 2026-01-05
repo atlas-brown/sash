@@ -19,10 +19,11 @@ import sash.util as util
 from sash.config import Config
 from sash.constraints import *
 from sash.frozen import FrozenAst, FrozenDict, freeze, freeze_thing
-from sash.interpreter_config import InterpConfig, UnboundVariablePolicy
+from sash.interpreter_config import BranchDecision, InterpConfig, UnboundVariablePolicy
 from sash.reporter import Reporter
 from sash.solver import field_to_z3
 from sash.specs import get_spec
+from sash.dfs_targeted import *
 from sash.symbolic.state import *
 
 
@@ -268,6 +269,9 @@ def handle_function_call_or_unknown(func_name: str,
         if None in func_defs:
             return handle_unknown_command(func_name, arg_fields, traces, config)
         else:
+            if config.ignore_function_calls or func_name in config.ignore_function_calls_for:
+                logging.debug("Ignoring function call to %s (configured as no-op)", func_name)
+                return traces
             the_func = func_defs.pop()
             assert isinstance(the_func, FrozenAst)
             return handle_function_call(func_name, the_func.ast, arg_fields, traces, config)
@@ -297,6 +301,9 @@ def handle_function_call(name: str,
                          arg_fields: list[Field],
                          traces: Traces,
                          config: InterpConfig) -> Traces:
+    if config.ignore_function_calls or name in config.ignore_function_calls_for:
+        logging.debug("Ignoring function call to %s (configured as no-op)", name)
+        return traces
     if logging.getLogger().isEnabledFor(logging.DEBUG):
         logging.debug("Handling function call to %s with args %s",
                       trim_string_for_logging(func_node.pretty()), arg_fields)
@@ -338,6 +345,18 @@ def handle_while(traces: Traces,
     logging.debug("Interpreting first iteration")
     t1 = guarded_interp_node(traces, node.test, temp_config)
     logging.debug("collected test_cmds: %s", test_cmds)
+    if config.branch_decider is not None:
+        decision = config.branch_decider(node)
+        t_true = [t for t in t1 if t.latest_state.last_exit_code[0] == SymStr(("0",))]
+        t_false = [t for t in t1 if t.latest_state.last_exit_code[0] == SymStr(("1",))]
+        t_other = [t for t in t1 if t.latest_state.last_exit_code[0] not in {SymStr(("0",)), SymStr(("1",))}]
+        t_true = t_true + trace_map(t_other, lambda s: s.set_last_exit_code(SymStr(("0",)), Confidence.SPECULATIVE))
+        t_false = t_false + trace_map(t_other, lambda s: s.set_last_exit_code(SymStr(("1",)), Confidence.SPECULATIVE))
+        if decision == BranchDecision.FIRST:
+            logging.debug("While loop single-path decision: take body once")
+            return guarded_interp_node(t_true, node.body, config)
+        logging.debug("While loop single-path decision: skip body")
+        return t_false
     # Special case: never runs
     if len(test_cmds) > 0 and interpret_test(test_cmds[0]) == False:
         logging.debug("While loop never runs")
@@ -530,6 +549,14 @@ def handle_if(traces: Traces, node: AST.IfNode, config: InterpConfig) -> Traces:
         else:
             return t1
     else:
+        if config.branch_decider is not None:
+            decision = config.branch_decider(node)
+            if decision == BranchDecision.FIRST:
+                return guarded_interp_node(t1, node.then_b, config)
+            if decision == BranchDecision.SECOND:
+                if node.else_b is not None:
+                    return guarded_interp_node(t1, node.else_b, config)
+                return t1
         return handle_branch(t1,
                             lambda ts: guarded_interp_node(ts, node.then_b, config),
                             lambda fs: guarded_interp_node(fs, node.else_b, config) if node.else_b is not None else fs,
@@ -1361,6 +1388,20 @@ def interp_node(traces: Traces,
             # because some programs use huge functions inside AND/OR nodes, and there's no need to fork on EVERYTHING inside them
             t1 = guarded_interp_node(traces, node.left_operand, config) # intentionally not in a checked position
             t_failure = [t.fail_last_command() for t in t1 if t.latest_state.last_exit_code[0] == SymStr(("0",))]
+            if config.branch_decider is not None:
+                decision = config.branch_decider(node)
+                t_success = [t for t in t1 + t_failure if t.latest_state.last_exit_code[0] == SymStr(("0",))]
+                t_failure_only = [t for t in t1 + t_failure if t.latest_state.last_exit_code[0] == SymStr(("1",))]
+                t_other = [t for t in t1 + t_failure if t.latest_state.last_exit_code[0] not in {SymStr(("0",)), SymStr(("1",))}]
+                t_success = t_success + trace_map(t_other, lambda s: s.set_last_exit_code(SymStr(("0",)), Confidence.SPECULATIVE))
+                t_failure_only = t_failure_only + trace_map(t_other, lambda s: s.set_last_exit_code(SymStr(("1",)), Confidence.SPECULATIVE))
+                if isinstance(node, AST.AndNode):
+                    if decision == BranchDecision.FIRST:
+                        return guarded_interp_node(t_success, node.right_operand, config)
+                    return t_failure_only
+                if decision == BranchDecision.FIRST:
+                    return guarded_interp_node(t_failure_only, node.right_operand, config)
+                return t_success
             def success(traces_with_exit_0: Traces) -> Traces:
                 if isinstance(node, AST.AndNode):
                     return guarded_interp_node(traces_with_exit_0, node.right_operand, config)
@@ -1489,6 +1530,20 @@ def symbexec_file(input_file: str,
     stop_event = stop
 
     try:
+        def constant_word(arg: list[AST.ArgChar]) -> str | None:
+            chars: list[str] = []
+            for c in arg:
+                if isinstance(c, AST.CArgChar):
+                    chars.append(chr(c.char))
+                else:
+                    return None
+            return "".join(chars)
+
+        def command_name(node: AST.CommandNode) -> str:
+            if not node.arguments:
+                return ""
+            return constant_word(node.arguments[0]) or ""
+
         def branch_policy_half_n_half_if_too_many(node, t_then: Traces, t_else: Traces) -> tuple[Traces, Traces]:
             if len(t_then) + len(t_else) > 256:
                 logging.info("Too many traces, dropping half of them in branch policy")
@@ -1503,9 +1558,41 @@ def symbexec_file(input_file: str,
             return ([], t_else) if t_else else (t_then, [])
 
         nodes = parser.parse_shell_script(input_file)
+        func_defs = find_func_defs([Trace((starting_state(),))], nodes, config)
+        func_map = replace(FuncMap(funcs=func_defs))
+
+        def func_calls_dangerous(func_name: str, seen: set[str]) -> bool:
+            if func_name in seen:
+                return False
+            seen.add(func_name)
+            func_node = func_defs.get(func_name)
+            if func_node is None:
+                return False
+            for cmd in util.iter_ast_command(func_node):
+                if not isinstance(cmd, AST.CommandNode):
+                    continue
+                name = command_name(cmd)
+                if is_dangerous_command(name):
+                    return True
+                if name is not None and name in func_defs and func_calls_dangerous(name, seen):
+                    return True
+            return False
+
+        safe_funcs = frozenset(
+            name for name in func_defs.keys()
+            if not func_calls_dangerous(name, set())
+        )
         # opt_store = parse_shebang_args(input_file)
         if config.DFS_first:
             logging.info("Doing whole execution with a single trace first (DFS_first)")
+            logging.info("DFS run: targeting dangerous commands")
+            targeted_result = run_targeted_dfs(
+                nodes=nodes,
+                config=config,
+                symb_engine=symb_engine,
+                func_defs=func_defs,
+                ignore_function_calls_for=safe_funcs,
+            )
             logging.info("DFS run: only taking THEN branches")
             symb_engine(nodes, replace(config, branch_policy=branch_policy_only_then))
             logging.info("DFS run: only taking ELSE branches")
@@ -1523,10 +1610,14 @@ def symbexec_file(input_file: str,
             # symb_engine(nodes, replace(config, trace_collapser = lambda ts: ts[:1]))
             logging.info("DFS_first run complete, proceeding with normal symbolic execution")
             Reporter.drop_issues({reporter.Code.DEAD_CODE}) # wholly unreliable with branch policies
+        else:
+            targeted_result = None
 
         traces = symb_engine(nodes, replace(config, branch_policy=branch_policy_half_n_half_if_too_many))
         if Reporter.get_timed_out():
             return SymbexecResult(SymbexecStatus.INTERRUPTED, traces)
+        if targeted_result is not None:
+            return SymbexecResult(SymbexecStatus.COMPLETED, targeted_result.traces + traces)
         return SymbexecResult(SymbexecStatus.COMPLETED, traces)
     except Exception as e:
         logging.error("Symbolic execution failed:")
