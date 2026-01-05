@@ -101,8 +101,9 @@ def test_delete_system_file(tmp_path):
 
     script = write_script(tmp_path, "rm -rf \"$FOO\"/\n")
     report = reset_and_run_main(script)
-    expected_error = reporter.UnboundID(foo_var.pretty(), 0)
-    assert_expected_report(report, [expected_error])
+    expected_error1 = reporter.UnboundID(foo_var.pretty(), 0)
+    expected_error2 = reporter.WordSplitCouldDeleteSystemFile("$FOO", 0)
+    assert_expected_report(report, [expected_error1, expected_error2])
 
     script = write_script(tmp_path, """
 if [ "$FOO" = "yes" ]; then
@@ -113,8 +114,9 @@ else
     rm -rf "$FOO/"
     """)
     report = reset_and_run_main(script)
-    expected_error = reporter.UnboundID(foo_var.pretty(), 0)
-    assert_expected_report(report, [expected_error])
+    expected_error1 = reporter.UnboundID(foo_var.pretty(), 0)
+    expected_error2 = reporter.WordSplitCouldDeleteSystemFile("$FOO/", 0)
+    assert_expected_report(report, [expected_error1, expected_error2])
 
     # regression test for binding unbound args after first expansion
     script = write_script(tmp_path, """
@@ -132,7 +134,8 @@ rm -rf "${DESTDIR}${LIBDIR}/${CAMLP5N}"
     expected_error1 = reporter.UnboundID("DESTDIR", 0)
     expected_error2 = reporter.UnboundID("LIBDIR", 0)
     expected_error3 = reporter.UnboundID("CAMLP5N", 0)
-    assert_expected_report(report, [expected_error1, expected_error2, expected_error3])
+    expected_error4 = reporter.WordSplitCouldDeleteSystemFile("${DESTDIR}${LIBDIR}/${CAMLP5N}", 0)
+    assert_expected_report(report, [expected_error1, expected_error2, expected_error3, expected_error4])
 
     script = write_script(tmp_path, """
 STEAMROOT="$(cd /nope && echo $PWD)"
