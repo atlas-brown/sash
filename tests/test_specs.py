@@ -335,13 +335,14 @@ def test_overwrite_file_4_core_fixed(tmp_path):
 
 def test_overwrite_file_xargs_core(tmp_path):
     script = write_script(tmp_path, """
+    touch target
     find . -name '*.R' | xargs -I files mv files target
     find . -name '*.sh' | xargs -I files mv files target
     """)
 
     report = reset_and_run_main(script, solver=True)
     expected_reports: list[reporter.Issue] = [
-        reporter.UnsatisfiedPrecondition(None, None, None),
-        reporter.UnsatisfiedPrecondition(None, None, None),
+        reporter.UnsatisfiedPrecondition(Empty(), "xargs -I files mv files target", 2),
+        reporter.UnsatisfiedPrecondition(Empty(), "xargs -I files mv files target", 3),
     ]
     assert_expected_report(report, expected_reports)
