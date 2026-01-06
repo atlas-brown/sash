@@ -108,7 +108,7 @@ def run_targeted_dfs(nodes: list,
                         lines.add(cmd.line_number)
         return sorted(lines)
 
-    def branch_decider_prefer_spec(node: AST.AstNode) -> BranchDecision:
+    def branch_policy_pre_prefer_spec(node: AST.AstNode) -> BranchDecision:
         if isinstance(node, AST.IfNode):
             then_score = count_spec_cmds(node.then_b)
             else_score = count_spec_cmds(node.else_b) if node.else_b is not None else 0
@@ -124,7 +124,7 @@ def run_targeted_dfs(nodes: list,
     dangerous_lines = find_dangerous_lines()
     all_traces: list[Trace] = []
     for target_line in dangerous_lines:
-        def branch_decider_for_target(node: AST.AstNode) -> BranchDecision | None:
+        def branch_policy_pre_for_target(node: AST.AstNode) -> BranchDecision | None:
             if isinstance(node, AST.IfNode):
                 then_score = count_spec_cmds(node.then_b)
                 else_score = count_spec_cmds(node.else_b) if node.else_b is not None else 0
@@ -139,14 +139,14 @@ def run_targeted_dfs(nodes: list,
                 return BranchDecision.FIRST if body_score > 0 else None
             return None
 
-        def branch_decider_target(node: AST.AstNode) -> BranchDecision:
-            decision = branch_decider_for_target(node)
-            return decision if decision is not None else branch_decider_prefer_spec(node)
+        def branch_policy_pre_target(node: AST.AstNode) -> BranchDecision:
+            decision = branch_policy_pre_for_target(node)
+            return decision if decision is not None else branch_policy_pre_prefer_spec(node)
 
         logging.info("DFS run: targeting dangerous command at line %d", target_line)
         target_traces = symb_engine(nodes, replace(
             config,
-            branch_decider=branch_decider_target,
+            branch_policy_pre=branch_policy_pre_target,
             unbound_policy=UnboundVariablePolicy.EMPTY,
             trace_collapser=lambda ts: collapse_traces_with_spec_coverage(ts, trace_cap),
             node_cbs=config.node_cbs + [spec_coverage_cb],
@@ -161,7 +161,7 @@ def run_targeted_dfs(nodes: list,
     if not dangerous_lines:
         target_traces = symb_engine(nodes, replace(
             config,
-            branch_decider=branch_decider_prefer_spec,
+            branch_policy_pre=branch_policy_pre_prefer_spec,
             unbound_policy=UnboundVariablePolicy.EMPTY,
             trace_collapser=lambda ts: collapse_traces_with_spec_coverage(ts, 16),
             node_cbs=config.node_cbs + [spec_coverage_cb],

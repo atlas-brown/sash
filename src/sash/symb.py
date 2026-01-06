@@ -345,8 +345,8 @@ def handle_while(traces: Traces,
     logging.debug("Interpreting first iteration")
     t1 = guarded_interp_node(traces, node.test, temp_config)
     logging.debug("collected test_cmds: %s", test_cmds)
-    if config.branch_decider is not None:
-        decision = config.branch_decider(node)
+    if config.branch_policy_pre is not None:
+        decision = config.branch_policy_pre(node)
         t_true = [t for t in t1 if t.latest_state.last_exit_code[0] == SymStr(("0",))]
         t_false = [t for t in t1 if t.latest_state.last_exit_code[0] == SymStr(("1",))]
         t_other = [t for t in t1 if t.latest_state.last_exit_code[0] not in {SymStr(("0",)), SymStr(("1",))}]
@@ -549,8 +549,8 @@ def handle_if(traces: Traces, node: AST.IfNode, config: InterpConfig) -> Traces:
         else:
             return t1
     else:
-        if config.branch_decider is not None:
-            decision = config.branch_decider(node)
+        if config.branch_policy_pre is not None:
+            decision = config.branch_policy_pre(node)
             if decision == BranchDecision.FIRST:
                 return guarded_interp_node(t1, node.then_b, config)
             if decision == BranchDecision.SECOND:
@@ -1388,8 +1388,8 @@ def interp_node(traces: Traces,
             # because some programs use huge functions inside AND/OR nodes, and there's no need to fork on EVERYTHING inside them
             t1 = guarded_interp_node(traces, node.left_operand, config) # intentionally not in a checked position
             t_failure = [t.fail_last_command() for t in t1 if t.latest_state.last_exit_code[0] == SymStr(("0",))]
-            if config.branch_decider is not None:
-                decision = config.branch_decider(node)
+            if config.branch_policy_pre is not None:
+                decision = config.branch_policy_pre(node)
                 t_success = [t for t in t1 + t_failure if t.latest_state.last_exit_code[0] == SymStr(("0",))]
                 t_failure_only = [t for t in t1 + t_failure if t.latest_state.last_exit_code[0] == SymStr(("1",))]
                 t_other = [t for t in t1 + t_failure if t.latest_state.last_exit_code[0] not in {SymStr(("0",)), SymStr(("1",))}]
