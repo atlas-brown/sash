@@ -16,6 +16,7 @@ from sash.constraints import (
     CommandExists,
     Constraint,
     Empty,
+    Not,
     IOType,
     IsDeleted,
     IsDir,
@@ -734,13 +735,13 @@ class Mv(Cmd):
             succ_no_impl = succ
         else:
             # Moving to a file or directory
-            assertion    = ((~IsFile(dst) | IsRead(dst)) & IsFile(srcs[0])) | \
-                           (~IsFile(dst) & IsDir(srcs[0]))
-            succ         = IsDeleted(srcs[0]) & \
-                           (IsRead(dst) >> IsFile(dst)) & \
-                           (IsDeleted(dst) >> \
-                               (IsFile(srcs[0]) >> IsFile(dst)) & \
-                               (IsDir(srcs[0]) >> IsDir(dst)))
+            # assertion = ( IsRead(dst) | ~IsFile(dst) ) & ~IsDeleted(srcs[0])
+            assertion = ~IsDeleted(srcs[0]) & (IsRead(dst) | IsDir(dst))
+            succ = IsDeleted(srcs[0]) & (IsFile(srcs[0]) >> IsFile(dst)) & (IsDir(srcs[0]) >> IsDir(dst))
+            # succ         = IsDeleted(srcs[0]) & \
+            #                (IsDeleted(dst) >> \
+            #                    (IsFile(srcs[0]) >> IsFile(dst)) & \
+            #                    (IsDir(srcs[0]) >> IsDir(dst)))
             succ_no_impl = IsDeleted(srcs[0]) & (IsFile(dst) | IsDir(dst))
 
         return CmdSpec(assertion, succ, Empty(), io)

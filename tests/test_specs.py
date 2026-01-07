@@ -342,7 +342,10 @@ def test_overwrite_file_xargs_core(tmp_path):
 
     report = reset_and_run_main(script, solver=True)
     expected_reports: list[reporter.Issue] = [
+        # For each line, we get two unsar: one for overwriting target (before reading it) and one for moving file (after moving it)
         reporter.UnsatisfiedPrecondition(Empty(), "xargs -I files mv files target", 2),
+        reporter.UnsatisfiedPrecondition(Empty(), "xargs -I files mv files target", 2),
+        reporter.UnsatisfiedPrecondition(Empty(), "xargs -I files mv files target", 3),
         reporter.UnsatisfiedPrecondition(Empty(), "xargs -I files mv files target", 3),
     ]
     assert_expected_report(report, expected_reports)
