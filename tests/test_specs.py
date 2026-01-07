@@ -346,3 +346,15 @@ def test_overwrite_file_xargs_core(tmp_path):
         reporter.UnsatisfiedPrecondition(Empty(), "xargs -I files mv files target", 3),
     ]
     assert_expected_report(report, expected_reports)
+
+def test_overwrite_file_xargs_core_fixed(tmp_path):
+    script = write_script(tmp_path, """
+    find . -name '*.R' | xargs -I files mv files target
+    find . -name '*.sh' | xargs -I files mv files target
+    """)
+
+    report = reset_and_run_main(script, solver=True)
+    expected_reports: list[reporter.Issue] = [
+    ]
+    assert_expected_report(report, expected_reports)
+
