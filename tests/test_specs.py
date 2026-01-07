@@ -358,3 +358,36 @@ def test_overwrite_file_xargs_core_fixed(tmp_path):
     ]
     assert_expected_report(report, expected_reports)
 
+def test_overwrite_file_xargs_core_fixed_mkdir(tmp_path):
+    script = write_script(tmp_path, """
+    mkdir target
+    find . -name '*.R' | xargs -I files mv files target
+    find . -name '*.sh' | xargs -I files mv files target
+    """)
+
+    report = reset_and_run_main(script, solver=True)
+    expected_reports: list[reporter.Issue] = [
+    ]
+    assert_expected_report(report, expected_reports)
+
+
+def delete_file_after_creation(tmp_path):
+    script = write_script(tmp_path, """
+    touch /tmp/somefile.txt
+    rm /tmp/somefile.txt
+    """)
+
+    report = reset_and_run_main(script, solver=True)
+    expected_report = reporter.UnsatisfiedPrecondition(None, "rm /tmp/somefile.txt", None)
+    assert_expected_report(report, [expected_report])
+
+
+def delete_file_after_creation_fixed(tmp_path):
+    script = write_script(tmp_path, """
+    touch /tmp/somefile.txt
+    grep "somepattern" /tmp/somefile.txt
+    rm /tmp/somefile.txt
+    """)
+
+    report = reset_and_run_main(script, solver=True)
+    assert_expected_report(report, [])
