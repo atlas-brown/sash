@@ -447,10 +447,10 @@ def touch_spec(cmd: CmdInvocation) -> CmdSpec:
     flags.discard("-t") # -t changes time to a specific time, which we do not model
 
     if flags == set(): # touch file...
-        # NOTE: Touch does not create unread files since they are empty upon creation
         assertion    = Empty()
-        succ         = And.from_field_iter(operands, lambda p: IsDeleted(p) >> IsRead(p))
-        succ_no_impl = And.from_field_iter(operands, lambda p: IsFile(p) | IsDir(p))
+        # Touch creates the file if it does not exist (all files are unread upon creation)
+        succ         = And.from_field_iter(operands, IsFile)
+        succ_no_impl = succ
 
     elif flags == set(["-c"]): # touch -c file...
         # -c tells touch to not create files if they do not exist, turning it essentially into a no-op for us
