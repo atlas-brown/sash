@@ -1567,11 +1567,11 @@ def symbexec_file(input_file: str,
         func_defs = find_func_defs([Trace((starting_state(),))], nodes, config)
         func_map = replace(FuncMap(funcs=func_defs))
 
-        def func_calls_dangerous(func_name: str, seen: set[str]) -> bool:
-            if func_name in seen:
-                return False
-            seen.add(func_name)
+        def func_calls_dangerous(func_name: str, danger_cache: dict[str, bool]) -> bool:
+            if func_name in danger_cache:
+                return danger_cache[func_name]
             func_node = func_defs.get(func_name)
+            danger_cache[func_name] = False
             if func_node is None:
                 return False
             for cmd in util.iter_ast_command(func_node):
@@ -1579,14 +1579,16 @@ def symbexec_file(input_file: str,
                     continue
                 name = command_name(cmd)
                 if is_dangerous_command(name):
+                    danger_cache[func_name] = True
                     return True
-                if name is not None and name in func_defs and func_calls_dangerous(name, seen):
+                if name is not None and name in func_defs and func_calls_dangerous(name, danger_cache):
+                    danger_cache[func_name] = True
                     return True
             return False
 
         safe_funcs = frozenset(
             name for name in func_defs.keys()
-            if not func_calls_dangerous(name, set())
+            if not func_calls_dangerous(name, {})
         )
         # opt_store = parse_shebang_args(input_file)
         if config.DFS_first:
