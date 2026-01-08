@@ -172,7 +172,7 @@ def run_solver(traces: list[Trace], config: InterpConfig, stop: threading.Event 
             break
 
         assertions = trace.latest_state.assertions
-        logging.debug("Trace %d/%d: checking %d assertions", i, len(traces), len(assertions))
+        logging.debug("Trace %d/%d: checking %d assertions", i + 1, len(traces), len(assertions))
         for assertion in assertions:
             if logging.getLogger().isEnabledFor(logging.DEBUG):
                 logging.debug("Checking assertion id %s from line %s :: %s", id(assertion), assertion.source_str, pformat(assertion))
