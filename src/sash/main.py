@@ -6,21 +6,11 @@ import threading
 import time
 
 import sash.symb
-from sash.config import Config
 from sash.interpreter_config import InterpConfig
 from sash.reporter import Report, Reporter
 from sash.solver import run_solver
+import sash.specs as specs
 
-timers = [] # keep references to timers to prevent garbage collection
-def set_timer(timeout: float | None, name: str) -> threading.Event | None:
-    stop_event = threading.Event()
-    if timeout is None or timeout <= 0:
-        return None
-    timer = threading.Timer(timeout, stop_event.set)
-    timer.daemon = True
-    timers.append(timer)
-    timer.start()
-    return stop_event
 
 def symbexec_main(file: str,
                   solver: bool = False,
@@ -42,19 +32,21 @@ def symbexec_main(file: str,
         case sash.symb.SymbexecStatus.COMPLETED:
             logging.info("Symbolic execution completed")
         case sash.symb.SymbexecStatus.INTERRUPTED:
-            logging.warning("Symbolic execution timed out; running solver with partial results")
+            logging.warning("Symbolic execution timed out; got partial results")
         case sash.symb.SymbexecStatus.FAILED:
-            logging.error("Symbolic execution failed")
+            logging.error("Symbolic execution failed; exiting")
             raise SystemExit(1)
         case _:
             assert False, "unreachable"
 
     if solver:
+        logging.info("Running solver")
         start_time = time.perf_counter()
         run_solver(result.traces, config, stop=set_timer(solver_timeout, "solver"))
         Reporter.set_solver_time(time.perf_counter() - start_time)
+        logging.info("Solver finished running")
     else:
-        logging.info("Skipping solver as configured")
+        logging.info("Skipping solver")
 
     return result
 
@@ -68,12 +60,13 @@ def main(file: str,
          enable_dfs: bool = False) -> Report:
 
     logging.basicConfig(
-        format="[%(asctime)s %(filename)s:%(lineno)d] %(message)s",
+        format="[%(levelname)s:%(module)s:%(lineno)d] %(message)s",
         level=getattr(logging, log_level.upper()) if log_level.lower() != "disabled" else logging.CRITICAL + 10,
         filename=log_file
     )
 
-    logging.info("Processing file %s with solver=%s and timeout=%s", file, solver, timeout)
+    logging.info("Processing file %s with solver=%s, exec_timeout=%s, solver_timeout=%s", file, solver, timeout, solver_timeout)
+    logging.info("Commands with specs: %s", [name for name, _ in specs.CMD_SPECS.items()])
 
     symbexec_main(file, solver, timeout, solver_timeout, enable_dfs)
 
@@ -156,6 +149,18 @@ def parse_cli():
     )
 
     return parser.parse_args()
+
+
+timers = [] # keep references to timers to prevent garbage collection
+def set_timer(timeout: float | None, name: str) -> threading.Event | None:
+    stop_event = threading.Event()
+    if timeout is None or timeout <= 0:
+        return None
+    timer = threading.Timer(timeout, stop_event.set)
+    timer.daemon = True
+    timers.append(timer)
+    timer.start()
+    return stop_event
 
 
 if __name__ == "__main__":

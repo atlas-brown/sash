@@ -159,25 +159,39 @@ def model_to_reports(core: list[z3.BoolRef]):
 # --> if sat, then there's a model where the assertion succeeds
 # --> if unsat, then there's no model where the assertion succeeds (ie it can only fail)
 def run_solver(traces: list[Trace], config: InterpConfig, stop: threading.Event | None = None):
-    logging.debug("Running Z3 solver on assertions")
-    for trace in traces:
+    total_issues_before_solver = len(Reporter._issues)
+    timed_out = False
+
+    total_assertions = sum(len(trace.latest_state.assertions) for trace in traces)
+    checked_assertions = 0
+
+    logging.info("Checking %d total assertions from %d total traces", total_assertions, len(traces))
+    for i, trace in enumerate(traces):
+        if timed_out:
+            logging.info("Ignoring %d/%d assertions due to solver timeout", total_assertions - checked_assertions, total_assertions)
+            break
+
         assertions = trace.latest_state.assertions
-        logging.debug("Checking %d assertions", len(assertions))
+        logging.debug("Trace %d/%d: checking %d assertions", i, len(traces), len(assertions))
         for assertion in assertions:
             if logging.getLogger().isEnabledFor(logging.DEBUG):
                 logging.debug("Checking assertion id %s from line %s :: %s", id(assertion), assertion.source_str, pformat(assertion))
 
             if stop and stop.is_set():
+                timed_out = True
                 logging.warning("Solver timed out")
                 Reporter.set_timed_out()
-                return
+                break
+
+            checked_assertions += 1
+
             solver = z3.Solver()
             solver.set(unsat_core=True)
             assertion_var, state_formula, assertion_formula = assertion_to_z3(assertion)
             solver.add(state_formula)
 
             if solver.check() == z3.unsat:
-                logging.debug("Path condition is unsat, skipping assertion check")
+                logging.debug("Path condition is unsat; skipping assertion check")
                 continue
 
             solver.assert_and_track(assertion_formula, assertion_var)
@@ -197,3 +211,5 @@ def run_solver(traces: list[Trace], config: InterpConfig, stop: threading.Event 
             else:
                 model = solver.model()
                 logging.debug("SAT model: %s", model)
+
+    logging.info("Solving produced %d new reports", len(Reporter._issues) - total_issues_before_solver)

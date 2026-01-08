@@ -856,34 +856,34 @@ def expand_simple(stuff: list[AST.ArgChar],
                                                                    WordCount(1, inf)))
                         elif var.fmt == "Plus" and not var.null:
                             # This is the case of `${VAR+word}`, where `VAR` is set: just expand to `word`.
-                            logging.debug("expansion: ${%s+word} with VAR set (non-colon form), expanding to word", var.var)
+                            logging.debug("Expansion: '${%s+word}' with VAR set (non-colon form), expanding to word", var.var)
                             Partial.add_the_default(self, var)
                         elif var.fmt == "Plus" and var.null:
                             # This is the case of `${VAR:+word}`, where `VAR` is set, we need to check whether it's empty or not and expand accordingly.
                             match v.value:
                                 case Field(_, WordCount(0, 0)):
-                                    logging.debug("expansion: ${%s:+word} with VAR empty, returning empty", var.var)
+                                    logging.debug("Expansion: '${%s:+word}' with VAR empty, returning empty", var.var)
                                     self.add_a_field(Field(SymStr(("",)), WordCount(0, 0)))
                                 case Field(SymStr(stuff), _) if all(isinstance(thing, str) for thing in stuff):
-                                    logging.debug("expansion: ${%s:+word} with VAR non-empty, expanding to word", var.var)
+                                    logging.debug("Expansion: '${%s:+word}' with VAR non-empty, expanding to word", var.var)
                                     Partial.add_the_default(self, var)
                                 case _:
-                                    logging.debug("expansion: forking on ${%s:+word} with potentially empty VAR", var.var)
+                                    logging.debug("Expansion: forking on '${%s:+word}' with potentially empty VAR", var.var)
                                     empty_case, word_case = self.fork(Description(f"{var.var} is non-empty for :+ expansion"))
                                     empty_case.add_a_field(Field(SymStr(("",)), WordCount(0, 0)))
                                     Partial.add_the_default(word_case, var)
                                     return [empty_case, word_case]
                         else:
-                            logging.info("expansion: treating var %s with unhandled fmt %s as completely arbitrary field", var.pretty(), var.fmt)
+                            logging.info("Expansion: treating var '%s' with unhandled fmt '%s' as completely arbitrary", var.pretty(), var.fmt)
                             self.add_a_field(arbitrary_field(var, ArbitraryType.APPROXIMATION, self.state))
                     elif var.fmt == "Minus":
                         # This is the case that $VAR is unset: take the default
                         if config.unbound_policy == UnboundVariablePolicy.EMPTY:
-                            logging.info("expansion: treating unset var %s as empty string due to config, so taking the default (%s) unconditionally",
+                            logging.info("Expansion: treating unset var '%s' as empty string due to config; taking the default ('%s') unconditionally",
                                          var.pretty(), util.shasta_pretty(var.arg))
                             Partial.add_the_default(self, var)
                         else:
-                            logging.debug("expansion: forking on unset var %s to take default (%s) or arbitrary",
+                            logging.debug("Expansion: forking on unset var '%s' to take default ('%s') or arbitrary",
                                           var.var, util.shasta_pretty(var.arg))
                             non_default, default = self.fork(Description(f"{var.var} takes the default value {Field.create_constant(util.shasta_pretty(var.arg))}"))
                             Partial.add_the_default(default, var)
@@ -896,23 +896,23 @@ def expand_simple(stuff: list[AST.ArgChar],
                         # This is the case that $VAR is unset
                         if config.unbound_policy == UnboundVariablePolicy.EMPTY:
                             # In the EMPTY pass, treat unset as definitely empty, so ${:?} terminates.
-                            logging.debug("expansion: terminating due to unset var %s with ${:?} (EMPTY policy)", var.var)
+                            logging.debug("Expansion: terminating due to unset var '%s' with '${:?}' (EMPTY policy)", var.var)
                             self.state = self.state.terminate()
                             return [self]
                         else:
                             # In the SYMBOLIC pass, assume it might be set and non-empty; do not terminate.
-                            logging.debug("expansion: treating unset var %s with ${:?} as non-empty to continue", var.var)
+                            logging.debug("Expansion: treating unset var '%s' with '${:?}' as non-empty to continue", var.var)
                             self.add_a_field(Field(CompletelyArbitrary(freeze_thing(var),
                                                                       ArbitraryType.ENVIRONMENT,
                                                                       self.state),
                                                    WordCount(1, inf)))
                     elif var.fmt == "Plus":
                         # This is the case where $VAR is unset.
-                        logging.info("expansion: treating unset var %s with ${%s+...} as an empty string", var.pretty(), var.fmt)
+                        logging.info("Expansion: treating unset var '%s' with '${%s+...}' as an empty string", var.pretty(), var.fmt)
                         self.add_a_field(Field(SymStr(("",)), WordCount(0, 0)))
                     elif var.fmt == "Assign":
                         # This is the case where $VAR is unset and ${VAR:=word} assigns the default.
-                        logging.debug("expansion: ${%s:=word} with VAR unset, assigning default", var.var)
+                        logging.debug("Expansion: '${%s:=word}' with VAR unset; assigning default", var.var)
                         default_fields, default_state = expand_default_value(self)
                         assign_default_value(self, default_fields, default_state)
                     else:
@@ -921,7 +921,7 @@ def expand_simple(stuff: list[AST.ArgChar],
                             error_code = reporter.UnboundIDSetU if self.state.opts.is_set(SetOptions.NOUNSET) else reporter.UnboundID
                             Reporter.add_issue(error_code(var.pretty(), context_line))
                         if config.unbound_policy == UnboundVariablePolicy.EMPTY:
-                            logging.info("expansion: treating unbound var %s as empty string due to config", var.pretty())
+                            logging.info("Expansion: treating unbound var '%s' as empty string due to config", var.pretty())
                             empty_str_field = Field(SymStr(("",)), WordCount(0, 0))
                             self.add_a_field(empty_str_field)
                             self.state = self.state.extend_localenv({var.var: ShellVar(empty_str_field, ghost=True)})
@@ -933,7 +933,7 @@ def expand_simple(stuff: list[AST.ArgChar],
                             self.state = self.state.extend_localenv({var.var: ShellVar(arbitrary_for_this_var, ghost=True)})
                             self.add_a_field(arbitrary_for_this_var)
                 case AST.BArgChar() as b:
-                    logging.info("expansion: treating backquote argchar %s as completely arbitrary field", b.pretty())
+                    logging.debug("Expansion: treating backquote argchar '%s' as completely arbitrary", b.pretty())
                     # todo use the trace: this case suggests we should really generalize the interface of `expand_simple` to be from one trace to many, instead of one state to many
                     t = guarded_interp_node([Trace((self.state,))], b.node, config)
                     output_field = None
@@ -955,8 +955,7 @@ def expand_simple(stuff: list[AST.ArgChar],
                     else:
                         self.add_a_field(arbitrary_field(b, ArbitraryType.APPROXIMATION, self.state))
                 case _:
-                    logging.error("argchar: %s %s", argchar.pretty(), type(argchar))
-                    logging.info("expansion: treating unhandled argchar as completely arbitrary field: %s", argchar.pretty())
+                    logging.error("Unsupported argchar of type '%s': '%s'; treating as completely arbitrary", argchar.NodeName, argchar.pretty())
                     self.add_a_field(arbitrary_field(argchar, ArbitraryType.APPROXIMATION, self.state))
 
             # Most cases fall through to here, no forking going on
@@ -1228,7 +1227,7 @@ def guarded_interp_node(traces: Traces,
         context_line = prev_context_line
         return res
     except NotImplementedError as e:
-        logging.error("Interp raised: %s. Ignoring.", e)
+        logging.error("Interp raised: '%s'; ignoring.", e)
         context_line = prev_context_line
         return traces
 
@@ -1445,7 +1444,7 @@ def interp_node(traces: Traces,
         # todo bring other cases as needed
 
         case _:
-            raise NotImplementedError(f"node type {node.NodeName} not handled")
+            raise NotImplementedError(f"Unhandled node type: '{node.NodeName}'")
 
 def starting_state(fs_model: FSModel | None = None) -> State:
     # env["IFS"] = ShellVar(" \t\n")
@@ -1505,12 +1504,16 @@ class SymbexecResult(NamedTuple):
 def symb_engine(nodes: list[parser.WrappedAst], config: InterpConfig) -> Traces:
     global context_line
     global func_map
-    logging.debug("Running symb engine with %d raw nodes", len(nodes))
+    global stop_event
+
+    logging.info("Running symb engine with %d raw nodes", len(nodes))
     traces = [Trace((starting_state(),))]
 
     func_map = replace(FuncMap(funcs=find_func_defs(traces, nodes, config)))
 
     for node in nodes:
+        if stop_event and stop_event.is_set():
+            break
         context_line = node.get_line_number()
         logging.debug("Interpreting next node (line %d) %s",
                       context_line, trim_string_for_logging(node.ast_node.pretty()))
@@ -1518,8 +1521,11 @@ def symb_engine(nodes: list[parser.WrappedAst], config: InterpConfig) -> Traces:
 
     func_traces: dict[str, Traces] = {}
     for (name, node) in func_map.uncalled_funcs().items():
-        logging.debug("Interpreting uncalled function '%s'", name)
+        if stop_event and stop_event.is_set():
+            break
+        logging.info("Interpreting uncalled function '%s'", name)
         func_traces[name] = guarded_interp_node([Trace((starting_state(),))], node, config)
+
 
     return traces + [t for ts in func_traces.values() for t in ts]
 
@@ -1546,7 +1552,7 @@ def symbexec_file(input_file: str,
 
         def branch_policy_half_n_half_if_too_many(node, t_then: Traces, t_else: Traces) -> tuple[Traces, Traces]:
             if len(t_then) + len(t_else) > 256:
-                logging.info("Too many traces, dropping half of them in branch policy")
+                logging.info("Too many traces; dropping half of them in branch policy")
                 half_then = [t for i, t in enumerate(t_then) if i % 2 == 0]
                 half_else = [t for i, t in enumerate(t_else) if i % 2 == 0]
                 return (half_then, half_else)

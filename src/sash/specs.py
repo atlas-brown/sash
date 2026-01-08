@@ -526,8 +526,7 @@ for name, func in inspect.getmembers(current_module, inspect.isfunction):
 def get_spec(cmd_name: str | None, cmd_: tuple[Field, ...]) -> CmdSpec | None:
     if cmd_name in CMD_SPECS:
         return CMD_SPECS[cmd_name](parse_command(cmd_))
-    logging.info("Specs are %s", CMD_SPECS)
-    logging.warning("No spec found for command '%s', treating as no-op.", cmd_name)
+    logging.warning("Unknown command '%s'; treating as no-op.", cmd_name)
 
 
 def log_crit_unhandled_inv(cmd: CmdInvocation) -> None:

@@ -4,6 +4,8 @@ from typing import Callable
 
 import shasta.ast_node as AST
 
+from sash.frozen import FrozenDict
+from sash.parser import WrappedAst
 import sash.util as util
 from sash.interpreter_config import BranchDecision, InterpConfig, UnboundVariablePolicy
 from sash.specs import CMD_SPECS
@@ -15,10 +17,10 @@ class TargetedDfsResult:
     traces: Traces
 
 
-def run_targeted_dfs(nodes: list,
+def run_targeted_dfs(nodes: list[WrappedAst],
                      config: InterpConfig,
                      symb_engine: Callable[[list, InterpConfig], Traces],
-                     func_defs: dict,
+                     func_defs: FrozenDict,
                      ignore_function_calls_for: frozenset[str],
                      trace_cap: int = 8) -> TargetedDfsResult:
     def constant_word(arg: list[AST.ArgChar]) -> str | None:
@@ -101,6 +103,8 @@ def run_targeted_dfs(nodes: list,
     def find_dangerous_lines() -> list[int]:
         lines: set[int] = set()
         for wrapped in nodes:
+            if not isinstance(wrapped.ast_node, AST.Command):
+                continue
             for cmd in util.iter_ast_command(wrapped.ast_node):
                 if isinstance(cmd, AST.CommandNode):
                     name = command_name(cmd) or ""
@@ -122,6 +126,7 @@ def run_targeted_dfs(nodes: list,
         return BranchDecision.FIRST
 
     dangerous_lines = find_dangerous_lines()
+    logging.info("Dangerous lines: %s", dangerous_lines)
     all_traces: list[Trace] = []
     for target_line in dangerous_lines:
         def branch_policy_pre_for_target(node: AST.AstNode) -> BranchDecision | None:
