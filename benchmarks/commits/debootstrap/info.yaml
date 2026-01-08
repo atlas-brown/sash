@@ -1,8 +1,8 @@
 bugs:
-- line: 47
+- line: 67
   description: Variable in for loop is never used/For loop body is constant
   note: unclear if we should try to catch this
-- line: 490
+- line: 510
   description: An invocation of the script deletes the process working directory
 
 note:
@@ -17,12 +17,12 @@ sources:
 
 ground_truth:
   errors:
-  - line: 47
+  - line: 67
     code: unused_loop_var
     shellcheck:
       detects: true
       fixed_false_positive: false
-  - line: 490
+  - line: 510
     code: word_split_del_sys_file
     shellcheck:
       detects: false
