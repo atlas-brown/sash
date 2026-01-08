@@ -1509,7 +1509,7 @@ def symb_engine(nodes: list[parser.WrappedAst], config: InterpConfig) -> Traces:
     logging.info("Running symb engine with %d raw nodes", len(nodes))
     traces = [Trace((starting_state(),))]
 
-    func_map = replace(FuncMap(funcs=find_func_defs(traces, nodes, config)))
+    func_map = replace(func_map, funcs=find_func_defs(traces, nodes, config), called=set())
 
     for node in nodes:
         if stop_event and stop_event.is_set():
@@ -1519,8 +1519,11 @@ def symb_engine(nodes: list[parser.WrappedAst], config: InterpConfig) -> Traces:
                       context_line, trim_string_for_logging(node.ast_node.pretty()))
         traces = guarded_interp_node(traces, node.ast_node, config)
 
+    uncalled_funcs = func_map.uncalled_funcs().items()
+    func_map = FuncMap() # Replace the func map with an empty one to avoid generating false "Undefined function" errors when checking uncalled functions
+
     func_traces: dict[str, Traces] = {}
-    for (name, node) in func_map.uncalled_funcs().items():
+    for (name, node) in uncalled_funcs:
         if stop_event and stop_event.is_set():
             break
         logging.info("Interpreting uncalled function '%s'", name)
@@ -1565,7 +1568,6 @@ def symbexec_file(input_file: str,
 
         nodes = parser.parse_shell_script(input_file)
         func_defs = find_func_defs([Trace((starting_state(),))], nodes, config)
-        func_map = replace(FuncMap(funcs=func_defs))
 
         def func_calls_dangerous(func_name: str, danger_cache: dict[str, bool]) -> bool:
             if func_name in danger_cache:
