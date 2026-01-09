@@ -238,7 +238,7 @@ def handle_rm(expanded_args: tuple[Field, ...], trace: Trace, node: AST.CommandN
                 if is_protected(exp):
                     Reporter.add_issue(reporter.WordSplitCouldDeleteSystemFile(exp, context_line))
 
-            if max_words and not content.quoted:
+            if max_words > 1 and not content.quoted:
                 if content.prefix is not None and (pre := content.prefix.try_to_str()) and is_protected(pre):
                     Reporter.add_issue(reporter.WordSplitCouldDeleteSystemFile(pre, context_line))
                 if content.suffix is not None and (suf := content.suffix.try_to_str()) and is_protected(suf):
