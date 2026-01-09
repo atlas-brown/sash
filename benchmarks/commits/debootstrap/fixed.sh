@@ -21,6 +21,26 @@ DEVICES_TARGZ=$DEBOOTSTRAP_DIR/devices.tar.gz
 . $DEBOOTSTRAP_DIR/functions
 exec 4>&1
 
+# ================ $DEBOOTSTRAP_DIR/functions
+error() {
+  # <error code> <name> <string> <args>
+  err="$1"
+  name="$2"
+  fmt="$3"
+  shift; shift; shift
+  if [ "$USE_DEBIANINSTALLER_INTERACTION" ]; then
+    (echo "E: $name"
+    for x in "$@"; do echo "EA: $x"; done
+    echo "EF: $fmt") >&4
+  elif [ "$USE_GETTEXT_INTERACTION" ]; then
+    (printf "E: $(LANG=$GETTEXT_LANG gettext debootstrap "$fmt")\n" "$@") >&4
+  else
+    (printf "E: $fmt\n" "$@") >&4
+  fi
+  exit $err
+}
+# ==================================================
+
 GETTEXT_LANG=$LANG
 LANG=C
 USE_COMPONENTS=main
@@ -34,7 +54,7 @@ umask 022
 
 ###########################################################################
 
-## phases: 
+## phases:
 ##   finddebs dldebs printdebs first_stage second_stage
 
 RESOLVE_DEPS=true
@@ -75,7 +95,7 @@ usage()
 
       --include=A,B,C        adds specified names to the list of base packages
       --exclude=A,B,C        removes specified packages from the list
-      --components=A,B,C     use packages from the listed components of the 
+      --components=A,B,C     use packages from the listed components of the
                              archive
       --variant=X            use variant X of the bootstrap scripts
                              (currently supported variants: buildd, fakechroot)
@@ -418,7 +438,7 @@ if am_doing_phase maketarball; then
 fi
 
 if am_doing_phase first_stage; then
-  # first stage sets up the chroot -- no calls should be made to 
+  # first stage sets up the chroot -- no calls should be made to
   # "chroot $TARGET" here; but they should be possible by the time it's
   # finished
   first_stage_install
