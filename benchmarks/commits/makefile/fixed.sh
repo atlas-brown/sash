@@ -71,9 +71,9 @@ depend() {
 }
 
 install() {
-    if test -z "$(LIBDIR)"; then
+    if test -z "${LIBDIR}"; then
 	  echo "*** Variable LIBDIR not set"; exit 1; fi
-	if test -z "$(CAMLP5N)"; then
+	if test -z "${CAMLP5N}"; then
 	  echo "*** Variable CAMLP5N not set"; exit 1; fi
     rm -rf "${DESTDIR}${LIBDIR}/${CAMLP5N}"
     for i in $DIRS compile; do run_make "$i" install DESTDIR="$DESTDIR"; done
