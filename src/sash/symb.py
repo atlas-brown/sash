@@ -211,7 +211,7 @@ def command_substitution_output(cmd_name: str,
 
     return None
 
-def handle_rm(expanded_args: tuple[Field], trace: Trace, node: AST.CommandNode) -> tuple[Trace, Trace]:
+def handle_rm(expanded_args: tuple[Field, ...], trace: Trace, node: AST.CommandNode) -> tuple[Trace, Trace]:
     logging.debug("Checking rm command with expansion possibility: %s", expanded_args)
     spec = get_spec("rm", expanded_args)
 
@@ -226,28 +226,37 @@ def handle_rm(expanded_args: tuple[Field], trace: Trace, node: AST.CommandNode) 
     for arg_idx, arg_field in enumerate(expanded_args[1:], start=1):
         if (path := arg_field.try_to_str()) and is_protected(path):
             Reporter.add_issue(reporter.DeleteSystemFile(path, context_line))
+
         def maybe_report_protected_split(content: CompletelyArbitrary, max_words: int | float) -> None:
-            maybe_empty = content.maybe_empty
-            if maybe_empty or (max_words > 1 and not content.quoted):
-                if content.prefix is not None and (path := content.prefix.try_to_str()) and is_protected(path):
-                    Reporter.add_issue(reporter.WordSplitCouldDeleteSystemFile(path, context_line))
-                if content.suffix is not None and (path := content.suffix.try_to_str()) and is_protected(path):
-                    Reporter.add_issue(reporter.WordSplitCouldDeleteSystemFile(path, context_line))
-                # Handle cases like "${DESTDIR}${LIBDIR}/${CAMLP5N}" where the literal "/" is embedded between the prefixes and suffixes
-                # and gets untracked during merging (in `collect_prefixes_suffixes`).
-                if arg_idx < len(node.arguments):
-                    literal_path = extract_literal_strings_from_arg(node.arguments[arg_idx])
-                    if literal_path and is_protected(literal_path):
-                        Reporter.add_issue(reporter.WordSplitCouldDeleteSystemFile(literal_path, context_line))
+            if content.maybe_empty and content.quoted:
+                # "<pre>$VAR<post>" but $VAR could be empty
+                exp = ""
+                if content.prefix is not None and (pre := content.prefix.try_to_str()):
+                    exp += pre
+                if content.suffix is not None and (suf := content.suffix.try_to_str()):
+                    exp += suf
+                if is_protected(exp):
+                    Reporter.add_issue(reporter.WordSplitCouldDeleteSystemFile(exp, context_line))
+
+            if max_words and not content.quoted:
+                if content.prefix is not None and (pre := content.prefix.try_to_str()) and is_protected(pre):
+                    Reporter.add_issue(reporter.WordSplitCouldDeleteSystemFile(pre, context_line))
+                if content.suffix is not None and (suf := content.suffix.try_to_str()) and is_protected(suf):
+                    Reporter.add_issue(reporter.WordSplitCouldDeleteSystemFile(suf, context_line))
+
+            # Handle cases where multiple arbitraries are merged into one and the literals between them get "lost" during the merging (e.g. $a/$b when a and b are empty)
+            # This overapproximates things because it does not consider that one of the arbitraries could be for-sure not empty
+            # Also, to avoid making this even on non-merged arbitraries, we first check that the arbitrary has more than one sources
+            if isinstance(content.source, tuple) and len(content.source) > 1 and arg_idx < len(node.arguments):
+                literal_path = extract_literal_strings_from_arg(node.arguments[arg_idx])
+                if literal_path and is_protected(literal_path):
+                    Reporter.add_issue(reporter.WordSplitCouldDeleteSystemFile(literal_path, context_line))
 
         match arg_field:
-            case Field(CompletelyArbitrary() as content, WordCount(_, max_words)) if not content.quoted and max_words > 1:
-                Reporter.add_issue(reporter.DangerousWordSplit(content.source, context_line))
-                maybe_report_protected_split(content, max_words)
             case Field(CompletelyArbitrary() as content, WordCount(_, max_words)):
+                if not content.quoted and max_words > 1:
+                    Reporter.add_issue(reporter.DangerousWordSplit(content.source, context_line))
                 maybe_report_protected_split(content, max_words)
-            case _:
-                pass
 
     return (
         trace.extend(lambda s: s.update_fs(spec.success_postcond)\
