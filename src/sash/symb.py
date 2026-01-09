@@ -338,8 +338,9 @@ def handle_function_call(name: str,
     # TODO: should actually pop the localenv as well! need a stack of localenvs...
     return [t.extend(lambda s: s.exit_function()) for t in call_result_traces]
 
-def record_assignment(trace: Trace, var: str, rhs: Field) -> Trace:
-    return trace.extend(lambda s: s.set_env(var, ShellVar(rhs)).set_last_exit_code(SymStr(("0",)), Confidence.DEFINITE))
+def record_assignment(trace: Trace, var: str, rhs: Field, definite_confidence: bool = True) -> Trace:
+    conf = Confidence.DEFINITE if definite_confidence else Confidence.SPECULATIVE
+    return trace.extend(lambda s: s.set_env(var, ShellVar(rhs)).set_last_exit_code(SymStr(("0",)), conf))
 
 def handle_while(traces: Traces,
                  node: AST.WhileNode,
@@ -1292,9 +1293,14 @@ def interp_node(traces: Traces,
             # A simple way to achieve this is to unquote the argument before passing it to expand().
 
             # "if the value of the node is a single quoted argument, remove the quotes"
+
             val = node.val[0].arg if len(node.val) == 1 and isinstance(node.val[0], AST.QArgChar) else node.val
+
             trace_expansion_pairs = expand(traces, val, config)
-            return [record_assignment(t, node.var, join_fields(rhs)) for (t, rhs) in trace_expansion_pairs]
+
+            # If the assignment contains a command substitution do not set exit code to 0 with definite confidence
+            assignment_definitely_succeeds = not any(isinstance(ac, AST.BArgChar) for ac in util.iter_argchar_list(node.val, [AST.AArgChar]))
+            return [record_assignment(t, node.var, join_fields(rhs), assignment_definitely_succeeds) for (t, rhs) in trace_expansion_pairs]
 
 
         case AST.SemiNode():

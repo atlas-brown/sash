@@ -81,6 +81,20 @@ def iter_ast_command(node: AST.Command, skip: list[type[AST.Command]] = []) -> G
             pass
 
 
+def iter_argchar_list(nodes: list[AST.ArgChar], skip: list[type[AST.ArgChar]]) -> Generator[AST.ArgChar]:
+    for node in nodes:
+        if type(node) in skip:
+            continue
+
+        yield node
+
+        match node:
+            case AST.CArgChar() | AST.EArgChar() | AST.TArgChar() | AST.BArgChar():
+                pass
+            case AST.AArgChar() | AST.VArgChar() | AST.QArgChar():
+                yield from iter_argchar_list(node.arg, skip)
+
+
 def iter_constraint(node: Constraint, skip: list[type[Constraint]]) -> Generator[Constraint]:
     if type(node) in skip:
         return
