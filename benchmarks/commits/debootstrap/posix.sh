@@ -22,7 +22,7 @@ DEVICES_TARGZ=$DEBOOTSTRAP_DIR/devices.tar.gz
 exec 4>&1
 
 # ================ $DEBOOTSTRAP_DIR/functions
-error () {
+error() {
   # <error code> <name> <string> <args>
   err="$1"
   name="$2"
@@ -281,7 +281,7 @@ else
 
   MIRRORS="$DEF_MIRROR"
   SCRIPT="$DEBOOTSTRAP_DIR/scripts/$1"
-  if [ -n "$VARIANT" -a -e "${SCRIPT}.${VARIANT}" ]; then
+  if [ -n "$VARIANT" ] && [ -e "${SCRIPT}.${VARIANT}" ]; then
     SCRIPT="${SCRIPT}.${VARIANT}"
     SUPPORTED_VARIANTS="$VARIANT"
   fi
@@ -385,7 +385,7 @@ fi
 ###########################################################################
 
 if am_doing_phase finddebs; then
-  if [ "$FINDDEBS_NEEDS_INDICES" = "true" -o "$RESOLVE_DEPS" = "true" ]; then
+  if [ "$FINDDEBS_NEEDS_INDICES" = "true" ] || [ "$RESOLVE_DEPS" = "true" ]; then
     download_indices
     GOT_INDICES=true
   fi

@@ -428,7 +428,7 @@ if [ "$UNAME" = "Linux" ]; then
 
 		# Install any additional dependencies
 		STEAMDEPS="`dirname $STEAMSCRIPT`/`detect_package`deps"
-		if [ -f "$STEAMDEPS" -a -f "$STEAMROOT/steamdeps.txt" ]; then
+		if [ -f "$STEAMDEPS" ] && [ -f "$STEAMROOT/steamdeps.txt" ]; then
 			"$STEAMDEPS" $STEAMROOT/steamdeps.txt
 		fi
 
@@ -436,7 +436,7 @@ if [ "$UNAME" = "Linux" ]; then
 		if [ ! -e "$STEAMCONFIG" ]; then
 			mkdir "$STEAMCONFIG"
 		fi
-		if [ "$STEAMROOT" != "$STEAMROOTLINK" -a "$STEAMROOT" != "$STEAMDATALINK" ]; then
+		if [ "$STEAMROOT" != "$STEAMROOTLINK" ] && [ "$STEAMROOT" != "$STEAMDATALINK" ]; then
 			rm -f "$STEAMBIN32LINK" && ln -s "$STEAMROOT/$PLATFORM32" "$STEAMBIN32LINK"
 			rm -f "$STEAMBIN64LINK" && ln -s "$STEAMROOT/$PLATFORM64" "$STEAMBIN64LINK"
 			rm -f "$STEAMSDK32LINK" && ln -s "$STEAMROOT/linux32" "$STEAMSDK32LINK"
@@ -520,7 +520,7 @@ if [ "$UNAME" = "Linux" ]; then
 	else
 		echo "STEAM_RUNTIME has been set by the user to: $STEAM_RUNTIME"
 	fi
-	if [ "$STEAM_RUNTIME" -a "$STEAM_RUNTIME" != "0" ]; then
+	if [ "$STEAM_RUNTIME" ] && [ "$STEAM_RUNTIME" != "0" ]; then
 		# Unpack the runtime if necessary
 		if unpack_runtime; then
 			case $(uname -m) in
@@ -584,10 +584,10 @@ export PATH="$SYSTEM_PATH"
 export LD_LIBRARY_PATH="$SYSTEM_LD_LIBRARY_PATH"
 
 if [ "$UNAME" = "Linux" ]; then
-	if [ "$INITIAL_LAUNCH" -a \
-	     $STATUS -ne $MAGIC_RESTART_EXITCODE -a \
-	     -f "$STEAMSTARTING" -a \
-	     -z "$STEAM_INSTALLED_BOOTSTRAP" -a \
+	if [ "$INITIAL_LAUNCH" ] && [ \
+	     $STATUS -ne $MAGIC_RESTART_EXITCODE ] && [ \
+	     -f "$STEAMSTARTING" ] && [ \
+	     -z "$STEAM_INSTALLED_BOOTSTRAP" ] && [ \
 	     -z "$STEAMSCRIPT_OUTOFDATE" ]; then
 		# Launching the bootstrap failed, try reinstalling
 		if install_bootstrap; then

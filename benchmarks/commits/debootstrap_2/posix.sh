@@ -166,7 +166,7 @@ if [ $# != 0 ] ; then
 		if [ "$SECOND_STAGE_ONLY" != "true" ] ; then
 			error 1 STAGE2ONLY "option %s only applies in the second stage" "$1"
 		fi
-		if [ "$1" = "--second-stage-target" -a -n "$2" ] ; then
+		if [ "$1" = "--second-stage-target" ] && [ -n "$2" ] ; then
 			CHROOTDIR="$2"
 			shift 2
 		elif [ "$1" != "${1#--second-stage-target=}" ]; then
@@ -187,7 +187,7 @@ if [ $# != 0 ] ; then
 		;;
 	    --make-tarball|--make-tarball=?*)
 		WHAT_TO_DO="finddebs dldebs maketarball kill_target"
-		if [ "$1" = "--make-tarball" -a -n "$2" ] ; then
+		if [ "$1" = "--make-tarball" ] && [ -n "$2" ] ; then
 			MAKE_TARBALL="$2"
 			shift 2
 		elif [ "$1" != "${1#--make-tarball=}" ]; then
@@ -211,7 +211,7 @@ if [ $# != 0 ] ; then
 		shift
 		;;
 	    --arch|--arch=?*)
-		if [ "$1" = "--arch" -a -n "$2" ] ; then
+		if [ "$1" = "--arch" ] && [ -n "$2" ] ; then
 			ARCH="$2"
 			shift 2
                 elif [ "$1" != "${1#--arch=}" ]; then
@@ -222,7 +222,7 @@ if [ $# != 0 ] ; then
 		fi
 		;;
 	    --extractor|--extractor=?*)
-		if [ "$1" = "--extractor" -a -n "$2" ] ; then
+		if [ "$1" = "--extractor" ] && [ -n "$2" ] ; then
 			EXTRACTOR_OVERRIDE="$2"
 			shift 2
 		elif [ "$1" != "${1#--extractor=}" ]; then
@@ -240,7 +240,7 @@ if [ $# != 0 ] ; then
 		fi
 		;;
 	    --unpack-tarball|--unpack-tarball=?*)
-		if [ "$1" = "--unpack-tarball" -a -n "$2" ] ; then
+		if [ "$1" = "--unpack-tarball" ] && [ -n "$2" ] ; then
 			UNPACK_TARBALL="$2"
 			shift 2
 		elif [ "$1" != "${1#--unpack-tarball=}" ]; then
@@ -254,7 +254,7 @@ if [ $# != 0 ] ; then
 		fi
 		;;
 	    --include|--include=?*)
-		if [ "$1" = "--include" -a -n "$2" ]; then
+		if [ "$1" = "--include" ] && [ -n "$2" ]; then
 			ADDITIONAL="$2"
 			shift 2
                 elif [ "$1" != "${1#--include=}" ]; then
@@ -266,7 +266,7 @@ if [ $# != 0 ] ; then
 		ADDITIONAL="$(echo "$ADDITIONAL" | tr , " ")"
 		;;
 	    --exclude|--exclude=?*)
-		if [ "$1" = "--exclude" -a -n "$2" ]; then
+		if [ "$1" = "--exclude" ] && [ -n "$2" ]; then
 			EXCLUDE="$2"
 			shift 2
                 elif [ "$1" != "${1#--exclude=}" ]; then
@@ -283,7 +283,7 @@ if [ $# != 0 ] ; then
 		shift 1
 		;;
 	    --components|--components=?*)
-		if [ "$1" = "--components" -a -n "$2" ]; then
+		if [ "$1" = "--components" ] && [ -n "$2" ]; then
 			USE_COMPONENTS="$2"
 			shift 2
                 elif [ "$1" != "${1#--components=}" ]; then
@@ -295,7 +295,7 @@ if [ $# != 0 ] ; then
 		USE_COMPONENTS="$(echo "$USE_COMPONENTS" | tr , "|")"
 		;;
 	    --variant|--variant=?*)
-		if [ "$1" = "--variant" -a -n "$2" ]; then
+		if [ "$1" = "--variant" ] && [ -n "$2" ]; then
 			VARIANT="$2"
 			shift 2
                 elif [ "$1" != "${1#--variant=}" ]; then
@@ -317,7 +317,7 @@ if [ $# != 0 ] ; then
 		if ! gpgv --version >/dev/null 2>&1; then
 			error 1 NEEDGPGV "gpgv not installed, but required for Release verification"
 		fi
-		if [ "$1" = "--keyring" -a -n "$2" ]; then
+		if [ "$1" = "--keyring" ] && [ -n "$2" ]; then
 			KEYRING="$2"
 			shift 2
                 elif [ "$1" != "${1#--keyring=}" ]; then
@@ -339,7 +339,7 @@ if [ $# != 0 ] ; then
 			FORCE_KEYRING=1
 		;;
 	    --certificate|--certificate=?*)
-		if [ "$1" = "--certificate" -a -n "$2" ]; then
+		if [ "$1" = "--certificate" ] && [ -n "$2" ]; then
 			CERTIFICATE="--certificate=$2"
 			shift 2
 		elif [ "$1" != "${1#--certificate=}" ]; then
@@ -350,7 +350,7 @@ if [ $# != 0 ] ; then
 		fi
 		;;
 	    --private-key|--private-key=?*)
-		if [ "$1" = "--private-key" -a -n "$2" ]; then
+		if [ "$1" = "--private-key" ] && [ -n "$2" ]; then
 			PRIVATEKEY="--private-key=$2"
 			shift 2
 		elif [ "$1" != "${1#--private-key=}" ]; then
@@ -376,7 +376,7 @@ fi
 
 ###########################################################################
 
-if [ -n "$DISABLE_KEYRING" -a -n "$FORCE_KEYRING" ]; then
+if [ -n "$DISABLE_KEYRING" ] && [ -n "$FORCE_KEYRING" ]; then
 	error 1 BADARG "Both --no-check-gpg and --force-check-gpg specified, please pick one (at most)"
 fi
 

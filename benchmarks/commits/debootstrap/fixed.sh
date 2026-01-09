@@ -239,7 +239,7 @@ if [ "$SECOND_STAGE_ONLY" = "true" ]; then
   MIRRORS=null:
   SCRIPT=$DEBOOTSTRAP_DIR/suite-script
 else
-  if [ "$1" = "" -o "$2" = "" ]; then # fix here: $2 __must__ be specified by the user
+  if [ "$1" = "" ] || [ "$2" = "" ]; then # fix here: $2 __must__ be specified by the user
     usage_err 1 NEEDSUITETARGET "You must specify a suite and a target."
   fi
   SUITE="$1"
@@ -255,7 +255,7 @@ else
 
   MIRRORS="$DEF_MIRROR"
   SCRIPT="$DEBOOTSTRAP_DIR/scripts/$1"
-  if [ -n "$VARIANT" -a -e "${SCRIPT}.${VARIANT}" ]; then
+  if [ -n "$VARIANT" ] && [ -e "${SCRIPT}.${VARIANT}" ]; then
     SCRIPT="${SCRIPT}.${VARIANT}"
     SUPPORTED_VARIANTS="$VARIANT"
   fi
@@ -359,7 +359,7 @@ fi
 ###########################################################################
 
 if am_doing_phase finddebs; then
-  if [ "$FINDDEBS_NEEDS_INDICES" = "true" -o "$RESOLVE_DEPS" = "true" ]; then
+  if [ "$FINDDEBS_NEEDS_INDICES" = "true" ] || [ "$RESOLVE_DEPS" = "true" ]; then
     download_indices
     GOT_INDICES=true
   fi
