@@ -16,6 +16,7 @@ notes:
 ground_truth:
   errors:
   - line: 131
+    line_in_fixed: 131
     code:
       - word_split_del_sys_file
       - word_split
@@ -24,6 +25,7 @@ ground_truth:
       fixed_false_positive: false
       code: SC2115
   - line: 144
+    line_in_fixed: 144
     code:
       - word_split_del_sys_file
       - word_split

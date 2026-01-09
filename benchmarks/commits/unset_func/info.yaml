@@ -8,6 +8,7 @@ sources:
 ground_truth:
   errors:
   - line: 75
+    line_in_fixed: 120
     code: function_use_before_def
     shellcheck:
       detects: true

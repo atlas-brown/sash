@@ -18,6 +18,7 @@ notes:
 ground_truth:
   errors:
   - line: 179
+    line_in_fixed: 181
     code: const_cond
     shellcheck:
       detects: true
@@ -25,6 +26,7 @@ ground_truth:
       code: SC2181
       note: Warns about not checking exit codes indirectly; it's a 'style' check
   - line: 203
+    line_in_fixed: 211
     code: const_cond
     note: This is only const along one execution path
     shellcheck:

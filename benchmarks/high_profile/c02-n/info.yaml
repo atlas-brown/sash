@@ -10,6 +10,7 @@ sources:
 ground_truth:
   errors:
   - line: 145
+    line_in_fixed: 144
     code:
       - del_sys_file
       - word_split

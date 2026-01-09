@@ -10,11 +10,13 @@ sources:
 ground_truth:
   errors:
   - line: 8
+    line_in_fixed: 8
     code: loop_once
     shellcheck:
       detects: true
       fixed_false_positive: false
   - line: 15
+    line_in_fixed: 15
     code: loop_once
     shellcheck:
       detects: true

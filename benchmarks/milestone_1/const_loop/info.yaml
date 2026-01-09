@@ -10,6 +10,7 @@ sources:
 ground_truth:
   errors:
   - line: 11
+    line_in_fixed: 11
     code: infinite_loop
     shellcheck:
       detects: false

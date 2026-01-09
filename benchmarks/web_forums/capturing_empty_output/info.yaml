@@ -8,6 +8,7 @@ sources:
 ground_truth:
   errors:
   - line: 11
+    line_in_fixed: 11
     code: capturing_empty_output
     shellcheck:
       detects: false

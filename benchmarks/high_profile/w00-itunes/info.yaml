@@ -10,6 +10,7 @@ sources:
 ground_truth:
   errors:
   - line: 5
+    line_in_fixed: 5
     code: word_split
     shellcheck:
       detects: true

@@ -10,11 +10,13 @@ sources:
 ground_truth:
   errors:
   - line: 3
+    line_in_fixed: 3
     code: unexpected_stdin
     shellcheck:
       detects: false
       fixed_false_positive: false
   - line: 4
+    line_in_fixed: 4
     code: unexpected_stdin
     shellcheck:
       detects: false

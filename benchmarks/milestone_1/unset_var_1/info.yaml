@@ -24,6 +24,7 @@ sources:
 ground_truth:
   errors:
   - line: 37
+    line_in_fixed: 37
     code: unbound
     fix_clears: false
     shellcheck:
@@ -32,6 +33,7 @@ ground_truth:
       code: SC2154
       note: Needs --enable=check-unassigned-uppercase
   - line: 57
+    line_in_fixed: 57
     code: unbound
     shellcheck:
       detects: true
@@ -39,6 +41,7 @@ ground_truth:
       code: SC2154
       note: Needs --enable=check-unassigned-uppercase
   - line: 60
+    line_in_fixed: 60
     code: unbound
     shellcheck:
       detects: true
@@ -46,6 +49,7 @@ ground_truth:
       code: SC2154
       note: Needs --enable=check-unassigned-uppercase
   - line: 61
+    line_in_fixed: 61
     code: unbound
     duplicate: true
     shellcheck:
@@ -54,6 +58,7 @@ ground_truth:
       code: SC2154
       note: Needs --enable=check-unassigned-uppercase
   - line: 62
+    line_in_fixed: 62
     code: unbound
     duplicate: true
     shellcheck:
@@ -62,6 +67,7 @@ ground_truth:
       code: SC2154
       note: Needs --enable=check-unassigned-uppercase
   - line: 63
+    line_in_fixed: 63
     code: unbound
     duplicate: true
     shellcheck:
@@ -70,6 +76,7 @@ ground_truth:
       code: SC2154
       note: Needs --enable=check-unassigned-uppercase
   - line: 64
+    line_in_fixed: 64
     code: unbound
     duplicate: true
     shellcheck:
@@ -78,6 +85,7 @@ ground_truth:
       code: SC2154
       note: Needs --enable=check-unassigned-uppercase
   - line: 65
+    line_in_fixed: 65
     code: unbound
     duplicate: true
     shellcheck:

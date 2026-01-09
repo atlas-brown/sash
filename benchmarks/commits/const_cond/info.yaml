@@ -11,6 +11,7 @@ sources:
 ground_truth:
   errors:
   - line: 42
+    line_in_fixed: 43
     code: const_cond
     shellcheck:
       detects: true

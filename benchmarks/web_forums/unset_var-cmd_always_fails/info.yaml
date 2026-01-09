@@ -11,6 +11,7 @@ ground_truth:
   errors:
   - code: unbound
     line: 9
+    line_in_fixed: 9
     shellcheck:
       detects: true
       fixed_false_positive: false
@@ -18,6 +19,7 @@ ground_truth:
       note: Detects that it's probably a misspelling of $OPTARG
   - code: command_can_only_fail
     line: 16
+    line_in_fixed: 16
     shellcheck:
       detects: false
       fixed_false_positive: false

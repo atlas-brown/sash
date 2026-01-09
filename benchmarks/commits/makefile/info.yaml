@@ -11,12 +11,14 @@ sources:
 ground_truth:
   errors:
   - line: 74
+    line_in_fixed: 78
     code: word_split_del_sys_file
     shellcheck:
       detects: true
       fixed_false_positive: true
       code: SC2115
   - line: 79
+    line_in_fixed: 87
     code: word_split_del_sys_file
     shellcheck:
       detects: true

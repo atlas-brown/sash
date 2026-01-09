@@ -10,6 +10,7 @@ sources:
 ground_truth:
   errors:
   - line: 85
+    line_in_fixed: 85
     code: unbound
     note: we only expect one report, first unbound occurence
     shellcheck:

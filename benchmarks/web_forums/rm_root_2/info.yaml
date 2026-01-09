@@ -10,6 +10,7 @@ sources:
 ground_truth:
   errors:
   - line: 24
+    line_in_fixed: 24
     code: word_split_del_sys_file
     shellcheck:
       detects: true

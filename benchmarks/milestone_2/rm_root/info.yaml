@@ -46,6 +46,7 @@ sources:
 ground_truth:
   errors:
   - line: 4
+    line_in_fixed: 4
     code: not_a_command
     note: A command name never ends in /
     shellcheck:
@@ -53,6 +54,7 @@ ground_truth:
       fixed_false_positive: false
       code: SC1127
   - line: 5
+    line_in_fixed: 5
     code: not_a_command
     note: A command name never ends in /
     shellcheck:
@@ -60,6 +62,7 @@ ground_truth:
       fixed_false_positive: false
       code: SC1127
   - line: 6
+    line_in_fixed: 6
     code: not_a_command
     note: A command name never ends in /
     shellcheck:
@@ -67,6 +70,7 @@ ground_truth:
       fixed_false_positive: false
       code: SC1127
   - line: 7
+    line_in_fixed: 7
     code: not_a_command
     note: A command name never ends in /
     shellcheck:
@@ -74,6 +78,7 @@ ground_truth:
       fixed_false_positive: false
       code: SC1127
   - line: 8
+    line_in_fixed: 8
     code: not_a_command
     note: A command name never ends in /
     shellcheck:
@@ -81,6 +86,7 @@ ground_truth:
       fixed_false_positive: false
       code: SC1127
   - line: 9
+    line_in_fixed: 9
     code: not_a_command
     note: A command name never ends in /
     shellcheck:
@@ -88,6 +94,7 @@ ground_truth:
       fixed_false_positive: false
       code: SC1127
   - line: 10
+    line_in_fixed: 10
     code: not_a_command
     note: A command name never ends in /
     shellcheck:
@@ -95,6 +102,7 @@ ground_truth:
       fixed_false_positive: false
       code: SC1127
   - line: 11
+    line_in_fixed: 11
     code: unbound
     shellcheck:
       detects: true
@@ -108,12 +116,14 @@ ground_truth:
   #     code: SC2154
   - code: word_split
     line: 12
+    line_in_fixed: 12
     shellcheck:
       detects: true
       fixed_false_positive: false
       code: SC2086
   - code: del_sys_file
     line: 12
+    line_in_fixed: 12
     note: for "$OUT_DIR/*"
     shellcheck:
       detects: true
@@ -121,6 +131,7 @@ ground_truth:
       code: SC2115
   - code: del_sys_file
     line: 12
+    line_in_fixed: 12
     note: for "//"
     shellcheck:
       detects: true
@@ -133,12 +144,14 @@ ground_truth:
   #     detects: true
   #     code: SC2154
   - line: 13
+    line_in_fixed: 13
     code: unbound
     shellcheck:
       detects: true
       fixed_false_positive: false
       code: SC2154
   - line: 14
+    line_in_fixed: 14
     code: unbound
     note: DUMP
     shellcheck:
@@ -146,6 +159,7 @@ ground_truth:
       fixed_false_positive: false
       code: SC2154
   - line: 14
+    line_in_fixed: 14
     code: unbound
     note: DB_USER
     shellcheck:
@@ -153,6 +167,7 @@ ground_truth:
       fixed_false_positive: false
       code: SC2154
   - line: 14
+    line_in_fixed: 14
     code: unbound
     note: DB_PASS
     shellcheck:
@@ -173,6 +188,7 @@ ground_truth:
   #     detects: true
   #     code: SC2154
   - line: 15
+    line_in_fixed: 15
     code: unbound
     note: TAR_DIR
     shellcheck:
@@ -180,6 +196,7 @@ ground_truth:
       fixed_false_positive: false
       code: SC2154
   - line: 15
+    line_in_fixed: 15
     code: unbound
     note: TAR_BAK
     shellcheck:
@@ -206,6 +223,7 @@ ground_truth:
   #     detects: true
   #     code: SC2154
   - line: 16
+    line_in_fixed: 16
     code: unbound
     note: DAYS
     shellcheck:

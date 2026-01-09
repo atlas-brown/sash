@@ -12,11 +12,13 @@ sources:
 ground_truth:
   errors:
   - line: 6
+    line_in_fixed: 6
     code: loop_once
     shellcheck:
       detects: false
       fixed_false_positive: false
   - line: 10
+    line_in_fixed: 10
     code: ignored_cmd_result
     shellcheck:
       detects: false

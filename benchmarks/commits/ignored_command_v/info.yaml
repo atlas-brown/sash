@@ -8,6 +8,7 @@ sources:
 ground_truth:
   errors:
   - line: 113
+    line_in_fixed: 113
     code: not_a_command
     shellcheck:
       detects: false
