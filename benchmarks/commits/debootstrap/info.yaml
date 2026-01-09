@@ -18,13 +18,13 @@ sources:
 ground_truth:
   errors:
   - line: 67
-    line_in_fixed: 47
+    line_in_fixed: 67
     code: unused_loop_var
     shellcheck:
       detects: true
       fixed_false_positive: false
   - line: 510
-    line_in_fixed: 484
+    line_in_fixed: 504
     code: word_split_del_sys_file
     shellcheck:
       detects: false
