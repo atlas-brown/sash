@@ -280,7 +280,7 @@ def process_benchmark(benchmark: Path, top: Path, symbexec_timeout: float | None
     shellcheck_results = []
     unknown_codes: list[str] = []
     if gt_exists:
-        expected_results = [r for r in load_expected_results(gt_path) \
+        expected_results = [r for r in load_expected_results(gt_path, fixed_mode) \
                             if r.code not in out_of_scope_codes \
                                and (r.fix_clears is not False if fixed_mode else True)]
         unknown_codes = [e.code for e in expected_results if e.code not in known_codes]
@@ -406,13 +406,16 @@ def find_benchmarks(bench_dir: Path):
             yield path.resolve(strict=True)
 
 
-def load_expected_results(gt_path) -> list[CheckResult]:
+def load_expected_results(gt_path, fixed: bool) -> list[CheckResult]:
     with open(gt_path, "r") as f:
         data = yaml.safe_load(f)
     results = []
     for entry in data.get("ground_truth", []).get("errors", []):
         code = entry.get("code")
-        line = entry.get("line")
+        if not fixed:
+            line = entry.get("line")
+        else:
+            line = entry.get("line_in_fixed")
         fix_clears = entry.get("fix_clears", None)
         if entry.get("duplicate", False):
             continue
