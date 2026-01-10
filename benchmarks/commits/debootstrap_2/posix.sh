@@ -21,6 +21,26 @@ fi
 . $DEBOOTSTRAP_DIR/functions
 exec 4>&1
 
+# ================ $DEBOOTSTRAP_DIR/functions
+error() {
+  # <error code> <name> <string> <args>
+  err="$1"
+  name="$2"
+  fmt="$3"
+  shift; shift; shift
+  if [ "$USE_DEBIANINSTALLER_INTERACTION" ]; then
+    (echo "E: $name"
+    for x in "$@"; do echo "EA: $x"; done
+    echo "EF: $fmt") >&4
+  elif [ "$USE_GETTEXT_INTERACTION" ]; then
+    (printf "E: $(LANG=$GETTEXT_LANG gettext debootstrap "$fmt")\n" "$@") >&4
+  else
+    (printf "E: $fmt\n" "$@") >&4
+  fi
+  exit $err
+}
+# ==================================================
+
 LANG=C
 USE_COMPONENTS=main
 KEYRING=""

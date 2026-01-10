@@ -21,6 +21,26 @@ fi
 . $DEBOOTSTRAP_DIR/functions
 exec 4>&1
 
+# ================ $DEBOOTSTRAP_DIR/functions
+error() {
+  # <error code> <name> <string> <args>
+  err="$1"
+  name="$2"
+  fmt="$3"
+  shift; shift; shift
+  if [ "$USE_DEBIANINSTALLER_INTERACTION" ]; then
+    (echo "E: $name"
+    for x in "$@"; do echo "EA: $x"; done
+    echo "EF: $fmt") >&4
+  elif [ "$USE_GETTEXT_INTERACTION" ]; then
+    (printf "E: $(LANG=$GETTEXT_LANG gettext debootstrap "$fmt")\n" "$@") >&4
+  else
+    (printf "E: $fmt\n" "$@") >&4
+  fi
+  exit $err
+}
+# ==================================================
+
 LANG=C
 USE_COMPONENTS=main
 KEYRING=""
@@ -717,7 +737,7 @@ if am_doing_phase kill_target; then
 	elif [ "$PRINT_DEBS" = true ] && [ "$TARGET_EMPTY" != true ]; then
 		true
 	else
-                info KILLTARGET "Deleting target directory"
+        info KILLTARGET "Deleting target directory"
 		rm -rf --one-file-system "$TARGET"
 	fi
 fi

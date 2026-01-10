@@ -10,8 +10,8 @@ sources:
 
 ground_truth:
   errors:
-  - line: 707
-    line_in_fixed: 721
+  - line: 727
+    line_in_fixed: 741
     code: word_split_del_sys_file
     shellcheck:
       detects: false
