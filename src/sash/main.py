@@ -80,7 +80,7 @@ def cli_main():
         args.filename.resolve(strict=True).as_posix(),
         log_level=args.log_level,
         log_file=args.log_file.resolve().as_posix() if args.log_file else None,
-        solver=args.solver,
+        solver=True,
         timeout=args.timeout,
         solver_timeout=args.solver_timeout,
         enable_dfs=args.enable_dfs,
@@ -122,13 +122,6 @@ def parse_cli():
         "--enable-dfs",
         action="store_true",
         help="Use depth-first search strategy for symbolic execution (default: breadth-first search)",
-    )
-
-    parser.add_argument(
-        "-S",
-        "--solver",
-        action="store_false",
-        help="Enable the solver and get additional reports",
     )
 
     parser.add_argument(
