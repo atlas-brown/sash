@@ -751,6 +751,17 @@ def expand_simple(stuff: list[AST.ArgChar],
                         self.field_so_far.append(c.pretty(AST.QUOTED if self.quoted else AST.UNQUOTED))
                         if c.pretty() == "*" and not self.quoted:
                             self.field_so_far_words_max = inf
+                case AST.TArgChar() as t:
+                    # Tilde expansion: only plain "~" expands to $HOME.
+                    if not self.quoted and getattr(t, "string", None) in (None, "None"):
+                        home_var = self.state.lookup("HOME")
+                        if home_var is not None:
+                            self.add_a_field(home_var.value)
+                        else:
+                            self.add_a_field(arbitrary_field(t, ArbitraryType.ENVIRONMENT, self.state))
+                    else:
+                        logging.debug("Expansion: treating tilde '%s' as completely arbitrary", t.pretty())
+                        self.add_a_field(arbitrary_field(t, ArbitraryType.APPROXIMATION, self.state))
                 case AST.EArgChar() as c:
                     self.field_so_far.append(c.pretty(AST.QUOTED if self.quoted else AST.UNQUOTED))
                 case AST.QArgChar() as q:
