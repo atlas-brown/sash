@@ -4,6 +4,8 @@ from abc import ABC
 from dataclasses import dataclass
 from enum import Enum
 from typing import NamedTuple
+from sash.interpreter_config import InterpConfig
+from sash.debugtools.logger import DebugLogger
 
 
 class Severity(Enum):
@@ -196,8 +198,9 @@ class Reporter:
         cls._initialized = True
 
     @classmethod
-    def add_issue(cls, issue: Issue):
+    def add_issue(cls, issue: Issue, current_config: InterpConfig):
         cls._issues.add(issue)
+        DebugLogger.log_issue(issue, current_config.current_pass)
 
     @classmethod
     def set_exec_time(cls, exec_time: float):

@@ -18,6 +18,8 @@ from sash.constraints import (
     NormalizedConstraint,
 )
 from sash.frozen import FrozenAst, FrozenDict
+from sash.debugtools.logger import DebugLogger
+
 @dataclass(frozen=True)
 class ShellVar:
     value: Field
@@ -96,6 +98,9 @@ class State:
         return replace(self, localenv=(self.localenv | new_vars))
 
     def add_pathcond(self, cond: Constraint, source_str: str | None = None, source_line: int | None = None) -> 'State':
+        if cond == Empty():
+            logging.debug("Skipping empty path condition from %s at line %s", source_str, source_line)
+            return self
         new_pathcond = self.pathcond + (Condition(self, cond, source_str, source_line),)
         return replace(self, pathcond=new_pathcond)
 
@@ -203,10 +208,9 @@ class Trace:
     states: tuple[State, ...]
 
     def extend(self, state: State | Callable[[State], State]) -> 'Trace':
-        if isinstance(state, State):
-            return Trace(self.states + (state,))
-        else:
-            return Trace(self.states + (state(self.states[-1]),))
+        new_state = state if isinstance(state, State) else state(self.states[-1])
+        DebugLogger.log_trace_extension(self.latest_state, new_state)
+        return replace(self, states=self.states + (new_state,))
 
     @property
     def latest_state(self):
@@ -223,6 +227,7 @@ class Trace:
                                 .add_pathcond(last_state.last_cmd_failure_postcond)\
                                 .update_fs(last_state.last_cmd_failure_postcond)\
                                 .set_last_exit_code(SymStr(("1",)), Confidence.SPECULATIVE)
+            DebugLogger.log_trace_extension(prior_state, new_state)
             return replace(self, states=self.states[:-1] + (new_state,))
         else:
             return self

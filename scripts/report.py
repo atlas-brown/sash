@@ -245,7 +245,7 @@ def generate_html_report(html_file: Path, run_results: list[RunResult], ran: int
     html_parts.append(f"""
 <body>
     <div class="container">
-        <h1>📊 Evaluation Results: {'Fixed' if in_fixed_mode else 'Buggy'} scripts (timeout SE:{SE_timeout if SE_timeout else '?'}s | Z3:{solver_timeout if solver_timeout else '?'}s)</h1>
+        <h1>📊 Evaluation Results: {'Fixed' if in_fixed_mode else 'Buggy'} scripts (timeout SE:{SE_timeout if SE_timeout else '?'}s | Z3:{solver_timeout if solver_timeout else '?'}s) --- <a href="results{'' if in_fixed_mode else '-fixed'}.html">{'Buggy' if in_fixed_mode else 'Fixed'} Report</a></h1>
 """)
 
     # Summary section

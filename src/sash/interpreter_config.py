@@ -36,6 +36,8 @@ class InterpConfig:
     branch_policy_pre: BranchPolicyPre | None = None
     ignore_function_calls: bool = False
     ignore_function_calls_for: frozenset[str] = field(default_factory=frozenset)
+    current_pass: str = "default"
+    debug_instrumentation: bool = False
 
     def add_node_callback(self, cb: NodeCB) -> 'InterpConfig':
         return replace(self, node_cbs=(self.node_cbs + [cb]))

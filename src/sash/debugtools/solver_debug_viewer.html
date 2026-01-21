@@ -1,0 +1,730 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Solver Debug Viewer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f5f5f5;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        header h1 {
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+
+        header p {
+            opacity: 0.9;
+            font-size: 14px;
+        }
+
+        .controls {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .file-input-wrapper {
+            position: relative;
+            overflow: hidden;
+            display: inline-block;
+        }
+
+        .file-input-wrapper input[type=file] {
+            position: absolute;
+            left: -9999px;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #5568d3;
+            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-secondary {
+            background: #f0f0f0;
+            color: #333;
+            border: 1px solid #ddd;
+        }
+
+        .btn-secondary:hover {
+            background: #e0e0e0;
+        }
+
+        .search-box {
+            flex: 1;
+            min-width: 200px;
+            padding: 10px 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .search-box:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 15px;
+            border-radius: 4px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .stat-card h3 {
+            font-size: 12px;
+            color: #999;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+
+        .stat-card .value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .outcome-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 3px;
+            font-size: 11px;
+            font-weight: 600;
+            margin-right: 6px;
+        }
+
+        .outcome-UNSAT {
+            background: #ffebee;
+            color: #d32f2f;
+        }
+
+        .outcome-SAT {
+            background: #fff3e0;
+            color: #f57c00;
+        }
+
+        .outcome-PATHCOND_UNSAT {
+            background: #f3e5f5;
+            color: #7b1fa2;
+        }
+
+        .outcome-SKIPPED {
+            background: #e0e0e0;
+            color: #666;
+        }
+
+        .assertions-container {
+            background: white;
+            border-radius: 4px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .assertion {
+            border-bottom: 1px solid #eee;
+            transition: background 0.2s ease;
+        }
+
+        .assertion:hover {
+            background: #f9f9f9;
+        }
+
+        .assertion-header {
+            padding: 15px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            justify-content: space-between;
+        }
+
+        .assertion-header:hover {
+            background: #f5f5f5;
+        }
+
+        .assertion.expanded .assertion-header {
+            background: #f0f4ff;
+            border-bottom: 2px solid #667eea;
+        }
+
+        .assertion-title {
+            flex: 1;
+        }
+
+        .assertion-title h4 {
+            font-size: 14px;
+            margin-bottom: 4px;
+        }
+
+        .assertion-title .location {
+            font-size: 12px;
+            color: #666;
+            font-family: 'Courier New', monospace;
+        }
+
+        .assertion-toggle {
+            color: #667eea;
+            font-weight: bold;
+            user-select: none;
+            font-size: 16px;
+        }
+
+        .assertion-content {
+            display: none;
+            padding: 20px;
+            background: #fafafa;
+            border-top: 1px solid #eee;
+        }
+
+        .assertion.expanded .assertion-content {
+            display: block;
+        }
+
+        .level-2 {
+            margin-bottom: 20px;
+            background: white;
+            padding: 15px;
+            border-radius: 4px;
+            border-left: 3px solid #667eea;
+        }
+
+        .level-2 h5 {
+            font-size: 13px;
+            color: #667eea;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            font-weight: 600;
+        }
+
+        .level-2-content {
+            font-size: 12px;
+            font-family: 'Courier New', monospace;
+            color: #333;
+            line-height: 1.5;
+            max-height: 300px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-break: break-word;
+            background: #f9f9f9;
+            padding: 10px;
+            border-radius: 3px;
+        }
+
+        .level-3-section {
+            margin-top: 20px;
+            background: white;
+            padding: 15px;
+            border-radius: 4px;
+            border-left: 3px solid #f57c00;
+        }
+
+        .level-3-section h5 {
+            font-size: 13px;
+            color: #f57c00;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            font-weight: 600;
+        }
+
+        .z3-map-filter {
+            margin-bottom: 10px;
+            display: flex;
+            gap: 8px;
+        }
+
+        .z3-map-filter input {
+            padding: 6px 10px;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+            font-size: 12px;
+            flex: 1;
+        }
+
+        .z3-map-filter input:focus {
+            outline: none;
+            border-color: #f57c00;
+            box-shadow: 0 0 0 2px rgba(245, 124, 0, 0.1);
+        }
+
+        .z3-map-content {
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
+            background: #f9f9f9;
+            padding: 10px;
+            border-radius: 3px;
+            max-height: 250px;
+            overflow-y: auto;
+            overflow-x: auto;
+            line-height: 1.6;
+            word-break: break-word;
+        }
+
+        .z3-map-entry {
+            margin-bottom: 6px;
+            padding: 4px;
+            border-radius: 2px;
+            display: block;
+        }
+
+        .z3-map-entry:hover {
+            background: #e8f5e9;
+        }
+
+        .z3-key {
+            color: #1976d2;
+            font-weight: bold;
+            word-break: break-word;
+        }
+
+        .z3-value {
+            color: #c41c3b;
+            margin-left: 8px;
+            word-break: break-word;
+        }
+
+        .result-display {
+            background: white;
+            padding: 10px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
+            max-height: 300px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-break: break-word;
+            color: #333;
+            border: 1px solid #ddd;
+            line-height: 1.5;
+        }
+
+        .no-data {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+        }
+
+        .status-message {
+            padding: 12px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+            display: none;
+        }
+
+        .status-message.show {
+            display: block;
+        }
+
+        .status-message.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .status-message.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .status-message.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
+        @media (max-width: 768px) {
+            header {
+                padding: 20px;
+            }
+
+            header h1 {
+                font-size: 20px;
+            }
+
+            .controls {
+                flex-direction: column;
+            }
+
+            .search-box {
+                width: 100%;
+            }
+
+            .stats {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .assertion-header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🔍 Solver Debug Viewer</h1>
+            <p>Hierarchical visualization of solver assertions and Z3 interactions</p>
+        </header>
+
+        <div class="controls">
+            <div class="file-input-wrapper">
+                <button class="btn btn-primary">📁 Load Debug Log</button>
+                <input type="file" id="fileInput" accept=".jsonl,.json">
+            </div>
+            <input type="text" class="search-box" id="searchBox" placeholder="Search assertions...">
+            <button class="btn btn-secondary" id="clearBtn">Clear</button>
+        </div>
+
+        <div id="statusMessage" class="status-message"></div>
+
+        <div class="stats" id="stats"></div>
+
+        <div class="assertions-container" id="assertionsContainer"></div>
+    </div>
+
+    <script>
+        let allAssertions = [];
+        let filteredAssertions = [];
+        let searchTerm = "";
+        let z3MapFilters = {};  // assertion_id -> filter string
+
+        const fileInput = document.getElementById('fileInput');
+        const searchBox = document.getElementById('searchBox');
+        const clearBtn = document.getElementById('clearBtn');
+        const assertionsContainer = document.getElementById('assertionsContainer');
+        const statsContainer = document.getElementById('stats');
+        const statusMessage = document.getElementById('statusMessage');
+
+        // File input handler
+        document.querySelector('.file-input-wrapper button').addEventListener('click', () => {
+            fileInput.click();
+        });
+
+        fileInput.addEventListener('change', handleFileSelect);
+        searchBox.addEventListener('input', handleSearch);
+        clearBtn.addEventListener('click', handleClear);
+
+        function showStatus(message, type = 'info') {
+            statusMessage.textContent = message;
+            statusMessage.className = `status-message show ${type}`;
+            if (type !== 'error') {
+                setTimeout(() => statusMessage.classList.remove('show'), 3000);
+            }
+        }
+
+        function handleFileSelect(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                try {
+                    const content = event.target.result;
+                    const lines = content.trim().split('\n');
+                    allAssertions = lines.map(line => {
+                        try {
+                            return JSON.parse(line);
+                        } catch {
+                            return null;
+                        }
+                    }).filter(e => e !== null);
+
+                    if (allAssertions.length === 0) {
+                        showStatus('No valid assertions found in file', 'error');
+                        return;
+                    }
+
+                    searchTerm = "";
+                    searchBox.value = "";
+                    z3MapFilters = {};
+                    applyFilters();
+                    updateStats();
+                    renderAssertions();
+                    showStatus(`Loaded ${allAssertions.length} assertions`, 'success');
+                } catch (error) {
+                    showStatus(`Error loading file: ${error.message}`, 'error');
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        function updateStats() {
+            if (allAssertions.length === 0) {
+                statsContainer.innerHTML = '';
+                return;
+            }
+
+            const outcomes = {};
+            allAssertions.forEach(a => {
+                const result = a.solver_result?.result_type || "SKIPPED";
+                outcomes[result] = (outcomes[result] || 0) + 1;
+            });
+
+            const stats = [
+                { label: 'Total Assertions', value: allAssertions.length },
+                { label: 'UNSAT', value: outcomes['UNSAT'] || 0 },
+                { label: 'SAT', value: outcomes['SAT'] || 0 },
+                { label: 'Skipped', value: (outcomes['PATHCOND_UNSAT'] || 0) }
+            ];
+
+            statsContainer.innerHTML = stats.map(s => `
+                <div class="stat-card">
+                    <h3>${s.label}</h3>
+                    <div class="value">${s.value}</div>
+                </div>
+            `).join('');
+        }
+
+        function applyFilters() {
+            filteredAssertions = allAssertions.filter(assertion => {
+                const searchMatch = searchTerm === '' || 
+                    JSON.stringify(assertion).toLowerCase().includes(searchTerm.toLowerCase());
+                return searchMatch;
+            });
+        }
+
+        function handleSearch(e) {
+            searchTerm = e.target.value;
+            applyFilters();
+            renderAssertions();
+        }
+
+        function handleClear() {
+            fileInput.value = '';
+            allAssertions = [];
+            filteredAssertions = [];
+            searchTerm = '';
+            searchBox.value = '';
+            z3MapFilters = {};
+            assertionsContainer.innerHTML = '';
+            statsContainer.innerHTML = '';
+            statusMessage.classList.remove('show');
+        }
+
+        function filterZ3Map(mapObj, filterStr) {
+            if (!filterStr) return mapObj;
+            const lowerFilter = filterStr.toLowerCase();
+            const filtered = {};
+            for (const [key, value] of Object.entries(mapObj)) {
+                if (key.toLowerCase().includes(lowerFilter) || 
+                    value.toLowerCase().includes(lowerFilter)) {
+                    filtered[key] = value;
+                }
+            }
+            return filtered;
+        }
+
+        function renderAssertions() {
+            if (filteredAssertions.length === 0) {
+                assertionsContainer.innerHTML = '<div class="no-data">No assertions to display</div>';
+                return;
+            }
+
+            assertionsContainer.innerHTML = filteredAssertions.map((assertion, idx) => {
+                const assertionId = assertion.assertion_id;
+                const resultType = assertion.solver_result?.result_type || "SKIPPED";
+                const isSkipped = resultType === "PATHCOND_UNSAT";
+                
+                return `
+                    <div class="assertion" id="assertion-${idx}">
+                        <div class="assertion-header">
+                            <div class="assertion-title">
+                                <h4>
+                                    <span class="outcome-badge outcome-${resultType}">${resultType}</span>
+                                    ${assertion.source_str}
+                                </h4>
+                                <div class="location">Line ${assertion.source_line} • ID: ${assertionId}</div>
+                            </div>
+                            <span class="assertion-toggle">▼</span>
+                        </div>
+                        <div class="assertion-content">
+                            <!-- Level 2: Details -->
+                            <div class="level-2">
+                                <h5>📋 Assertion Formula</h5>
+                                <div class="level-2-content">${escapeHtml(assertion.assertion_formula)}</div>
+                            </div>
+
+                            <div class="level-2">
+                                <h5>🔗 Path Conditions (${assertion.pathcond_constraints.length})</h5>
+                                <div class="level-2-content">${assertion.pathcond_constraints.length > 0 ? 
+                                    assertion.pathcond_constraints.map(c => '• ' + escapeHtml(c)).join('\n') :
+                                    '(none)'}</div>
+                            </div>
+
+                            <div class="level-2">
+                                <h5>📁 Filesystem State</h5>
+                                <div class="level-2-content">${escapeHtml(assertion.fs_state_desc)}</div>
+                            </div>
+
+                            <!-- Level 3: Solver Details (only if not skipped) -->
+                            ${!isSkipped ? `
+                                <div class="level-3-section">
+                                    <h5>⚙️ Z3 Arbitrary Variables Map</h5>
+                                    <div class="z3-map-filter">
+                                        <input type="text" class="z3-map-filter-input" 
+                                               data-assertion-id="${assertionId}"
+                                               placeholder="Filter z3 map (search by name or value)...">
+                                    </div>
+                                    <div class="z3-map-content" data-z3-map-id="${assertionId}">
+                                        ${renderZ3Map(assertion.arb_z3_map, assertionId)}
+                                    </div>
+                                </div>
+
+                                <div class="level-3-section">
+                                    <h5>🎯 ${assertion.solver_result.result_type === 'UNSAT' ? 'Unsat Core' : 'Satisfying Model'}</h5>
+                                    <div class="result-display">
+                                        ${renderSolverResult(assertion.solver_result)}
+                                    </div>
+                                </div>
+                            ` : ''}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            // Add event listeners for assertion expansion
+            document.querySelectorAll('.assertion').forEach((el, idx) => {
+                el.querySelector('.assertion-header').addEventListener('click', function() {
+                    el.classList.toggle('expanded');
+                });
+            });
+
+            // Add event listeners for z3 map filtering
+            document.querySelectorAll('.z3-map-filter-input').forEach(input => {
+                input.addEventListener('input', function() {
+                    const assertionId = this.getAttribute('data-assertion-id');
+                    const filterStr = this.value;
+                    z3MapFilters[assertionId] = filterStr;
+                    
+                    const mapContainer = document.querySelector(`[data-z3-map-id="${assertionId}"]`);
+                    const assertion = filteredAssertions.find(a => a.assertion_id == assertionId);
+                    if (mapContainer && assertion) {
+                        mapContainer.innerHTML = renderZ3Map(assertion.arb_z3_map, assertionId);
+                    }
+                });
+            });
+        }
+
+        function renderZ3Map(mapObj, assertionId) {
+            const filter = z3MapFilters[assertionId] || '';
+            const filtered = filterZ3Map(mapObj, filter);
+            const entries = Object.entries(filtered);
+            
+            if (entries.length === 0) {
+                return `<div style="color: #999; padding: 8px;">${filter ? '(no matches)' : '(empty)'}</div>`;
+            }
+            
+            return entries.map(([key, value]) => `
+                <div class="z3-map-entry">
+                    <span class="z3-key">${escapeHtml(key)}</span>
+                    <span class="z3-value">→ ${escapeHtml(value)}</span>
+                </div>
+            `).join('');
+        }
+
+        function renderSolverResult(result) {
+            if (result.result_type === 'UNSAT') {
+                const core = result.unsat_core || [];
+                return `<strong>Core Constraints (${core.length}):</strong>\n${
+                    core.map((c, i) => `${i + 1}. ${escapeHtml(c)}`).join('\n')
+                }\n\nSolver time: ${(result.solver_time * 1000).toFixed(2)}ms`;
+            } else if (result.result_type === 'SAT') {
+                return `<strong>Model:</strong>\n${
+                    escapeHtml(result.sat_model || '(empty)')
+                }\n\nSolver time: ${(result.solver_time * 1000).toFixed(2)}ms`;
+            } else {
+                return `<strong>Result:</strong> ${result.result_type}`;
+            }
+        }
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            const map = {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#039;'
+            };
+            return text.replace(/[&<>"']/g, m => map[m]);
+        }
+
+        // Try to auto-load if solver_debug.jsonl exists in the same directory
+        async function tryAutoLoad() {
+            try {
+                const response = await fetch('solver_debug.jsonl');
+                if (response.ok) {
+                    const content = await response.text();
+                    const lines = content.trim().split('\n').filter(l => l);
+                    allAssertions = lines.map(line => JSON.parse(line)).filter(e => e !== null);
+                    if (allAssertions.length > 0) {
+                        applyFilters();
+                        updateStats();
+                        renderAssertions();
+                        showStatus(`Auto-loaded ${allAssertions.length} assertions from solver_debug.jsonl`, 'success');
+                    }
+                }
+            } catch (e) {
+                // Silent fail - file may not exist
+            }
+        }
+
+        // Initialize
+        tryAutoLoad();
+    </script>
+</body>
+</html>

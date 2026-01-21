@@ -74,6 +74,11 @@ class FrozenDict(Generic[K, V]):
     def __repr__(self):
         return f"FrozenDict({self._d})"
 
+    def pretty(self) -> str:
+        if len(self._d) == 0:
+            return repr(self)
+        return "frozendict{\n    " + "\n\n    ".join(f"{k}:    {v}" for k, v in self._d.items()) + "\n}"
+
     def set(self, k, v):
         return FrozenDict(self._d | {k: v})
 

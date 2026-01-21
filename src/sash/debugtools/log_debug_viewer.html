@@ -1,0 +1,1296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Symbolic Execution Debugger</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Cytoscape.js for Graph Visualization -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.28.1/cytoscape.min.js"></script>
+    
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        :root {
+            --bg-dark: #1e1e1e;
+            --bg-panel: #252526;
+            --border-color: #3e3e42;
+            --text-main: #d4d4d4;
+            --accent-blue: #0e639c;
+            --accent-highlight: #264f78;
+            --gutter-bg: #1e1e1e;
+            --code-bg: #1e1e1e;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 10px;
+            height: 10px;
+        }
+        ::-webkit-scrollbar-track {
+            background: var(--bg-dark); 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #424242; 
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #4f4f4f; 
+        }
+
+        /* Source Code Styling */
+        .code-line {
+            display: flex;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 14px;
+            line-height: 1.5;
+            cursor: pointer;
+        }
+        .code-line:hover {
+            background-color: #2a2d2e;
+        }
+        .line-number {
+            width: 40px;
+            text-align: right;
+            padding-right: 10px;
+            color: #858585;
+            user-select: none;
+        }
+        .gutter-widgets {
+            width: 80px;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            padding-right: 8px;
+            border-right: 1px solid var(--border-color);
+            margin-right: 10px;
+        }
+        .code-content {
+            flex-grow: 1;
+            white-space: pre;
+            color: #d4d4d4;
+        }
+        
+        /* Syntax Highlighting Mock */
+        .token-keyword { color: #569cd6; }
+        .token-type { color: #4ec9b0; }
+        .token-func { color: #dcdcaa; }
+        .token-num { color: #b5cea8; }
+        .token-comment { color: #6a9955; }
+        .token-string { color: #ce9178; }
+
+        /* Highlights */
+        .highlight-active {
+            background-color: rgba(38, 79, 120, 0.3);
+        }
+        .highlight-trace {
+            background-color: rgba(78, 201, 176, 0.15);
+            border-left: 2px solid #4ec9b0;
+        }
+        .dimmed {
+            opacity: 0.3;
+        }
+
+        /* Expanded Details in Code */
+        .line-details {
+            background-color: #2d2d30;
+            border-top: 1px solid var(--border-color);
+            border-bottom: 1px solid var(--border-color);
+            padding: 8px 8px 8px 130px; /* Align with code */
+            font-size: 12px;
+            display: none;
+        }
+        .line-details.open {
+            display: block;
+        }
+
+        /* Graph Container */
+        #cy {
+            width: 100%;
+            height: 100%;
+            background-color: var(--bg-panel);
+        }
+
+        /* Badges */
+        .badge {
+            font-size: 10px;
+            padding: 1px 4px;
+            border-radius: 3px;
+            margin-left: 2px;
+            font-weight: bold;
+        }
+        .badge-states { background-color: #3794ff; color: white; }
+        .badge-error { background-color: #f14c4c; color: white; }
+        .badge-assert { background-color: #cca700; color: black; }
+        .badge-pass { background-color: #6a9955; color: white; }
+
+        .json-key { color: #9cdcfe; }
+        .json-string { color: #ce9178; }
+        .json-number { color: #b5cea8; }
+        .json-boolean { color: #569cd6; }
+
+        /* Ancestor gutter indicators */
+        .ancestor-indicator {
+            display: inline-block;
+            margin-left: 6px;
+            color: #eab308; /* amber */
+            font-size: 12px;
+            line-height: 1;
+            vertical-align: middle;
+            opacity: 1;
+            user-select: none;
+            pointer-events: none;
+        }
+
+    </style>
+</head>
+<body class="flex flex-col">
+
+    <!-- Header -->
+    <header class="h-12 bg-gray-900 border-b border-gray-700 flex items-center px-4 justify-between shrink-0">
+        <div class="flex items-center gap-3">
+            <i class="fa-solid fa-bug text-blue-400"></i>
+            <h1 class="font-bold text-gray-200">SymEx Debugger</h1>
+            <h1 class="font-bold text-gray-200">---</h1>
+            <h3 class="font-bold text-gray-200"><a href="solver_debug_viewer.html">Open solver debugger</a></h3>
+        </div>
+
+        <div class="flex items-center gap-4">
+            <div class="flex items-center gap-2">
+                 <label class="cursor-pointer bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1 rounded transition">
+                    <i class="fa-solid fa-upload mr-1"></i> Load Log File
+                    <input type="file" id="fileInput" class="hidden" accept=".json,.jsonl,.txt,.log">
+                </label>
+                <button id="helpBtn" class="bg-gray-700 hover:bg-gray-600 text-white text-xs px-3 py-1 rounded transition flex items-center gap-1" title="Show help">
+                    <i class="fa-regular fa-circle-question"></i>
+                    Help
+                </button>
+            </div>
+
+            <div class="h-6 w-px bg-gray-600 mx-2"></div>
+
+            <label class="text-sm text-gray-400">Filter by Pass:</label>
+            <select id="passSelector" class="bg-gray-800 border border-gray-600 text-sm text-white rounded px-2 py-1 focus:outline-none focus:border-blue-500">
+                <option value="all">All Passes</option>
+                <!-- Populated via JS -->
+            </select>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <div class="flex-1 flex overflow-hidden">
+        
+        <!-- Left Panel: Source Code -->
+        <div class="w-1/2 flex flex-col border-r border-gray-700">
+            <div class="px-3 py-2 bg-gray-800 text-xs font-semibold text-gray-400 uppercase tracking-wider border-b border-gray-700 flex justify-between">
+                <span id="sourceTitle">Program Analysis View</span>
+                <!-- Optional: Toggle for source code replacement could go here -->
+            </div>
+            <!-- Changed overflow-y-auto to overflow-auto to support horizontal scroll -->
+            <div id="sourceContainer" class="flex-1 overflow-auto bg-[#1e1e1e] pb-10">
+                <!-- Source Lines Injected Here -->
+            </div>
+        </div>
+
+        <!-- Right Panel: Graph & Details -->
+        <div class="w-1/2 flex flex-col">
+            
+            <!-- Top Right: State Graph -->
+            <div class="h-1/2 flex flex-col border-b border-gray-700 relative">
+                <div class="px-3 py-2 bg-gray-800 text-xs font-semibold text-gray-400 uppercase tracking-wider border-b border-gray-700 flex justify-between">
+                    <span>Ancestry Graph</span>
+                    <span id="graphStatus" class="text-gray-500">Select a state</span>
+                </div>
+                <div id="cy"></div>
+                <!-- Legend -->
+                <div class="absolute bottom-2 left-2 bg-gray-900/80 p-2 rounded text-xs pointer-events-none border border-gray-700">
+                    <div class="flex items-center gap-2 mb-1"><span class="w-3 h-3 rounded-full bg-blue-500"></span> Normal State</div>
+                    <div class="flex items-center gap-2 mb-1"><span class="w-3 h-3 rounded-full bg-red-500"></span> Error State</div>
+                    <div class="flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-yellow-500"></span> Assertion</div>
+                </div>
+            </div>
+
+            <!-- Bottom Right: Details Panel -->
+            <div class="h-1/2 flex flex-col bg-[#252526]">
+                <div class="px-3 py-2 bg-gray-800 text-xs font-semibold text-gray-400 uppercase tracking-wider border-b border-gray-700">
+                    State Details
+                </div>
+                <div id="detailsPanel" class="flex-1 overflow-y-auto p-4 font-mono text-sm">
+                    <div class="text-gray-500 italic">Select a state in the graph or source view to see details.</div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Help Modal -->
+    <div id="helpModal" class="fixed inset-0 z-50 hidden items-center justify-center">
+        <div id="helpBackdrop" class="absolute inset-0 bg-black/60"></div>
+        <div class="relative bg-[#252526] border border-gray-700 rounded-lg max-w-3xl w-[92%] max-h-[85vh] overflow-hidden shadow-xl">
+            <div class="flex items-center justify-between px-4 py-3 border-b border-gray-700 bg-gray-800">
+                <div class="flex items-center gap-2 text-gray-200 font-semibold"><i class="fa-regular fa-circle-question text-blue-400"></i> Page Help</div>
+                <button id="helpClose" class="text-gray-400 hover:text-gray-200" title="Close"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="p-4 overflow-y-auto text-sm text-gray-200 space-y-4">
+                <div>
+                    <div class="font-semibold text-blue-300 mb-1">Overview</div>
+                    <p class="text-gray-300">This viewer helps inspect symbolic execution logs: source coverage by states, pass-aware filtering, a state graph with ancestry, and per-state details.</p>
+                </div>
+                <div>
+                    <div class="font-semibold text-blue-300 mb-1">Loading Logs</div>
+                    <ul class="list-disc ml-5 text-gray-300 space-y-1">
+                        <li>Click <span class="bg-blue-600/30 px-1 rounded">Load Log File</span> and select a <span class="text-gray-100">.jsonl</span> log generated by the debugger.</li>
+                        <li>If the log contains a <span class="text-gray-100">source_file</span> record, the source pane will populate automatically.</li>
+                    </ul>
+                </div>
+                <div>
+                    <div class="font-semibold text-blue-300 mb-1">Pass Filtering</div>
+                    <ul class="list-disc ml-5 text-gray-300 space-y-1">
+                        <li>Use <span class="bg-gray-700/50 px-1 rounded">Filter by Pass</span> to show only states, assertions, and reports from a specific analysis pass.</li>
+                        <li>Graph nodes are labeled with the passes that reached them; filtering dims nodes outside the selected pass.</li>
+                    </ul>
+                </div>
+                <div>
+                    <div class="font-semibold text-blue-300 mb-1">Graph Interactions</div>
+                    <ul class="list-disc ml-5 text-gray-300 space-y-1">
+                        <li><span class="text-gray-100">Click a node</span> to select a state. The corresponding source line is highlighted, and ancestor lines show a 🧬 icon in the gutter.</li>
+                        <li><span class="text-gray-100">Click an edge</span> to view a concise diff between the parent and child states (Added / Removed / Changed).</li>
+                        <li>Use marquee or Ctrl/Cmd+Click for multi-select (graph-only; source highlighting follows single-node selection).</li>
+                    </ul>
+                </div>
+                <div>
+                    <div class="font-semibold text-blue-300 mb-1">Source Pane</div>
+                    <ul class="list-disc ml-5 text-gray-300 space-y-1">
+                        <li>Line badges: <span class="badge badge-states">N</span> active states, <span class="badge badge-error"><i class="fa-solid fa-triangle-exclamation"></i></span> reports, <span class="badge badge-assert"><i class="fa-solid fa-check"></i></span> assertions.</li>
+                        <li><span class="text-gray-100">Click a line</span> to select all visible states at that line (clears 🧬 markers since there are multiple states).</li>
+                        <li>Click the gutter to toggle a details drawer with states, reports (by pass), and assertion summaries.</li>
+                    </ul>
+                </div>
+                <div>
+                    <div class="font-semibold text-blue-300 mb-1">Details Pane</div>
+                    <ul class="list-disc ml-5 text-gray-300 space-y-1">
+                        <li>Shows the selected state’s fields and metadata. The <span class="text-gray-100">_meta</span> section appears last and includes error/report/parent info.</li>
+                        <li>When an edge is selected, shows a color-coded diff for Added / Removed / Changed fields.</li>
+                    </ul>
+                </div>
+                <div class="text-xs text-gray-400">Tip: Use the pass filter to focus the graph and source on a single analysis pass.</div>
+            </div>
+            <div class="px-4 py-3 border-t border-gray-700 bg-gray-800 flex justify-end">
+                <button id="helpOk" class="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1 rounded">Got it</button>
+            </div>
+        </div>
+    </div>
+    <script>
+        // ==========================================
+        // 1. DATA MANAGEMENT
+        // ==========================================
+        
+        const MOCK_CODE_TEXT = `
+int process_request(int user_id, char* input) {
+    int access_level = 0;
+    
+    // Initial validation
+    if (user_id < 0) {
+        return -1; // Invalid user
+    }
+
+    // Determine access level
+    if (user_id == 0) {
+        access_level = 999; // Admin
+    } else {
+        access_level = 1;   // User
+    }
+
+    // Buffer processing
+    char buffer[10];
+    int len = 0;
+    
+    while (input[len] != '\\0') {
+        buffer[len] = input[len];
+        len++;
+        
+        // Assert constraint
+        assert(len <= 10);
+        
+        if (input[len] == 'X') {
+            // Special trigger
+            error("Forbidden character sequence");
+        }
+    }
+    
+    return access_level;
+}`.trim();
+
+        // Default Mock Data in format compatible with the parsing logic
+        const MOCK_LOG_LINES = [
+            // NEW: Source Code Event
+            { type: "source_file", code: MOCK_CODE_TEXT, path: "/src/main.c" },
+
+            // Pass 1
+            { type: "state", id: "S0", details: { memory: {}, constraints: [] } },
+            { type: "line", line: 2, states: ["S0"], pass: "Pass_1_Exploration" },
+            
+            { type: "state", id: "S1", details: { memory: { user_id: "< 0" } } },
+            { type: "trace", from: "S0", to: "S1" },
+            { type: "line", line: 4, states: ["S1"], pass: "Pass_1_Exploration" },
+            
+            { type: "state", id: "S2", details: { memory: { user_id: ">= 0" } } },
+            { type: "trace", from: "S0", to: "S2" },
+            { type: "line", line: 9, states: ["S2"], pass: "Pass_1_Exploration" },
+            
+            { type: "state", id: "S3", details: { access_level: 999 } },
+            { type: "trace", from: "S2", to: "S3" },
+            { type: "line", line: 10, states: ["S3"], pass: "Pass_1_Exploration" },
+
+            { type: "state", id: "S4", details: { access_level: 1 } },
+            { type: "trace", from: "S2", to: "S4" },
+            { type: "line", line: 12, states: ["S4"], pass: "Pass_1_Exploration" },
+
+            { type: "state", id: "S7", details: { len: 0 } },
+            { type: "trace", from: "S3", to: "S7" }, // Jumping a bit for brevity
+            { type: "line", line: 19, states: ["S7"], pass: "Pass_1_Exploration" },
+            
+            { type: "state", id: "S8", details: { len: 1 } },
+            { type: "trace", from: "S7", to: "S8" },
+            { type: "line", line: 23, states: ["S8"], pass: "Pass_1_Exploration" },
+            { type: "assertion", line: 23, formula: "len <= 10", state: "S8", pass: "Pass_1_Exploration" },
+            { type: "assertion", line: 23, formula: "len <= 10", state: "S8_dup", pass: "Pass_1_Exploration" }, // Mock Duplicate for demo
+
+            { type: "state", id: "S9", details: { len: 1, input_1: "X" } },
+            { type: "trace", from: "S8", to: "S9" },
+            { type: "line", line: 19, states: ["S9"], pass: "Pass_1_Exploration" },
+
+            { type: "state", id: "S10", details: { error: "Crash" } },
+            { type: "trace", from: "S9", to: "S10" },
+            { type: "line", line: 27, states: ["S10"], pass: "Pass_1_Exploration" },
+            { type: "report", line: 27, code: "ERR_01", message: "Forbidden char", state: "S10", pass: "Pass_1_Exploration" },
+
+            // Pass 2 (Partial overlap logic)
+            { type: "state", id: "S_V1", details: { focused: true } },
+            { type: "line", line: 2, states: ["S_V1"], pass: "Pass_2_Validation" },
+            { type: "report", line: 2, code: "ERR_02", message: "Validation issue", pass: "Pass_2_Validation" }
+        ];
+
+        // Global Application Data Store
+        let appData = {
+            passes: [],
+            states: [], // Array of State objects
+            stateMap: {}, // O(1) Lookup Map for states
+            lines_reached: {}, // line_no -> [state_ids]
+            stateToLine: {}, // state_id -> line_no (Optimization)
+            assertions: [],
+            errors: [],
+            edges: [], // {source, target}
+            sourceLines: ["Waiting for log file with source..."]
+        };
+
+        const appState = {
+            currentPass: 'all',
+            selectedStateId: null
+        };
+
+        // DOM Elements
+        const sourceContainer = document.getElementById('sourceContainer');
+        const passSelector = document.getElementById('passSelector');
+        const detailsPanel = document.getElementById('detailsPanel');
+        const graphStatus = document.getElementById('graphStatus');
+        const fileInput = document.getElementById('fileInput');
+        const sourceTitle = document.getElementById('sourceTitle');
+        const helpBtn = document.getElementById('helpBtn');
+        const helpModal = document.getElementById('helpModal');
+        const helpClose = document.getElementById('helpClose');
+        const helpOk = document.getElementById('helpOk');
+        const helpBackdrop = document.getElementById('helpBackdrop');
+        let cy; // Cytoscape instance
+
+        // Helper: Get State Object - OPTIMIZED to O(1)
+        const getState = (id) => appData.stateMap[String(id)];
+
+        // ==========================================
+        // 2. PARSING LOGIC
+        // ==========================================
+
+        function processLogs(jsonLines) {
+            // Reset Data
+            const newData = {
+                passes: new Set(),
+                states: {}, // Temp Map for O(1) access
+                lines_reached: {},
+                stateToLine: {}, // New Optimization Map
+                assertions: [],
+                errors: [],
+                edges: [],
+                statePasses: {} // Map state_id -> Set(pass_ids)
+            };
+
+            // 1. First Pass: Ingest Raw Events
+            jsonLines.forEach(record => {
+                if(!record) return;
+
+                switch(record.type) {
+                    case 'source_file':
+                        // Handle Source Code Injection
+                        if (record.code) {
+                            appData.sourceLines = record.code.replace(/\r\n/g, '\n').split('\n');
+                            if (record.path) {
+                                sourceTitle.innerText = `View: ${record.path}`;
+                            }
+                        }
+                        break;
+
+                    case 'line':
+                        // Record: { type: "line", line: int, states: [ids], pass: str }
+                        newData.passes.add(record.pass);
+                        
+                        if (!newData.lines_reached[record.line]) {
+                            newData.lines_reached[record.line] = new Set();
+                        }
+                        
+                        record.states.forEach(sid => {
+                            const sidStr = String(sid);
+                            newData.lines_reached[record.line].add(sidStr);
+                            
+                            // Optimization: Map State -> Line
+                            newData.stateToLine[sidStr] = record.line;
+
+                            // Track which pass this state was seen in
+                            if (!newData.statePasses[sidStr]) newData.statePasses[sidStr] = new Set();
+                            newData.statePasses[sidStr].add(record.pass);
+                        });
+                        break;
+
+                    case 'state':
+                        // Record: { type: "state", id: id, details: {} }
+                        const sidStr = String(record.id);
+                        newData.states[sidStr] = {
+                            id: sidStr,
+                            details: record.details,
+                            parent: null // Will be filled by traces
+                        };
+                        break;
+
+                    case 'trace':
+                        // Record: { type: "trace", from: id, to: id }
+                        const fromStr = String(record.from);
+                        const toStr = String(record.to);
+                        newData.edges.push({ source: fromStr, target: toStr });
+                        break;
+
+                    case 'assertion':
+                        // Record: { type: "assertion", line: int, formula: str, state: id, pass: str }
+                        newData.assertions.push({
+                            line: record.line,
+                            formula: record.formula,
+                            stateId: String(record.state),
+                            passId: record.pass,
+                            status: "checked"
+                        });
+                        break;
+
+                    case 'report':
+                        // Record: { type: "report", line: int, code: str, message: str, state?: id, pass?: str }
+                        newData.errors.push({
+                            line: record.line,
+                            id: record.code,
+                            message: record.message,
+                            stateId: record.state ? String(record.state) : null, // Optional
+                            passId: record.pass || null // Now can include pass
+                        });
+                        break;
+                }
+            });
+
+            // 2. Second Pass: Reconstruct Relationships
+            
+            // Link parents via edges
+            newData.edges.forEach(edge => {
+                if (newData.states[edge.target]) {
+                    newData.states[edge.target].parent = edge.source;
+                }
+            });
+
+            // Convert structures for App
+            appData.passes = Array.from(newData.passes);
+            appData.assertions = newData.assertions;
+            appData.errors = newData.errors;
+            appData.edges = newData.edges;
+            appData.stateToLine = newData.stateToLine; // Store optimized map
+            
+            // Convert State Map to Array and attach Pass info
+            appData.states = Object.values(newData.states).map(s => ({
+                ...s,
+                passes: Array.from(newData.statePasses[s.id] || [])
+            }));
+
+            // POPULATE O(1) LOOKUP MAP
+            appData.stateMap = {};
+            appData.states.forEach(s => {
+                appData.stateMap[s.id] = s;
+            });
+
+            // Convert Line Sets to Arrays
+            appData.lines_reached = {};
+            for (const [line, stateSet] of Object.entries(newData.lines_reached)) {
+                appData.lines_reached[line] = Array.from(stateSet);
+            }
+        }
+
+        // File Handler
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                try {
+                    const text = event.target.result;
+                    // Reset global source before loading new one (to clear old file if new one doesn't have source)
+                    appData.sourceLines = ["Source not found in log."];
+                    
+                    // Split by newline and parse JSON
+                    const jsonLines = text.trim().split('\n').map(line => {
+                        try { return JSON.parse(line); } catch(e) { return null; }
+                    }).filter(x => x);
+
+                    processLogs(jsonLines);
+                    refreshUI();
+                } catch (err) {
+                    alert("Error parsing log file: " + err.message);
+                }
+            };
+            reader.readAsText(file);
+        });
+
+        // ==========================================
+        // 3. UI RENDERING
+        // ==========================================
+
+        function init() {
+            // Load Mock Data initially
+            processLogs(MOCK_LOG_LINES);
+            refreshUI();
+
+            // Help modal wiring
+            const openHelp = () => { helpModal.classList.remove('hidden'); helpModal.classList.add('flex'); };
+            const closeHelp = () => { helpModal.classList.add('hidden'); helpModal.classList.remove('flex'); };
+            helpBtn?.addEventListener('click', openHelp);
+            helpClose?.addEventListener('click', closeHelp);
+            helpOk?.addEventListener('click', closeHelp);
+            helpBackdrop?.addEventListener('click', closeHelp);
+            document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !helpModal.classList.contains('hidden')) closeHelp(); });
+        }
+
+        function refreshUI() {
+            populatePassSelector();
+            renderSourceCode();
+            initGraph();
+            detailsPanel.innerHTML = '<div class="text-gray-500 italic">Select a state...</div>';
+            appState.selectedStateId = null;
+        }
+
+        function populatePassSelector() {
+            passSelector.innerHTML = '<option value="all">All Passes</option>';
+            appData.passes.forEach(pass => {
+                const opt = document.createElement('option');
+                opt.value = pass;
+                opt.innerText = pass;
+                passSelector.appendChild(opt);
+            });
+        }
+
+        function renderSourceCode() {
+            sourceContainer.innerHTML = '';
+            
+            // Add a wrapper to ensure content fits and scrolls correctly
+            const wrapper = document.createElement('div');
+            wrapper.className = 'min-w-full w-fit';
+
+            appData.sourceLines.forEach((lineText, index) => {
+                const lineNum = index + 1;
+                const lineStates = appData.lines_reached[lineNum] || [];
+                
+                // Filter states by pass
+                const visibleStates = appState.currentPass === 'all' 
+                    ? lineStates 
+                    : lineStates.filter(sid => {
+                        const s = getState(sid);
+                        return s && s.passes.includes(appState.currentPass);
+                    });
+
+                const errors = appData.errors.filter(e => e.line === lineNum && (appState.currentPass === 'all' || !e.passId || e.passId === appState.currentPass)); 
+                const asserts = appData.assertions.filter(a => a.line === lineNum && (appState.currentPass === 'all' || a.passId === appState.currentPass));
+
+                // Container
+                const lineEl = document.createElement('div');
+                lineEl.className = `flex flex-col`;
+                lineEl.dataset.line = lineNum;
+
+                // Main Line Row
+                const mainRow = document.createElement('div');
+                mainRow.className = `code-line ${visibleStates.length === 0 ? 'dimmed' : ''}`;
+                
+                // 1. Line Number
+                const numSpan = document.createElement('span');
+                numSpan.className = 'line-number';
+                numSpan.innerText = lineNum;
+                
+                // 2. Gutter Widgets
+                const gutter = document.createElement('div');
+                gutter.className = 'gutter-widgets';
+                
+                // State Count Badge
+                if (visibleStates.length > 0) {
+                    const sBadge = document.createElement('span');
+                    sBadge.className = 'badge badge-states';
+                    sBadge.innerText = visibleStates.length;
+                    sBadge.title = `Active States: ${visibleStates.slice(0, 5).join(', ')}${visibleStates.length > 5 ? '...' : ''}`;
+                    gutter.appendChild(sBadge);
+                }
+
+                // Error Badge
+                if (errors.length > 0) {
+                    const eBadge = document.createElement('span');
+                    eBadge.className = 'badge badge-error';
+                    eBadge.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i>';
+                    gutter.appendChild(eBadge);
+                }
+
+                // Assert Badge
+                if (asserts.length > 0) {
+                    const aBadge = document.createElement('span');
+                    aBadge.className = 'badge badge-assert';
+                    aBadge.innerHTML = '<i class="fa-solid fa-check"></i>';
+                    gutter.appendChild(aBadge);
+                }
+
+                // 3. Code Content
+                const content = document.createElement('div');
+                content.className = 'code-content';
+                content.innerHTML = syntaxHighlight(lineText);
+
+                mainRow.appendChild(numSpan);
+                mainRow.appendChild(gutter);
+                mainRow.appendChild(content);
+
+                // Details Drawer
+                const detailsDrawer = document.createElement('div');
+                detailsDrawer.className = 'line-details';
+                detailsDrawer.id = `details-${lineNum}`;
+                
+                // Drawer Content
+                let drawerHTML = '';
+                if (visibleStates.length > 0) {
+                    drawerHTML += `<div class="mb-2"><strong class="text-blue-400">States (${visibleStates.length}):</strong> <span class="text-gray-400 break-all text-xs">${visibleStates.join(', ')}</span></div>`;
+                }
+                if (errors.length > 0) {
+                    drawerHTML += `<div class="mb-2 text-red-400"><strong>Errors:</strong><ul class="list-disc pl-4">${errors.map(e => {
+                        const passInfo = e.passId ? ` <span class="text-gray-500 text-xs">[${e.passId}]</span>` : '';
+                        return `<li>[${e.id}] ${e.message}${passInfo}</li>`;
+                    }).join('')}</ul></div>`;
+                }
+                if (asserts.length > 0) {
+                    // Filter duplicate assertions (group by formula)
+                    const uniqueFormulas = {};
+                    asserts.forEach(a => {
+                        if (!uniqueFormulas[a.formula]) uniqueFormulas[a.formula] = 0;
+                        uniqueFormulas[a.formula]++;
+                    });
+
+                    drawerHTML += `<div class="mb-2 text-yellow-500"><strong>Assertions:</strong><ul class="list-disc pl-4">${
+                        Object.entries(uniqueFormulas).map(([formula, count]) => 
+                            `<li>${formula} ${count > 1 ? `<span class="text-gray-500 text-xs">(${count} states)</span>` : ''}</li>`
+                        ).join('')
+                    }</ul></div>`;
+                }
+                detailsDrawer.innerHTML = drawerHTML;
+
+                // Event: Click gutter to toggle Details
+                gutter.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const isOpen = detailsDrawer.classList.contains('open');
+                    document.querySelectorAll('.line-details').forEach(d => d.classList.remove('open'));
+                    if (!isOpen && (visibleStates.length > 0 || errors.length > 0 || asserts.length > 0)) {
+                        detailsDrawer.classList.add('open');
+                    }
+                });
+
+                // Event: Click Line to Select States in Graph
+                mainRow.addEventListener('click', () => {
+                    // Clear any ancestor indicators and line highlights since this is a multi-state selection
+                    document.querySelectorAll('.ancestor-indicator').forEach(el => el.remove());
+                    document.querySelectorAll('.highlight-active').forEach(el => el.classList.remove('highlight-active'));
+                    document.querySelectorAll('.highlight-trace').forEach(el => el.classList.remove('highlight-trace'));
+                    if (cy && visibleStates.length > 0) {
+                        cy.elements().unselect();
+                        // Build selector for all state IDs at this line
+                        const selector = visibleStates.map(id => `#${id}`).join(', ');
+                        const nodes = cy.$(selector);
+                        nodes.select();
+                        // Optional: Center view on selection (can be jarring if too frequent, left out for now)
+                        graphStatus.innerText = `Selected ${visibleStates.length} states at Line ${lineNum}`;
+                    }
+                });
+
+                lineEl.appendChild(mainRow);
+                lineEl.appendChild(detailsDrawer);
+                wrapper.appendChild(lineEl);
+            });
+            sourceContainer.appendChild(wrapper);
+        }
+
+        function syntaxHighlight(code) {
+            // Escape HTML entities
+            code = code.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            
+            // Single-pass tokenizer using callback to avoid nested replacement issues
+            // Order: Strings > Comments > Keywords > Numbers
+            return code.replace(/(".*?"|'.*?')|(\/\/.*|#.*)|(\b(?:int|char|void|return|if|else|while|echo|exit|fi|then|sh|cd|pip|ghcloneall|deactivate|tar|rm|function)\b)|(\b\d+\b)/g, function(match, str, comment, keyword, num) {
+                if (str) return `<span class="token-string">${str}</span>`;
+                if (comment) return `<span class="token-comment">${comment}</span>`;
+                if (keyword) return `<span class="token-keyword">${keyword}</span>`;
+                if (num) return `<span class="token-num">${num}</span>`;
+                return match;
+            });
+        }
+
+        // ==========================================
+        // 4. GRAPH VISUALIZATION
+        // ==========================================
+
+        function initGraph() {
+            const elements = buildGraphElements();
+
+            cy = cytoscape({
+                container: document.getElementById('cy'),
+                elements: elements,
+                style: [
+                    {
+                        selector: 'node',
+                        style: {
+                            'background-color': '#3b82f6',
+                            'label': 'data(label)',
+                            'color': '#e5e7eb',
+                            'font-size': '8px',
+                            'text-wrap': 'wrap',
+                            'text-valign': 'center',
+                            'text-halign': 'left',
+                            'text-margin-x': '8px',
+                            'width': '12px',
+                            'height': '12px',
+                        }
+                    },
+                    {
+                        selector: 'node[type="error"]',
+                        style: { 'background-color': '#ef4444', 'width': '16px', 'height': '16px' }
+                    },
+                    {
+                        selector: 'node[type="assert"]',
+                        style: { 'background-color': '#eab308' }
+                    },
+                    {
+                        selector: 'edge',
+                        style: {
+                            'width': 1,
+                            'line-color': '#4b5563',
+                            'target-arrow-color': '#4b5563',
+                            'target-arrow-shape': 'triangle',
+                            'curve-style': 'bezier'
+                        }
+                    },
+                    {
+                        selector: ':selected',
+                        style: {
+                            'border-width': 2,
+                            'border-color': '#fff',
+                            'background-color': '#2563eb',
+                            'width': '20px',
+                            'height': '20px'
+                        }
+                    },
+                    {
+                        selector: '.dimmed',
+                        style: { 'opacity': 0.1 }
+                    }
+                ],
+                layout: {
+                    name: 'breadthfirst',
+                    directed: true,
+                    padding: 30,
+                    spacingFactor: 1.2
+                }
+            });
+
+            cy.on('tap', 'node', function(evt){
+                const node = evt.target;
+                selectState(node.id());
+            });
+
+            cy.on('tap', 'edge', function(evt){
+                const edge = evt.target;
+                const fromId = edge.data('source');
+                const toId = edge.data('target');
+                renderEdgeDiff(fromId, toId);
+            });
+        }
+
+        function buildGraphElements() {
+            const nodes = [];
+            const edges = [];
+
+            appData.states.forEach(s => {
+                const isError = appData.errors.some(e => String(e.stateId) === s.id);
+                const isAssert = appData.assertions.some(a => String(a.stateId) === s.id);
+                
+                const label = s.passes && s.passes.length ? s.passes.join('\n') : '';
+
+                nodes.push({
+                    data: { 
+                        id: s.id, 
+                        passes: s.passes,
+                        label,
+                        type: isError ? 'error' : (isAssert ? 'assert' : 'normal')
+                    }
+                });
+            });
+
+            appData.edges.forEach(e => {
+                // Only add edge if both nodes exist (sanity check)
+                if (appData.states.find(s => s.id === e.source) && appData.states.find(s => s.id === e.target)) {
+                    edges.push({
+                        data: { source: e.source, target: e.target }
+                    });
+                }
+            });
+
+            return [...nodes, ...edges];
+        }
+
+        function filterGraph() {
+            if (!cy) return;
+            
+            cy.batch(() => {
+                const nodes = cy.nodes();
+                nodes.removeClass('dimmed');
+                
+                if (appState.currentPass !== 'all') {
+                    nodes.forEach(node => {
+                        const nodePasses = node.data('passes') || [];
+                        if (!nodePasses.includes(appState.currentPass)) {
+                            node.addClass('dimmed');
+                        }
+                    });
+                }
+            });
+        }
+
+        // ==========================================
+        // 5. INTERACTION & HELPERS
+        // ==========================================
+
+        // Safe Stringifier to prevent OOM on massive objects
+        const safeStringify = (obj, maxLen = 1000000) => {
+            let str = '';
+            
+            const process = (o, depth) => {
+                if (str.length > maxLen) return;
+                if (depth > 4) { str += '"..."'; return; }
+                
+                if (o === null) { str += 'null'; return; }
+                if (o === undefined) { str += 'undefined'; return; }
+
+                if (typeof o !== 'object') {
+                    // For strings, preserve newlines instead of escaping them
+                    if (typeof o === 'string') {
+                        str += `"${o}"`;
+                    } else {
+                        // Use native stringify for other primitives (numbers, booleans)
+                        str += JSON.stringify(o);
+                    }
+                    return;
+                }
+                
+                if (Array.isArray(o)) {
+                    str += '[';
+                    for (let i = 0; i < o.length; i++) {
+                        if (str.length > maxLen) { str += '...'; return; }
+                        process(o[i], depth + 1);
+                        if (i < o.length - 1) str += ',';
+                    }
+                    str += ']';
+                } else {
+                    str += '{';
+                    const keys = Object.keys(o);
+                    for (let i = 0; i < keys.length; i++) {
+                        if (str.length > maxLen) { str += '...'; return; }
+                        str += `"${keys[i]}":`;
+                        process(o[keys[i]], depth + 1);
+                        if (i < keys.length - 1) str += ',';
+                    }
+                    str += '}';
+                }
+            };
+            
+            try {
+                process(obj, 0);
+            } catch (e) {
+                str += ' <Error>';
+            }
+            
+            if (str.length > maxLen) str += ' ... (truncated)';
+            return str;
+        };
+
+        // Helper: Format JSON for Display (Optimized)
+        const formatJSON = (obj) => {
+            if (!obj) return '<span class="text-gray-500">No details</span>';
+            
+            let html = '<div class="flex flex-col gap-2">';
+            
+            // Sort keys for consistent display, but keep _meta last if present
+            let keys = Object.keys(obj).sort();
+            if (keys.includes('_meta')) {
+                keys = keys.filter(k => k !== '_meta');
+                keys.push('_meta');
+            }
+
+            for (const key of keys) {
+                const val = obj[key];
+                let strVal = '';
+                let truncated = false;
+
+                try {
+                    // Use safeStringify instead of JSON.stringify to prevent massive allocations
+                    strVal = safeStringify(val); 
+                    
+                    // Check if safeStringify truncated it
+                    if (strVal.endsWith('... (truncated)')) {
+                        truncated = true;
+                    }
+                } catch (e) {
+                    strVal = `<Error: ${e.message}>`;
+                }
+
+                // Escape HTML
+                const safeVal = strVal
+                    ? strVal.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') 
+                    : 'undefined';
+
+                html += `
+                    <div class="text-xs font-mono">
+                        <span class="text-blue-400 font-bold">${key}:</span>
+                        <span class="text-gray-300 whitespace-pre-wrap break-all">${safeVal}</span>
+                        ${truncated ? '<span class="text-yellow-600 italic bg-yellow-900/20 px-1 rounded ml-1">(truncated)</span>' : ''}
+                    </div>
+                    <div class="h-px bg-gray-700 my-1"></div>
+                `;
+            }
+            html += '</div>';
+            return html;
+        };
+
+        // Diff helper: compare parent and child state details
+        function diffStateDetails(parentDetails = {}, childDetails = {}) {
+            const added = {};
+            const removed = {};
+            const changed = {};
+
+            const parentKeys = new Set(Object.keys(parentDetails));
+            const childKeys = new Set(Object.keys(childDetails));
+            const allKeys = new Set([...parentKeys, ...childKeys]);
+
+            allKeys.forEach(key => {
+                const inParent = parentKeys.has(key);
+                const inChild = childKeys.has(key);
+
+                if (inParent && !inChild) {
+                    removed[key] = parentDetails[key];
+                } else if (!inParent && inChild) {
+                    added[key] = childDetails[key];
+                } else {
+                    const pVal = parentDetails[key];
+                    const cVal = childDetails[key];
+                    // Shallow compare; stringify to keep it simple for now
+                    if (JSON.stringify(pVal) !== JSON.stringify(cVal)) {
+                        changed[key] = { from: pVal, to: cVal };
+                    }
+                }
+            });
+
+            return { added, removed, changed };
+        }
+
+        // Render edge diff into the details panel
+        function renderEdgeDiff(fromId, toId) {
+            const parentState = getState(fromId);
+            const childState = getState(toId);
+
+            if (!parentState || !childState) {
+                detailsPanel.innerHTML = '<span class="text-red-400">Unable to load edge details.</span>';
+                return;
+            }
+
+            graphStatus.innerText = `Selected edge: ${fromId} → ${toId}`;
+
+            const diff = diffStateDetails(parentState.details || {}, childState.details || {});
+
+            // Render a concise, color-coded diff for readability
+            const escapeHtml = (text) => String(text)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;');
+
+            const stringifyVal = (val) => escapeHtml(safeStringify(val));
+
+            const renderSection = (title, icon, colorClass, items, formatter) => {
+                if (!items || Object.keys(items).length === 0) return '';
+                const rows = Object.entries(items).map(([k, v]) => `<div class="flex gap-2"><span class="text-gray-400">${escapeHtml(k)}:</span><span class="text-gray-200 whitespace-pre-wrap">${formatter(v)}</span></div>`).join('');
+                return `
+                    <div class="mb-3">
+                        <div class="flex items-center gap-2 ${colorClass} font-semibold text-sm mb-1">${icon} ${title}</div>
+                        <div class="ml-2 text-xs space-y-1">${rows}</div>
+                    </div>
+                `;
+            };
+
+            // Git-style unified diff for strings
+            const generateUnifiedDiff = (fromStr, toStr) => {
+                const fromLines = fromStr.split('\n');
+                const toLines = toStr.split('\n');
+                
+                // Simple LCS-based diff (Myers algorithm simplified)
+                const lcs = (a, b) => {
+                    const m = a.length, n = b.length;
+                    const dp = Array(m + 1).fill(null).map(() => Array(n + 1).fill(0));
+                    
+                    for (let i = 1; i <= m; i++) {
+                        for (let j = 1; j <= n; j++) {
+                            if (a[i - 1] === b[j - 1]) {
+                                dp[i][j] = dp[i - 1][j - 1] + 1;
+                            } else {
+                                dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1]);
+                            }
+                        }
+                    }
+                    return dp;
+                };
+                
+                const backtrack = (a, b, dp, i, j) => {
+                    if (i === 0 || j === 0) return [];
+                    if (a[i - 1] === b[j - 1]) {
+                        return [...backtrack(a, b, dp, i - 1, j - 1), { type: 'common', line: a[i - 1] }];
+                    }
+                    if (dp[i - 1][j] > dp[i][j - 1]) {
+                        return [...backtrack(a, b, dp, i - 1, j), { type: 'removed', line: a[i - 1] }];
+                    }
+                    return [...backtrack(a, b, dp, i, j - 1), { type: 'added', line: b[j - 1] }];
+                };
+                
+                const dp = lcs(fromLines, toLines);
+                let diff = [];
+                let i = 0, j = 0;
+                
+                // Simpler approach: just mark all lines as added/removed if changed
+                const maxLen = Math.max(fromLines.length, toLines.length);
+                for (let idx = 0; idx < maxLen; idx++) {
+                    if (idx < fromLines.length && idx < toLines.length) {
+                        if (fromLines[idx] === toLines[idx]) {
+                            diff.push({ type: 'common', line: fromLines[idx] });
+                        } else {
+                            diff.push({ type: 'removed', line: fromLines[idx] });
+                            diff.push({ type: 'added', line: toLines[idx] });
+                        }
+                    } else if (idx < fromLines.length) {
+                        diff.push({ type: 'removed', line: fromLines[idx] });
+                    } else {
+                        diff.push({ type: 'added', line: toLines[idx] });
+                    }
+                }
+                
+                return diff;
+            };
+
+            const renderChanged = (changed) => Object.entries(changed).map(([k, v]) => {
+                const fromVal = v.from;
+                const toVal = v.to;
+                
+                // Use unified diff for strings with newlines
+                if (typeof fromVal === 'string' && typeof toVal === 'string' && 
+                    (fromVal.includes('\n') || toVal.includes('\n'))) {
+                    const diff = generateUnifiedDiff(fromVal, toVal);
+                    const diffLines = diff.map(d => {
+                        const prefix = d.type === 'added' ? '+' : d.type === 'removed' ? '-' : ' ';
+                        const colorClass = d.type === 'added' ? 'text-green-300 bg-green-900/20' : 
+                                          d.type === 'removed' ? 'text-red-300 bg-red-900/20' : 
+                                          'text-gray-400';
+                        return `<div class="${colorClass} font-mono text-xs px-1"><span class="text-gray-500">${escapeHtml(prefix)}</span> ${escapeHtml(d.line)}</div>`;
+                    }).join('');
+                    
+                    return `
+                        <div class="flex flex-col gap-1">
+                            <div class="text-gray-400">${escapeHtml(k)}:</div>
+                            <div class="ml-3 text-xs border-l-2 border-gray-600 pl-2">${diffLines}</div>
+                        </div>
+                    `;
+                } else {
+                    // Fallback to simple from/to for non-string or single-line changes
+                    return `
+                        <div class="flex flex-col gap-1">
+                            <div class="text-gray-400">${escapeHtml(k)}:</div>
+                            <div class="ml-3 text-xs">
+                                <div><span class="text-gray-500">-</span> <span class="text-red-300 whitespace-pre-wrap">${stringifyVal(fromVal)}</span></div>
+                                <div><span class="text-gray-500">+</span> <span class="text-green-300 whitespace-pre-wrap">${stringifyVal(toVal)}</span></div>
+                            </div>
+                        </div>
+                    `;
+                }
+            }).join('');
+
+            const addedHTML = renderSection('Added', '<i class="fa-solid fa-plus"></i>', 'text-green-400', diff.added, stringifyVal);
+            const removedHTML = renderSection('Removed', '<i class="fa-solid fa-minus"></i>', 'text-red-400', diff.removed, stringifyVal);
+            const changedHTML = diff.changed && Object.keys(diff.changed).length > 0
+                ? `
+                    <div class="mb-3">
+                        <div class="flex items-center gap-2 text-amber-300 font-semibold text-sm mb-1"><i class="fa-solid fa-arrow-right-arrow-left"></i> Changed</div>
+                        <div class="ml-2 text-xs space-y-2">${renderChanged(diff.changed)}</div>
+                    </div>
+                `
+                : '';
+
+            detailsPanel.innerHTML = `
+                <div class="text-xs text-gray-300">
+                    <div class="mb-2 text-sm font-semibold text-blue-300">Edge ${escapeHtml(fromId)} → ${escapeHtml(toId)}</div>
+                    ${addedHTML || removedHTML || changedHTML ? '' : '<div class="text-gray-500">No differences.</div>'}
+                    ${addedHTML}${removedHTML}${changedHTML}
+                </div>
+            `;
+        }
+
+        function selectState(stateId) {
+            appState.selectedStateId = stateId;
+            const stateObj = getState(stateId);
+
+            if (!stateObj) return;
+
+            // Immediate Feedback to prevent feeling of "Frozen UI"
+            graphStatus.innerText = `Selected: ${stateId}`;
+            detailsPanel.innerHTML = '<div class="text-gray-400 p-2 flex items-center gap-2"><i class="fa-solid fa-circle-notch fa-spin"></i> Loading details...</div>';
+
+            // Defer heavy processing to next tick to allow UI to update
+            setTimeout(() => {
+                // Gather extra details
+                const error = appData.errors.find(e => String(e.stateId) === stateId);
+                const assert = appData.assertions.find(a => String(a.stateId) === stateId);
+                
+                // Find all reports for this state/line
+                const stateLineNum = appData.stateToLine[stateId];
+                const reports = stateLineNum 
+                    ? appData.errors.filter(e => e.line === stateLineNum && (!appState.currentPass || appState.currentPass === 'all' || !e.passId || e.passId === appState.currentPass))
+                    : [];
+                
+                const displayObj = {
+                    id: stateObj.id,
+                    passes: stateObj.passes,
+                    ...stateObj.details,
+                    _meta: {
+                        error: error ? error.message : undefined,
+                        associated_reports: reports.length > 0 ? reports.map(r => ({
+                            code: r.id,
+                            message: r.message,
+                            pass: r.passId || 'unknown'
+                        })) : undefined,
+                        assertion_status: assert ? assert.status : undefined,
+                        parent: stateObj.parent
+                    }
+                };
+                
+                // Render Details
+                detailsPanel.innerHTML = formatJSON(displayObj);
+
+                // Highlight Trace (now optimized)
+                highlightTrace(stateId);
+            }, 10);
+        }
+
+        function highlightTrace(stateId) {
+            // Clear previous highlights and transient ancestor indicators
+            document.querySelectorAll('.highlight-active').forEach(el => el.classList.remove('highlight-active'));
+            document.querySelectorAll('.highlight-trace').forEach(el => el.classList.remove('highlight-trace'));
+            document.querySelectorAll('.ancestor-indicator').forEach(el => el.remove());
+
+            // Walk up parents
+            let curr = getState(stateId);
+            const visited = new Set(); // Safety loop prevention
+            const markedLines = new Set();
+            
+            while(curr && !visited.has(curr.id)) {
+                visited.add(curr.id); // Guard against circular refs
+
+                // If a pass filter is active, skip states not in the current pass
+                if (appState.currentPass !== 'all') {
+                    const passes = curr.passes || [];
+                    if (!passes.includes(appState.currentPass)) {
+                        curr = curr.parent ? getState(curr.parent) : null;
+                        continue;
+                    }
+                }
+
+                // Optimized Lookup: O(1) instead of O(Lines)
+                const foundLine = appData.stateToLine[curr.id];
+                
+                if (foundLine) {
+                    // Selected state's line: highlight prominently
+                    if (curr.id === stateId) {
+                        const row = document.querySelector(`div[data-line="${foundLine}"] .code-line`);
+                        if (row) {
+                            row.classList.add('highlight-active');
+                            row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        }
+                    } else {
+                        // Ancestor lines: add a persistent indicator in the gutter (cleared on new state or source click)
+                        if (!markedLines.has(foundLine)) {
+                            const gutter = document.querySelector(`div[data-line="${foundLine}"] .gutter-widgets`);
+                            if (gutter) {
+                                const indicator = document.createElement('span');
+                                indicator.className = 'ancestor-indicator';
+                                indicator.textContent = '🧬';
+                                indicator.title = 'Ancestor state';
+                                gutter.appendChild(indicator);
+                                markedLines.add(foundLine);
+                            }
+                        }
+                    }
+                }
+
+                if(curr.parent) curr = getState(curr.parent);
+                else curr = null;
+            }
+        }
+
+        passSelector.addEventListener('change', (e) => {
+            appState.currentPass = e.target.value;
+            renderSourceCode();
+            filterGraph();
+            appState.selectedStateId = null;
+            detailsPanel.innerHTML = '<div class="text-gray-500 italic">Select a state...</div>';
+            cy.elements().unselect();
+            // Clear any ancestor indicators when pass filter changes
+            document.querySelectorAll('.ancestor-indicator').forEach(el => el.remove());
+        });
+
+        // Boot
+        init();
+
+    </script>
+</body>
+</html>

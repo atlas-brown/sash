@@ -122,7 +122,7 @@ def assertion_to_z3(assertion: Assertion) -> tuple[z3.BoolRef, # assertion var
     return assertion_var, state_formula, constraint_formula
 
 
-def model_to_reports(core: list[z3.BoolRef]):
+def model_to_reports(core: list[z3.BoolRef], config: InterpConfig):
     """
     Convert an unsat core to structured reporter errors.
     """
@@ -140,7 +140,7 @@ def model_to_reports(core: list[z3.BoolRef]):
             assertion.source_str,
             assertion.source_line
         )
-        Reporter.add_issue(err)
+        Reporter.add_issue(err, config)
 
 
 # TODOS:
@@ -164,6 +164,10 @@ def run_solver(traces: list[Trace], config: InterpConfig, stop: threading.Event 
 
     total_assertions = sum(len(trace.latest_state.assertions) for trace in traces)
     checked_assertions = 0
+
+    if config.debug_instrumentation:
+        from sash.debugtools.solver_debug import get_debugger as solver_debugger, log_assertion_result
+        debugger = solver_debugger()
 
     logging.info("Checking %d total assertions from %d total traces", total_assertions, len(traces))
     for i, trace in enumerate(traces):
@@ -191,7 +195,16 @@ def run_solver(traces: list[Trace], config: InterpConfig, stop: threading.Event 
             solver.add(state_formula)
 
             if solver.check() == z3.unsat:
-                logging.debug("Path condition is unsat; skipping assertion check")
+                logging.debug("Path condition is unsat, skipping assertion check")
+                if config.debug_instrumentation:
+                    log_assertion_result(
+                        assertion=assertion,
+                        assertion_formula=assertion_formula,
+                        arb_z3_map=None,
+                        result_type="PATHCOND_UNSAT",
+                        solver_time=0.0,
+                        debugger=debugger,
+                    )
                 continue
 
             solver.assert_and_track(assertion_formula, assertion_var)
@@ -207,9 +220,30 @@ def run_solver(traces: list[Trace], config: InterpConfig, stop: threading.Event 
             if result == z3.unsat:
                 core = solver.unsat_core()
                 logging.debug("Unsat core: %s", core)
-                model_to_reports(core)
+                if config.debug_instrumentation:
+                    log_assertion_result(
+                        assertion=assertion,
+                        assertion_formula=assertion_formula,
+                        arb_z3_map=arbitrary_to_z3_var,
+                        result_type="UNSAT",
+                        solver_time=-1,
+                        unsat_core=core,
+                        debugger=debugger,
+                    )
+                model_to_reports(core, config)
             else:
                 model = solver.model()
                 logging.debug("SAT model: %s", model)
+                if config.debug_instrumentation:
+                    log_assertion_result(
+                        assertion=assertion,
+                        assertion_formula=assertion_formula,
+                        arb_z3_map=arbitrary_to_z3_var,
+                        result_type="SAT",
+                        solver_time=-1,
+                        sat_model=model,
+                        debugger=debugger,
+                    )
 
     logging.info("Solving produced %d new reports", len(Reporter._issues) - total_issues_before_solver)
+

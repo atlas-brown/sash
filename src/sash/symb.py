@@ -25,6 +25,7 @@ from sash.solver import field_to_z3
 from sash.specs import get_spec
 from sash.dfs_targeted import *
 from sash.symbolic.state import *
+from sash.debugtools.logger import DebugLogger
 
 
 def handle_commandnode(traces: Traces,
@@ -49,7 +50,7 @@ def handle_commandnode(traces: Traces,
             # meaning a pattern is not provided for the command,
             # `grep` will expect input from stdin instead of treating the second argument as a file.
             if expanded_args[1].count.min == 0:
-                Reporter.add_issue(reporter.UnexpectedStdin(cmd_name, context_line))
+                Reporter.add_issue(reporter.UnexpectedStdin(cmd_name, context_line), config)
 
     if expanded_args:
         match expanded_args[0].try_to_str():
@@ -60,7 +61,7 @@ def handle_commandnode(traces: Traces,
                 cmd_traces = []
                 for arg_fields, traces in simplified_expansions.items():
                     for trace in traces:
-                        ts, tf = handle_rm(arg_fields, trace, node)
+                        ts, tf = handle_rm(arg_fields, trace, node, config)
                         cmd_traces.append(ts)
                         if config.in_checked_position:
                             logging.debug("rm is in a checked position? Adding failure traces")
@@ -87,7 +88,7 @@ def handle_commandnode(traces: Traces,
                                     for trace in t1
                                 )
                                 if should_report:
-                                    Reporter.add_issue(reporter.NotACommand(non_existent_cmd_name, context_line))
+                                    Reporter.add_issue(reporter.NotACommand(non_existent_cmd_name, context_line), config)
                 if spec.min_operands > 0:
                     trace_expansions = expand_args(t1, node.arguments, config)
                     has_sufficient_operands = False
@@ -133,8 +134,12 @@ def handle_commandnode(traces: Traces,
                                 break
                     if not has_sufficient_operands:
                         assert isinstance(cmd_name, str), "cmd_name should be str when a spec is found"
-                        Reporter.add_issue(reporter.CommandCanOnlyFail(cmd_name, context_line))
+                        Reporter.add_issue(reporter.CommandCanOnlyFail(cmd_name, context_line), config)
                 t_precond = trace_map(t1, lambda s: s.add_assertion(spec.check, source_str=node.pretty(), source_line=context_line).update_known_commands(spec.check))
+                if config.debug_instrumentation:
+                    for trace in t1:
+                        DebugLogger.log_assertion(spec.check, trace.latest_state, context_line, config.current_pass)
+
                 t_success = trace_map(t_precond,
                                       lambda s: s.update_fs(spec.success_postcond)\
                                                  .add_pathcond(spec.success_postcond)\
@@ -191,7 +196,8 @@ def word_count_from_output(output: str) -> WordCount:
 
 def command_substitution_output(cmd_name: str,
                                 operands: list[Field],
-                                state: State) -> Field | None:
+                                state: State,
+                                config: InterpConfig) -> tuple[Field | None, State]:
     if cmd_name == "pwd":
         pwd_var = state.lookup("PWD")
         if pwd_var is not None and (pwd_value := pwd_var.value.try_to_str()) is not None:
@@ -211,13 +217,14 @@ def command_substitution_output(cmd_name: str,
 
     return None
 
-def handle_rm(expanded_args: tuple[Field, ...], trace: Trace, node: AST.CommandNode) -> tuple[Trace, Trace]:
+def handle_rm(expanded_args: tuple[Field, ...], trace: Trace, node: AST.CommandNode, config: Config) -> tuple[Trace, Trace]:
     logging.debug("Checking rm command with expansion possibility: %s", expanded_args)
     spec = get_spec("rm", expanded_args)
 
     assert spec is not None, "Expected rm spec to always be found"
 
     logging.debug("Adding rm precondition: %s", spec.check)
+    DebugLogger.log_assertion(spec.check, trace.latest_state, context_line, config.current_pass)
     trace = trace.extend(lambda s: s.add_assertion(spec.check, source_str=node.pretty(), source_line=context_line))
 
     def is_protected(path):
@@ -225,7 +232,7 @@ def handle_rm(expanded_args: tuple[Field, ...], trace: Trace, node: AST.CommandN
 
     for arg_idx, arg_field in enumerate(expanded_args[1:], start=1):
         if (path := arg_field.try_to_str()) and is_protected(path):
-            Reporter.add_issue(reporter.DeleteSystemFile(path, context_line))
+            Reporter.add_issue(reporter.DeleteSystemFile(path, context_line), config)
 
         def maybe_report_protected_split(content: CompletelyArbitrary, max_words: int | float) -> None:
             if content.maybe_empty and content.quoted:
@@ -236,13 +243,13 @@ def handle_rm(expanded_args: tuple[Field, ...], trace: Trace, node: AST.CommandN
                 if content.suffix is not None and (suf := content.suffix.try_to_str()):
                     exp += suf
                 if is_protected(exp):
-                    Reporter.add_issue(reporter.WordSplitCouldDeleteSystemFile(exp, context_line))
+                    Reporter.add_issue(reporter.WordSplitCouldDeleteSystemFile(exp, context_line), config)
 
             if max_words > 1 and not content.quoted:
                 if content.prefix is not None and (pre := content.prefix.try_to_str()) and is_protected(pre):
-                    Reporter.add_issue(reporter.WordSplitCouldDeleteSystemFile(pre, context_line))
+                    Reporter.add_issue(reporter.WordSplitCouldDeleteSystemFile(pre, context_line), config)
                 if content.suffix is not None and (suf := content.suffix.try_to_str()) and is_protected(suf):
-                    Reporter.add_issue(reporter.WordSplitCouldDeleteSystemFile(suf, context_line))
+                    Reporter.add_issue(reporter.WordSplitCouldDeleteSystemFile(suf, context_line), config)
 
             # Handle cases where multiple arbitraries are merged into one and the literals between them get "lost" during the merging (e.g. $a/$b when a and b are empty)
             # This overapproximates things because it does not consider that one of the arbitraries could be for-sure not empty
@@ -250,12 +257,12 @@ def handle_rm(expanded_args: tuple[Field, ...], trace: Trace, node: AST.CommandN
             if isinstance(content.source, tuple) and len(content.source) > 1 and arg_idx < len(node.arguments):
                 literal_path = extract_literal_strings_from_arg(node.arguments[arg_idx])
                 if literal_path and is_protected(literal_path):
-                    Reporter.add_issue(reporter.WordSplitCouldDeleteSystemFile(literal_path, context_line))
+                    Reporter.add_issue(reporter.WordSplitCouldDeleteSystemFile(literal_path, context_line), config)
 
         match arg_field:
             case Field(CompletelyArbitrary() as content, WordCount(_, max_words)):
                 if not content.quoted and max_words > 1:
-                    Reporter.add_issue(reporter.DangerousWordSplit(content.source, context_line))
+                    Reporter.add_issue(reporter.DangerousWordSplit(content.source, context_line), config)
                 maybe_report_protected_split(content, max_words)
 
     return (
@@ -293,10 +300,10 @@ def handle_unknown_command(name: str,
                            traces: Traces,
                            config: InterpConfig) -> Traces:
     if name in func_map.funcs.keys():
-        Reporter.add_issue(reporter.UndefinedFunction(name, context_line))
+        Reporter.add_issue(reporter.UndefinedFunction(name, context_line), config)
 
     if name.endswith("/") or any(name in t.latest_state.known_nonexistent_commands for t in traces):
-        Reporter.add_issue(reporter.NotACommand(name, context_line))
+        Reporter.add_issue(reporter.NotACommand(name, context_line), config)
 
     logging.debug("Unknown command %s, optimistically treating as no-op", name) # that reads its operands", name)
     # mark all args as being read
@@ -392,7 +399,7 @@ def handle_while(traces: Traces,
         logging.debug("While loop only runs once")
         return t3 + t_skip_body
     elif is_constant_test(test_cmds[0], test_cmds[1]):
-        Reporter.add_issue(reporter.InfiniteLoop(node, context_line))
+        Reporter.add_issue(reporter.InfiniteLoop(node, context_line), config)
         return t3 + t_skip_body
     logging.debug("collected test_cmds: %s", test_cmds)
     # todo extend path condition
@@ -410,7 +417,7 @@ def handle_while(traces: Traces,
 
     logging.debug("Checking constant test cond")
     if len(test_cmds) > 2 and is_constant_test(test_cmds[2], test_cmds[1]):
-        Reporter.add_issue(reporter.InfiniteLoop(node, context_line))
+        Reporter.add_issue(reporter.InfiniteLoop(node, context_line), config)
 
     return t5 + t_skip_body
 
@@ -534,16 +541,16 @@ def handle_if(traces: Traces, node: AST.IfNode, config: InterpConfig) -> Traces:
         test_result = interpret_test(test_cmds[-1])
         logging.debug("Test command result: %s", test_result)
     if test_result is not None:
-        Reporter.add_issue(reporter.ConstantCondition(test_cmds, test_line_number))
+        Reporter.add_issue(reporter.ConstantCondition(test_cmds, test_line_number), config)
         if test_result == True and (node.else_b is not None and node.else_b.pretty()):
                                                              # Hack because libdash sometimes gives empty else bodies
             t1 = trace_map(t1, lambda s: s.set_last_exit_code(SymStr(("0",)), Confidence.DEFINITE))
             logging.debug("Reporting dead code in else branch.")
-            Reporter.add_issue(reporter.DeadCode(node.else_b, test_line_number))
+            Reporter.add_issue(reporter.DeadCode(node.else_b, test_line_number), config)
         elif test_result == False:
             t1 = trace_map(t1, lambda s: s.set_last_exit_code(SymStr(("1",)), Confidence.DEFINITE))
             logging.debug("Reporting dead code in then branch")
-            Reporter.add_issue(reporter.DeadCode(node.then_b, test_line_number))
+            Reporter.add_issue(reporter.DeadCode(node.then_b, test_line_number), config)
     else:
         logging.debug("FORK: explicit if")
     # Several possibilities here:
@@ -940,7 +947,7 @@ def expand_simple(stuff: list[AST.ArgChar],
                         # todo we should report path information
                         if not is_special_var(var.var):
                             error_code = reporter.UnboundIDSetU if self.state.opts.is_set(SetOptions.NOUNSET) else reporter.UnboundID
-                            Reporter.add_issue(error_code(var.pretty(), context_line))
+                            Reporter.add_issue(error_code(var.pretty(), context_line), config)
                         if config.unbound_policy == UnboundVariablePolicy.EMPTY:
                             logging.info("Expansion: treating unbound var '%s' as empty string due to config", var.pretty())
                             empty_str_field = Field(SymStr(("",)), WordCount(0, 0))
@@ -965,10 +972,10 @@ def expand_simple(stuff: list[AST.ArgChar],
                             if isinstance(cmd_name, str) and (spec := get_spec(cmd_name, tuple(expanded_args))):
                                 # Check the spec to see if the command has no stdout. If it does, report an issue.
                                 if spec.io in {IOType.NONE, IOType.STDIN}:
-                                    Reporter.add_issue(reporter.CapturingEmptyOutput(cmd_name, context_line))
+                                    Reporter.add_issue(reporter.CapturingEmptyOutput(cmd_name, context_line), config)
                             if isinstance(cmd_name, str):
                                 # Specific logic for a few key built-in commands whose output we can reason about
-                                output_field = command_substitution_output(cmd_name, expanded_args[1:], self.state)
+                                output_field = command_substitution_output(cmd_name, expanded_args[1:], self.state, config)
                     # We found one of our special commands with known output
                     if output_field is not None:
                         self.add_a_field(output_field)
@@ -1261,11 +1268,13 @@ def interp_node(traces: Traces,
     traces = config.apply_node_cbs(traces, node)
     if not traces:
         logging.debug("No active traces when interpreting %s, reporting dead code and returning early", trim_string_for_logging(node.pretty()))
-        Reporter.add_issue(reporter.DeadCode(node, context_line))
+        Reporter.add_issue(reporter.DeadCode(node, context_line), config)
         return traces
 
     logging.debug("Interpreting line %d %s with %d traces",
                   context_line, trim_string_for_logging(node.pretty()), len(traces))
+    DebugLogger.log_interp_line(context_line, traces, config.current_pass)
+
     match node:
         case AST.CommandNode():
             if len(node.arguments) == 0:
@@ -1326,7 +1335,7 @@ def interp_node(traces: Traces,
             t0, var_name = expand_assuming_single_constant_word(traces, node.variable, config)
             t1, items = expand_args_dumb(t0, node.argument, config)
             if join_fields(items).count.max <= 1:
-                Reporter.add_issue(reporter.LoopRunsOnce(node, context_line))
+                Reporter.add_issue(reporter.LoopRunsOnce(node, context_line), config)
             # if all items are constant, we can unroll the loop
             if all(field.is_constant() for field in items):
                 logging.debug("For loop over constant items, unrolling: %s", items)
@@ -1355,26 +1364,34 @@ def interp_node(traces: Traces,
                     def not_safe_path(op: Field) -> Constraint:
                         return And.from_iter(Not(StringEq(op, Field.create_constant(p, 1))) for p in safe_paths)
 
+                    assertion_constraint = And.from_field_iter(redir_args, lambda op: Implies(not_safe_path(op), IsRead(op) | IsDeleted(op)))
                     t_precond = t.extend(t.latest_state.add_assertion(
-                        And.from_field_iter(redir_args, lambda op: Implies(not_safe_path(op), IsRead(op) | IsDeleted(op))),
+                        assertion_constraint,
                         source_str=node.pretty(),
                         source_line=context_line
                     ))
+                    DebugLogger.log_assertion(assertion_constraint, t.latest_state, context_line, config.current_pass)
                     t_postcond = t_precond.extend(t_precond.latest_state.update_fs(And.from_field_iter(redir_args, IsFile)))
 
                 elif node.redir_type == "Append": # >>
                     # NOTE: asserting IsFile also implicitly asserts that the file is *unread*
-                    t_precond = t.extend(t.latest_state.add_assertion(And.from_field_iter(redir_args, lambda op: ~IsDir(op)), source_str=node.pretty(), source_line=context_line))
+                    assertion_constraint = And.from_field_iter(redir_args, lambda op: ~IsDir(op))
+                    t_precond = t.extend(t.latest_state.add_assertion(assertion_constraint, source_str=node.pretty(), source_line=context_line))
+                    DebugLogger.log_assertion(assertion_constraint, t.latest_state, context_line, config.current_pass)
                     t_postcond = t_precond.extend(t_precond.latest_state.update_fs(And.from_field_iter(redir_args, IsFile)))
 
                 elif node.redir_type == "From": # <
                     # The targets of the redirection were read from
-                    t_precond = t.extend(t.latest_state.add_assertion(And.from_field_iter(redir_args, IsFile), source_str=node.pretty(), source_line=context_line))
+                    assertion_constraint = And.from_field_iter(redir_args, IsFile)
+                    t_precond = t.extend(t.latest_state.add_assertion(assertion_constraint, source_str=node.pretty(), source_line=context_line))
+                    DebugLogger.log_assertion(assertion_constraint, t.latest_state, context_line, config.current_pass)
                     t_postcond = t_precond.extend(t_precond.latest_state.update_fs(And.from_field_iter(redir_args, IsRead)))
 
                 elif node.redir_type == "FromTo":
                     # Conservatively assume the file is opened for reading
-                    t_precond = t.extend(t.latest_state.add_assertion(And.from_field_iter(redir_args, lambda op: ~IsDir(op)), source_str=node.pretty(), source_line=context_line))
+                    assertion_constraint = And.from_field_iter(redir_args, lambda op: ~IsDir(op))
+                    t_precond = t.extend(t.latest_state.add_assertion(assertion_constraint, source_str=node.pretty(), source_line=context_line))
+                    DebugLogger.log_assertion(assertion_constraint, t.latest_state, context_line, config.current_pass)
                     t_postcond = t_precond.extend(t_precond.latest_state.update_fs(And.from_field_iter(redir_args, IsRead)))
 
                 else:
@@ -1386,7 +1403,7 @@ def interp_node(traces: Traces,
                     case [Field(SymStr([something]), WordCount(1, 1))]:
                         if isinstance(something, str) and something in t.latest_state.fundefs:
                             # TODO: Associate the warning with the trace that caused it
-                            Reporter.add_issue(reporter.RedirectToFunction(something, context_line))
+                            Reporter.add_issue(reporter.RedirectToFunction(something, context_line), config)
                     case [Field(CompletelyArbitrary(), _)]:
                         pass
                     case _:
@@ -1624,22 +1641,34 @@ def symbexec_file(input_file: str,
             logging.info("DFS run: targeting dangerous commands")
             targeted_result = run_targeted_dfs(
                 nodes=nodes,
-                config=config,
+                config=replace(config, current_pass="dangerous-first"),
                 symb_engine=symb_engine,
                 func_defs=func_defs,
                 ignore_function_calls_for=safe_funcs,
             )
             logging.info("DFS run: only taking THEN branches")
-            symb_engine(nodes, replace(config, branch_policy=branch_policy_only_then))
+            symb_engine(nodes, replace(config,
+                                       branch_policy=branch_policy_only_then,
+                                       current_pass="conds:then"))
             logging.info("DFS run: only taking ELSE branches")
-            symb_engine(nodes, replace(config, branch_policy=branch_policy_only_else))
+            symb_engine(nodes, replace(config,
+                                       branch_policy=branch_policy_only_else,
+                                       current_pass="conds:else"))
             issues_so_far = Reporter._issues.copy()
             logging.info("DFS run: only taking THEN branches with unbound variables as empty strings")
-            symb_engine(nodes, replace(config, branch_policy=branch_policy_only_then, unbound_policy=UnboundVariablePolicy.EMPTY))
+            symb_engine(nodes, replace(config,
+                                       branch_policy=branch_policy_only_then,
+                                       unbound_policy=UnboundVariablePolicy.EMPTY,
+                                       current_pass="unbound:empty+conds:then"))
             logging.info("DFS run: only taking ELSE branches with unbound variables as empty strings")
-            symb_engine(nodes, replace(config, branch_policy=branch_policy_only_else, unbound_policy=UnboundVariablePolicy.EMPTY))
+            symb_engine(nodes, replace(config,
+                                       branch_policy=branch_policy_only_else,
+                                       unbound_policy=UnboundVariablePolicy.EMPTY,
+                                       current_pass="unbound:empty+conds:else"))
             logging.info("DFS run: treating unbound variables solely as empty strings")
-            symb_engine(nodes, replace(config, unbound_policy=UnboundVariablePolicy.EMPTY))
+            symb_engine(nodes, replace(config,
+                                       unbound_policy=UnboundVariablePolicy.EMPTY,
+                                       current_pass="unbound:empty"))
             Reporter.drop_issues({reporter.Code.DELETE_SYSTEM_FILE, reporter.Code.CONSTANT_CONDITION})
             Reporter._issues = Reporter._issues | issues_so_far # this dance ensures that any del_sys_files found before the last run are kept
             # logging.info("DFS run: exploring the first trace only")

@@ -10,17 +10,24 @@ from sash.interpreter_config import InterpConfig
 from sash.reporter import Report, Reporter
 from sash.solver import run_solver
 import sash.specs as specs
+from sash.debugtools.logger import DebugLogger
 
 
 def symbexec_main(file: str,
                   solver: bool = False,
                   symbexec_timeout: float | None = None,
                   solver_timeout: float | None = None,
-                  enable_dfs: bool = False) -> sash.symb.SymbexecResult:
+                  enable_dfs: bool = False,
+                  debug_instrumentation: bool = False) -> sash.symb.SymbexecResult:
     global timers
     timers = []
 
+    if debug_instrumentation:
+        logging.info(f"Debug instrumentation enabled: detailed json execution logging to {DebugLogger.default_log_file}")
+        DebugLogger.initialize(file)
+
     config = InterpConfig(trace_collapser = sash.symb.collapse_traces_if_too_many,
+                          debug_instrumentation = debug_instrumentation,
                           DFS_first = enable_dfs)
 
     Reporter.initialize(file)
@@ -57,7 +64,8 @@ def main(file: str,
          solver=True,
          timeout: float | None = None,
          solver_timeout: float | None = None,
-         enable_dfs: bool = False) -> Report:
+         enable_dfs: bool = False,
+         debug_instrumentation: bool = False) -> Report:
 
     logging.basicConfig(
         format="[%(levelname)s:%(module)s:%(lineno)d] %(message)s",
@@ -68,8 +76,7 @@ def main(file: str,
     logging.info("Processing file %s with solver=%s, exec_timeout=%s, solver_timeout=%s", file, solver, timeout, solver_timeout)
     logging.info("Commands with specs: %s", [name for name, _ in specs.CMD_SPECS.items()])
 
-    symbexec_main(file, solver, timeout, solver_timeout, enable_dfs)
-
+    symbexec_main(file, solver, timeout, solver_timeout, enable_dfs, debug_instrumentation)
     return Reporter.get_report()
 
 
@@ -84,6 +91,7 @@ def cli_main():
         timeout=args.timeout,
         solver_timeout=args.solver_timeout,
         enable_dfs=args.enable_dfs,
+        debug_instrumentation=args.enable_debug_instrumentation,
     )
 
     print(json.dumps(report.to_dict(), indent=2))
@@ -139,6 +147,14 @@ def parse_cli():
         type=float,
         default=None,
         help="Set a timeout (in seconds) for the solver step",
+    )
+
+    # enable debug instrumentation flag
+    parser.add_argument(
+        "-I",
+        "--enable-debug-instrumentation",
+        action="store_true",
+        help="Enable debug instrumentation (for development purposes)",
     )
 
     return parser.parse_args()
