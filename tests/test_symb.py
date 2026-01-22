@@ -151,6 +151,18 @@ rm -rf "$STEAMROOT/"*
     expected_error = reporter.DeleteSystemFile("/home/", 0)
     assert_expected_report(report, [expected_error])
 
+def test_steamroot_fix(tmp_path):
+    # Deleting $STEAMROOT/* should not produce an error if STEAMROOT is properly constrained
+    script = write_script(tmp_path, """
+    STEAMROOT="$(cd /nope && echo $PWD)"
+    if [ "$STEAMROOT" = "" ]; then
+        exit 1
+    fi
+    rm -rf "$STEAMROOT/"*
+    """)
+    report = reset_and_run_main(script, solver=True)
+    assert_expected_report(report, [])
+
 def test_delete_splitting(tmp_path):
     script = write_script(tmp_path, "rm $UNQUOTED\n")
     report = reset_and_run_main(script, solver=True)
