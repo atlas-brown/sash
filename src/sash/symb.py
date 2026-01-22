@@ -229,15 +229,62 @@ def handle_rm(expanded_args: tuple[Field, ...], trace: Trace, node: AST.CommandN
     DebugLogger.log_assertion(spec.check, trace.latest_state, context_line, config.current_pass)
     trace = trace.extend(lambda s: s.add_assertion(spec.check, source_str=node.pretty(), source_line=context_line))
 
+    def field_core_key(field: Field) -> CompletelyArbitrary | None:
+        match field.content:
+            case CompletelyArbitrary() as content:
+                return replace(content, prefix=None, suffix=None, quoted=False, maybe_empty=False)
+            case _:
+                return None
+
+    def is_empty_constant(field: Field) -> bool:
+        return field.try_to_str() == ""
+
+    def is_non_empty_constant(field: Field) -> bool:
+        field_str = field.try_to_str()
+        return field_str is not None and field_str != ""
+
+    def constraint_implies_non_empty(core: CompletelyArbitrary, constraint: Constraint) -> bool:
+        norm = constraint.normalized().constraint
+        logging.debug("Checking if constraint %s implies non-empty for core %s", norm, core)
+        match norm:
+            case StringEq(lhs, rhs):
+                if core == field_core_key(lhs) and is_non_empty_constant(rhs):
+                    return True
+                if core == field_core_key(rhs) and is_non_empty_constant(lhs):
+                    return True
+                return False
+            case Not(StringEq(lhs, rhs)):
+                if core == field_core_key(lhs) and is_empty_constant(rhs):
+                    return True
+                if core == field_core_key(rhs) and is_empty_constant(lhs):
+                    return True
+                return False
+            case And(lhs, rhs):
+                return constraint_implies_non_empty(core, lhs) or constraint_implies_non_empty(core, rhs)
+            case Or(lhs, rhs):
+                return constraint_implies_non_empty(core, lhs) and constraint_implies_non_empty(core, rhs)
+            case _:
+                return False
+
+    def is_definitely_non_empty(field: Field) -> bool:
+        logging.debug("Checking if field %s is definitely non-empty", field)
+        core = field_core_key(field)
+        logging.debug("Extracted core: %s", core)
+        if core is None:
+            return False
+        logging.debug("Checking path conditions for non-emptiness implications, have %d conditions", len(trace.latest_state.pathcond))
+        return any(constraint_implies_non_empty(core, cond.constraint) for cond in trace.latest_state.pathcond)
+
     def is_protected(path):
         return any(path in [p, p + "/", p + "/*"] for p in Config.get("PROTECTED_PATHS"))
 
     for arg_idx, arg_field in enumerate(expanded_args[1:], start=1):
+        definitely_non_empty = is_definitely_non_empty(arg_field)
         if (path := arg_field.try_to_str()) and is_protected(path):
             Reporter.add_issue(reporter.DeleteSystemFile(path, context_line), config)
 
         def maybe_report_protected_split(content: CompletelyArbitrary, max_words: int | float) -> None:
-            if content.maybe_empty and content.quoted:
+            if content.maybe_empty and content.quoted and not definitely_non_empty:
                 # "<pre>$VAR<post>" but $VAR could be empty
                 exp = ""
                 if content.prefix is not None and (pre := content.prefix.try_to_str()):
@@ -705,6 +752,112 @@ def expand_simple(stuff: list[AST.ArgChar],
     """
     IFS = " \t\n"
 
+    def field_core_key(field: Field) -> CompletelyArbitrary | None:
+        match field.content:
+            case CompletelyArbitrary() as content:
+                return replace(content, prefix=None, suffix=None, quoted=False, maybe_empty=False)
+            case _:
+                return None
+
+    def argchars_var_name(argchars: list[AST.ArgChar]) -> str | None:
+        if len(argchars) != 1:
+            return None
+        match argchars[0]:
+            case AST.VArgChar() as var:
+                return var.var
+            case AST.QArgChar() as q:
+                return argchars_var_name(q.arg)
+            case _:
+                return None
+
+    def source_var_name(source) -> str | None:
+        match source:
+            case FrozenAst(ast=ast):
+                match ast:
+                    case AST.VArgChar() as var:
+                        return var.var
+                    case AST.QArgChar() as q:
+                        return argchars_var_name(q.arg)
+                    case _:
+                        return None
+            case tuple() | list():
+                if len(source) == 1:
+                    return source_var_name(source[0])
+                return None
+            case _:
+                return None
+
+    def core_matches_field(core: CompletelyArbitrary, field: Field) -> bool:
+        other_core = field_core_key(field)
+        if other_core is None:
+            return False
+        if core == other_core:
+            return True
+        core_var = source_var_name(core.source)
+        other_var = source_var_name(other_core.source)
+        return core_var is not None and core_var == other_var
+
+    def is_empty_constant(field: Field) -> bool:
+        return field.try_to_str() == ""
+
+    def is_non_empty_constant(field: Field) -> bool:
+        field_str = field.try_to_str()
+        return field_str is not None and field_str != ""
+
+    def constraint_implies_non_empty(core: CompletelyArbitrary, constraint: Constraint) -> bool:
+        norm = constraint.normalized().constraint
+        match norm:
+            case StringEq(lhs, rhs):
+                if core_matches_field(core, lhs) and is_non_empty_constant(rhs):
+                    return True
+                if core_matches_field(core, rhs) and is_non_empty_constant(lhs):
+                    return True
+                return False
+            case Not(StringEq(lhs, rhs)):
+                if core_matches_field(core, lhs) and is_empty_constant(rhs):
+                    return True
+                if core_matches_field(core, rhs) and is_empty_constant(lhs):
+                    return True
+                return False
+            case And(lhs, rhs):
+                return constraint_implies_non_empty(core, lhs) or constraint_implies_non_empty(core, rhs)
+            case Or(lhs, rhs):
+                return constraint_implies_non_empty(core, lhs) and constraint_implies_non_empty(core, rhs)
+            case _:
+                return False
+
+    def constraint_implies_empty(core: CompletelyArbitrary, constraint: Constraint) -> bool:
+        norm = constraint.normalized().constraint
+        match norm:
+            case StringEq(lhs, rhs):
+                if core_matches_field(core, lhs) and is_empty_constant(rhs):
+                    return True
+                if core_matches_field(core, rhs) and is_empty_constant(lhs):
+                    return True
+                return False
+            case And(lhs, rhs):
+                return constraint_implies_empty(core, lhs) or constraint_implies_empty(core, rhs)
+            case Or(lhs, rhs):
+                return constraint_implies_empty(core, lhs) and constraint_implies_empty(core, rhs)
+            case _:
+                return False
+
+    def field_is_definitely_empty(field: Field) -> bool:
+        if field.count.max == 0 or is_empty_constant(field):
+            return True
+        core = field_core_key(field)
+        if core is None:
+            return False
+        return any(constraint_implies_empty(core, cond.constraint) for cond in state.pathcond)
+
+    def field_is_definitely_non_empty(field: Field) -> bool:
+        if field.count.min >= 1:
+            return True
+        core = field_core_key(field)
+        if core is None:
+            return False
+        return any(constraint_implies_non_empty(core, cond.constraint) for cond in state.pathcond)
+
     @dataclass
     class Partial:
         ## Notes on what's happening here:
@@ -833,14 +986,33 @@ def expand_simple(stuff: list[AST.ArgChar],
                                     Partial.add_the_default(default, var)
                                     non_default.add_a_field(arbitrary_field(var, ArbitraryType.APPROXIMATION, self.state))
                                     return [non_default, default]
-                        elif var.fmt in {"Length", "TrimR", "TrimRMax", "TrimL", "TrimLMax"} and v.value == Field(SymStr(("",)), WordCount(0, 0)):
-                            # All of these manipulations have known results on the empty string
-                            logging.info("Special casing string manipulation expansion on empty string")
-                            match var.fmt:
-                                case "Length":
-                                    self.add_a_field(Field(SymStr(("0",)), WordCount(1, 1)))
-                                case "TrimR" | "TrimRMax" | "TrimL" | "TrimLMax":
-                                    self.add_a_field(Field(SymStr(("",)), WordCount(0, 0)))
+                        elif var.fmt in {"Length", "TrimR", "TrimRMax", "TrimL", "TrimLMax"}:
+                            definitely_empty = field_is_definitely_empty(v.value)
+                            definitely_non_empty = field_is_definitely_non_empty(v.value)
+                            if definitely_empty:
+                                # All of these manipulations have known results on the empty string
+                                logging.info("Special casing string manipulation expansion on empty string")
+                                match var.fmt:
+                                    case "Length":
+                                        self.add_a_field(Field(SymStr(("0",)), WordCount(1, 1)))
+                                    case "TrimR" | "TrimRMax" | "TrimL" | "TrimLMax":
+                                        self.add_a_field(Field(SymStr(("",)), WordCount(0, 0)))
+                            else:
+                                match var.fmt:
+                                    case "Length":
+                                        if (value_str := v.value.try_to_str()) is not None:
+                                            self.add_a_field(Field(SymStr((str(len(value_str)),)), WordCount(1, 1)))
+                                        else:
+                                            self.add_a_field(arbitrary_field(var,
+                                                                             ArbitraryType.APPROXIMATION,
+                                                                             self.state,
+                                                                             min_words=1))
+                                    case "TrimR" | "TrimRMax" | "TrimL" | "TrimLMax":
+                                        min_words = 1 if definitely_non_empty else 0
+                                        self.add_a_field(arbitrary_field(var,
+                                                                         ArbitraryType.APPROXIMATION,
+                                                                         self.state,
+                                                                         min_words=min_words))
                         elif var.fmt == "Assign":
                             # This is the case of `${VAR:=word}` with VAR set.
                             if not var.null:
