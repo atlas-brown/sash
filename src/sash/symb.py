@@ -71,6 +71,8 @@ def handle_commandnode(traces: Traces,
                 t1 = handle_set(expanded_args, t1)
             case "exit":
                 t1 = handle_exit(t1)
+            case "return":
+                t1 = handle_return(t1)
             case "read":
                 t1 = handle_read(expanded_args, t1, node)
             case "xargs":
@@ -582,6 +584,10 @@ def handle_if(traces: Traces, node: AST.IfNode, config: InterpConfig) -> Traces:
 
 def handle_exit(traces: Traces) -> Traces:
     logging.debug("Handling exit command, terminating %d traces", len(traces))
+    return trace_map(traces, lambda s: s.terminate())
+
+def handle_return(traces: Traces) -> Traces:
+    logging.debug("Handling return command, terminating %d traces", len(traces))
     return trace_map(traces, lambda s: s.terminate())
 
 def handle_branch(traces: Traces, success_cb: Callable[[Traces], Traces], failure_cb: Callable[[Traces], Traces], node: AST.AstNode, config: InterpConfig) -> Traces:
