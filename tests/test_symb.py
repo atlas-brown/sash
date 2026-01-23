@@ -155,7 +155,7 @@ def test_steamroot_fix(tmp_path):
     # Deleting $STEAMROOT/* should not produce an error if STEAMROOT is properly constrained
     script = write_script(tmp_path, """
     STEAMROOT="$(cd /nope && echo $PWD)"
-    if [ "$STEAMROOT" = "" ]; then
+    if [ -z "$STEAMROOT" ]; then
         exit 1
     fi
     rm -rf "$STEAMROOT/"*
@@ -904,7 +904,7 @@ def test_command_not_exists_no_error(tmp_path):
 def test_early_exit_in_path_cond(tmp_path):
     """Test that an early exit in a path condition is handled correctly."""
     script = write_script(tmp_path, """
-    if [ "$1" = "" ]; then
+    if [ -z "$1" ]; then
         exit 1
     fi
     path=$(echo `pwd`)/"$1"
@@ -916,7 +916,7 @@ def test_early_exit_in_path_cond(tmp_path):
 def test_early_exit_in_path_cond_trimmed(tmp_path):
     """Test that an early exit in a path condition is handled correctly."""
     script = write_script(tmp_path, """
-    if [ "$1" = "" ]; then
+    if [ -z "$1" ]; then
         exit 1
     fi
     TARGET="$1"
@@ -948,7 +948,7 @@ def test_debootstrap_minimal(tmp_path):
 
 def test_debootstrap_minimal_fixed(tmp_path):
     script = write_script(tmp_path, """
-    if [ "$2" = "" ]; then
+    if [ -z "$2" ]; then
         exit 1
     fi
     TARGET="$2"
@@ -963,7 +963,7 @@ def test_debootstrap_minimal_fixed(tmp_path):
 
 def test_debootstrap_fixed_false_positive_minimal(tmp_path):
     script = write_script(tmp_path, """
-    if [ "$1" = "" ] || [ "$2" = "" ]; then
+    if [ -z "$1" ] || [ -z "$2" ]; then
         exit 1
     fi
     TARGET="$2"
