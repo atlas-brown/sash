@@ -16,7 +16,7 @@ import sash.parser as parser
 import sash.reporter as reporter
 from sash.symbolic.strings import ArbitraryType, CompletelyArbitrary, Field, SymStr, SymVar, WordCount
 import sash.util as util
-from sash.config import Config
+from sash.config import Config # TODO: refactor to delete sash.config, move all needed stuff to InterpConfig
 from sash.constraints import *
 from sash.frozen import FrozenAst, FrozenDict, freeze, freeze_thing
 from sash.interpreter_config import BranchDecision, InterpConfig, UnboundVariablePolicy
@@ -223,13 +223,8 @@ def command_substitution_output(cmd_name: str,
     match cmd_name:
         case "pwd":
             pwd_var = state.lookup("PWD")
-            if pwd_var is not None:
-                return pwd_var.value, state
-            assert False, "PWD should always be defined"
-            if Config.get("CONCRETE_CWD"):
-                cwd_path = Config.get("CWD_PATH")
-                return Field(SymStr((cwd_path,)), word_count_from_output(cwd_path)), state
-            return None, state
+            assert pwd_var is not None, "PWD should always be defined"
+            return pwd_var.value, state
         case "echo":
             output_field = merge_partial_fields(operands, sep=" ", state=state) # TODO: sep should be from IFS
             if (output_str := output_field.try_to_str()) is not None:
@@ -311,6 +306,12 @@ def handle_rm(expanded_args: tuple[Field, ...], trace: Trace, node: AST.CommandN
         definitely_non_empty = is_definitely_non_empty(arg_field)
         if (path := arg_field.try_to_str()) and is_protected(path):
             Reporter.add_issue(reporter.DeleteSystemFile(path, context_line), config)
+
+        pwdval = trace.latest_state.lookup("PWD")
+        assert pwdval is not None, "PWD should always be defined"
+        trace = trace.extend(lambda s: s.add_assertion(Not(StringEq(arg_field, pwdval.value)),
+                                                       node.pretty(),
+                                                       context_line))
 
         def maybe_report_protected_split(content: CompletelyArbitrary, max_words: int | float) -> None:
             if content.maybe_empty and content.quoted and not definitely_non_empty:
@@ -1177,7 +1178,7 @@ def expand_simple(stuff: list[AST.ArgChar],
                     temp_config = config.add_expanded_command_callback(lambda expanded: inner_cmds.append(expanded))
                     t = guarded_interp_node([Trace((self.state,))], b.node, temp_config)
                     output_field = None
-                    if len(inner_cmds) != 0:
+                    if len(inner_cmds) != 0 and isinstance(b.node, AST.CommandNode):
                         expanded_args = inner_cmds[-1]
                         if expanded_args and (cmd_name := expanded_args[0].try_to_str()):
                             spec = get_spec(cmd_name, tuple(expanded_args))
@@ -1421,7 +1422,6 @@ def collapse_equiv_trace_expansions(expansions: list[tuple[Trace, list[Field]]])
         key = tuple(fields)
         seen[key].append(trace)
     return seen
-
 
 # ============================================================
 #                  Symbolic Interpreter
@@ -1713,7 +1713,7 @@ def starting_state(fs_model: FSModel | None = None) -> State:
     make_ast = lambda var: AST.VArgChar("Normal", False, var, [])
     starter_env = {
         "HOME": ShellVar(arbitrary_field(make_ast("HOME"), ArbitraryType.ENVIRONMENT, root)),
-        "PWD": ShellVar(arbitrary_field(make_ast("PWD"), ArbitraryType.ENVIRONMENT, root)),
+        "PWD": ShellVar(arbitrary_field(make_ast("PWD"), ArbitraryType.ENVIRONMENT, root, min_words=1)),
         "OLDPWD": ShellVar(arbitrary_field(make_ast("OLDPWD"), ArbitraryType.ENVIRONMENT, root)),
         "PATH": ShellVar(arbitrary_field(make_ast("PATH"), ArbitraryType.ENVIRONMENT, root))
     }

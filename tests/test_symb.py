@@ -147,8 +147,8 @@ rm -rf "$STEAMROOT/"*
     assert_expected_report(report, [expected_error])
 
     script = write_script(tmp_path, 'rm -rf "$(echo `pwd`/)"\n')
-    report = reset_and_run_main(script)
-    expected_error = reporter.DeleteSystemFile("/home/", 0)
+    report = reset_and_run_main(script, solver=True)
+    expected_error = reporter.UnsatisfiedPrecondition(None, 'rm -rf "$(echo `pwd`/)"', 0)
     assert_expected_report(report, [expected_error])
 
 def test_steamroot_fix(tmp_path):
@@ -639,7 +639,7 @@ rm somefile.txt
     res = reset_and_run_symbexec_main(script, solver=True)
     report = reporter.Reporter.get_report()
     assert len(res.traces) == 1
-    assert len(res.traces[0].latest_state.assertions) == 2
+    assert len(res.traces[0].latest_state.assertions) == 4
     expected_warning = reporter.UnsatisfiedPrecondition(None, "rm somefile.txt", 0)
     assert_expected_report(report, [expected_warning])
 
@@ -666,7 +666,7 @@ cp "$2" something.txt
     res = reset_and_run_symbexec_main(script, solver=True)
     report = reporter.Reporter.get_report()
     assert len(res.traces) == 1
-    assert len(res.traces[0].latest_state.assertions) == 2
+    assert len(res.traces[0].latest_state.assertions) == 3
     expected_warning = reporter.UnsatisfiedPrecondition(None, "cp \"$2\" something.txt", 0)
     assert_expected_report(report, [expected_warning])
 
@@ -798,7 +798,7 @@ xargs -I thing rm somefile.txt thing
     res = reset_and_run_symbexec_main(script, solver=True)
     report = reporter.Reporter.get_report()
     assert len(res.traces) == 1
-    assert len(res.traces[0].latest_state.assertions) == 2
+    assert len(res.traces[0].latest_state.assertions) == 6 # 2x assertion per rm (for each arg), 3x unrolling
     expected_warning = reporter.UnsatisfiedPrecondition(None, "rm somefile.txt thing", 0)
     expected_warning2 = reporter.DangerousWordSplit(None, 0)
     assert_expected_report(report, [expected_warning, expected_warning2])

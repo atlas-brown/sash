@@ -57,6 +57,15 @@ class SymStr:
                 return None
         return "".join(nls)
 
+    def try_without_trailing_slash(self) -> 'SymStr':
+        if isinstance(self.parts[-1], str):
+            # only remove trailing slash if it's part of a string literal at the end
+            first_parts = self.parts[:-1]
+            last_part = self.parts[-1]
+            if last_part.endswith("/"):
+                return replace(self, parts=(first_parts + (last_part[:-1],)))
+        return self
+
 
 class ArbitraryType(Enum):
     APPROXIMATION = 0
@@ -129,13 +138,16 @@ class Field:
                 return None
 
     def try_without_trailing_slash(self) -> "Field":
-        if isinstance(self.content, SymStr) and isinstance(self.content.parts[-1], str):
-            # only remove trailing slash if it's part of a string literal at the end
-            first_parts = self.content.parts[:-1]
-            last_part = self.content.parts[-1]
-            if last_part.endswith("/"):
-                new_path = Field(SymStr(first_parts + (last_part[:-1],)), self.count)
-                return new_path
+        if isinstance(self.content, SymStr):
+            new_content = self.content.try_without_trailing_slash()
+            if self.content != new_content:
+                return replace(self, content=new_content)
+
+        elif isinstance(self.content, CompletelyArbitrary) and self.content.suffix:
+            new_suf = self.content.suffix.try_without_trailing_slash()
+            if self.content.suffix != new_suf:
+                new_content = replace(self.content, suffix=new_suf)
+                return replace(self, content=new_content)
 
         # otherwise, do nothing
         return self
