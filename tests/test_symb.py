@@ -946,6 +946,24 @@ def test_debootstrap_minimal(tmp_path):
     report = reset_and_run_main(script, solver=True)
     assert_expected_report(report, [expected_error])
 
+def test_deboostrap_minimal_2(tmp_path):
+    script = write_script(tmp_path, """
+    TARGET=""
+    KEEP_DEBOOTSTRAP_DIR=$(unknown)
+    TARGET="$(echo `pwd`/$TARGET)"
+
+    if am_doing_phase kill_target; then
+      if [ "$KEEP_DEBOOTSTRAP_DIR" != true ]; then
+        info KILLTARGET "Deleting target directory"
+        rm -rf "$TARGET"
+      fi
+    fi
+    """)
+    expected_error = reporter.DeleteSystemFile("", 0)
+    report = reset_and_run_main(script)
+    assert_expected_report(report, [expected_error])
+
+
 def test_debootstrap_minimal_fixed(tmp_path):
     script = write_script(tmp_path, """
     if [ -z "$2" ]; then
@@ -975,6 +993,7 @@ def test_debootstrap_fixed_false_positive_minimal(tmp_path):
     """)
     report = reset_and_run_main(script, solver=True)
     assert_expected_report(report, [])
+
 
 # def test_function_call_multipath(tmp_path):
 #     # A function that is called should not produce unbound variable errors for its parameters
