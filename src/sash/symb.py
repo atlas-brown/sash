@@ -1273,6 +1273,9 @@ def interp_node(traces: Traces,
     traces = config.trace_collapser(traces)
     traces = config.apply_node_cbs(traces, node)
     if not traces:
+        if isinstance(node, AST.CommandNode) and not node.arguments and not node.assignments:
+            logging.debug("Skipping dead code warning for empty command node")
+            return traces
         logging.debug("No active traces when interpreting %s, reporting dead code and returning early", trim_string_for_logging(node.pretty()))
         Reporter.add_issue(reporter.DeadCode(node, context_line), config)
         return traces
