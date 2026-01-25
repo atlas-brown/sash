@@ -229,6 +229,7 @@ def handle_rm(expanded_args: tuple[Field, ...], trace: Trace, node: AST.CommandN
     DebugLogger.log_assertion(spec.check, trace.latest_state, context_line, config.current_pass)
     trace = trace.extend(lambda s: s.add_assertion(spec.check, source_str=node.pretty(), source_line=context_line))
 
+    # TODO: These helper functions are repeated in the expansion routine, consider refactoring them out into utils
     def field_core_key(field: Field) -> CompletelyArbitrary | None:
         match field.content:
             case CompletelyArbitrary() as content:
