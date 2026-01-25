@@ -76,12 +76,12 @@ def test_unbound_variable_setu_with_plus_colon(tmp_path):
 def test_delete_system_file(tmp_path):
     # Deleting a system file should produce a DeleteSystemFile error
     script = write_script(tmp_path, "rm /usr\n")
-    report = reset_and_run_main(script, solver=True)
+    report = reset_and_run_main(script)
     expected_error = reporter.DeleteSystemFile("/usr", 0)
     assert_expected_report(report, [expected_error])
 
     script = write_script(tmp_path, "rm $FOO/usr\n")
-    report = reset_and_run_main(script, solver=True)
+    report = reset_and_run_main(script)
     expected_error1 = reporter.WordSplitCouldDeleteSystemFile("/usr", 0)
     expected_error2 = reporter.UnboundID(foo_var.pretty(), 0)
     expected_error3 = reporter.DangerousWordSplit("$FOO", 0)
@@ -89,19 +89,19 @@ def test_delete_system_file(tmp_path):
 
 
     script = write_script(tmp_path, "rm -rf $STEAMROOT/*\n")
-    report = reset_and_run_main(script, solver=True)
+    report = reset_and_run_main(script)
     expected_error1 = reporter.WordSplitCouldDeleteSystemFile("/*", 0)
     expected_error2 = reporter.UnboundID(foo_var.pretty(), 0)
     expected_error3 = reporter.DangerousWordSplit("$STEAMROOT", 0)
     assert_expected_report(report, [expected_error1, expected_error2, expected_error3])
 
     script = write_script(tmp_path, "rm -rf /*\n")
-    report = reset_and_run_main(script, solver=True)
+    report = reset_and_run_main(script)
     expected_error = reporter.DeleteSystemFile("/*", 0)
     assert_expected_report(report, [expected_error])
 
     script = write_script(tmp_path, "rm -rf \"$FOO\"/\n")
-    report = reset_and_run_main(script, solver=True)
+    report = reset_and_run_main(script)
     expected_error1 = reporter.UnboundID(foo_var.pretty(), 0)
     expected_error2 = reporter.WordSplitCouldDeleteSystemFile("$FOO", 0)
     assert_expected_report(report, [expected_error1, expected_error2])
@@ -114,7 +114,7 @@ else
     fi
     rm -rf "$FOO/"
     """)
-    report = reset_and_run_main(script, solver=True)
+    report = reset_and_run_main(script)
     expected_error1 = reporter.UnboundID(foo_var.pretty(), 0)
     expected_error2 = reporter.WordSplitCouldDeleteSystemFile("$FOO/", 0)
     assert_expected_report(report, [expected_error1, expected_error2])
@@ -124,14 +124,14 @@ else
 echo $1
 rm -rf "${1-/usr}"
 """)
-    report = reset_and_run_main(script, solver=True)
+    report = reset_and_run_main(script)
     expected_error = reporter.DeleteSystemFile("/usr", 0)
     assert_expected_report(report, [expected_error])
 
     script = write_script(tmp_path, """
 rm -rf "${DESTDIR}${LIBDIR}/${CAMLP5N}"
 """)
-    report = reset_and_run_main(script, solver=True)
+    report = reset_and_run_main(script)
     expected_error1 = reporter.UnboundID("DESTDIR", 0)
     expected_error2 = reporter.UnboundID("LIBDIR", 0)
     expected_error3 = reporter.UnboundID("CAMLP5N", 0)
@@ -142,12 +142,12 @@ rm -rf "${DESTDIR}${LIBDIR}/${CAMLP5N}"
 STEAMROOT="$(cd /nope && echo $PWD)"
 rm -rf "$STEAMROOT/"*
 """)
-    report = reset_and_run_main(script, solver=True)
+    report = reset_and_run_main(script)
     expected_error = reporter.WordSplitCouldDeleteSystemFile("/*", 0)
     assert_expected_report(report, [expected_error])
 
     script = write_script(tmp_path, 'rm -rf "$(echo `pwd`/)"\n')
-    report = reset_and_run_main(script, solver=True)
+    report = reset_and_run_main(script)
     expected_error = reporter.DeleteSystemFile("/home/", 0)
     assert_expected_report(report, [expected_error])
 
@@ -160,12 +160,12 @@ def test_steamroot_fix(tmp_path):
     fi
     rm -rf "$STEAMROOT/"*
     """)
-    report = reset_and_run_main(script, solver=True)
+    report = reset_and_run_main(script)
     assert_expected_report(report, [])
 
 def test_delete_splitting(tmp_path):
     script = write_script(tmp_path, "rm $UNQUOTED\n")
-    report = reset_and_run_main(script, solver=True)
+    report = reset_and_run_main(script)
     expected_error1 = reporter.DangerousWordSplit("$UNQUOTED", 0)
     expected_error2 = reporter.UnboundID(foo_var.pretty(), 0)
     assert_expected_report(report, [expected_error1, expected_error2])
@@ -311,7 +311,7 @@ myfunc() {
 }
 myfunc /usr
 """)
-    report = reset_and_run_main(script, solver=True)
+    report = reset_and_run_main(script)
     expected_error = reporter.DeleteSystemFile("/usr", 0)
     assert_expected_report(report, [expected_error])
 
@@ -327,7 +327,7 @@ case "$1" in
         ;;
 esac
 """)
-    report = reset_and_run_main(script, solver=True)
+    report = reset_and_run_main(script)
     expected_error = reporter.DeleteSystemFile("/usr", 0)
     assert_expected_report(report, [expected_error])
 
@@ -336,7 +336,7 @@ def test_and_or(tmp_path):
     script = write_script(tmp_path, """
 echo hi && rm -rf /usr || rm -rf /*
 """)
-    report = reset_and_run_main(script, solver=True)
+    report = reset_and_run_main(script)
     expected_error1 = reporter.DeleteSystemFile("/usr", 0)
     expected_error2 = reporter.DeleteSystemFile("/*", 0)
     assert_expected_report(report, [expected_error1, expected_error2])
@@ -348,7 +348,7 @@ if [ "a" = "b" ]; then
     rm -rf /*
 fi
 """)
-    report = reset_and_run_main(script, solver=True)
+    report = reset_and_run_main(script)
     expected_error1 = reporter.ConstantCondition(None, 0) # Mock the location
     expected_error2 = reporter.DeadCode("rm -rf /*", 0)
     assert_expected_report(report, [expected_error1, expected_error2]) # Notice: no DeleteSystemFile error
@@ -360,7 +360,7 @@ else
     echo $FOO
 fi
 """)
-    report = reset_and_run_main(script, solver=True)
+    report = reset_and_run_main(script)
     expected_error1 = reporter.ConstantCondition(None, 0) # Mock the location
     expected_error2 = reporter.DeadCode("rm -rf /*", 0)
     expected_error3 = reporter.UnboundID(foo_var.pretty(), 0)
@@ -373,7 +373,7 @@ echo $FOO
 exit 1
 rm -rf /usr
 """)
-    report = reset_and_run_main(script, solver=True)
+    report = reset_and_run_main(script)
     expected_error1 = reporter.UnboundID(foo_var.pretty(), 0)
     expected_error2 = reporter.DeadCode("rm -rf /usr", 0)
     assert_expected_report(report, [expected_error1, expected_error2]) # Notice: no DeleteSystemFile error
@@ -532,7 +532,7 @@ def test_param_expansion_question_nonempty_no_error(tmp_path):
     script = write_script(tmp_path, """
 rm -rf ${SQUID_PIDFILE_DIR:?}/*
 """)
-    report = reset_and_run_main(script, solver=True)
+    report = reset_and_run_main(script)
     expected_error1 = reporter.WordSplitCouldDeleteSystemFile("/*", 0)
     expected_error2 = reporter.DangerousWordSplit(None, 0)
     assert_expected_report(report, [expected_error1, expected_error2])
@@ -569,7 +569,7 @@ def test_question_nonempty(tmp_path):
     echo ${UNSET_VAR:?}
     rm -rf /usr
     """)
-    report = reset_and_run_main(script, solver=True)
+    report = reset_and_run_main(script)
     expected_error1 = reporter.DeleteSystemFile("/usr", 0)
     assert_expected_report(report, [expected_error1])
 
@@ -910,7 +910,7 @@ def test_early_exit_in_path_cond(tmp_path):
     path=$(echo `pwd`)/"$1"
     rm -rf "$path"
     """)
-    report = reset_and_run_main(script, solver=True)
+    report = reset_and_run_main(script)
     assert_expected_report(report, [])
 
 def test_early_exit_in_path_cond_trimmed(tmp_path):
@@ -930,7 +930,7 @@ def test_early_exit_in_path_cond_trimmed(tmp_path):
     fi
     rm -rf "$TARGET"
     """)
-    report = reset_and_run_main(script, solver=True)
+    report = reset_and_run_main(script)
     assert_expected_report(report, [])
 
 def test_debootstrap_minimal(tmp_path):
@@ -943,7 +943,7 @@ def test_debootstrap_minimal(tmp_path):
     rm -rf "$TARGET"
     """)
     expected_error = reporter.WordSplitCouldDeleteSystemFile("/home/", 0)
-    report = reset_and_run_main(script, solver=True)
+    report = reset_and_run_main(script)
     assert_expected_report(report, [expected_error])
 
 def test_deboostrap_minimal_2(tmp_path):
@@ -976,7 +976,7 @@ def test_debootstrap_minimal_fixed(tmp_path):
     fi
     rm -rf "$TARGET"
     """)
-    report = reset_and_run_main(script, solver=True)
+    report = reset_and_run_main(script)
     assert_expected_report(report, [])
 
 def test_debootstrap_fixed_false_positive_minimal(tmp_path):
@@ -991,7 +991,7 @@ def test_debootstrap_fixed_false_positive_minimal(tmp_path):
     fi
     rm -rf "$TARGET"
     """)
-    report = reset_and_run_main(script, solver=True)
+    report = reset_and_run_main(script)
     assert_expected_report(report, [])
 
 
