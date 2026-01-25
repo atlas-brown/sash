@@ -359,6 +359,10 @@ def handle_unknown_command(name: str,
     #t = trace_map(traces, lambda s: s.update_fs(And.from_field_iter(arg_fields, lambda f: IsFile(f) >> IsRead(f))))
     #return t
     # this makes execution significantly slower, so for now leave it commented out
+    if config.in_checked_position:
+        t_success = trace_map(traces, lambda s: s.set_last_exit_code(SymStr(("0",)), Confidence.SPECULATIVE))
+        t_failure = trace_map(traces, lambda s: s.set_last_exit_code(SymStr(("1",)), Confidence.SPECULATIVE))
+        return t_success + t_failure
     return traces
 
 def handle_function_call(name: str,
