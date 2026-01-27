@@ -366,6 +366,62 @@ fi
     expected_error3 = reporter.UnboundID(foo_var.pretty(), 0)
     assert_expected_report(report, [expected_error1, expected_error2, expected_error3])
 
+def test_set_e_const_cond_last_exit(tmp_path):
+    # A constant condition in an if statement with set -e should be detected, and the dead code should not be interpreted
+    script = write_script(tmp_path, """
+    set -e
+    git config --list | grep -q "key"
+    if [ $? -ne 0 ]; then # bug here: due to `set -e`, this can never be true
+        git config --global "key" "value"
+    fi
+    """)
+    report = reset_and_run_main(script)
+    expected_error1 = reporter.ConstantCondition(None, 0)
+    expected_error2 = reporter.DeadCode('git config --global "key" "value"', 0)
+    assert_expected_report(report, [expected_error1, expected_error2])
+
+def test_set_e_const_cond_fix(tmp_path):
+    # No constant condition should be detected if we fix the set -e issue
+    script = write_script(tmp_path, """
+    git config --list | grep -q "key"
+    if [ $? -ne 0 ]; then # bug here: due to `set -e`, this can never be true
+        git config --global "key" "value"
+    fi
+    """)
+    report = reset_and_run_main(script)
+    assert_expected_report(report, [])
+
+def test_set_e_const_cond_use_var(tmp_path):
+    # A constant condition in an if statement with set -e should be detected, and the dead code should not be interpreted
+    script = write_script(tmp_path, """
+    set -e
+    git config --list | grep -q "key"
+    rc="$?"
+    if [ "$rc" -eq 0 ]; then
+        echo "Key exists"
+    else
+        echo "This will never run"
+    fi
+    """)
+    report = reset_and_run_main(script)
+    expected_error1 = reporter.ConstantCondition(None, 0)
+    expected_error2 = reporter.DeadCode('echo "This will never run"', 0)
+    assert_expected_report(report, [expected_error1, expected_error2])
+
+def test_set_e_const_cond_use_var_fix(tmp_path):
+    # A constant condition in an if statement with set -e should be detected, and the dead code should not be interpreted
+    script = write_script(tmp_path, """
+    git config --list | grep -q "key"
+    rc="$?"
+    if [ "$rc" -eq 0 ]; then
+        echo "Key exists"
+    else
+        echo "This will never run"
+    fi
+    """)
+    report = reset_and_run_main(script)
+    assert_expected_report(report, [])
+
 def test_dead_code(tmp_path):
     # Code after exit should not be interpreted
     script = write_script(tmp_path, """
@@ -993,7 +1049,6 @@ def test_debootstrap_fixed_false_positive_minimal(tmp_path):
     """)
     report = reset_and_run_main(script)
     assert_expected_report(report, [])
-
 
 # def test_function_call_multipath(tmp_path):
 #     # A function that is called should not produce unbound variable errors for its parameters
