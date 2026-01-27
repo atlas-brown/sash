@@ -149,6 +149,57 @@ def test_expand_undefined_var():
                                                      state),
                                  WordCount(0, float('inf')))]
 
+# Notes about empty strings:
+# mkdir "" # -> mkdir throws error 'no such file or directory'
+# mkdir # -> mkdir shows usage message
+#
+# A= # A="" is equivalent
+# mkdir "$A" # -> mkdir throws error 'no such file or directory'
+# mkdir $A # -> mkdir shows usage message
+#
+# mkdir "$(:)" # -> mkdir throws error 'no such file or directory'
+# mkdir $(:) # -> mkdir shows usage message
+#
+# A quoted empty string expands to a word of length zero (one word)
+# An unquoted empty string disappears entirely (zero words)
+
+def test_expand_empty_string():
+    script = parse_script('''echo ""''')
+    assert len(script) == 1
+    assert isinstance(script[0], AST.CommandNode)
+
+    state = starting_state()
+
+    expanded = [expand_simple_r(arg, state, config) for arg in script[0].arguments]
+    assert len(expanded) == 2
+    assert expanded[0] == [constant_field("echo")]
+    assert expanded[1] == [constant_field("", 1)]
+
+def test_expand_quoted_empty_var():
+    script = parse_script('''echo "$A"''')
+    assert len(script) == 1
+    assert isinstance(script[0], AST.CommandNode)
+
+    state = starting_state()
+    state = state.set_env("A", ShellVar(constant_field("", 1)))
+
+    expanded = [expand_simple_r(arg, state, config) for arg in script[0].arguments]
+    assert len(expanded) == 2
+    assert expanded[0] == [constant_field("echo")]
+    assert expanded[1] == [constant_field("", 1)]
+
+def test_expand_unquoted_empty_var():
+    script = parse_script('''echo $A''')
+    assert len(script) == 1
+    assert isinstance(script[0], AST.CommandNode)
+
+    state = starting_state()
+    state = state.set_env("A", ShellVar(constant_field("", 1)))
+
+    expanded = [expand_simple_r(arg, state, config) for arg in script[0].arguments]
+    assert len(expanded) == 1
+    assert expanded[0] == [constant_field("echo")]
+
 def test_expand_undefined_var_default():
     script = parse_script("""${A:-default}""")
     assert len(script) == 1
@@ -221,7 +272,7 @@ def test_expand_question_var_empty():
     reporter.Reporter.initialize("<test>")
     state = starting_state()
 
-    state = state.set_env("A", ShellVar(constant_field("", 0)))
+    state = state.set_env("A", ShellVar(constant_field("", 1)))
     expanded = expand_simple_r(script[0].arguments[0], state, config)
     # If the variable is empty, expansion terminates and yields no fields
     assert expanded == []
