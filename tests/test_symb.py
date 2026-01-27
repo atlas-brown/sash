@@ -542,7 +542,7 @@ def test_const_cond_triggered_by_exit_code_nested_if(tmp_path):
     """
     script = write_script(tmp_path, """
 if [ -e "file" ]; then
-    mkdir ""
+    mkdir
     status="all good (actually not)"
     if [ $? -gt 0 ]; then
         echo "This is unreachable"
