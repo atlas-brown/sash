@@ -1050,6 +1050,47 @@ def test_debootstrap_fixed_false_positive_minimal(tmp_path):
     report = reset_and_run_main(script)
     assert_expected_report(report, [])
 
+def test_deboostrap_more(tmp_path):
+    script = write_script(tmp_path, """
+    if [ -z "$2" ]; then
+        exit 1
+    fi
+
+    if [ -z "$2" ] && am_doing_phase dldebs first_stage second_stage; then # dead code
+        exit 1 # dead code
+    fi
+
+    TARGET="$2"
+    TARGET="${TARGET%/}"
+    if [ "${TARGET#/}" = "${TARGET}" ]; then
+    if [ "${TARGET%/*}" = "$TARGET" ] ; then
+      TARGET="$(echo `pwd`/$TARGET)"
+    else
+      TARGET="$(cd ${TARGET%/*}; echo `pwd`/${TARGET##*/})"
+    fi
+    fi
+
+    rm -rf "$TARGET"
+    """)
+    report = reset_and_run_main(script)
+    expected_error1 = reporter.DeadCode('am_doing_phase dldebs first_stage second_stage', 0)
+    expected_error2 = reporter.DeadCode('exit 1 # This becomes dead code', 0)
+    assert_expected_report(report, [expected_error1, expected_error2])
+
+def test_deboostrap_or(tmp_path):
+    script = write_script(tmp_path, """
+if [ -z "$1" ] || [ -z "$2" ]; then
+    exit 1
+fi
+
+if [ -z "$2" ]; then
+    echo unreachable
+fi
+""")
+    report = reset_and_run_main(script)
+    expected_error = reporter.DeadCode('echo unreachable', 0)
+    assert_expected_report(report, [expected_error])
+
 # def test_function_call_multipath(tmp_path):
 #     # A function that is called should not produce unbound variable errors for its parameters
 #     script = write_script(tmp_path, """
