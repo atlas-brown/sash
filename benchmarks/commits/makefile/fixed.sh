@@ -72,18 +72,26 @@ depend() {
 
 install() {
     if test -z "${LIBDIR}"; then
-	  echo "*** Variable LIBDIR not set"; exit 1; fi
-	if test -z "${CAMLP5N}"; then
-	  echo "*** Variable CAMLP5N not set"; exit 1; fi
+	echo "*** Variable LIBDIR not set";
+	exit 1;
+    fi
+    if test -z "${CAMLP5N}"; then
+	echo "*** Variable CAMLP5N not set";
+	exit 1;
+    fi
     rm -rf "${DESTDIR}${LIBDIR}/${CAMLP5N}"
     for i in $DIRS compile; do run_make "$i" install DESTDIR="$DESTDIR"; done
 }
 
 uninstall() {
-    if test -z "$(LIBDIR)"; then
-	  echo "*** Variable LIBDIR not set"; exit 1; fi
-	if test -z "$(CAMLP5N)"; then
-	  echo "*** Variable CAMLP5N not set"; exit 1; fi
+    if test -z "${LIBDIR}"; then
+	echo "*** Variable LIBDIR not set";
+	exit 1;
+    fi
+    if test -z "${CAMLP5N}"; then
+	echo "*** Variable CAMLP5N not set";
+	exit 1;
+    fi
     rm -rf "${DESTDIR}${LIBDIR}/${CAMLP5N}"
     (cd "${DESTDIR}${BINDIR}" && rm -f *"${CAMLP5N}"* odyl ocpp)
     (cd "${DESTDIR}${MANDIR}/man1" && rm -f *"${CAMLP5N}"* odyl ocpp)
