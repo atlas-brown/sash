@@ -113,6 +113,7 @@ def run_targeted_dfs(nodes: list[WrappedAst],
         return sorted(lines)
 
     def branch_policy_pre_prefer_spec(node: AST.AstNode) -> BranchDecision:
+        return BranchDecision.ALL
         if isinstance(node, AST.IfNode):
             then_score = count_spec_cmds(node.then_b)
             else_score = count_spec_cmds(node.else_b) if node.else_b is not None else 0
@@ -164,15 +165,8 @@ def run_targeted_dfs(nodes: list[WrappedAst],
             logging.info("DFS run: did not reach dangerous command at line %d", target_line)
 
     if not dangerous_lines:
-        target_traces = symb_engine(nodes, replace(
-            config,
-            branch_policy_pre=branch_policy_pre_prefer_spec,
-            unbound_policy=UnboundVariablePolicy.SYMBOLIC,
-            trace_collapser=lambda ts: collapse_traces_with_spec_coverage(ts, 16),
-            node_cbs=config.node_cbs + [spec_coverage_cb],
-            ignore_function_calls_for=ignore_function_calls_for,
-        ))
-        all_traces.extend(target_traces)
+        logging.info("No dangerous commands found; skipping targeted DFS")
+        return TargetedDfsResult(traces=[])
 
     return TargetedDfsResult(traces=all_traces)
 

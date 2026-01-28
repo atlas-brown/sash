@@ -1077,7 +1077,7 @@ def test_deboostrap_more(tmp_path):
     expected_error2 = reporter.DeadCode('exit 1 # This becomes dead code', 0)
     assert_expected_report(report, [expected_error1, expected_error2])
 
-def test_deboostrap_or(tmp_path):
+def test_or_unreachable(tmp_path):
     script = write_script(tmp_path, """
 if [ -z "$1" ] || [ -z "$2" ]; then
     exit 1
@@ -1090,6 +1090,19 @@ fi
     report = reset_and_run_main(script)
     expected_error = reporter.DeadCode('echo unreachable', 0)
     assert_expected_report(report, [expected_error])
+
+def test_or_reachable(tmp_path):
+    script = write_script(tmp_path, """
+if [ -z "$2" ] || [ -z "$3" ]; then
+    exit 1
+fi
+
+if [ -z "$1" ]; then
+    echo reachable
+fi
+""")
+    report = reset_and_run_main(script)
+    assert_expected_report(report, [])
 
 # def test_function_call_multipath(tmp_path):
 #     # A function that is called should not produce unbound variable errors for its parameters
