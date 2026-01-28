@@ -142,7 +142,20 @@ def handle_commandnode(traces: Traces,
                     for trace in t1:
                         DebugLogger.log_assertion(spec.check, trace.latest_state, context_line, config.current_pass)
 
-                t_success = trace_map(t_precond,
+                def pathcond_contradicts(state: State, new_cond: Constraint) -> bool:
+                    if new_cond == Empty():
+                        return False
+                    norm_new = new_cond.normalized().constraint
+                    for cond in state.pathcond:
+                        norm_existing = cond.constraint.normalized().constraint
+                        if isinstance(norm_existing, Not) and norm_existing.constraint == norm_new:
+                            return True
+                        if isinstance(norm_new, Not) and norm_new.constraint == norm_existing:
+                            return True
+                    return False
+
+                t_success_precond = [t for t in t_precond if not pathcond_contradicts(t.latest_state, spec.success_postcond)]
+                t_success = trace_map(t_success_precond,
                                       lambda s: s.update_fs(spec.success_postcond)\
                                                  .add_pathcond(spec.success_postcond)\
                                                  .update_known_commands(spec.success_postcond)\
@@ -151,7 +164,8 @@ def handle_commandnode(traces: Traces,
                                                                      spec.failure_postcond))
                 t_failure = []
                 if config.in_checked_position:
-                    t_failure = trace_map(t_precond,
+                    t_failure_precond = [t for t in t_precond if not pathcond_contradicts(t.latest_state, spec.failure_postcond)]
+                    t_failure = trace_map(t_failure_precond,
                                           lambda s: s.update_fs(spec.failure_postcond)\
                                                      .add_pathcond(spec.failure_postcond)\
                                                      .update_known_commands(spec.failure_postcond)\
