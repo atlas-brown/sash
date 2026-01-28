@@ -1,4 +1,5 @@
 import logging
+import threading
 import traceback
 from collections import defaultdict
 from copy import copy
@@ -1799,7 +1800,9 @@ def symb_engine(nodes: list[parser.WrappedAst], config: InterpConfig) -> Traces:
 
 def symbexec_file(input_file: str,
                   config: InterpConfig,
-                  stop: Event | None) -> SymbexecResult:
+                  stop: Event | None,
+                  dfs_timeout: float | None = None,
+                  main_timeout: float | None = None) -> SymbexecResult:
     global stop_event
     stop_event = stop
 
@@ -1861,6 +1864,9 @@ def symbexec_file(input_file: str,
         if config.DFS_first:
             logging.info("Doing whole execution with a single trace first (DFS_first)")
             logging.info("DFS run: targeting dangerous commands")
+            dfs_event = _set_timer(dfs_timeout) if dfs_timeout is not None else stop_event
+            prev_stop_event = stop_event
+            stop_event = dfs_event
             targeted_result = run_targeted_dfs(
                 nodes=nodes,
                 config=replace(config, current_pass="dangerous-first"),
@@ -1897,6 +1903,16 @@ def symbexec_file(input_file: str,
             # symb_engine(nodes, replace(config, trace_collapser = lambda ts: ts[:1]))
             logging.info("DFS_first run complete, proceeding with normal symbolic execution")
             Reporter.drop_issues({reporter.Code.DEAD_CODE}) # wholly unreliable with branch policies
+            if dfs_event is not None and dfs_event.is_set():
+                Reporter.clear_timed_out()
+            if stop is not None and main_timeout is None:
+                main_stop = stop
+            else:
+                main_stop = _set_timer(main_timeout)
+            stop_event = main_stop if main_stop is not None else prev_stop_event
+        else:
+            main_stop = stop if (stop is not None and main_timeout is None) else _set_timer(main_timeout)
+            stop_event = main_stop if main_stop is not None else stop_event
 
         traces = symb_engine(nodes, replace(config, branch_policy=branch_policy_half_n_half_if_too_many))
         if Reporter.get_timed_out():
@@ -1908,4 +1924,15 @@ def symbexec_file(input_file: str,
         return SymbexecResult(SymbexecStatus.FAILED, [])
 
 stop_event: Event | None = None
+_timers: list[threading.Timer] = []
+
+def _set_timer(timeout: float | None) -> Event | None:
+    if timeout is None or timeout <= 0:
+        return None
+    event = Event()
+    timer = threading.Timer(timeout, event.set)
+    timer.daemon = True
+    _timers.append(timer)
+    timer.start()
+    return event
 func_map = FuncMap()

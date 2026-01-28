@@ -215,6 +215,10 @@ class Reporter:
         cls._timed_out = True
 
     @classmethod
+    def clear_timed_out(cls):
+        cls._timed_out = False
+
+    @classmethod
     def get_timed_out(cls) -> bool:
         return cls._timed_out
 

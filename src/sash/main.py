@@ -16,6 +16,7 @@ from sash.debugtools.logger import DebugLogger
 def symbexec_main(file: str,
                   solver: bool = False,
                   symbexec_timeout: float | None = None,
+                  dfs_timeout: float | None = None,
                   solver_timeout: float | None = None,
                   enable_dfs: bool = False,
                   debug_instrumentation: bool = False) -> sash.symb.SymbexecResult:
@@ -32,7 +33,16 @@ def symbexec_main(file: str,
 
     Reporter.initialize(file)
     start_time = time.perf_counter()
-    result = sash.symb.symbexec_file(file, config, stop=set_timer(symbexec_timeout, "symbexec"))
+    if enable_dfs and dfs_timeout is None:
+        dfs_timeout = symbexec_timeout
+    stop = None
+    result = sash.symb.symbexec_file(
+        file,
+        config,
+        stop=stop,
+        dfs_timeout=dfs_timeout,
+        main_timeout=symbexec_timeout,
+    )
     Reporter.set_exec_time(time.perf_counter() - start_time)
 
     match result.status:
@@ -63,6 +73,7 @@ def main(file: str,
          log_file: pathlib.Path | None=None,
          solver=True,
          timeout: float | None = None,
+         dfs_timeout: float | None = None,
          solver_timeout: float | None = None,
          enable_dfs: bool = False,
          debug_instrumentation: bool = False) -> Report:
@@ -76,7 +87,7 @@ def main(file: str,
     logging.info("Processing file %s with solver=%s, exec_timeout=%s, solver_timeout=%s", file, solver, timeout, solver_timeout)
     logging.info("Commands with specs: %s", [name for name, _ in specs.CMD_SPECS.items()])
 
-    symbexec_main(file, solver, timeout, solver_timeout, enable_dfs, debug_instrumentation)
+    symbexec_main(file, solver, timeout, dfs_timeout, solver_timeout, enable_dfs, debug_instrumentation)
     return Reporter.get_report()
 
 
@@ -89,6 +100,7 @@ def cli_main():
         log_file=args.log_file.resolve().as_posix() if args.log_file else None,
         solver=True,
         timeout=args.timeout,
+        dfs_timeout=args.dfs_timeout,
         solver_timeout=args.solver_timeout,
         enable_dfs=args.enable_dfs,
         debug_instrumentation=args.enable_debug_instrumentation,
@@ -138,6 +150,14 @@ def parse_cli():
         type=float,
         default=None,
         help="Set a timeout (in seconds) for the symbolic execution (not including the solver step)",
+    )
+
+    parser.add_argument(
+        "-dfsT",
+        type=float,
+        dest="dfs_timeout",
+        default=None,
+        help="Set a timeout (in seconds) for the DFS-first phase only (defaults to --timeout when -D is used)",
     )
 
     # solver timeout
