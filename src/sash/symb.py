@@ -1626,10 +1626,14 @@ def interp_node(traces: Traces,
 
         case AST.AndNode() | AST.OrNode():
             logging.debug("FORK: explicit AND/OR")
-            # workaround the `checked_position` by manually adding the failure traces back
-            # because some programs use huge functions inside AND/OR nodes, and there's no need to fork on EVERYTHING inside them
-            t1 = guarded_interp_node(traces, node.left_operand, config) # intentionally not in a checked position
-            t_failure = [t.fail_last_command() for t in t1 if t.latest_state.last_exit_code[0] == SymStr(("0",))]
+            # Workaround the `checked_position` by manually adding the failure traces back only when
+            # the left operand was *not* evaluated in a checked position.
+            left_config = config if config.in_checked_position else replace(config, in_checked_position=False)
+            right_config = config
+            t1 = guarded_interp_node(traces, node.left_operand, left_config)
+            t_failure: Traces = []
+            if not left_config.in_checked_position:
+                t_failure = [t.fail_last_command() for t in t1 if t.latest_state.last_exit_code[0] == SymStr(("0",))]
             if config.branch_policy_pre is not None:
                 decision = config.branch_policy_pre(node)
                 t_success = [t for t in t1 + t_failure if t.latest_state.last_exit_code[0] == SymStr(("0",))]
@@ -1646,7 +1650,7 @@ def interp_node(traces: Traces,
                 return t_success
             def success(traces_with_exit_0: Traces) -> Traces:
                 if isinstance(node, AST.AndNode):
-                    return guarded_interp_node(traces_with_exit_0, node.right_operand, config)
+                    return guarded_interp_node(traces_with_exit_0, node.right_operand, right_config)
                 else:
                     return traces_with_exit_0
             def failure(traces_with_exit_1: Traces) -> Traces:
@@ -1656,7 +1660,7 @@ def interp_node(traces: Traces,
                 if isinstance(node, AST.AndNode):
                     return traces_with_exit_1
                 else:
-                    return guarded_interp_node(traces_with_exit_1, node.right_operand, config)
+                    return guarded_interp_node(traces_with_exit_1, node.right_operand, right_config)
             return handle_branch(t1 + t_failure, success, failure, node, config)
 
         case AST.NotNode():
