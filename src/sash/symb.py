@@ -1897,14 +1897,10 @@ def symbexec_file(input_file: str,
             # symb_engine(nodes, replace(config, trace_collapser = lambda ts: ts[:1]))
             logging.info("DFS_first run complete, proceeding with normal symbolic execution")
             Reporter.drop_issues({reporter.Code.DEAD_CODE}) # wholly unreliable with branch policies
-        else:
-            targeted_result = None
 
         traces = symb_engine(nodes, replace(config, branch_policy=branch_policy_half_n_half_if_too_many))
         if Reporter.get_timed_out():
             return SymbexecResult(SymbexecStatus.INTERRUPTED, traces)
-        if targeted_result is not None:
-            return SymbexecResult(SymbexecStatus.COMPLETED, targeted_result.traces + traces)
         return SymbexecResult(SymbexecStatus.COMPLETED, traces)
     except Exception as e:
         logging.error("Symbolic execution failed:")
