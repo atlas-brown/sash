@@ -36,11 +36,10 @@ def handle_commandnode(traces: Traces,
 
     # Handle variable expansion before we evaluate the command itself
     t1, expanded_args = expand_args_dumb(traces, node.arguments, config)
-    t1_active = drop_terminated_traces(t1)
+    t1_active, t1_inactive = drop_terminated_traces(t1)
     if not t1_active:
         logging.debug("All traces terminated during expansion of %s", trim_string_for_logging(node.pretty()))
         return t1
-    t1 = t1_active
     logging.debug("Expanded cmd to %s", expanded_args)
 
     if expanded_args and len(node.arguments) >= 2:
@@ -1246,6 +1245,7 @@ def expand_args_dumb(traces: Traces,
         active_expansions = [expansion for expansion in expansions if not expansion[0].latest_state.terminated]
         terminated_traces.extend([expansion[0] for expansion in expansions if expansion[0].latest_state.terminated])
         if not active_expansions:
+            logging.debug(f"Stopping expansion of entire args because all traces terminated on {arg}")
             return terminated_traces, []
         expanded_fields = [expansion[1] for expansion in active_expansions]
         # for each trace, we have a list of fields that this arg expands to
@@ -1428,22 +1428,24 @@ def collapse_equiv_trace_expansions(expansions: list[tuple[Trace, list[Field]]])
 # ============================================================
 
 context_line = None
+inactive_trace_stash: list[Trace] = []
 
 trace_count = 1
-def collapse_traces_if_too_many(traces: Traces) -> Traces:
+def collapse_traces_if_too_many(traces: Traces) -> tuple[Traces, Traces]:
     global trace_count
+    new_inactive = []
     if len(traces) > trace_count:
         logging.debug("Too many traces (%d), collapsing", len(traces))
-        traces = collapse_traces(traces)
+        traces, new_inactive = collapse_traces(traces)
         trace_count = len(traces)
         logging.debug("Collapsed to %d traces", trace_count)
-    return traces
+    return traces, new_inactive
 
-def drop_terminated_traces(traces: Traces) -> Traces:
-    active_traces = [t for t in traces if not t.latest_state.terminated]
-    if len(active_traces) < len(traces):
-        logging.debug("Dropping %d terminated traces", len(traces) - len(active_traces))
-    return active_traces
+def drop_terminated_traces(traces: Traces) -> tuple[Traces, Traces]:
+    inactive_traces, active_traces = util.partition(traces, lambda t: t.latest_state.terminated)
+    if len(inactive_traces) > 0:
+        logging.debug("Dropping %d terminated traces", len(inactive_traces))
+    return active_traces, inactive_traces
 
 def guarded_interp_node(traces: Traces,
                         node: AST.AstNode,
@@ -1459,6 +1461,11 @@ def guarded_interp_node(traces: Traces,
     prev_context_line = context_line
     context_line = getattr(node, "line_number", context_line)
 
+    traces, inactive1 = drop_terminated_traces(traces)
+    traces, inactive2 = config.trace_collapser(traces)
+    inactive_trace_stash.extend(inactive1 + inactive2)
+    traces = config.apply_node_cbs(traces, node)
+
     try:
         res = interp_node(traces, node, config)
         context_line = prev_context_line
@@ -1472,9 +1479,6 @@ def interp_node(traces: Traces,
                 node: AST.AstNode,
                 config: InterpConfig) -> Traces:
     # refer to https://github.com/binpash/shasta/blob/main/shasta/ast_node.py
-    traces = drop_terminated_traces(traces)
-    traces = config.trace_collapser(traces)
-    traces = config.apply_node_cbs(traces, node)
     if not traces:
         if isinstance(node, AST.CommandNode) and not node.arguments and not node.assignments:
             logging.debug("Skipping dead code warning for empty command node")
@@ -1764,8 +1768,10 @@ def symb_engine(nodes: list[parser.WrappedAst], config: InterpConfig) -> Traces:
     global context_line
     global func_map
     global stop_event
+    global inactive_trace_stash
 
     logging.info("Running symb engine with %d raw nodes", len(nodes))
+    inactive_trace_stash = []
     traces = [Trace((starting_state(),))]
 
     func_map = replace(func_map, funcs=find_func_defs(traces, nodes, config), called=set())
@@ -1789,7 +1795,7 @@ def symb_engine(nodes: list[parser.WrappedAst], config: InterpConfig) -> Traces:
         func_traces[name] = guarded_interp_node([Trace((starting_state(),))], node, config)
 
 
-    return traces + [t for ts in func_traces.values() for t in ts]
+    return traces + [t for ts in func_traces.values() for t in ts] + inactive_trace_stash
 
 def symbexec_file(input_file: str,
                   config: InterpConfig,

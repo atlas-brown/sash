@@ -9,7 +9,7 @@ from sash.symbolic.strings import Field
 
 NodeCB = Callable[[Traces, AST.AstNode], list | None]
 ExpandedCmdCB = Callable[[list[Field]], None]
-TraceCollapser = Callable[[Traces], Traces]
+TraceCollapser = Callable[[Traces], tuple[Traces, Traces]]
 
 class BranchDecision(Enum):
     ALL = 0
@@ -27,7 +27,7 @@ class UnboundVariablePolicy(Enum):
 class InterpConfig:
     node_cbs: list[NodeCB] = field(default_factory=list)
     expanded_command_cbs: list[ExpandedCmdCB] = field(default_factory=list)
-    trace_collapser: TraceCollapser = lambda ts: ts
+    trace_collapser: TraceCollapser = lambda ts: (ts, [])
     in_checked_position: bool = False
     max_loop_unroll: int = 2
     unbound_policy: UnboundVariablePolicy = UnboundVariablePolicy.SYMBOLIC

@@ -4,6 +4,7 @@ import shasta.ast_node as AST
 import z3
 
 from sash.constraints import And, Constraint, Implies, Not, Or
+from typing import Callable
 
 
 def split_at(l: list, element) -> list[list]:
@@ -120,3 +121,14 @@ def iter_constraint(node: Constraint, skip: list[type[Constraint]]) -> Generator
 def create_fresh_varname(prefix: str | None = None) -> str:
     prefix = prefix if prefix is not None else "vr"
     return str(z3.FreshConst(z3.StringSort(),prefix))
+
+def partition(l: list, predicate: Callable) -> tuple[list, list]:
+    """Partition a sequence into two tuples based on a predicate."""
+    trues = []
+    falses = []
+    for item in l:
+        if predicate(item):
+            trues.append(item)
+        else:
+            falses.append(item)
+    return trues, falses

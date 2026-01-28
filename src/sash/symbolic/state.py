@@ -239,12 +239,13 @@ Traces = list[Trace]
 def trace_map(traces: Traces, f: Callable[[State], State]) -> Traces:
     return [trace.extend(f) for trace in traces]
 
-def collapse_traces(traces: Traces) -> Traces:
+def collapse_traces(traces: Traces) -> tuple[Traces, Traces]:
     traces_by_latest_states: dict[State, Trace] = {}
     for t in traces:
         if t.latest_state not in traces_by_latest_states:
             traces_by_latest_states[t.latest_state] = t
-    return list(traces_by_latest_states.values())
+    # technically this isn't dropping any traces
+    return list(traces_by_latest_states.values()), []
 
 @dataclass(frozen=True)
 class FuncMap:

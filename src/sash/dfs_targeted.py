@@ -80,13 +80,14 @@ def run_targeted_dfs(nodes: list[WrappedAst],
                 return [frozenset(get_spec_coverage(t.latest_state) | {line}) for t in traces]
         return None
 
-    def collapse_traces_with_spec_coverage(traces: Traces, cap: int) -> Traces:
+    def collapse_traces_with_spec_coverage(traces: Traces, cap: int) -> tuple[Traces, Traces]:
         if len(traces) <= cap:
-            return traces
+            return traces, []
         remaining = list(traces)
         remaining.sort(key=lambda t: len(get_spec_coverage(t.latest_state)), reverse=True)
         selected: list[Trace] = []
         covered: set[int] = set()
+        unselected: list[Trace] = []
         while remaining and len(selected) < cap:
             best_idx = max(
                 range(len(remaining)),
@@ -98,7 +99,10 @@ def run_targeted_dfs(nodes: list[WrappedAst],
         if len(selected) < cap:
             remaining.sort(key=lambda t: len(get_spec_coverage(t.latest_state)), reverse=True)
             selected.extend(remaining[:cap - len(selected)])
-        return selected
+            unselected = remaining[cap - len(selected):]
+        else:
+            unselected = remaining
+        return (selected, unselected)
 
     def find_dangerous_lines() -> list[int]:
         lines: set[int] = set()
