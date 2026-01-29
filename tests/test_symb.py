@@ -1115,6 +1115,41 @@ fi
     report = reset_and_run_main(script)
     assert_expected_report(report, [])
 
+def test_const_cond_assignment(tmp_path):
+    script = write_script(tmp_path, """
+    if [ unknown_cmd ]; then
+        do_something
+        VAR="value1"
+    else
+        do_something_else
+        VAR="value2"
+    fi
+    if [ $? -gt 0 ]; then # constant condition: both branches do variable assignment as their last command
+        echo $VAR
+    fi
+    """)
+    report = reset_and_run_main(script)
+    expected_error1 = reporter.ConstantCondition(None, 0)
+    expected_error2 = reporter.DeadCode('echo $VAR', 0)
+    assert_expected_report(report, [expected_error1, expected_error2])
+
+def test_const_cond_assignment_fixed(tmp_path):
+    script = write_script(tmp_path, """
+    if [ unknown_cmd ]; then
+        do_something
+        VAR="value1"
+    else
+        do_something_else
+    fi
+    if [ $? -gt 0 ]; then # constant condition: both branches do variable assignment as their last command
+        echo $VAR
+    fi
+    """)
+    expected_error = reporter.UnboundID("VAR", 0)
+    report = reset_and_run_main(script)
+    assert_expected_report(report, [expected_error])
+
+
 # def test_function_call_multipath(tmp_path):
 #     # A function that is called should not produce unbound variable errors for its parameters
 #     script = write_script(tmp_path, """
