@@ -1002,18 +1002,19 @@ def test_early_exit_in_path_cond_trimmed(tmp_path):
 
 def test_debootstrap_minimal(tmp_path):
     script = write_script(tmp_path, """
-    TARGET="$2"
+    TARGET="" # Simulate empty argument
     TARGET="${TARGET%/}"
     if [ "${TARGET#/}" = "${TARGET}" ]; then
         TARGET="$(echo `pwd`/$TARGET)"
     fi
     rm -rf "$TARGET"
     """)
-    expected_error = reporter.WordSplitCouldDeleteSystemFile("/home/", 0)
-    report = reset_and_run_main(script)
-    assert_expected_report(report, [expected_error])
+    expected_error1 = reporter.UnsatisfiedPrecondition(None, 'rm -rf "$TARGET"', 0)
+    expected_error2 = reporter.ConstantCondition(None, 0)
+    report = reset_and_run_main(script, solver=True)
+    assert_expected_report(report, [expected_error1, expected_error2])
 
-def test_deboostrap_minimal_2(tmp_path):
+def test_debootstrap_minimal_2(tmp_path):
     script = write_script(tmp_path, """
     TARGET=""
     KEEP_DEBOOTSTRAP_DIR=$(unknown)
@@ -1026,8 +1027,8 @@ def test_deboostrap_minimal_2(tmp_path):
       fi
     fi
     """)
-    expected_error = reporter.DeleteSystemFile("", 0)
-    report = reset_and_run_main(script)
+    expected_error = reporter.UnsatisfiedPrecondition(None, 'rm -rf "$TARGET"', 0)
+    report = reset_and_run_main(script, solver=True)
     assert_expected_report(report, [expected_error])
 
 
