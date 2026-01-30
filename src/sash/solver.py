@@ -90,7 +90,7 @@ def constraint_to_z3(constraint: Constraint, s: State) -> z3.ExprRef:
 
     return norm_constraint_to_z3(constraint.normalized().constraint, s)
 
-def state_to_z3(s: State) -> z3.ExprRef:
+def state_to_z3(s: State, include_fs: bool = True) -> z3.ExprRef:
     if logging.getLogger().isEnabledFor(logging.DEBUG):
         logging.debug("Path condition constraints: %s", pformat(s.pathcond))
     pathcond_formula = z3.And([constraint_to_z3(pc.constraint, pc.producing_state) for pc in s.pathcond]) if s.pathcond else z3.BoolVal(True)
@@ -106,7 +106,7 @@ def state_to_z3(s: State) -> z3.ExprRef:
         env_formula.append(eq_formula)
     env_formula = z3.And(env_formula)
 
-    fs_state_formula = s.fs_model.state_to_z3()
+    fs_state_formula = s.fs_model.state_to_z3() if include_fs else z3.BoolVal(True)
 
     if logging.getLogger().isEnabledFor(logging.DEBUG):
         logging.debug("FS state:\n%s", pformat(s.fs_model))
@@ -126,7 +126,7 @@ def assertion_to_z3(assertion: Assertion) -> tuple[z3.BoolRef, # assertion var
     rc = assertion.constraint
     constraint_formula = constraint_to_z3(rc.full, assertion.producing_state)
     refinement_formulas = [(constraint_to_z3(c, assertion.producing_state), im(assertion.source_line)) for (c, im) in rc.refinements]
-    state_formula = state_to_z3(assertion.producing_state)
+    state_formula = state_to_z3(assertion.producing_state, include_fs=assertion.include_fs)
 
     return assertion_var, state_formula, constraint_formula, refinement_formulas
 
