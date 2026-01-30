@@ -1894,13 +1894,14 @@ def symbexec_file(input_file: str,
             if not func_calls_dangerous(name, {})
         )
         # opt_store = parse_shebang_args(input_file)
+        dfs_traces = []
         if config.DFS_first:
             logging.info("Doing whole execution with a single trace first (DFS_first)")
             logging.info("DFS run: targeting dangerous commands")
             dfs_event = _set_timer(dfs_timeout) if dfs_timeout is not None else stop_event
             prev_stop_event = stop_event
             stop_event = dfs_event
-            targeted_result = run_targeted_dfs(
+            targeted_dfs_result = run_targeted_dfs(
                 nodes=nodes,
                 config=replace(config, current_pass="dangerous-first"),
                 symb_engine=symb_engine,
@@ -1908,32 +1909,32 @@ def symbexec_file(input_file: str,
                 ignore_function_calls_for=safe_funcs,
             )
             logging.info("DFS run: only taking THEN branches")
-            symb_engine(nodes, replace(config,
+            only_then_traces = symb_engine(nodes, replace(config,
                                        branch_policy=branch_policy_only_then,
                                        current_pass="conds:then",
                                        current_pass_condition=Description("(DFS) all then branches are taken")))
             logging.info("DFS run: only taking ELSE branches")
-            symb_engine(nodes, replace(config,
+            only_else_traces = symb_engine(nodes, replace(config,
                                        branch_policy=branch_policy_only_else,
                                        current_pass="conds:else",
                                        current_pass_condition=Description("(DFS) all else branches are taken")))
             issues_so_far = Reporter._issues.copy()
             logging.info("DFS run: only taking THEN branches with unbound variables as empty strings")
-            symb_engine(nodes, replace(config,
+            only_then_unbound_empty = symb_engine(nodes, replace(config,
                                        branch_policy=branch_policy_only_then,
                                        unbound_policy=UnboundVariablePolicy.EMPTY,
                                        current_pass="unbound:empty+conds:then",
                                        current_pass_condition=And(Description("(DFS) all then branches are taken"),
                                                                   Description("(DFS) unbound variables are empty"))))
             logging.info("DFS run: only taking ELSE branches with unbound variables as empty strings")
-            symb_engine(nodes, replace(config,
+            only_else_unbound_empty = symb_engine(nodes, replace(config,
                                        branch_policy=branch_policy_only_else,
                                        unbound_policy=UnboundVariablePolicy.EMPTY,
                                        current_pass="unbound:empty+conds:else",
                                        current_pass_condition=And(Description("(DFS) all else branches are taken"),
                                                                   Description("(DFS) unbound variables are empty"))))
             logging.info("DFS run: treating unbound variables solely as empty strings")
-            symb_engine(nodes, replace(config,
+            unbound_empty = symb_engine(nodes, replace(config,
                                        unbound_policy=UnboundVariablePolicy.EMPTY,
                                        current_pass="unbound:empty",
                                        current_pass_condition=Description("(DFS) unbound variables are empty")))
@@ -1942,6 +1943,10 @@ def symbexec_file(input_file: str,
             # logging.info("DFS run: exploring the first trace only")
             # symb_engine(nodes, replace(config, trace_collapser = lambda ts: ts[:1]))
             logging.info("DFS_first run complete, proceeding with normal symbolic execution")
+            dfs_traces = targeted_dfs_result.traces + \
+                            only_then_traces + only_else_traces + \
+                            only_then_unbound_empty + only_else_unbound_empty + \
+                            unbound_empty
             Reporter.drop_issues({reporter.Code.DEAD_CODE}) # wholly unreliable with branch policies
             if dfs_event is not None and dfs_event.is_set():
                 Reporter.clear_timed_out()
@@ -1955,6 +1960,7 @@ def symbexec_file(input_file: str,
             stop_event = main_stop if main_stop is not None else stop_event
 
         traces = symb_engine(nodes, replace(config, branch_policy=branch_policy_half_n_half_if_too_many))
+        traces = traces + dfs_traces
         if Reporter.get_timed_out():
             return SymbexecResult(SymbexecStatus.INTERRUPTED, traces)
         return SymbexecResult(SymbexecStatus.COMPLETED, traces)
