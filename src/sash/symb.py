@@ -1585,6 +1585,13 @@ def interp_node(traces: Traces,
         case AST.FileRedirNode():
             res = []
             for t, redir_args in expand(traces, node.arg, config):
+                # If the redir_arg is already known to be a safe path to overwrite, we don't need to add any assertions
+                if all(redir_arg.is_constant() and \
+                       redir_arg.content.try_to_str() in Config.get("SAFE_OVERWRITE_PATHS") \
+                    for redir_arg in redir_args):
+                    res.append(t)
+                    continue
+
                 t_precond = t
                 if node.redir_type in ["To", "Clobber"]: # >, >|
                     safe_paths = Config.get("SAFE_OVERWRITE_PATHS")
