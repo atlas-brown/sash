@@ -317,6 +317,9 @@ def handle_rm(expanded_args: tuple[Field, ...], trace: Trace, node: AST.CommandN
                                                    context_line, priority=10))
 
     for arg_idx, arg_field in enumerate(expanded_args[1:], start=1):
+        arg_field_str = arg_field.try_to_str()
+        if arg_field_str is not None and arg_field_str.startswith("-"):
+            continue
         definitely_non_empty = is_definitely_non_empty(arg_field)
         if (path := arg_field.try_to_str()) and is_protected(path):
             Reporter.add_issue(reporter.DeleteSystemFile(path, context_line), config)
