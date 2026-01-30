@@ -873,8 +873,11 @@ class Test(Cmd):
                 fail = Empty()
             case 1: # test string
                 op = operands[0]
-                # z-postcond is the negation of nz-postcond
-                fail = StringEq(op, Field(SymStr(("",)), WordCount(1,1)))
+                if op.try_to_str() == '=':
+                    fail = StringEq(Field(SymStr(("",)), WordCount(1,1)), Field(SymStr(("",)), WordCount(1,1))) # TODO: Remove, this is caused by a bug during expansion
+                else:
+                    # z-postcond is the negation of nz-postcond
+                    fail = StringEq(op, Field(SymStr(("",)), WordCount(1,1)))
             case 2: # test -flag operand
                 op = operands[1]
                 flag = operands[0].content.parts[0] if isinstance(operands[0].content, SymStr) else None
