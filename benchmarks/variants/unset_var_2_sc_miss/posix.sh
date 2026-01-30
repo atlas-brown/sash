@@ -5,7 +5,7 @@ cd vscode || { echo "'vscode' dir not found"; exit 1; }
 git add .
 git reset -q --hard HEAD
 
-if [ -f "${FILE}" ]; then # bug here: file is unset (unbound)
+if [ -f "${FILE}" ]; then # bug here: FILE is unset (unbound)
   git apply --reject "${FILE}"
 fi
 

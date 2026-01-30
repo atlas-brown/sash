@@ -1,6 +1,6 @@
 bugs:
 - line: 10
-  description: An unbound variable is used ($file)
+  description: An unbound variable is used ($FILE)
 
 sources:
 - https://github.com/VSCodium/vscodium/commit/97eb57c196159bb0bcebc04adf5d5dac0885fb4d
