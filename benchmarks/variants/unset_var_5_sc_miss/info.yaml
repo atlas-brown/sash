@@ -1,0 +1,19 @@
+bugs:
+- line: 85
+  description: An unset variable is used ($NVM_SOURCE)
+- line: 86
+  description: An unset variable is used ($NVM_SOURCE)
+
+sources:
+- https://github.com/nvm-sh/nvm/commit/5904d41b253e03d7ad0f3b58ce081e46e44f3c9a
+
+ground_truth:
+  errors:
+  - line: 85
+    line_in_fixed: 85
+    code: unbound
+    note: we only expect one report, first unbound occurence
+    shellcheck:
+      detects: false
+      fixed_false_positive: false
+      code: SC2153

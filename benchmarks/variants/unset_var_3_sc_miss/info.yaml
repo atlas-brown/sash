@@ -11,6 +11,6 @@ ground_truth:
     line_in_fixed: 25
     code: unbound
     shellcheck:
-      detects: true
+      detects: false
       fixed_false_positive: false
       code: SC2153
