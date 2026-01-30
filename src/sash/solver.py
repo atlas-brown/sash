@@ -235,6 +235,7 @@ def run_solver(traces: list[Trace], config: InterpConfig, stop: threading.Event 
 
         assertions = trace.latest_state.assertions
         assertions = assertions + assume_unknowns_are_files(assertions)
+        assertions = sorted(assertions, key=lambda a: a.priority, reverse=True)
         logging.debug("Trace %d/%d: checking %d assertions", i + 1, len(traces), len(assertions))
         for assertion in assertions:
             if logging.getLogger().isEnabledFor(logging.DEBUG):

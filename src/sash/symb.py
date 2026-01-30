@@ -314,7 +314,7 @@ def handle_rm(expanded_args: tuple[Field, ...], trace: Trace, node: AST.CommandN
                                                                                         lambda arg_field: Not(StringEq(arg_field, pwdval.value))),
                                                                     lambda line: reporter.DeleteSystemFile("PWD", line)),
                                                    node.pretty(),
-                                                   context_line))
+                                                   context_line, priority=10))
 
     for arg_idx, arg_field in enumerate(expanded_args[1:], start=1):
         definitely_non_empty = is_definitely_non_empty(arg_field)

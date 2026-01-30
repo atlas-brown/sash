@@ -70,13 +70,14 @@ class Assertion:
     constraint: RefineableConstraint
     source_str: str
     source_line: int
+    priority: int = 0
 
     def __post_init__(self):
         assert isinstance(self.constraint, RefineableConstraint), "Assertion constructed with non-RefineableConstraint"
 
     # exclude the state from repr to avoid large prints
     def __repr__(self):
-        return f"Assertion(state<{hash(self.producing_state)}>, constraint={repr(self.constraint)}, source_str={repr(self.source_str)}, source_line={self.source_line})"
+        return f"Assertion(state<{hash(self.producing_state)}>, constraint={repr(self.constraint)}, source_str={repr(self.source_str)}, source_line={self.source_line}, priority={self.priority})"
 
 @dataclass(frozen=True)
 class Condition(Assertion):
@@ -134,12 +135,16 @@ class State:
         new_pathcond = self.pathcond + (Condition(self, cond, source_str, source_line),)
         return replace(self, pathcond=new_pathcond)
 
-    def add_assertion(self, assertion_constraint: RefineableConstraint, source_str: str | None = None, source_line: int | None = None) -> 'State':
+    def add_assertion(self, assertion_constraint: Constraint, source_str: str | None = None, source_line: int | None = None, priority: int = 0) -> 'State':
         assert isinstance(assertion_constraint, RefineableConstraint), f"Got non-RC assertion: {type(assertion_constraint)} : {assertion_constraint}"
         if assertion_constraint == Empty():
             logging.debug("Skipping empty assertion from %s at line %s", source_str, source_line)
             return self
-        assertion = Assertion(producing_state=self, constraint=assertion_constraint, source_str=source_str, source_line=source_line)
+        assertion = Assertion(producing_state=self,
+                              constraint=assertion_constraint,
+                              source_str=source_str,
+                              source_line=source_line,
+                              priority=priority)
         logging.debug(f"Added assertion id: {id(assertion)}")
         new_assertions = self.assertions + (assertion,)
         return replace(self, assertions=new_assertions)
