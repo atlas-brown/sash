@@ -1,10 +1,12 @@
 import logging
 import math
+import copy
 from abc import ABC
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import Enum
 from typing import NamedTuple
 from sash.interpreter_config import InterpConfig
+from sash.constraints import Constraint, Empty
 from sash.debugtools.logger import DebugLogger
 
 
@@ -33,6 +35,8 @@ class Code(Enum):
     UNEXPECTED_STDIN = "unexpected_stdin"
     COMMAND_CAN_ONLY_FAIL = "command_can_only_fail"
     CAPTURING_EMPTY_OUTPUT = "capturing_empty_output"
+    CMD_ASSERTION_PATH_STATE = "cmd_expected_path_state"
+    DATA_LOSS = "data_loss"
 
 
 @dataclass(frozen=True)
@@ -41,6 +45,7 @@ class Issue(ABC):
     message: str
     severity: Severity
     source_line: int | None
+    condition: Constraint | None = None
 
     def is_error(self) -> bool:
         return self.severity == Severity.ERROR
@@ -49,15 +54,26 @@ class Issue(ABC):
         return self.severity == Severity.WARNING
 
     def __repr__(self) -> str:
-        return f"L{self.source_line}:{self.code}:{self.message}"
+        qualification = f"IF {self.condition} then " if self.condition else ""
+        return f"L{self.source_line}:{self.code}: {qualification}{self.message}"
 
     def to_dict(self) -> dict:
         return {
             "line": self.source_line,
             "code": self.code.value,
             "severity": self.severity.value,
+            "condition": str(self.condition),
             "message": self.message
         }
+
+    def under_condition(self, cond: 'Condition') -> 'Issue':
+        if cond != Empty():
+            # Workaround that `replace` doesn't work with custom custructors
+            cp = copy.copy(self)
+            object.__setattr__(cp, 'condition', cond)
+            return cp
+        else:
+            return self
 
     @classmethod
     def all_codes(cls) -> set[str]:
@@ -159,6 +175,14 @@ class CapturingEmptyOutput(Issue):
     def __init__(self, command: str, line):
         super().__init__(Code.CAPTURING_EMPTY_OUTPUT, f"command '{command}' captures empty output", Severity.WARNING, line)
 
+class ExpectedPathState(Issue):
+    def __init__(self, command: str, state: str, paths: 'list[Field]', line):
+        super().__init__(Code.CMD_ASSERTION_PATH_STATE, f"command '{command}' expects paths that are {state}, but one or more of {paths} are not", Severity.ERROR, line)
+
+class DataLoss(Issue):
+    def __init__(self, command: str, paths, line):
+        super().__init__(Code.DATA_LOSS, f"command '{command}' deletes {paths}, one of which has not been read, potentially causing loss of data", Severity.ERROR, line)
+
 class Report(NamedTuple):
     filename: str
     issues: list[Issue]
@@ -199,6 +223,8 @@ class Reporter:
 
     @classmethod
     def add_issue(cls, issue: Issue, current_config: InterpConfig):
+        if current_config.current_pass_condition:
+            issue = issue.under_condition(current_config.current_pass_condition)
         cls._issues.add(issue)
         DebugLogger.log_issue(issue, current_config.current_pass)
 

@@ -199,7 +199,16 @@ class FSModelSimple(FSModel):
 
     def state_to_z3(self) -> 'z3.ExprRef':
         exprs = []
+        logging.debug("Converting FSModelSimple to z3")
         for fsvar, arr_expr in self.history:
+            logging.debug(f"s2z3: fsvar={fsvar}, arr_expr={arr_expr}")
             if arr_expr is not None:
                 exprs.append(fsvar == arr_expr)
         return z3.And(exprs)
+
+    def set_default_path_state(self, default: z3.ExprRef) -> "FSModelSimple":
+        """Return a new FSModelSimple where any unknown paths default to the given state."""
+        base_fs_array = z3.K(z3.StringSort(), default)
+        logging.debug(f"Setting default path state to {base_fs_array}")
+        new_history = ((self.history[0][0], base_fs_array),) + self.history[1:]
+        return replace(self, history=new_history)

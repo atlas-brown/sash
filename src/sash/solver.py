@@ -7,6 +7,7 @@ from dataclasses import replace
 import logging
 from sash.symbolic.strings import CompletelyArbitrary, Field, SymStr
 from sash.util import shasta_pretty
+from sash.fs import FileInfo, File, Unread
 from pprint import pformat
 import z3
 
@@ -144,12 +145,16 @@ def model_to_reports(core: list[z3.BoolRef], config: InterpConfig):
         )
         Reporter.add_issue(err, config)
 
-
-# TODOS:
-# write unit tests
-# update michael's interface
-# plug in michael's fs model
-# trace merging
+def assume_unknowns_are_files(assertions: list[Assertion]) -> tuple[Assertion, ...]:
+    new_assertions: list[Assertion] = []
+    for assertion in assertions:
+        state = assertion.producing_state
+        fs_model = state.fs_model
+        new_fs_model = fs_model.set_default_path_state(FileInfo.mk_pair(File, Unread))
+        new_state = replace(state, fs_model=new_fs_model).add_pathcond(Description("Assume unknown paths are files"))
+        new_assertion = replace(assertion, producing_state=new_state)
+        new_assertions.append(new_assertion)
+    return tuple(new_assertions)
 
 # <assertion_constraint>: if true, then things are OK, if false then there's a bug
 
@@ -178,6 +183,7 @@ def run_solver(traces: list[Trace], config: InterpConfig, stop: threading.Event 
             break
 
         assertions = trace.latest_state.assertions
+        assertions = assertions + assume_unknowns_are_files(assertions)
         logging.debug("Trace %d/%d: checking %d assertions", i + 1, len(traces), len(assertions))
         for assertion in assertions:
             if logging.getLogger().isEnabledFor(logging.DEBUG):

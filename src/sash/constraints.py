@@ -91,6 +91,8 @@ class NormalizedConstraint(Constraint):
 
 @dataclass(frozen=True)
 class Empty(Constraint):
+    def __bool__(self):
+        return False
     pass
 
 

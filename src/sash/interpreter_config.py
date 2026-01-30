@@ -1,11 +1,11 @@
-from dataclasses import dataclass
-from sash.symbolic.state import Trace, Traces
-from dataclasses import field, replace
+from dataclasses import dataclass, field, replace
 from collections.abc import Callable
 import shasta.ast_node as AST
 from enum import Enum
 
 from sash.symbolic.strings import Field
+from sash.symbolic.state import Trace, Traces
+from sash.constraints import Constraint, Empty
 
 NodeCB = Callable[[Traces, AST.AstNode], list | None]
 ExpandedCmdCB = Callable[[list[Field]], None]
@@ -37,6 +37,7 @@ class InterpConfig:
     ignore_function_calls: bool = False
     ignore_function_calls_for: frozenset[str] = field(default_factory=frozenset)
     current_pass: str = "default"
+    current_pass_condition: Constraint = Empty()
     debug_instrumentation: bool = False
 
     def add_node_callback(self, cb: NodeCB) -> 'InterpConfig':

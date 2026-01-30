@@ -19,9 +19,13 @@ def write_script(tmp_path, content: str) -> str:
     path.write_text(content)
     return str(path)
 
-def assert_expected_report(report: reporter.Report, expected_errors: list[reporter.Issue]):
+def is_under_allowable_condition(issue: reporter.Issue, allowable_strs: list[str]) -> bool:
+    cond_str = str(issue.condition)
+    return not issue.condition or any(s in cond_str for s in allowable_strs)
+
+def assert_expected_report(report: reporter.Report, expected_errors: list[reporter.Issue], allowable_conditions: list[str] = []):
     """Helper to compare actual report with expected errors."""
-    actual = [rep.code.value for rep in report.issues]
+    actual = [rep.code.value for rep in report.issues if is_under_allowable_condition(rep, allowable_conditions)]
     expected = [err.code.value for err in expected_errors]
     if sorted(actual) != sorted(expected):
         pytest.fail(
