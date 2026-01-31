@@ -904,6 +904,7 @@ class Test(Cmd):
                         # to reason about this kind of usage, we should add a failure postcondition if `op` is a var capturing that it is defined and has a value
                         succ = StringEq(op, empty_str_var)
                         # nz-postcond is the negation of z-postcond
+                        fail = ~StringEq(op, empty_str_var)
                     case _:
                         logging.debug("Unhandled test invocation: %s; treating as no-op", cmd)
                         succ = Empty()
@@ -916,7 +917,7 @@ class Test(Cmd):
                 match operator:
                     case "=":
                         succ = StringEq(op1, op2)
-                        # nz-postcond is the negation of z-postcond
+                        fail = ~StringEq(op1, op2)
                     case "!=":
                         # z-postcond is the negation of nz-postcond
                         fail = StringEq(op1, op2)
