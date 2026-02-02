@@ -1009,7 +1009,7 @@ def test_debootstrap_minimal(tmp_path):
     fi
     rm -rf "$TARGET"
     """)
-    expected_error1 = reporter.UnsatisfiedPrecondition(None, 'rm -rf "$TARGET"', 0)
+    expected_error1 = reporter.DeleteSystemFile("PWD", 0)
     expected_error2 = reporter.ConstantCondition(None, 0)
     report = reset_and_run_main(script, solver=True)
     assert_expected_report(report, [expected_error1, expected_error2])
@@ -1027,7 +1027,7 @@ def test_debootstrap_minimal_2(tmp_path):
       fi
     fi
     """)
-    expected_error = reporter.UnsatisfiedPrecondition(None, 'rm -rf "$TARGET"', 0)
+    expected_error = reporter.DeleteSystemFile("PWD", 0)
     report = reset_and_run_main(script, solver=True)
     assert_expected_report(report, [expected_error])
 
@@ -1173,7 +1173,7 @@ def test_deboostrap_dfs(tmp_path):
     rm -rf "$TARGET" # bug here (cont'd): eventually, $TARGET is deleted, which is a directory not created by debootstrap
     """)
 
-    expected_error = reporter.UnsatisfiedPrecondition(None, 'rm -rf "$TARGET"', 0)
+    expected_error = reporter.DeleteSystemFile("PWD", 0)
     report = reset_and_run_main(script, solver=True, enable_dfs=True)
     assert_expected_report(report, [expected_error])
 
