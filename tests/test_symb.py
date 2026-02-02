@@ -1150,6 +1150,33 @@ def test_const_cond_assignment_fixed(tmp_path):
     report = reset_and_run_main(script)
     assert_expected_report(report, [expected_error])
 
+def test_deboostrap_dfs(tmp_path):
+    script = write_script(tmp_path, """
+    if [ -z "$1" ]; then
+        exit 1
+    fi
+    SUITE="$1"
+
+    if [ -z "$2" ] && am_doing_phase dldebs first_stage second_stage; then
+        exit 1
+    fi
+    TARGET="$2" # bug here (cont'd): if $2 is not given, $TARGET defaults to `pwd`
+    TARGET="${TARGET%/}"
+    if [ "${TARGET#/}" = "${TARGET}" ]; then
+    if [ "${TARGET%/*}" = "$TARGET" ] ; then
+      TARGET="$(echo `pwd`/$TARGET)"
+    else
+      TARGET="$(cd ${TARGET%/*}; echo `pwd`/${TARGET##*/})"
+    fi
+    fi
+
+    rm -rf "$TARGET" # bug here (cont'd): eventually, $TARGET is deleted, which is a directory not created by debootstrap
+    """)
+
+    expected_error = reporter.UnsatisfiedPrecondition(None, 'rm -rf "$TARGET"', 0)
+    report = reset_and_run_main(script, solver=True, enable_dfs=True)
+    assert_expected_report(report, [expected_error])
+
 
 # def test_function_call_multipath(tmp_path):
 #     # A function that is called should not produce unbound variable errors for its parameters

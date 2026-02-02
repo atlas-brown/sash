@@ -70,10 +70,10 @@ def create_field(val: str) -> sash.symbolic.strings.Field:
 def create_symstr(val: str) -> sash.symbolic.strings.SymStr:
     return sash.symbolic.strings.SymStr((val,))
 
-def reset_and_run_main(script: str, solver: bool = False) -> reporter.Report:
+def reset_and_run_main(script: str, solver: bool = False, enable_dfs: bool = False) -> reporter.Report:
     """Helper to reset the reporter and run the main analysis on a script."""
     reporter.Reporter.reset()
-    report = main.main(script, solver=solver)
+    report = main.main(script, solver=solver, enable_dfs=enable_dfs)
     return report
 
 def reset_and_run_symbexec_main(script: str, solver: bool = False) -> symb.SymbexecResult:
