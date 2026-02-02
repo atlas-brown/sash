@@ -261,12 +261,12 @@ if [ "$SECOND_STAGE_ONLY" = "true" ]; then
   MIRRORS=null:
   SCRIPT=$DEBOOTSTRAP_DIR/suite-script
 else
-  if [ "$1" = "" ]; then
+  if [ -z "$1" ]; then
     usage_err 1 NEEDSUITETARGET "You must specify a suite and a target."
   fi
   SUITE="$1"
 
-  if [ "$2" = "" ] && am_doing_phase dldebs first_stage second_stage; then
+  if [ -z "$2" ] && am_doing_phase dldebs first_stage second_stage; then
     usage_err 1 NEEDSUITETARGET "You must specify a suite and a target."
   fi
   TARGET="$2" # bug here (cont'd): if $2 is not given, $TARGET defaults to `pwd`
@@ -285,7 +285,7 @@ else
     SCRIPT="${SCRIPT}.${VARIANT}"
     SUPPORTED_VARIANTS="$VARIANT"
   fi
-  if [ "$3" != "" ]; then
+  if [ ! -z "$3" ]; then
     MIRRORS="$3"
     MIRRORS="${MIRRORS%/}"
     if [ "$4" != "" ]; then

@@ -259,7 +259,7 @@ if [ "$SECOND_STAGE_ONLY" = "true" ]; then
   MIRRORS=null:
   SCRIPT=$DEBOOTSTRAP_DIR/suite-script
 else
-  if [ "$1" = "" ] || [ "$2" = "" ]; then # fix here: $2 __must__ be specified by the user
+  if [ -z "$1" ] || [ -z "$2" ]; then # fix here: $2 __must__ be specified by the user
     usage_err 1 NEEDSUITETARGET "You must specify a suite and a target."
   fi
   SUITE="$1"
