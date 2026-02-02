@@ -288,8 +288,8 @@ def run_solver(traces: list[Trace], config: InterpConfig, stop: threading.Event 
                 model_to_reports(core, solver, config, assertion_formula, state_formula, refinements,
                                  debugger if config.debug_instrumentation else None)
             else:
-                model = solver.model()
-                logging.debug("SAT model: %s", model)
+                model = solver.model() if result == z3.sat else None
+                logging.debug("{z3.result}, model: %s", model)
                 if config.debug_instrumentation:
                     log_assertion_result(
                         assertion=assertion,

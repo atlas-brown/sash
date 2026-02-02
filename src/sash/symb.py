@@ -1591,9 +1591,9 @@ def interp_node(traces: Traces,
                     def not_safe_path(op: Field) -> Constraint:
                         return And.from_iter(Not(StringEq(op, Field.create_constant(p, 1))) for p in safe_paths)
 
-                    if assertion_constraint:
-                        assertion_constraint = SimpleConstraint(And.from_field_iter(redir_args, lambda op: Implies(not_safe_path(op), IsRead(op) | IsDeleted(op))),
+                    assertion_constraint = SimpleConstraint(And.from_field_iter(redir_args, lambda op: Implies(not_safe_path(op), IsRead(op) | IsDeleted(op))),
                                                             lambda line: reporter.DataLoss(node.pretty(), redir_args, line))
+                    if assertion_constraint:
                         t_precond = t.extend(t.latest_state.add_assertion(
                             assertion_constraint,
                             source_str=node.pretty(),
