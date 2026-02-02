@@ -43,13 +43,36 @@ class SetOptions:
     def relevant(cls, option: str) -> bool:
         return option.strip("-") not in {"x"}
 
+@dataclass(frozen=True)
+class RefineableConstraint:
+    full: Constraint
+    refinements: tuple[tuple[Constraint,
+                             Callable[[int], 'reporter.Issue']],
+                       ...]
+
+    def __post_init__(self):
+        assert self.full, "empty RefineableConstraints should not be constructed"
+        assert len(self.refinements) >= 1, "must have at least one issue"
+        match self.refinements:
+            case [(c, _)]:
+                assert c == Empty(), "single refinement constraint must be empty"
+
+def SimpleConstraint(c: Constraint, issue_maker: Callable[[int], 'reporter.Issue']) -> RefineableConstraint | None:
+    if not c:
+        return None
+    else:
+        return RefineableConstraint(c, ((Empty(), issue_maker),))
+
 # <assertion_constraint>: if true, then things are OK, if false then there's a bug
 @dataclass(frozen=True)
 class Assertion:
     producing_state: "State"
-    constraint: Constraint
+    constraint: RefineableConstraint
     source_str: str
     source_line: int
+
+    def __post_init__(self):
+        assert isinstance(self.constraint, RefineableConstraint), "Assertion constructed with non-RefineableConstraint"
 
     # exclude the state from repr to avoid large prints
     def __repr__(self):
@@ -57,8 +80,13 @@ class Assertion:
 
 @dataclass(frozen=True)
 class Condition(Assertion):
+    constraint: Constraint
+
     def __repr__(self):
         return f"Condition(state<{hash(self.producing_state)}>, constraint={repr(self.constraint)}, source_str={repr(self.source_str)}, source_line={self.source_line})"
+
+    def __post_init__(self):
+        pass # since constraint is just `Constraint`, no need for this
 
 
 class Confidence(Enum):
@@ -106,7 +134,8 @@ class State:
         new_pathcond = self.pathcond + (Condition(self, cond, source_str, source_line),)
         return replace(self, pathcond=new_pathcond)
 
-    def add_assertion(self, assertion_constraint: Constraint, source_str: str | None = None, source_line: int | None = None) -> 'State':
+    def add_assertion(self, assertion_constraint: RefineableConstraint, source_str: str | None = None, source_line: int | None = None) -> 'State':
+        assert isinstance(assertion_constraint, RefineableConstraint), f"Got non-RC assertion: {type(assertion_constraint)} : {assertion_constraint}"
         if assertion_constraint == Empty():
             logging.debug("Skipping empty assertion from %s at line %s", source_str, source_line)
             return self
@@ -169,8 +198,8 @@ class State:
     def remove_existing_command(self, name: str) -> 'State':
         return replace(self, known_existing_commands=self.known_existing_commands - {name})
 
-    def update_known_commands(self, spec: Constraint) -> 'State':
-        norm_spec = spec.normalized() # turns ~(a & b) into (~a | ~b), removes double negations, etc.
+    def update_known_commands(self, constraint: Constraint) -> 'State':
+        norm_spec = constraint.normalized() # turns ~(a & b) into (~a | ~b), removes double negations, etc.
         if isinstance(norm_spec, NormalizedConstraint):
             norm_spec = norm_spec.constraint
 

@@ -33,6 +33,8 @@ from sash.symbolic.strings import (
     SymVar,
     WordCount,
 )
+from sash.symbolic.state import RefineableConstraint, SimpleConstraint
+import sash.reporter as reporter
 
 
 @dataclass(frozen=True)
@@ -47,11 +49,10 @@ class CmdInvocation:
         flag_str = " ".join(self.flags)
         return f"{self.cmd_name} {flag_str} {arg_str}"
 
-
 @dataclass(frozen=True)
 class CmdSpec:
-    check: Constraint # condition to check before executing the command to detect possible bugs
-    success_postcond: Constraint # post-condition if exit code is 0
+    check: RefineableConstraint | None # conditions to check before executing the command to detect possible bugs
+    success_postcond: Constraint | tuple[Constraint, Constraint] # post-condition if exit code is 0; if pair, it's info about state before exec, and info about state after exec
     failure_postcond: Constraint # post-condition if exit code is non-0
     io: IOType = IOType.UNKNOWN # whether the command does IO on stdin/stdout
     min_operands: int = 0 # minimum number of operands required for command to succeed (for guarding against commands that can only fail)
@@ -204,7 +205,7 @@ def alias_spec(cmd: CmdInvocation) -> CmdSpec:
         log_crit_unhandled_inv(cmd)
         return handle_non_posix(cmd)
 
-    return CmdSpec(Empty(), succ, Empty(), io)
+    return CmdSpec(None, succ, Empty(), io)
 
 
 def cd_spec(cmd: CmdInvocation) -> CmdSpec:
@@ -235,23 +236,23 @@ def cd_spec(cmd: CmdInvocation) -> CmdSpec:
                  WordCount(0, inf))
 
     if flags == set() and len(operands) == 0: # cd
-        assertion    = IsDir(home_var)
+        assertion    = SimpleConstraint(IsDir(home_var), lambda line: reporter.ExpectedPathState("cd", 'directory', (home_var,), line))
         succ         = IsDir(home_var) & StringEq(pwd_var, home_var) & IsDir(pwd_var)
         succ_no_impl = succ
     elif flags == set() and len(operands) == 1 and operands[0].try_to_str() == "-": # cd -
-        assertion    = IsDir(oldpwd_var)
+        assertion    = SimpleConstraint(IsDir(oldpwd_var), lambda line: reporter.ExpectedPathState("cd", 'directory', (oldpwd_var,), line))
         succ         = IsDir(pwd_var)
         succ_no_impl = succ
         io = IOType.add_stdout(io)
     elif flags == set() and len(operands) == 1: # cd dir
         d = operands[0]
-        assertion    = IsDir(d)
+        assertion    = SimpleConstraint(IsDir(d), lambda line: reporter.ExpectedPathState("cd", 'directory', (d,), line))
         succ         = IsDir(d) & StringEq(pwd_var, d) & IsDir(pwd_var)
         succ_no_impl = succ
     else:
         log_crit_unhandled_inv(cmd)
 
-        assertion    = Empty()
+        assertion    = None
         succ         = IsDir(pwd_var)
         succ_no_impl = succ
 
@@ -284,28 +285,39 @@ def cp_spec(cmd: CmdInvocation) -> CmdSpec:
 
     if len(operands) < 2:
         logging.error("cp command with less than 2 operands is invalid; treating as no-op")
-        return CmdSpec(Empty(), Empty(), Empty(), IOType.UNKNOWN)
+        return CmdSpec(None, Empty(), Empty(), IOType.UNKNOWN)
 
     srcs, dst = operands[:-1], operands[-1]
     if len(operands) > 2 or is_definitely_dir(dst) or any(will_definitely_expand(op) for op in srcs):
         # Copying to a directory
         if "-R" not in flags:
-            assertion    = IsDir(dst) & And.from_field_iter(srcs, IsFile)
+            assertion    = RefineableConstraint(IsDir(dst) & And.from_field_iter(srcs, IsFile),
+                                                ((IsDir(dst), lambda line: reporter.ExpectedPathState("cp", 'directory', (dst,), line)),
+                                                 (And.from_field_iter(srcs, IsFile), lambda line: reporter.ExpectedPathState("cp", 'files', tuple(srcs), line))))
             succ         = IsDir(dst) & And.from_field_iter(srcs, IsRead)
             succ_no_impl = succ
         else:
-            assertion    = IsDir(dst) & And.from_field_iter(srcs, lambda op: ~IsDeleted(op))
+            assertion    = RefineableConstraint(IsDir(dst) & And.from_field_iter(srcs, lambda op: ~IsDeleted(op)),
+                                                ((IsDir(dst), lambda line: reporter.ExpectedPathState("cp", 'directory', (dst,), line)),
+                                                 (And.from_field_iter(srcs, lambda op: ~IsDeleted(op)), lambda line: reporter.ExpectedPathState("cp", 'existant', tuple(srcs), line))))
             succ         = IsDir(dst) & And.from_field_iter(srcs, lambda op: IsFile(op) >> IsRead(op))
             succ_no_impl = IsDir(dst) & And.from_field_iter(srcs, lambda op: IsRead(op) | IsDir(op))
     else:
         # Copying to a file or directory or nothing
         if "-R" not in flags:
-            assertion    = (IsRead(dst) | ~IsFile(dst)) & IsFile(srcs[0])
+            # assertion    = (IsRead(dst) | ~IsFile(dst)) & IsFile(srcs[0])
+            assertion    = RefineableConstraint((IsRead(dst) | ~IsFile(dst)) & IsFile(srcs[0]),
+                                                ((IsFile(dst) >> IsRead(dst), lambda line: reporter.DataLoss("cp", (dst,), line)),
+                                                 (IsFile(srcs[0]), lambda line: reporter.ExpectedPathState("cp", 'file', (srcs[0],), line))))
             succ         = (((IsRead(dst) | IsDeleted(dst)) >> IsFile(dst))) & IsRead(srcs[0])
             succ_no_impl = (IsDir(dst) | IsFile(dst)) & IsRead(srcs[0])
         else:
-            assertion    = ((IsRead(dst) | ~IsFile(dst)) & IsFile(srcs[0])) | \
-                           (~IsFile(dst) & IsDir(srcs[0]))
+            # assertion    = ((IsRead(dst) | ~IsFile(dst)) & IsFile(srcs[0])) | (~IsFile(dst) & IsDir(srcs[0]))
+            assertion    = RefineableConstraint(((IsRead(dst) | ~IsFile(dst)) & IsFile(srcs[0])) | \
+                                                (~IsFile(dst) & IsDir(srcs[0])),
+                                                ((IsFile(dst) >> IsRead(dst), lambda line: reporter.DataLoss("cp", (dst,), line)),
+                                                 (IsFile(srcs[0]) | IsDir(srcs[0]), lambda line: reporter.ExpectedPathState("cp", 'file or directory', (srcs[0],), line)),
+                                                 (IsDir(srcs[0]) >> ~IsFile(dst), lambda line: reporter.ExpectedPathState("cp", f'not a file (because {srcs[0]} must be a directory)', (dst,), line))))
             succ         = (IsFile(srcs[0]) >> IsRead(srcs[0])) & \
                            (IsRead(dst) >> IsFile(dst)) & \
                            (IsDeleted(dst) >> \
@@ -334,7 +346,7 @@ def echo_spec(cmd: CmdInvocation) -> CmdSpec:
     # z-postcond:   none
     # nz-postcond:  none
 
-    return CmdSpec(Empty(), Empty(), Empty(), io)
+    return CmdSpec(None, Empty(), Empty(), io)
 
 
 def grep_spec(cmd: CmdInvocation) -> CmdSpec:
@@ -346,21 +358,22 @@ def grep_spec(cmd: CmdInvocation) -> CmdSpec:
     assert name == SymStr(("grep",)), f"Expected grep command, got: {name}"
 
     if flags == set() and len(operands) == 1: # grep pattern
-        check = Empty()
+        check = None
         success_postcond = Empty()
         failure_postcond = Empty()
         io = IOType.add_stdin(io)
 
     elif flags == set() and len(operands) >= 1: # grep pattern file...
         files = operands[1:]
-        check = And.from_field_iter(files, IsFile)
+        check = SimpleConstraint(And.from_field_iter(files, IsFile),
+                                 lambda line: reporter.ExpectedPathState("grep", 'file', tuple(files), line))
         success_postcond = And.from_field_iter(files, IsRead)
         failure_postcond = Empty()
 
     else:
         log_crit_unhandled_inv(cmd)
 
-        check = Empty()
+        check = None
         success_postcond = Empty()
         failure_postcond = Empty()
         io = IOType.UNKNOWN
@@ -384,10 +397,12 @@ def mkdir_spec(cmd: CmdInvocation) -> CmdSpec:
     flags.discard("-v")
 
     if flags == set(["-p"]):
-        assertion = And.from_field_iter(operands, lambda op: ~IsFile(op))
+        assertion = SimpleConstraint(And.from_field_iter(operands, lambda op: ~IsFile(op)),
+                                     lambda line: reporter.ExpectedPathState("mkdir", 'non-files', tuple(operands), line))
 
     elif flags == set():
-        assertion = And.from_field_iter(operands, lambda op: ~(IsFile(op) | IsDir(op)))
+        assertion = SimpleConstraint(And.from_field_iter(operands, lambda op: ~(IsFile(op) | IsDir(op))),
+                                     lambda line: reporter.ExpectedPathState("mkdir", 'non-existant', tuple(operands), line))
 
     else:
         return handle_non_posix(cmd)
@@ -425,7 +440,7 @@ def sudo_spec(cmd: CmdInvocation) -> CmdSpec | None:
         return get_spec(operands[0].content.parts[0], tuple(operands))
     else:
         logging.critical("Got non-str command name in sudo:%s\n%s", cmd, cmd)
-        return CmdSpec(Empty(), Empty(), Empty())
+        return CmdSpec(None, Empty(), Empty())
 
 
 def test_spec(cmd: CmdInvocation) -> CmdSpec:
@@ -451,15 +466,15 @@ def touch_spec(cmd: CmdInvocation) -> CmdSpec:
     flags.discard("-t") # -t changes time to a specific time, which we do not model
 
     if flags == set(): # touch file...
-        assertion    = Empty()
-        # Touch creates the file if it does not exist (all files are unread upon creation)
-        succ         = And.from_field_iter(operands, IsFile)
+        # NOTE: Touch does not create unread files since they are empty upon creation
+        assertion    = None
+        succ         = And.from_field_iter(operands, IsRead)
         succ_no_impl = succ
 
     elif flags == set(["-c"]): # touch -c file...
         # -c tells touch to not create files if they do not exist, turning it essentially into a no-op for us
 
-        assertion    = Empty()
+        assertion    = None
         succ         = Empty()
         succ_no_impl = succ
 
@@ -478,13 +493,14 @@ def cat_spec(cmd: CmdInvocation) -> CmdSpec:
     assert name == SymStr(("cat",)), f"Expected cat command, got: {name}"
 
     if flags == set(): # cat file...
-        check            = And.from_field_iter(operands, IsFile)
+        assertion        = SimpleConstraint(And.from_field_iter(operands, IsFile),
+                                            lambda line: reporter.ExpectedPathState("cat", 'files', tuple(operands), line))
         success_postcond = And.from_field_iter(operands, IsRead)
 
     else:
         return handle_non_posix(cmd)
 
-    return CmdSpec(check, success_postcond, Empty(), io)
+    return CmdSpec(assertion, success_postcond, Empty(), io)
 
 
 def file_spec(cmd: CmdInvocation) -> CmdSpec:
@@ -497,7 +513,8 @@ def file_spec(cmd: CmdInvocation) -> CmdSpec:
     assert name == SymStr(("file",)), f"Expected file command, got: {name}"
 
     if flags == set(): # file file...
-        check            = And.from_field_iter(operands, IsFile)
+        check            = SimpleConstraint(And.from_field_iter(operands, IsFile),
+                                            lambda line: reporter.ExpectedPathState("file", 'files', tuple(operands), line))
         success_postcond = And.from_field_iter(operands, IsFile)
 
     else:
@@ -563,7 +580,7 @@ def handle_non_posix(cmd: CmdInvocation) -> CmdSpec:
     logging.critical("Unsupported inv:\n%s", json.dumps(cmd_json, indent=2, default=str))
 
     #logging.warning("Non-POSIX '%s' handling is not supported; treating as no-op", cmd_name)
-    return CmdSpec(Empty(), Empty(), Empty(), IOType.UNKNOWN) # no-op spec
+    return CmdSpec(None, Empty(), Empty(), IOType.UNKNOWN) # no-op spec
 
 
 class Cmd(ABC):
@@ -604,7 +621,7 @@ class Cmd(ABC):
 
         logging.debug("Unhandled invocation for command '%s':\n%s; treating as no-op",
                          cmd.cmd_name, json.dumps(cmd_json, indent=2, default=str))
-        return CmdSpec(Empty(), Empty(), Empty(), IOType.UNKNOWN)
+        return CmdSpec(None, Empty(), Empty(), IOType.UNKNOWN)
 
     @classmethod
     @abstractmethod
@@ -629,7 +646,7 @@ class Command(Cmd):
         assert name == SymStr((cls.name,)), f"Expected command command, got: {cmd}"
         assert len(flags) == 0 and len(options) == 0, f"The current parsing function does not produce flags/options for {cls.name}; something changed?"
 
-        check = Empty()
+        check = None
         success_postcond = Empty()
         failure_postcond = Empty()
         io = IOType.NONE
@@ -712,7 +729,7 @@ class Mv(Cmd):
 
         if len(operands) < (2 if "-t" not in options else 1):
             logging.error("mv command with less than 2 operands is invalid; treating as no-op")
-            return CmdSpec(Empty(), Empty(), Empty(), IOType.UNKNOWN)
+            return CmdSpec(None, Empty(), Empty(), IOType.UNKNOWN)
 
         if "-t" in options:
             srcs, dst = operands, options["-t"]
@@ -727,19 +744,41 @@ class Mv(Cmd):
             for src in srcs:
                 match src:
                     case Field(SymStr(parts), wc) if len(parts) >= 1 and isinstance(parts[-1], str) and parts[-1].endswith("/*"):
-                        trimmed = Field_trimR(replace(src, count=WordCount(1 ,1)), "*")
+                        trimmed = Field_trimR(replace(src, count=WordCount(1, 1)), "*")
                         glob_srcs.append(trimmed)
                     case _:
                         other_srcs.append(src)
 
-            assertion    = IsDir(dst) & And.from_field_iter(other_srcs, lambda src: ~IsDeleted(src)) & And.from_field_iter(glob_srcs, IsDir)
-            succ         = IsDir(dst) & And.from_field_iter(other_srcs, IsDeleted)
+            # assertion    = IsDir(dst) \
+            #              & And.from_field_iter(other_srcs, lambda src: ~IsDeleted(src)) \
+            #              & And.from_field_iter(glob_srcs, IsDir)
+            assertion    = RefineableConstraint(IsDir(dst) \
+                                                & And.from_field_iter(other_srcs, lambda src: ~IsDeleted(src)) \
+                                                & And.from_field_iter(glob_srcs, IsDir),
+                                                ((IsDir(dst) & And.from_field_iter(glob_srcs, IsDir),
+                                                  lambda line: reporter.ExpectedPathState('mv', 'directories', tuple([dst] + glob_srcs), line)),
+                                                 (And.from_field_iter(other_srcs, lambda src: ~IsDeleted(src)),
+                                                  lambda line: reporter.ExpectedPathState('mv', 'existant', tuple(other_srcs), line))))
+            succ         = IsDir(dst) \
+                         & And.from_field_iter(other_srcs, IsDeleted)
             succ_no_impl = succ
         else:
             # Moving to a file or directory
             # assertion = ( IsRead(dst) | ~IsFile(dst) ) & ~IsDeleted(srcs[0])
-            assertion = ~IsDeleted(srcs[0]) & (IsRead(dst) | IsDir(dst))
-            succ = IsDeleted(srcs[0]) & (IsFile(srcs[0]) >> IsFile(dst)) & (IsDir(srcs[0]) >> IsDir(dst))
+            # assertion = ~IsDeleted(srcs[0]) & (IsRead(dst) | IsDir(dst))
+            assertion = ((And.from_field_iter(srcs, lambda src: ~IsDeleted(src)),
+                          lambda line: reporter.ExpectedPathState('mv', 'existant', tuple(srcs), line)),)
+            if len(srcs) > 1:
+                assertion = assertion + ((IsDir(dst), lambda line: reporter.ExpectedPathState('mv', 'directory', (dst,), line)),)
+            else:
+                assertion = assertion + (((IsFile(dst) >> IsFile(srcs[0])),
+                                          lambda line: reporter.ExpectedPathState('mv', 'file (because destination is a file)', (srcs[0],), line)),
+                                         ((IsFile(dst) >> IsRead(dst)) & (~IsFile(dst) >> IsDir(dst)),
+                                          lambda line: reporter.DataLoss('mv', (dst,), line)),)
+            assertion = RefineableConstraint(And.from_field_iter(srcs, lambda src: ~IsDeleted(src)) & (IsRead(dst) | IsDir(dst)) & (IsFile(dst) >> IsFile(srcs[0])),
+                                             assertion)
+            succ = (And.from_field_iter(srcs, lambda src: ~IsDeleted(src)) & (IsFile(dst) >> IsFile(srcs[0])),
+                    IsDeleted(srcs[0]) & ((IsFile(srcs[0]) & ~IsDir(dst)) >> IsFile(dst)) & (IsDir(srcs[0]) >> IsDir(dst)))
             # succ         = IsDeleted(srcs[0]) & \
             #                (IsDeleted(dst) >> \
             #                    (IsFile(srcs[0]) >> IsFile(dst)) & \
@@ -771,10 +810,21 @@ class Rm(Cmd):
         recursive = any(f in flags for f in ("-d", "-r", "-R")) # -R is equivalent to -r
                                                                 # -d allows deletion of empty directories (we don't model emptiness, so we overapproximate)
 
-        if recursive:
-            assertion = And.from_field_iter(operands, lambda op: IsRead(op) | IsDir(op))
+        if recursive and operands:
+            # And.from_field_iter(operands, lambda op: IsRead(op) | IsDir(op)),
+            assertion = RefineableConstraint(And.from_field_iter(operands, lambda op: IsRead(op) | IsDir(op)),
+                                             ((And.from_field_iter(operands, lambda op: IsFile(op) >> IsRead(op)),
+                                               lambda line: reporter.DataLoss('rm', operands, line)),
+                                              (And.from_field_iter(operands, lambda op: ~IsFile(op) >> IsDir(op)),
+                                               lambda line: reporter.ExpectedPathState('rm', 'existant', tuple(operands), line))))
+        elif operands:
+            assertion = RefineableConstraint(And.from_field_iter(operands, IsRead),
+                                             ((And.from_field_iter(operands, IsFile),
+                                               lambda line: reporter.ExpectedPathState('rm', 'existant', tuple(operands), line)),
+                                              (And.from_field_iter(operands, IsRead),
+                                               lambda line: reporter.DataLoss('rm', operands, line))))
         else:
-            assertion = And.from_field_iter(operands, IsRead)
+            assertion = None
 
         succ         = And.from_field_iter(operands, IsDeleted)
         succ_no_impl = succ
@@ -800,7 +850,7 @@ class Test(Cmd):
         assert name == SymStr((cls.name,)) or name == SymStr(("[",)), f"Expected test command, got: {cmd}"
         assert len(flags) == 0 and len(options) == 0, f"The current parsing function does not produce flags/options for {cls.name}; something changed?"
 
-        check = Empty()
+        check = None
         succ = None
         fail = None
         io = IOType.NONE
@@ -913,7 +963,7 @@ class Env(Cmd):
         assert name == SymStr((cls.name,)), f"Expected env command, got: {name}"
         assert len(flags) == 0 and len(options) == 0, f"The current parsing function does not produce flags/options for env; something changed?"
 
-        check = Empty()
+        check = None
         success_postcond = Empty()
         failure_postcond = Empty()
         io = IOType.NONE
@@ -972,7 +1022,7 @@ class Mktemp(Cmd):
         assert len(options) == 0, f"Expected no options for mktemp, got: {cmd}"
 
         io = IOType.STDOUT_DIR if "-d" in flags else IOType.STDOUT_FILE
-        return CmdSpec(Empty(), Empty(), Empty(), io)
+        return CmdSpec(None, Empty(), Empty(), io)
 
 
 def is_definitely_dir(field: Field) -> bool:

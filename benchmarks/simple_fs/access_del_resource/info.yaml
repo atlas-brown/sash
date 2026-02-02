@@ -9,8 +9,7 @@ ground_truth:
   errors:
   - line: 9
     line_in_fixed: 9
-    #code: access_del_resource
-    code: unsat_precond
+    code: cmd_expected_path_state
     shellcheck:
       detects: false
       fixed_false_positive: false

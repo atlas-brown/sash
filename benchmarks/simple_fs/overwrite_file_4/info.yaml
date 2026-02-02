@@ -11,15 +11,13 @@ ground_truth:
   errors:
   - line: 7
     line_in_fixed: 7
-    #code: file_overwrite
-    code: unsat_precond
+    code: data_loss
     shellcheck:
       detects: false
       fixed_false_positive: false
   - line: 8
     line_in_fixed: 8
-    #code: file_overwrite
-    code: unsat_precond
+    code: data_loss
     shellcheck:
       detects: false
       fixed_false_positive: false

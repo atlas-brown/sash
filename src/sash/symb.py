@@ -137,10 +137,13 @@ def handle_commandnode(traces: Traces,
                     if not has_sufficient_operands:
                         assert isinstance(cmd_name, str), "cmd_name should be str when a spec is found"
                         Reporter.add_issue(reporter.CommandCanOnlyFail(cmd_name, context_line), config)
-                t_precond = trace_map(t1, lambda s: s.add_assertion(spec.check, source_str=node.pretty(), source_line=context_line).update_known_commands(spec.check))
-                if config.debug_instrumentation:
-                    for trace in t1:
-                        DebugLogger.log_assertion(spec.check, trace.latest_state, context_line, config.current_pass)
+                if spec.check:
+                    t_precond = trace_map(t1, lambda s: s.add_assertion(spec.check, source_str=node.pretty(), source_line=context_line))
+                    if config.debug_instrumentation:
+                        for trace in t1:
+                            DebugLogger.log_assertion(spec.check, trace.latest_state, context_line, config.current_pass)
+                else:
+                    t_precond = t1
 
                 def pathcond_contradicts(state: State, new_cond: Constraint) -> bool:
                     if new_cond == Empty():
@@ -154,11 +157,13 @@ def handle_commandnode(traces: Traces,
                             return True
                     return False
 
-                t_success_precond = [t for t in t_precond if not pathcond_contradicts(t.latest_state, spec.success_postcond)]
+                knowledge_before_exec, knowledge_after_exec = spec.success_postcond if isinstance(spec.success_postcond, tuple) else (Empty(), spec.success_postcond)
+                t_success_precond = [t for t in t_precond if not pathcond_contradicts(t.latest_state, knowledge_after_exec)]
                 t_success = trace_map(t_success_precond,
-                                      lambda s: s.update_fs(spec.success_postcond)\
-                                                 .add_pathcond(spec.success_postcond)\
-                                                 .update_known_commands(spec.success_postcond)\
+                                      lambda s: s.add_pathcond(knowledge_before_exec)\
+                                                 .update_fs(knowledge_after_exec)\
+                                                 .add_pathcond(knowledge_after_exec)\
+                                                 .update_known_commands(knowledge_after_exec)\
                                                  .set_last_exit_code(SymStr(("0",)),
                                                                      Confidence.DEFINITE if s.opts.is_set(SetOptions.NOFAIL) and not config.in_checked_position else Confidence.SPECULATIVE,
                                                                      spec.failure_postcond))
@@ -248,9 +253,10 @@ def handle_rm(expanded_args: tuple[Field, ...], trace: Trace, node: AST.CommandN
 
     assert spec is not None, "Expected rm spec to always be found"
 
-    logging.debug("Adding rm precondition: %s", spec.check)
-    DebugLogger.log_assertion(spec.check, trace.latest_state, context_line, config.current_pass)
-    trace = trace.extend(lambda s: s.add_assertion(spec.check, source_str=node.pretty(), source_line=context_line))
+    if spec.check:
+        logging.debug("Adding rm precondition: %s", spec.check)
+        DebugLogger.log_assertion(spec.check, trace.latest_state, context_line, config.current_pass)
+        trace = trace.extend(lambda s: s.add_assertion(spec.check, source_str=node.pretty(), source_line=context_line))
 
     # TODO: These helper functions are repeated in the expansion routine, consider refactoring them out into utils
     def field_core_key(field: Field) -> CompletelyArbitrary | None:
@@ -302,16 +308,18 @@ def handle_rm(expanded_args: tuple[Field, ...], trace: Trace, node: AST.CommandN
     def is_protected(path):
         return any(path in [p, p + "/", p + "/*"] for p in Config.get("PROTECTED_PATHS"))
 
+    pwdval = trace.latest_state.lookup("PWD")
+    assert pwdval is not None, "PWD should always be defined"
+    trace = trace.extend(lambda s: s.add_assertion(SimpleConstraint(And.from_field_iter(expanded_args[1:],
+                                                                                        lambda arg_field: Not(StringEq(arg_field, pwdval.value))),
+                                                                    lambda line: reporter.DeleteSystemFile("PWD", line)),
+                                                   node.pretty(),
+                                                   context_line))
+
     for arg_idx, arg_field in enumerate(expanded_args[1:], start=1):
         definitely_non_empty = is_definitely_non_empty(arg_field)
         if (path := arg_field.try_to_str()) and is_protected(path):
             Reporter.add_issue(reporter.DeleteSystemFile(path, context_line), config)
-
-        pwdval = trace.latest_state.lookup("PWD")
-        assert pwdval is not None, "PWD should always be defined"
-        trace = trace.extend(lambda s: s.add_assertion(Not(StringEq(arg_field, pwdval.value)),
-                                                       node.pretty(),
-                                                       context_line))
 
         def maybe_report_protected_split(content: CompletelyArbitrary, max_words: int | float) -> None:
             if content.maybe_empty and content.quoted and not definitely_non_empty:
@@ -1583,34 +1591,50 @@ def interp_node(traces: Traces,
                     def not_safe_path(op: Field) -> Constraint:
                         return And.from_iter(Not(StringEq(op, Field.create_constant(p, 1))) for p in safe_paths)
 
-                    assertion_constraint = And.from_field_iter(redir_args, lambda op: Implies(not_safe_path(op), IsRead(op) | IsDeleted(op)))
-                    t_precond = t.extend(t.latest_state.add_assertion(
-                        assertion_constraint,
-                        source_str=node.pretty(),
-                        source_line=context_line
-                    ))
-                    DebugLogger.log_assertion(assertion_constraint, t.latest_state, context_line, config.current_pass)
+                    if assertion_constraint:
+                        assertion_constraint = SimpleConstraint(And.from_field_iter(redir_args, lambda op: Implies(not_safe_path(op), IsRead(op) | IsDeleted(op))),
+                                                            lambda line: reporter.DataLoss(node.pretty(), redir_args, line))
+                        t_precond = t.extend(t.latest_state.add_assertion(
+                            assertion_constraint,
+                            source_str=node.pretty(),
+                            source_line=context_line
+                        ))
+                        DebugLogger.log_assertion(assertion_constraint, t.latest_state, context_line, config.current_pass)
+                    else:
+                        t_precond = t
                     t_postcond = t_precond.extend(t_precond.latest_state.update_fs(And.from_field_iter(redir_args, IsFile)))
 
                 elif node.redir_type == "Append": # >>
                     # NOTE: asserting IsFile also implicitly asserts that the file is *unread*
-                    assertion_constraint = And.from_field_iter(redir_args, lambda op: ~IsDir(op))
-                    t_precond = t.extend(t.latest_state.add_assertion(assertion_constraint, source_str=node.pretty(), source_line=context_line))
-                    DebugLogger.log_assertion(assertion_constraint, t.latest_state, context_line, config.current_pass)
+                    assertion_constraint = SimpleConstraint(And.from_field_iter(redir_args, lambda op: ~IsDir(op)),
+                                                            lambda line: reporter.ExpectedPathState(node.pretty(), 'non-directories', redir_args, line))
+                    if assertion_constraint:
+                        t_precond = t.extend(t.latest_state.add_assertion(assertion_constraint, source_str=node.pretty(), source_line=context_line))
+                        DebugLogger.log_assertion(assertion_constraint, t.latest_state, context_line, config.current_pass)
+                    else:
+                        t_precond = t
                     t_postcond = t_precond.extend(t_precond.latest_state.update_fs(And.from_field_iter(redir_args, IsFile)))
 
                 elif node.redir_type == "From": # <
                     # The targets of the redirection were read from
-                    assertion_constraint = And.from_field_iter(redir_args, IsFile)
-                    t_precond = t.extend(t.latest_state.add_assertion(assertion_constraint, source_str=node.pretty(), source_line=context_line))
-                    DebugLogger.log_assertion(assertion_constraint, t.latest_state, context_line, config.current_pass)
+                    assertion_constraint = SimpleConstraint(And.from_field_iter(redir_args, IsFile),
+                                                            lambda line: reporter.ExpectedPathState(node.pretty(), 'files', redir_args, line))
+                    if assertion_constraint:
+                        t_precond = t.extend(t.latest_state.add_assertion(assertion_constraint, source_str=node.pretty(), source_line=context_line))
+                        DebugLogger.log_assertion(assertion_constraint, t.latest_state, context_line, config.current_pass)
+                    else:
+                        t_precond = t
                     t_postcond = t_precond.extend(t_precond.latest_state.update_fs(And.from_field_iter(redir_args, IsRead)))
 
                 elif node.redir_type == "FromTo":
                     # Conservatively assume the file is opened for reading
-                    assertion_constraint = And.from_field_iter(redir_args, lambda op: ~IsDir(op))
-                    t_precond = t.extend(t.latest_state.add_assertion(assertion_constraint, source_str=node.pretty(), source_line=context_line))
-                    DebugLogger.log_assertion(assertion_constraint, t.latest_state, context_line, config.current_pass)
+                    assertion_constraint = SimpleConstraint(And.from_field_iter(redir_args, lambda op: ~IsDir(op)),
+                                                            lambda line: reporter.ExpectedPathState(node.pretty(), 'non-directories', redir_args, line))
+                    if assertion_constraint:
+                        t_precond = t.extend(t.latest_state.add_assertion(assertion_constraint, source_str=node.pretty(), source_line=context_line))
+                        DebugLogger.log_assertion(assertion_constraint, t.latest_state, context_line, config.current_pass)
+                    else:
+                        t_precond = t
                     t_postcond = t_precond.extend(t_precond.latest_state.update_fs(And.from_field_iter(redir_args, IsRead)))
 
                 else:
@@ -1880,32 +1904,32 @@ def symbexec_file(input_file: str,
             symb_engine(nodes, replace(config,
                                        branch_policy=branch_policy_only_then,
                                        current_pass="conds:then",
-                                       current_pass_condition=Description("all then branches are taken")))
+                                       current_pass_condition=Description("(DFS) all then branches are taken")))
             logging.info("DFS run: only taking ELSE branches")
             symb_engine(nodes, replace(config,
                                        branch_policy=branch_policy_only_else,
                                        current_pass="conds:else",
-                                       current_pass_condition=Description("all else branches are taken")))
+                                       current_pass_condition=Description("(DFS) all else branches are taken")))
             issues_so_far = Reporter._issues.copy()
             logging.info("DFS run: only taking THEN branches with unbound variables as empty strings")
             symb_engine(nodes, replace(config,
                                        branch_policy=branch_policy_only_then,
                                        unbound_policy=UnboundVariablePolicy.EMPTY,
                                        current_pass="unbound:empty+conds:then",
-                                       current_pass_condition=And(Description("all then branches are taken"),
-                                                                  Description("unbound variables are empty"))))
+                                       current_pass_condition=And(Description("(DFS) all then branches are taken"),
+                                                                  Description("(DFS) unbound variables are empty"))))
             logging.info("DFS run: only taking ELSE branches with unbound variables as empty strings")
             symb_engine(nodes, replace(config,
                                        branch_policy=branch_policy_only_else,
                                        unbound_policy=UnboundVariablePolicy.EMPTY,
                                        current_pass="unbound:empty+conds:else",
-                                       current_pass_condition=And(Description("all else branches are taken"),
-                                                                  Description("unbound variables are empty"))))
+                                       current_pass_condition=And(Description("(DFS) all else branches are taken"),
+                                                                  Description("(DFS) unbound variables are empty"))))
             logging.info("DFS run: treating unbound variables solely as empty strings")
             symb_engine(nodes, replace(config,
                                        unbound_policy=UnboundVariablePolicy.EMPTY,
                                        current_pass="unbound:empty",
-                                       current_pass_condition=Description("unbound variables are empty")))
+                                       current_pass_condition=Description("(DFS) unbound variables are empty")))
             Reporter.drop_issues({reporter.Code.DELETE_SYSTEM_FILE, reporter.Code.CONSTANT_CONDITION})
             Reporter._issues = Reporter._issues | issues_so_far # this dance ensures that any del_sys_files found before the last run are kept
             # logging.info("DFS run: exploring the first trace only")

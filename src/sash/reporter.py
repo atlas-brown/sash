@@ -31,7 +31,6 @@ class Code(Enum):
     EMPTY_VAR = "empty_var"
     IGNORED_COMMAND_RESULT = "ignored_cmd_result"
     NOT_A_COMMAND = "not_a_command"
-    UNSATISFIED_PRECONDITION = "unsat_precond"
     UNEXPECTED_STDIN = "unexpected_stdin"
     COMMAND_CAN_ONLY_FAIL = "command_can_only_fail"
     CAPTURING_EMPTY_OUTPUT = "capturing_empty_output"
@@ -62,7 +61,7 @@ class Issue(ABC):
             "line": self.source_line,
             "code": self.code.value,
             "severity": self.severity.value,
-            "condition": str(self.condition),
+            "condition": str(self.condition) if self.condition else None,
             "message": self.message
         }
 
@@ -155,11 +154,6 @@ class IgnoredCommandResult(Issue):
 class NotACommand(Issue):
     def __init__(self, name: str, line):
         super().__init__(Code.NOT_A_COMMAND, f"'{name}' is invoked as a command, but it cannot be one", Severity.ERROR, line)
-
-
-class UnsatisfiedPrecondition(Issue):
-    def __init__(self, constraint, command: str, line):
-        super().__init__(Code.UNSATISFIED_PRECONDITION, f"precondition for '{command}' '{constraint}' might not hold", Severity.ERROR, line)
 
 
 class UnexpectedStdin(Issue):

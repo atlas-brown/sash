@@ -9,8 +9,7 @@ ground_truth:
   errors:
   - line: 12
     line_in_fixed: 12
-    #code: cd_into_file
-    code: unsat_precond
+    code: cmd_expected_path_state
     shellcheck:
       detects: false
       fixed_false_positive: false

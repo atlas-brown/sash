@@ -148,7 +148,7 @@ rm -rf "$STEAMROOT/"*
 
     script = write_script(tmp_path, 'rm -rf "$(echo `pwd`/)"\n')
     report = reset_and_run_main(script, solver=True)
-    expected_error = reporter.UnsatisfiedPrecondition(None, 'rm -rf "$(echo `pwd`/)"', 0)
+    expected_error = reporter.DeleteSystemFile('PWD', 0)
     assert_expected_report(report, [expected_error])
 
 def test_steamroot_fix(tmp_path):
@@ -640,7 +640,7 @@ rm somefile.txt
     report = reporter.Reporter.get_report()
     assert len(res.traces) == 1
     assert len(res.traces[0].latest_state.assertions) == 4
-    expected_warning = reporter.UnsatisfiedPrecondition(None, "rm somefile.txt", 0)
+    expected_warning = reporter.ExpectedPathState('rm', 'existant', ('somefile.txt',), 0)
     assert_expected_report(report, [expected_warning])
 
 def test_double_mv(tmp_path):
@@ -653,7 +653,19 @@ mv somefile.txt otherfile2.txt
     report = reporter.Reporter.get_report()
     assert len(res.traces) == 1
     assert len(res.traces[0].latest_state.assertions) == 2
-    expected_warning = reporter.UnsatisfiedPrecondition(None, "mv somefile.txt otherfile.txt", 0)
+    expected_warning = reporter.ExpectedPathState('mv', 'existant', ('somefile.txt',), 0)
+    assert_expected_report(report, [expected_warning])
+
+    script = write_script(tmp_path, """
+touch otherfile.txt # force file
+mv somefile1.txt otherfile.txt
+mv somefile2.txt otherfile.txt
+""")
+    res = reset_and_run_symbexec_main(script, solver=True)
+    report = reporter.Reporter.get_report()
+    assert len(res.traces) == 1
+    assert len(res.traces[0].latest_state.assertions) == 2
+    expected_warning = reporter.DataLoss('mv', ('otherfile.txt',), 0)
     assert_expected_report(report, [expected_warning])
 
 
@@ -667,7 +679,7 @@ cp "$2" something.txt
     report = reporter.Reporter.get_report()
     assert len(res.traces) == 1
     assert len(res.traces[0].latest_state.assertions) == 3
-    expected_warning = reporter.UnsatisfiedPrecondition(None, "cp \"$2\" something.txt", 0)
+    expected_warning = reporter.ExpectedPathState('cp', 'existant', ('$2',), 0)
     assert_expected_report(report, [expected_warning])
 
 def test_nested_function_localenv(tmp_path):
@@ -694,7 +706,7 @@ if [ "$2" = "$1" ]; then
 fi
 """)
     report = reset_and_run_main(script, solver=True)
-    expected_warning = reporter.UnsatisfiedPrecondition(None, "cat \"$2\"", 0)
+    expected_warning = reporter.ExpectedPathState('cat', 'existant', ('$2',), 0)
     assert_expected_report(report, [expected_warning])
 
 def test_read_binds_single_variable(tmp_path):
@@ -730,7 +742,7 @@ def test_redirection_to_unread_file(tmp_path):
     echo "bug" > $x.txt
     """)
     report = reset_and_run_main(script, solver=True)
-    expected_error = reporter.UnsatisfiedPrecondition(None, 'echo "bug" > $x.txt', 0)
+    expected_error = reporter.DataLoss('echo', ('$x.txt',), 0)
     assert_expected_report(report, [expected_error])
 
 def test_redirection_to_read_file(tmp_path):
@@ -760,7 +772,7 @@ def test_redirection_to_normal_path_still_checked(tmp_path):
     echo "bug" > /tmp/output.txt
     """)
     report = reset_and_run_main(script, solver=True)
-    expected_error = reporter.UnsatisfiedPrecondition(None, 'echo "bug" > /tmp/output.txt', 0)
+    expected_error = reporter.DataLoss('echo', ('/tmp/output.txt',), 0)
     assert_expected_report(report, [expected_error])
 
 def test_mv_unread_file(tmp_path):
@@ -774,7 +786,7 @@ def test_mv_unread_file(tmp_path):
     mv $x.txt $y.txt
     """)
     report = reset_and_run_main(script, solver=True)
-    expected_error = reporter.UnsatisfiedPrecondition(None, 'mv $x.txt $y.txt', 0)
+    expected_error = reporter.DataLoss('mv', ('$y.txt',), 0)
     assert_expected_report(report, [expected_error])
 
 def test_mv_read_file(tmp_path):
@@ -798,8 +810,7 @@ xargs -I thing rm somefile.txt thing
     res = reset_and_run_symbexec_main(script, solver=True)
     report = reporter.Reporter.get_report()
     assert len(res.traces) == 1
-    assert len(res.traces[0].latest_state.assertions) == 6 # 2x assertion per rm (for each arg), 3x unrolling
-    expected_warning = reporter.UnsatisfiedPrecondition(None, "rm somefile.txt thing", 0)
+    expected_warning = reporter.ExpectedPathState('rm', 'existant', ('somefile.txt',), 0)
     expected_warning2 = reporter.DangerousWordSplit(None, 0)
     assert_expected_report(report, [expected_warning, expected_warning2])
 

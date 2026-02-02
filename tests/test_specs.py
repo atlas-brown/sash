@@ -31,18 +31,30 @@ from sash.symbolic.state import Assertion, State
 # The things that we can check are limited to simple file system constraints and variable string equalities
 
 
-def sanity_check_spec_constraints(cmd_spec: specs.CmdSpec):
+def sanity_check_spec_constraints(cmd_name: str, cmd_spec: specs.CmdSpec):
     fs_model = FSModelSimple(lambda _: z3.FreshConst(z3.StringSort(), "field"))
 
     fs_model.apply_postcondition(cmd_spec.success_postcond.normalized())
     fs_model.apply_postcondition(cmd_spec.failure_postcond.normalized())
 
-    assertion_to_z3(Assertion(
-        producing_state=State(fs_model=fs_model),
-        constraint=cmd_spec.check,
-        source_str="",
-        source_line=0
-    ))
+    if cmd_spec.check:
+        _, state_formula, full_check_formula, refinements = assertion_to_z3(Assertion(
+            producing_state=State(fs_model=fs_model),
+            constraint=cmd_spec.check,
+            source_str="",
+            source_line=0
+        ))
+        solver = z3.Solver()
+        solver.add(state_formula)
+        assert solver.check(z3.Not(z3.Implies(full_check_formula, z3.And(*[refinement_formula for refinement_formula, _ in refinements])))) == z3.unsat, "RefineableConstraint: full check does not imply all refinements"
+        if solver.check(full_check_formula) == z3.unsat and len(refinements) > 1:
+            combination_so_far = z3.BoolVal(True)
+            some_fail = False
+            for refinement_formula, _ in refinements:
+                combination_so_far = z3.And(combination_so_far, refinement_formula)
+                if solver.check(combination_so_far) == z3.unsat:
+                    some_fail = True
+            assert some_fail, f"RefineableConstraint: {cmd_name} spec full check failure does not imply any refinements fail.\n\nFull spec: {full_check_formula}\n\nRefinements: {[refinement_formula for refinement_formula, _ in refinements]}"
 
 
 def test_rm_spec__check_disallows_deleting_unread_files():
@@ -74,8 +86,8 @@ def test_rm_spec__check_disallows_deleting_unread_files():
     generated_specs = [specs.rm_spec(inv) for inv in invocations]
     for inv, s, ecs in zip(invocations, generated_specs, expected_checks_per_inv):
         for ec in ecs:
-            assert constraint_contains(s.check, ec), f"Expected check to contain:\n{pformat(ec)}\nbut got:\n{pformat(s.check)}\nfor invocation:\n{pformat(inv)}"
-        sanity_check_spec_constraints(s)
+            assert constraint_contains(s.check.full, ec), f"Expected check to contain:\n{pformat(ec)}\nbut got:\n{pformat(s.check)}\nfor invocation:\n{pformat(inv)}"
+        sanity_check_spec_constraints('rm', s)
 
 
 def test_rm_spec__z_postcond_is_deleted_operands():
@@ -107,7 +119,7 @@ def test_rm_spec__z_postcond_is_deleted_operands():
     generated_specs = [specs.rm_spec(inv) for inv in invocations]
     for inv, s, esp in zip(invocations, generated_specs, expected_spost):
         assert s.success_postcond == esp, f"Expected check to be:\n{pformat(esp)}\nbut got:\n{pformat(s.success_postcond)}\nfor invocation:\n{pformat(inv)}"
-        sanity_check_spec_constraints(s)
+        sanity_check_spec_constraints('rm', s)
 
 
 def test_rm_spec__failure_postcond_is_empty():
@@ -133,7 +145,7 @@ def test_rm_spec__failure_postcond_is_empty():
     generated_specs = [specs.rm_spec(inv) for inv in invocations]
     for s in generated_specs:
         assert s.failure_postcond == Empty(), f"Expected failure postcondition to be Empty, but got:\n{pformat(s.failure_postcond)}"
-        sanity_check_spec_constraints(s)
+        sanity_check_spec_constraints('rm', s)
 
 
 def test_test_spec__check_is_always_empty():
@@ -158,8 +170,8 @@ def test_test_spec__check_is_always_empty():
 
     generated_specs = [specs.test_spec(inv) for inv in invocations]
     for s in generated_specs:
-        assert s.check == Empty(), f"Expected check to be Empty, but got:\n{pformat(s.check)}"
-        sanity_check_spec_constraints(s)
+        assert not s.check, f"Expected check to be Empty, but got:\n{pformat(s.check)}"
+        sanity_check_spec_constraints('test', s)
 
 
 def test_test_spec__postconds_are_negations_of_each_other():
@@ -192,7 +204,7 @@ def test_test_spec__postconds_are_negations_of_each_other():
             s.success_postcond == ~s.failure_postcond or s.failure_postcond == ~s.success_postcond
         ), f"Postconds must be negations of each other, but got:\nSuccess:\n{pformat(s.success_postcond)}\nFailure:\n{pformat(s.failure_postcond)}"
 
-        sanity_check_spec_constraints(s)
+        sanity_check_spec_constraints('test', s)
 
 
 def create_cmd_inv(cmd_name: sash.symbolic.strings.SymStr, flags: set[str], options: dict[str, sash.symbolic.strings.Field], operands: list[sash.symbolic.strings.Field]) -> specs.CmdInvocation:
@@ -255,7 +267,7 @@ def test_hypothesis_specs_to_constraints_do_not_crash(cmd_name: str, args: list[
     assert cmd_spec is not None, f"Spec function for command '{cmd_name}' returned None for fields: {pformat(fields)}"
 
     assume(cmd_spec.success_postcond != Empty() or cmd_spec.failure_postcond != Empty())
-    sanity_check_spec_constraints(cmd_spec)
+    sanity_check_spec_constraints(cmd_name, cmd_spec)
 
 
 def test_access_after_mv_core(tmp_path):
@@ -265,7 +277,7 @@ def test_access_after_mv_core(tmp_path):
     """)
 
     report = reset_and_run_main(script, solver=True)
-    expected_report = reporter.UnsatisfiedPrecondition(None, "mv actualbudget-actual-server-*/* /opt/actualbudget/", None)
+    expected_report = reporter.ExpectedPathState('mv', 'directory', ('/opt/actualbudget/',), 2)
     assert_expected_report(report, [expected_report])
 
 
@@ -289,7 +301,7 @@ def test_access_del_resource_core(tmp_path):
     """)
 
     report = reset_and_run_main(script, solver=True)
-    expected_report = reporter.UnsatisfiedPrecondition(None, "mv -f workingfolder/* /storage/sort_tv", None)
+    expected_report = reporter.ExpectedPathState('mv', 'existant', ('workingfolder',), 4)
     assert_expected_report(report, [expected_report])
 
 
@@ -315,8 +327,8 @@ def test_overwrite_file_4_core(tmp_path):
 
     report = reset_and_run_main(script, solver=True)
     expected_reports: list[reporter.Issue] = [
-        reporter.UnsatisfiedPrecondition(None, 'echo "proc print data=sasdata.data ;" > $x/chk.sas', None),
-        reporter.UnsatisfiedPrecondition(None, 'echo "run;" > $x/chk.sas', None),
+        reporter.DataLoss('echo', ('$x/chk.sas',), 3),
+        reporter.DataLoss('echo', ('$x/chk.sas',), 4),
     ]
     assert_expected_report(report, expected_reports)
 
@@ -342,11 +354,9 @@ def test_overwrite_file_xargs_core(tmp_path):
 
     report = reset_and_run_main(script, solver=True)
     expected_reports: list[reporter.Issue] = [
-        # For each line, we get two unsar: one for overwriting target (before reading it) and one for moving file (after moving it)
-        reporter.UnsatisfiedPrecondition(Empty(), "xargs -I files mv files target", 2),
-        reporter.UnsatisfiedPrecondition(Empty(), "xargs -I files mv files target", 2),
-        reporter.UnsatisfiedPrecondition(Empty(), "xargs -I files mv files target", 3),
-        reporter.UnsatisfiedPrecondition(Empty(), "xargs -I files mv files target", 3),
+        # For each line, we get two unsat: one for overwriting target (before reading it) and one for moving file (after moving it)
+        reporter.DataLoss('mv', ('target',), 2),
+        reporter.DataLoss('mv', ('target',), 3),
     ]
     assert_expected_report(report, expected_reports)
 

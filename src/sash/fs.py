@@ -109,17 +109,17 @@ class FSModelSimple(FSModel):
         """Return a new abstract file system after writing to the given path."""
         return self._set(path, Dir, status)
 
-    def _apply_postcondition(self, constraints: Constraint) -> "FSModelSimple":
+    def _apply_postcondition(self, constraints: Constraint, reference_state: "FsModelSimple") -> "FSModelSimple":
         logging.debug("Applying FS postcondition: %s", constraints)
         match constraints:
             case Empty():
                 return self
             case And(lhs, rhs):
-                fs_after_lhs = self._apply_postcondition(lhs)
-                return fs_after_lhs._apply_postcondition(rhs)
+                fs_after_lhs = self._apply_postcondition(lhs, reference_state)
+                return fs_after_lhs._apply_postcondition(rhs, reference_state)
             case Or(lhs, rhs):
-                fs_after_lhs = self._apply_postcondition(lhs)
-                fs_after_rhs = self._apply_postcondition(rhs)
+                fs_after_lhs = self._apply_postcondition(lhs, reference_state)
+                fs_after_rhs = self._apply_postcondition(rhs, reference_state)
                 lhs_new_history = fs_after_lhs.history[len(self.history):]
                 rhs_new_history = fs_after_rhs.history[len(self.history):]
                 lhs_new_history_renamed = tuple((self._rename_fs_var_append(var, "_lhs"), array_expr) for var, array_expr in lhs_new_history)
@@ -142,10 +142,10 @@ class FSModelSimple(FSModel):
                 # These constraints do not affect the FS model
                 return self
             case Implies(premise, conclusion):
-                fs_after_conclusion = self._apply_postcondition(conclusion)
+                fs_after_conclusion = self._apply_postcondition(conclusion, reference_state)
                 # Apply the postcondition, so we get the final state if the premise is true, and then add a new final state
                 # that chooses between the old final state and the new final state based on the premise
-                new_state = z3.If(self._fs_constraint_z3(premise), fs_after_conclusion.history[-1][0], self.history[-1][0])
+                new_state = z3.If(reference_state._fs_constraint_z3(premise), fs_after_conclusion.history[-1][0], self.history[-1][0])
                 return fs_after_conclusion._next_state(new_state) # type: ignore
             case CommandExists() | Not(CommandExists()):
                 # Does not affect FS model
@@ -158,7 +158,7 @@ class FSModelSimple(FSModel):
         return self
 
     def apply_postcondition(self, norm_constraints: NormalizedConstraint) -> FSModel:
-        return self._apply_postcondition(norm_constraints.constraint)
+        return self._apply_postcondition(norm_constraints.constraint, self)
 
     def is_file_z3(self, path_z3) -> 'z3.ExprRef':
         return FileInfo.state(z3.Select(self.history[-1][0], path_z3)) == File

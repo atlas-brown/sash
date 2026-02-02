@@ -2,14 +2,15 @@ import threading
 from sash.constraints import *
 from sash.reporter import *
 from sash.interpreter_config import InterpConfig
-from sash.symbolic.state import State, Assertion, Trace
+from sash.symbolic.state import State, Assertion, Trace, RefineableConstraint
 from dataclasses import replace
 import logging
 from sash.symbolic.strings import CompletelyArbitrary, Field, SymStr
 from sash.util import shasta_pretty
-from sash.fs import FileInfo, File, Unread
+from sash.fs import FileInfo, File, Read, Unread
 from pprint import pformat
 import z3
+from sash.debugtools.solver_debug import get_debugger as solver_debugger, log_assertion_result
 
 arbitrary_to_z3_var: dict[CompletelyArbitrary, z3.ExprRef] = {}
 tracked_assertions: dict[z3.BoolRef, Assertion] = {}
@@ -52,11 +53,13 @@ def _command_exists_to_z3(field: Field, s: State) -> z3.ExprRef:
     return command_exists_predicate(field_to_z3(field))
 
 
+z3True = z3.BoolVal(True)
+
 def constraint_to_z3(constraint: Constraint, s: State) -> z3.ExprRef:
     def norm_constraint_to_z3(constraint: Constraint, s: State):
         match constraint:
             case Empty():
-                return z3.BoolVal(True)
+                return z3True
             case CommandExists(name):
                 return _command_exists_to_z3(name, s)
             case IsRead(path):
@@ -83,7 +86,7 @@ def constraint_to_z3(constraint: Constraint, s: State) -> z3.ExprRef:
             case _:
                 logging.error("Unrecognized constraint type in Z3 translation: %s (type %s)",
                               constraint, type(constraint))
-                return z3.BoolVal(True)
+                return z3True
 
     return norm_constraint_to_z3(constraint.normalized().constraint, s)
 
@@ -112,20 +115,30 @@ def state_to_z3(s: State) -> z3.ExprRef:
 
 def assertion_to_z3(assertion: Assertion) -> tuple[z3.BoolRef, # assertion var
                                                    z3.ExprRef, # state formula
-                                                   z3.ExprRef]: # assertion constraint formula
+                                                   z3.ExprRef,
+                                                   list[tuple[z3.ExprRef, Issue]]]: # assertion constraint formula
     """
     Convert an assertion to a tracked Z3 formula.
     Returns a tuple of (assertion tracking var, state formula, assertion constraint formula).
     """
     assertion_var = z3.FreshBool('assertion')
     tracked_assertions[assertion_var] = assertion
-    constraint_formula = constraint_to_z3(assertion.constraint, assertion.producing_state)
+    rc = assertion.constraint
+    constraint_formula = constraint_to_z3(rc.full, assertion.producing_state)
+    refinement_formulas = [(constraint_to_z3(c, assertion.producing_state), im(assertion.source_line)) for (c, im) in rc.refinements]
     state_formula = state_to_z3(assertion.producing_state)
 
-    return assertion_var, state_formula, constraint_formula
+    return assertion_var, state_formula, constraint_formula, refinement_formulas
 
 
-def model_to_reports(core: list[z3.BoolRef], config: InterpConfig):
+# TODO: doesn't seem like this whole indirection via the assertion var matters at all, we should cut it
+def model_to_reports(core: list[z3.BoolRef],
+                     solver: 'Z3Solver',
+                     config: InterpConfig,
+                     full_assertion: z3.ExprRef,
+                     state_formula: z3.ExprRef,
+                     refinements: list[tuple[z3.ExprRef, Issue]],
+                     debugger: 'Optional[SolverDebugger]' = None):
     """
     Convert an unsat core to structured reporter errors.
     """
@@ -135,24 +148,63 @@ def model_to_reports(core: list[z3.BoolRef], config: InterpConfig):
             logging.warning("Unrecognized tracked var in core: %s", tracked)
             continue
 
-        constraint = assertion.constraint
-        state = assertion.producing_state
+        rc = assertion.constraint
 
-        err = UnsatisfiedPrecondition(
-            constraint,
-            assertion.source_str,
-            assertion.source_line
-        )
-        Reporter.add_issue(err, config)
+        match refinements:
+            case [(tt, issue)]:
+                assert tt == z3True, "Non-empty single refinement doesn't make sense"
+                logging.debug(f"Assertion has no refinements, reporting sole issue")
+                Reporter.add_issue(issue, config)
+                if debugger is not None:
+                    to_log = (full_assertion, issue)
+            case more:
+                logging.debug(f"Refining assertion using {len(more)} refinements")
+                assert more, "Can't have empty refinement list"
+                combination_so_far = z3True
+                reported = False
+                for constraint_formula, issue in more:
+                    solver.push()
+                    combination_so_far = z3.And(combination_so_far, constraint_formula)
+                    result = solver.check(combination_so_far)
+                    solver.pop()
+                    if result == z3.unsat:
+                        Reporter.add_issue(issue, config)
+                        if debugger is not None:
+                            to_log = (constraint_formula, issue)
+                        reported = True
+                        break
+                assert reported, f"Bad assertion refinements: at least one refinement is not implied by overall assertion? In {assertion.constraint}"
+        if debugger is not None:
+            assertion_formula, issue = to_log
+            log_assertion_result(
+                        assertion=assertion,
+                        assertion_formula=assertion_formula,
+                        state_formula=state_formula,
+                        issue=str(issue.code)[5:],
+                        arb_z3_map=arbitrary_to_z3_var,
+                        result_type="UNSAT",
+                        solver_time=-1,
+                        unsat_core=core,
+                        debugger=debugger,
+                    )
+
 
 def assume_unknowns_are_files(assertions: list[Assertion]) -> tuple[Assertion, ...]:
+    def add_condition(im):
+        return lambda line: im(line).under_condition(Description("Assume unknown paths are files"))
+    def with_file_condition(rc: RefineableConstraint) -> RefineableConstraint:
+        return replace(rc, refinements=[(c, add_condition(im)) for c, im in rc.refinements])
+
     new_assertions: list[Assertion] = []
     for assertion in assertions:
         state = assertion.producing_state
         fs_model = state.fs_model
-        new_fs_model = fs_model.set_default_path_state(FileInfo.mk_pair(File, Unread))
+        new_fs_model = fs_model.set_default_path_state(FileInfo.mk_pair(File, Read))
         new_state = replace(state, fs_model=new_fs_model).add_pathcond(Description("Assume unknown paths are files"))
-        new_assertion = replace(assertion, producing_state=new_state)
+        conditional_constraint = with_file_condition(assertion.constraint)
+        new_assertion = replace(assertion,
+                                producing_state=new_state,
+                                constraint=conditional_constraint)
         new_assertions.append(new_assertion)
     return tuple(new_assertions)
 
@@ -173,7 +225,6 @@ def run_solver(traces: list[Trace], config: InterpConfig, stop: threading.Event 
     checked_assertions = 0
 
     if config.debug_instrumentation:
-        from sash.debugtools.solver_debug import get_debugger as solver_debugger, log_assertion_result
         debugger = solver_debugger()
 
     logging.info("Checking %d total assertions from %d total traces", total_assertions, len(traces))
@@ -199,7 +250,7 @@ def run_solver(traces: list[Trace], config: InterpConfig, stop: threading.Event 
 
             solver = z3.Solver()
             solver.set(unsat_core=True)
-            assertion_var, state_formula, assertion_formula = assertion_to_z3(assertion)
+            assertion_var, state_formula, assertion_formula, refinements = assertion_to_z3(assertion)
             solver.add(state_formula)
 
             if solver.check() == z3.unsat:
@@ -207,7 +258,9 @@ def run_solver(traces: list[Trace], config: InterpConfig, stop: threading.Event 
                 if config.debug_instrumentation:
                     log_assertion_result(
                         assertion=assertion,
+                        state_formula=state_formula,
                         assertion_formula=assertion_formula,
+                        issue='/'.join({str(issue.code)[5:] for _, issue in refinements}),
                         arb_z3_map=None,
                         result_type="PATHCOND_UNSAT",
                         solver_time=0.0,
@@ -215,6 +268,7 @@ def run_solver(traces: list[Trace], config: InterpConfig, stop: threading.Event 
                     )
                 continue
 
+            solver.push()
             solver.assert_and_track(assertion_formula, assertion_var)
 
             if logging.getLogger().isEnabledFor(logging.DEBUG):
@@ -229,17 +283,9 @@ def run_solver(traces: list[Trace], config: InterpConfig, stop: threading.Event 
             if result == z3.unsat:
                 core = solver.unsat_core()
                 logging.debug("Unsat core: %s", core)
-                if config.debug_instrumentation:
-                    log_assertion_result(
-                        assertion=assertion,
-                        assertion_formula=assertion_formula,
-                        arb_z3_map=arbitrary_to_z3_var,
-                        result_type="UNSAT",
-                        solver_time=-1,
-                        unsat_core=core,
-                        debugger=debugger,
-                    )
-                model_to_reports(core, config)
+                solver.pop()
+                model_to_reports(core, solver, config, assertion_formula, state_formula, refinements,
+                                 debugger if config.debug_instrumentation else None)
             else:
                 model = solver.model()
                 logging.debug("SAT model: %s", model)
@@ -247,6 +293,8 @@ def run_solver(traces: list[Trace], config: InterpConfig, stop: threading.Event 
                     log_assertion_result(
                         assertion=assertion,
                         assertion_formula=assertion_formula,
+                        state_formula=state_formula,
+                        issue='/'.join({str(issue.code)[5:] for _, issue in refinements}),
                         arb_z3_map=arbitrary_to_z3_var,
                         result_type="SAT",
                         solver_time=-1,

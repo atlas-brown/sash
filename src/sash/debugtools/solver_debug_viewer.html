@@ -247,6 +247,27 @@
             margin-bottom: 10px;
             text-transform: uppercase;
             font-weight: 600;
+            cursor: pointer;
+            position: relative;
+            padding-right: 16px;
+        }
+
+        .level-2 h5::after {
+            content: '\25BE'; /* small down arrow */
+            position: absolute;
+            right: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 11px;
+            color: #667eea;
+        }
+
+        .level-2.collapsed h5::after {
+            transform: translateY(-50%) rotate(-90deg);
+        }
+
+        .level-2.collapsed > :not(h5) {
+            display: none;
         }
 
         .level-2-content {
@@ -263,6 +284,143 @@
             border-radius: 3px;
         }
 
+        .fs-graph-meta {
+            font-size: 11px;
+            color: #555;
+            margin-bottom: 8px;
+        }
+
+        .fs-graph-controls {
+            font-size: 11px;
+            margin-bottom: 4px;
+        }
+
+        .fs-graph-branches {
+            display: flex;
+            flex-direction: row;
+            flex-wrap: nowrap;
+            gap: 8px;
+            margin-top: 5px;
+            overflow-x: auto;
+            overflow-y: hidden;
+            padding-bottom: 4px;
+        }
+
+        .fs-branch {
+            border: 1px solid #e0e0e0;
+            border-radius: 3px;
+            background: #fafafa;
+            padding: 6px 8px;
+            flex: 0 0 320px;
+            max-width: 360px;
+            display: flex;
+            flex-direction: column;
+            transition: padding 0.1s ease, border-color 0.1s ease, background 0.1s ease;
+        }
+
+        .fs-branch-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 4px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .fs-branch-title {
+            color: #455a64;
+        }
+
+        .fs-branch-note {
+            color: #999;
+            font-weight: normal;
+            font-size: 11px;
+        }
+
+        .fs-branch-toggle {
+            border: none;
+            background: transparent;
+            cursor: pointer;
+            font-size: 11px;
+            margin-left: 6px;
+            color: #667eea;
+            transform: rotate(0deg);
+            transition: transform 0.15s ease;
+        }
+
+        .fs-branch.collapsed {
+            padding: 2px 6px;
+            flex: 0 0 auto;
+            max-width: none;
+            background: #f0f0f5;
+            border-color: #ddd;
+        }
+
+        .fs-branch.collapsed .fs-branch-toggle {
+            transform: rotate(-90deg);
+        }
+
+        .fs-branch.collapsed .fs-branch-note {
+            display: none;
+        }
+
+        .fs-branch.collapsed .fs-branch-title {
+            font-size: 11px;
+        }
+
+        .fs-branch-conditions {
+            font-size: 11px;
+            margin-bottom: 4px;
+        }
+
+        .fs-branch-conditions pre {
+            white-space: pre-wrap;
+            word-break: break-word;
+            background: #ffffff;
+            border-radius: 2px;
+            border: 1px solid #e0e0e0;
+            padding: 4px 6px;
+        }
+
+        .fs-branch-table-wrapper {
+            max-height: 180px;
+            overflow-x: auto;
+            overflow-y: hidden;
+            background: #ffffff;
+            border-radius: 2px;
+            border: 1px solid #e0e0e0;
+        }
+
+        .fs-branch-body {
+            margin-top: 2px;
+        }
+
+        .fs-branch.collapsed .fs-branch-body {
+            display: none;
+        }
+
+        .fs-branch-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 11px;
+        }
+
+        .fs-branch-table th,
+        .fs-branch-table td {
+            padding: 4px 6px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .fs-branch-table th {
+            background: #f5f5f5;
+            text-align: left;
+            font-weight: 600;
+        }
+
+        .fs-branch-table td {
+            font-family: 'Courier New', monospace;
+        }
+
         .level-3-section {
             margin-top: 20px;
             background: white;
@@ -277,6 +435,27 @@
             margin-bottom: 10px;
             text-transform: uppercase;
             font-weight: 600;
+            cursor: pointer;
+            position: relative;
+            padding-right: 16px;
+        }
+
+        .level-3-section h5::after {
+            content: '\25BE';
+            position: absolute;
+            right: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 11px;
+            color: #f57c00;
+        }
+
+        .level-3-section.collapsed h5::after {
+            transform: translateY(-50%) rotate(-90deg);
+        }
+
+        .level-3-section.collapsed > :not(h5) {
+            display: none;
         }
 
         .z3-map-filter {
@@ -441,6 +620,7 @@
         let filteredAssertions = [];
         let searchTerm = "";
         let z3MapFilters = {};  // assertion_id -> filter string
+        let fsGraphSelections = {}; // assertion_id -> selected fs id
 
         const fileInput = document.getElementById('fileInput');
         const searchBox = document.getElementById('searchBox');
@@ -578,6 +758,7 @@
                 const assertionId = assertion.assertion_id;
                 const resultType = assertion.solver_result?.result_type || "SKIPPED";
                 const isSkipped = resultType === "PATHCOND_UNSAT";
+                const issueLabel = assertion.issue ? `<span style="color: #f57c00; font-weight: 600;">[${escapeHtml(assertion.issue)}]</span>` : '';
                 
                 return `
                     <div class="assertion" id="assertion-${idx}">
@@ -585,6 +766,7 @@
                             <div class="assertion-title">
                                 <h4>
                                     <span class="outcome-badge outcome-${resultType}">${resultType}</span>
+                                    ${issueLabel}
                                     ${assertion.source_str}
                                 </h4>
                                 <div class="location">Line ${assertion.source_line} • ID: ${assertionId}</div>
@@ -606,8 +788,14 @@
                             </div>
 
                             <div class="level-2">
-                                <h5>📁 Filesystem State</h5>
+                                <h5>📁 Filesystem History (Raw)</h5>
                                 <div class="level-2-content">${escapeHtml(assertion.fs_state_desc)}</div>
+                            </div>
+                            <div class="level-2">
+                                <h5>🗂 Filesystem States</h5>
+                                <div class="fs-graph-root" data-assertion-id="${assertionId}">
+                                    ${renderFsStateGraph(assertion.fs_state_tree, assertionId)}
+                                </div>
                             </div>
 
                             <!-- Level 3: Solver Details (only if not skipped) -->
@@ -657,6 +845,9 @@
                     }
                 });
             });
+
+            // Enable collapsing for all level-2 subsections within assertions
+            setupCollapsibleSections();
         }
 
         function renderZ3Map(mapObj, assertionId) {
@@ -689,6 +880,128 @@
             } else {
                 return `<strong>Result:</strong> ${result.result_type}`;
             }
+        }
+
+        function renderFsStateGraph(tree, assertionId) {
+            if (!tree) {
+                return '<div class="fs-graph-meta">(no structured filesystem state available)</div>';
+            }
+
+            const byFs = tree.branches_by_fs || (tree.branches ? { [tree.final_fs || 'final']: tree.branches } : {});
+            let fsOrder = Array.isArray(tree.fs_order) ? tree.fs_order.slice() : Object.keys(byFs);
+            if (fsOrder.length === 0) {
+                fsOrder = Object.keys(byFs);
+            }
+
+            if (fsOrder.length === 0) {
+                return '<div class="fs-graph-meta">(no structured filesystem state available)</div>';
+            }
+
+            const defaultFs = tree.final_fs || fsOrder[fsOrder.length - 1] || fsOrder[0];
+            const selectedFs = fsGraphSelections[assertionId] || defaultFs;
+            const branches = Array.isArray(byFs[selectedFs]) ? byFs[selectedFs] : [];
+
+            const meta = `Root FS: ${escapeHtml(tree.root_fs || '')}` +
+                         (tree.final_fs ? ` • Final FS: ${escapeHtml(tree.final_fs)}` : '') +
+                         ` • Viewing: ${escapeHtml(selectedFs)} • Branches: ${branches.length}`;
+
+            const optionsHtml = fsOrder.map(fsId => `
+                <option value="${escapeHtml(fsId)}" ${fsId === selectedFs ? 'selected' : ''}>${escapeHtml(fsId)}</option>
+            `).join('');
+
+            const branchesHtml = branches.map((branch, idx) => {
+                const conds = Array.isArray(branch.conditions) && branch.conditions.length > 0
+                    ? branch.conditions.map(c => `• ${escapeHtml(c)}`).join('\n')
+                    : '(no conditions — base state)';
+
+                const paths = Array.isArray(branch.paths) && branch.paths.length > 0
+                    ? branch.paths.map(p => `
+                            <tr>
+                                <td>${escapeHtml(p.path)}</td>
+                                <td>${escapeHtml(p.state || '')}</td>
+                                <td>${escapeHtml(p.status || '')}</td>
+                            </tr>
+                        `).join('')
+                    : `<tr><td colspan="3" style="color: #999;">(no explicit paths)</td></tr>`;
+
+                return `
+                    <div class="fs-branch">
+                        <div class="fs-branch-header">
+                            <span class="fs-branch-title">V${idx + 1}</span>
+                            <span>
+                                <span class="fs-branch-note">FS: ${escapeHtml(branch.fs_id || '')}</span>
+                                <button type="button" class="fs-branch-toggle" onclick="toggleFsBranch(this)">▾</button>
+                            </span>
+                        </div>
+                        <div class="fs-branch-body">
+                            <div class="fs-branch-conditions">
+                                <pre>${conds}</pre>
+                            </div>
+                            <div class="fs-branch-table-wrapper">
+                                <table class="fs-branch-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Path</th>
+                                            <th>State</th>
+                                            <th>Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${paths}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            return `
+                <div class="fs-graph-meta">${meta}</div>
+                <div class="fs-graph-controls">
+                    <label>View FS:
+                        <select data-assertion-id="${assertionId}" onchange="onFsGraphSelect(this)">
+                            ${optionsHtml}
+                        </select>
+                    </label>
+                </div>
+                <div class="fs-graph-branches">
+                    ${branchesHtml}
+                </div>
+            `;
+        }
+
+        function toggleFsBranch(button) {
+            const branch = button.closest('.fs-branch');
+            if (!branch) return;
+            branch.classList.toggle('collapsed');
+        }
+
+        function onFsGraphSelect(selectEl) {
+            const assertionId = selectEl.getAttribute('data-assertion-id');
+            if (!assertionId) return;
+            const fsId = selectEl.value;
+            fsGraphSelections[assertionId] = fsId;
+
+            const root = selectEl.closest('.fs-graph-root');
+            if (!root) return;
+
+            const assertion = filteredAssertions.find(a => a.assertion_id == assertionId);
+            if (!assertion) return;
+
+            root.innerHTML = renderFsStateGraph(assertion.fs_state_tree, assertionId);
+        }
+
+        function setupCollapsibleSections() {
+            document.querySelectorAll('.assertion .level-2 h5, .assertion .level-3-section h5').forEach(header => {
+                const section = header.parentElement;
+                if (!section) return;
+                header.onclick = (event) => {
+                    // Avoid toggling when clicking interactive elements inside header (if any later)
+                    event.stopPropagation();
+                    section.classList.toggle('collapsed');
+                };
+            });
         }
 
         function escapeHtml(text) {
