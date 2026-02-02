@@ -1,5 +1,5 @@
 bugs:
-- line: 179
+- line: 180
   description: Log file is deleted due to improper exit code checking
 - line: 203
   description: Log file is deleted due to improper exit code checking

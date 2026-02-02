@@ -1,7 +1,6 @@
 #!/bin/sh
 
-# The user later forgets to call this function that sets `FILE`.
-set_file() {
+_setup() {
     FILE="../patches/${1}.patch"
 }
 
