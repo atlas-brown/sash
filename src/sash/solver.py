@@ -249,6 +249,7 @@ def run_solver(traces: list[Trace], config: InterpConfig, stop: threading.Event 
             checked_assertions += 1
 
             solver = z3.Solver()
+            solver.set('timeout', 5000)
             solver.set(unsat_core=True)
             assertion_var, state_formula, assertion_formula, refinements = assertion_to_z3(assertion)
             solver.add(state_formula)
