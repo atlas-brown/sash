@@ -1,7 +1,7 @@
 bugs:
 - line: 180
   description: Log file is deleted due to improper exit code checking
-- line: 203
+- line: 205
   description: Log file is deleted due to improper exit code checking
 
 name: "Ubuntu backup manager"
@@ -18,7 +18,7 @@ notes:
 ground_truth:
   errors:
   - line: 180
-    line_in_fixed: 181
+    line_in_fixed: 183
     code: const_cond
     shellcheck:
       detects: false
@@ -26,7 +26,7 @@ ground_truth:
       code: SC2181
   # Note: This is not buggy # TODO: Make a variant that is
   # - line: 205
-  #   line_in_fixed: 211
+  #   line_in_fixed: 213
   #   code: const_cond
   #   note: This is only const along one execution path
   #   shellcheck:

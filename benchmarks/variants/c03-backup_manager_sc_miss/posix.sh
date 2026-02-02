@@ -202,7 +202,7 @@ __exec_meta_command()
             fi
 
             exitcode=$?
-            if [ $exitcode -gt 0 ]; then # bug here: intent was to check the exit status of the first command in the pipeline on line 197; right now even if it fails the log is deleted
+            if [ $exitcode -gt 0 ]; then # bug here: intent was to check the exit status of the first command in the pipeline on line 198; right now even if it fails the log is deleted
                 warning "Unable to exec \$command; check \$logfile"
                 rm -f $file_to_create
             else
