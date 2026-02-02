@@ -7,8 +7,8 @@ sources:
 
 ground_truth:
   errors:
-  - line: 8
-    line_in_fixed: 10
+  - line: 13
+    line_in_fixed: 13
     code: unbound
     shellcheck:
       detects: false

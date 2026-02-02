@@ -1,5 +1,10 @@
 #!/bin/sh
 
+# The user later forgets to call this function that sets `FILE`.
+set_file() {
+    FILE="../patches/${1}.patch"
+}
+
 cd vscode || { echo "'vscode' dir not found"; exit 1; }
 
 git add .
