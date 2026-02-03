@@ -123,8 +123,7 @@ def run_targeted_dfs(nodes: list[WrappedAst],
             else_score = count_spec_cmds(node.else_b) if node.else_b is not None else 0
             return BranchDecision.FIRST if then_score >= else_score else BranchDecision.SECOND
         if isinstance(node, AST.AndNode) or isinstance(node, AST.OrNode):
-            right_score = count_spec_cmds(node.right_operand)
-            return BranchDecision.FIRST if right_score > 0 else BranchDecision.SECOND
+            return BranchDecision.ALL
         if isinstance(node, AST.WhileNode):
             body_score = count_spec_cmds(node.body)
             return BranchDecision.FIRST if body_score > 0 else BranchDecision.SECOND
@@ -142,8 +141,7 @@ def run_targeted_dfs(nodes: list[WrappedAst],
                     return None
                 return BranchDecision.FIRST if then_score >= else_score else BranchDecision.SECOND
             if isinstance(node, AST.AndNode) or isinstance(node, AST.OrNode):
-                right_score = count_spec_cmds(node.right_operand)
-                return BranchDecision.FIRST if right_score > 0 else None
+                return BranchDecision.ALL
             if isinstance(node, AST.WhileNode):
                 body_score = count_spec_cmds(node.body)
                 return BranchDecision.FIRST if body_score > 0 else None
