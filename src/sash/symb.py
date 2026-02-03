@@ -348,16 +348,6 @@ def handle_rm(expanded_args: tuple[Field, ...], trace: Trace, node: AST.CommandN
                 if content.suffix is not None and (suf := content.suffix.try_to_str()) and is_protected(suf):
                     Reporter.add_issue(reporter.WordSplitCouldDeleteSystemFile(suf, context_line), config)
 
-            # Handle cases where multiple arbitraries are merged into one and the literals between them get "lost" during the merging (e.g. $a/$b when a and b are empty)
-            # This overapproximates things because it does not consider that one of the arbitraries could be for-sure not empty
-            # Also, to avoid making this even on non-merged arbitraries, we first check that the arbitrary has more than one sources
-            if isinstance(content.source, tuple) and len(content.source) > 1 and arg_idx < len(node.arguments):
-                # TODO: as noted in the comment above, this is clearly wrong when we know things about
-                # the arbitraries involved. Can we defer the check to Z3?
-                literal_path = extract_literal_strings_from_arg(node.arguments[arg_idx])
-                if literal_path and is_protected(literal_path):
-                    Reporter.add_issue(reporter.WordSplitCouldDeleteSystemFile(literal_path, context_line), config)
-
         match arg_field:
             case Field(CompletelyArbitrary() as content, WordCount(_, max_words)):
                 if not content.quoted and max_words > 1:
