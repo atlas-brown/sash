@@ -308,19 +308,26 @@ def handle_rm(expanded_args: tuple[Field, ...], trace: Trace, node: AST.CommandN
     def is_protected(path):
         return any(path in [p, p + "/", p + "/*"] for p in Config.get("PROTECTED_PATHS"))
 
+    def is_flag(field: Field) -> bool:
+        field_str = field.try_to_str()
+        return field_str is not None and field_str.startswith("-")
+
+    non_flag_args = [arg for arg in expanded_args[1:] if not is_flag(arg)]
+
     pwdval = trace.latest_state.lookup("PWD")
     assert pwdval is not None, "PWD should always be defined"
-    trace = trace.extend(lambda s: s.add_assertion(SimpleConstraint(And.from_field_iter(expanded_args[1:],
-                                                                                        lambda arg_field: Not(StringEq(arg_field, pwdval.value))),
-                                                                    lambda line: reporter.DeleteSystemFile("PWD", line)),
-                                                   node.pretty(),
-                                                   context_line, priority=10, include_fs=False))
+    if non_flag_args:
+        trace = trace.extend(lambda s: s.add_assertion(SimpleConstraint(And.from_field_iter(non_flag_args,
+                                                                                            lambda arg_field: Not(StringEq(arg_field, pwdval.value))),
+                                                                        lambda line: reporter.DeleteSystemFile("PWD", line)),
+                                                       node.pretty(),
+                                                       context_line, priority=10, include_fs=False))
 
     for arg_idx, arg_field in enumerate(expanded_args[1:], start=1):
-        arg_field_str = arg_field.try_to_str()
-        if arg_field_str is not None and arg_field_str.startswith("-"):
+        if is_flag(arg_field):
             continue
         definitely_non_empty = is_definitely_non_empty(arg_field)
+        logging.debug("arg %d: %s, definitely_non_empty=%s", arg_idx, arg_field, definitely_non_empty)
         if (path := arg_field.try_to_str()) and is_protected(path):
             Reporter.add_issue(reporter.DeleteSystemFile(path, context_line), config)
 
