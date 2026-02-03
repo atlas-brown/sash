@@ -1177,6 +1177,29 @@ def test_deboostrap_dfs(tmp_path):
     report = reset_and_run_main(script, solver=True, enable_dfs=True)
     assert_expected_report(report, [expected_error])
 
+def test_deboostrap_dfs_easier(tmp_path):
+    script = write_script(tmp_path, """
+    if [ -z "$1" ]; then
+        exit 1
+    fi
+
+    TARGET="$2" # bug here (cont'd): if $1 is not given, $TARGET defaults to `pwd`
+    TARGET="${TARGET%/}"
+    if [ "${TARGET#/}" = "${TARGET}" ]; then
+    if [ "${TARGET%/*}" = "$TARGET" ] ; then
+      TARGET="$(echo `pwd`/$TARGET)"
+    else
+      TARGET="$(cd ${TARGET%/*}; echo `pwd`/${TARGET##*/})"
+    fi
+    fi
+
+    rm -rf "$TARGET" # bug here (cont'd): eventually, $TARGET is deleted, which is a directory not created by debootstrap
+    """)
+
+    expected_error = reporter.DeleteSystemFile("PWD", 0)
+    report = reset_and_run_main(script, solver=True, enable_dfs=True)
+    assert_expected_report(report, [expected_error])
+
 
 # def test_function_call_multipath(tmp_path):
 #     # A function that is called should not produce unbound variable errors for its parameters
