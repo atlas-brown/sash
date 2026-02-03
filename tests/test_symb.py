@@ -1200,6 +1200,34 @@ def test_deboostrap_dfs_easier(tmp_path):
     report = reset_and_run_main(script, solver=True, enable_dfs=True)
     assert_expected_report(report, [expected_error])
 
+def test_makefile(tmp_path):
+    script = write_script(tmp_path, """
+    rm -rf "${DESTDIR}${LIBDIR}/${CAMLP5N}"
+    """)
+    expected1 = reporter.UnboundID("LIBDIR", 0)
+    expected2 = reporter.UnboundID("CAMLP5N", 0)
+    expected3 = reporter.UnboundID("DESTDIR", 0)
+    expected4 = reporter.DangerousWordSplit(None, 0)
+    report = reset_and_run_main(script, solver=True)
+    assert_expected_report(report, [expected1, expected2, expected3, expected4])
+
+def test_makefile_fixed(tmp_path):
+    script = write_script(tmp_path, """
+    if test -z "${LIBDIR}"; then
+	echo "*** Variable LIBDIR not set";
+	exit 1;
+    fi
+    if test -z "${CAMLP5N}"; then
+	echo "*** Variable CAMLP5N not set";
+	exit 1;
+    fi
+    rm -rf "${DESTDIR}${LIBDIR}/${CAMLP5N}"
+    """)
+    expected1 = reporter.UnboundID("LIBDIR", 0)
+    expected2 = reporter.UnboundID("CAMLP5N", 0)
+    expected3 = reporter.UnboundID("DESTDIR", 0)
+    report = reset_and_run_main(script, solver=True)
+    assert_expected_report(report, [expected1, expected2, expected3])
 
 # def test_function_call_multipath(tmp_path):
 #     # A function that is called should not produce unbound variable errors for its parameters
