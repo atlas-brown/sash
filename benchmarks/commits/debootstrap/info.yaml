@@ -25,7 +25,7 @@ ground_truth:
       fixed_false_positive: false
   - line: 510
     line_in_fixed: 504
-    code: word_split_del_sys_file
+    code: del_sys_file
     shellcheck:
       detects: false
       fixed_false_positive: false
