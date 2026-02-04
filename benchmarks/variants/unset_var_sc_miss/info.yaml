@@ -1,0 +1,16 @@
+bugs:
+- line: 6
+  description: An unset variable is used (bar)
+
+sources:
+- https://stackoverflow.com/questions/26526776/bash-variable-defaulting-doesnt-work-if-followed-by-pipe-bash-bug
+
+ground_truth:
+  errors:
+  - line: 6
+    line_in_fixed: 7
+    code: unbound
+    shellcheck:
+      detects: true
+      fixed_false_positive: false
+      code: SC2031
