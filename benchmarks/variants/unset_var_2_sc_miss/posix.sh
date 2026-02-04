@@ -1,6 +1,6 @@
 #!/bin/sh
 
-_setup() {
+_set_FILE() {
     FILE="../patches/${1}.patch"
 }
 

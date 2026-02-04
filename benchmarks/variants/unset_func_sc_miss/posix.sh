@@ -71,7 +71,7 @@ git_prompt_status() {
   echo $STATUS
 }
 
-set_git_compare_version() {
+_set_git_compare_version() {
 #compare the provided version of git to the version installed and on path
 #prints 1 if input version <= installed version
 #prints -1 otherwise

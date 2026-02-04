@@ -1,6 +1,6 @@
 #!/usr/bin/env sh
 
-_setup() {
+_setup_file() {
     file=
 }
 
@@ -26,7 +26,7 @@ echo "Thanks for installing spf13-vim\n"
 # Backup existing .vim stuff
 echo "backing up current vim config\n"
 today=`date +%Y%m%d`
-_setup
+_setup_file
 for i in $HOME/.vim $HOME/.vimrc $HOME/.gvimrc; do [ -e $i ] && [ ! -L $file ] && mv $i $i.$today; done # bug here: file is unset (unbound)
 
 

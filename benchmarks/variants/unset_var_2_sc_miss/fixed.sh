@@ -1,6 +1,6 @@
 #!/bin/sh
 
-_setup() {
+_set_FILE() {
     FILE="../patches/${1}.patch"
 }
 
@@ -9,7 +9,7 @@ cd vscode || { echo "'vscode' dir not found"; exit 1; }
 git add .
 git reset -q --hard HEAD
 
-_setup "$1"
+_set_FILE "$1"
 if [ -f "${FILE}" ]; then
   git apply --reject "${FILE}"
 fi

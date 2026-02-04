@@ -3,7 +3,7 @@
 file ${foo:=$1}
 echo "foo >$foo<"
 
-set_bar() {
+_set_bar() {
     : "${bar:=$1}"
 }
 

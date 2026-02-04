@@ -71,7 +71,7 @@ git_prompt_status() {
   echo $STATUS
 }
 
-set_git_compare_version() {
+_set_git_compare_version() {
 #compare the provided version of git to the version installed and on path
 #prints 1 if input version <= installed version
 #prints -1 otherwise
@@ -119,7 +119,7 @@ EOF
 git_compare_version
 }
 
-set_git_compare_version
+_set_git_compare_version
 
 #this is unlikely to change so make it all statically assigned
 POST_1_7_2_GIT=$(git_compare_version "1.7.2") # bug here: function is defined in the nested function scope, where the outer function has not been invoked.
