@@ -2,6 +2,10 @@
 
 set -e
 
+set_source() {
+    _source= # variant: `_source` is unbound, even though it appears as an assignment.
+}
+
 nvm_has() {
   type "$1" > /dev/null 2>&1
   return $?
@@ -82,8 +86,8 @@ install_nvm_as_script() {
   else
     echo "=> Downloading nvm as script to '$NVM_DIR'"
   fi
-  nvm_download -s "$NVM_SOURCE" -o "$NVM_DIR/nvm.sh" || { # bug here: NVM_SOURCE is unset
-    echo >&2 "Failed to download '$NVM_SOURCE'.." # bug here: NVM_SOURCE is unset
+  nvm_download -s "$_source" -o "$NVM_DIR/nvm.sh" || { # bug here: _source is unset
+    echo >&2 "Failed to download '$_source'.." # bug here: _source is unset
     unset local_NVM_SOURCE
     return 1
   }

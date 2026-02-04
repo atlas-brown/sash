@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
 
-_setup_file() {
-    file=
+set_file() {
+    file= # variant: `file` is unbound, even though it appears as an assignment.
 }
 
 endpath="$HOME/.spf13-vim-3"
@@ -26,7 +26,6 @@ echo "Thanks for installing spf13-vim\n"
 # Backup existing .vim stuff
 echo "backing up current vim config\n"
 today=`date +%Y%m%d`
-_setup_file
 for i in $HOME/.vim $HOME/.vimrc $HOME/.gvimrc; do [ -e $i ] && [ ! -L $file ] && mv $i $i.$today; done # bug here: file is unset (unbound)
 
 

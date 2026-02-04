@@ -1,7 +1,7 @@
 #!/bin/sh
 
 _set_FILE() {
-    FILE="../patches/${1}.patch"
+    FILE="../patches/${1}.patch" # variant: Even though `FILE` is assigned in the function (definition), it is unbound in the following use since the function is not invoked.
 }
 
 cd vscode || { echo "'vscode' dir not found"; exit 1; }
