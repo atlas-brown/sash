@@ -661,6 +661,7 @@ def handle_if(traces: Traces, node: AST.IfNode, config: InterpConfig) -> Traces:
     else:
         if config.branch_policy_pre is not None:
             decision = config.branch_policy_pre(node)
+            logging.debug("If statement single-path decision: %s", decision)
             if decision == BranchDecision.FIRST:
                 return guarded_interp_node(t1, node.then_b, config)
             if decision == BranchDecision.SECOND:
@@ -1684,20 +1685,6 @@ def interp_node(traces: Traces,
             t_failure: Traces = []
             if not left_config.in_checked_position:
                 t_failure = [t.fail_last_command() for t in t1 if t.latest_state.last_exit_code[0] == SymStr(("0",))]
-            if config.branch_policy_pre is not None:
-                decision = config.branch_policy_pre(node)
-                t_success = [t for t in t1 + t_failure if t.latest_state.last_exit_code[0] == SymStr(("0",))]
-                t_failure_only = [t for t in t1 + t_failure if t.latest_state.last_exit_code[0] == SymStr(("1",))]
-                t_other = [t for t in t1 + t_failure if t.latest_state.last_exit_code[0] not in {SymStr(("0",)), SymStr(("1",))}]
-                t_success = t_success + trace_map(t_other, lambda s: s.set_last_exit_code(SymStr(("0",)), Confidence.SPECULATIVE))
-                t_failure_only = t_failure_only + trace_map(t_other, lambda s: s.set_last_exit_code(SymStr(("1",)), Confidence.SPECULATIVE))
-                if isinstance(node, AST.AndNode):
-                    if decision == BranchDecision.FIRST:
-                        return guarded_interp_node(t_success, node.right_operand, config)
-                    return t_failure_only
-                if decision == BranchDecision.FIRST:
-                    return guarded_interp_node(t_failure_only, node.right_operand, config)
-                return t_success
             def success(traces_with_exit_0: Traces) -> Traces:
                 if isinstance(node, AST.AndNode):
                     return guarded_interp_node(traces_with_exit_0, node.right_operand, right_config)
