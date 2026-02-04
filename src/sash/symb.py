@@ -323,6 +323,24 @@ def handle_rm(expanded_args: tuple[Field, ...], trace: Trace, node: AST.CommandN
                                                        node.pretty(),
                                                        context_line, priority=10, include_fs=False))
 
+    for path in Config.get("PROTECTED_PATHS"):
+        trace = trace.extend(
+            lambda s: s.add_assertion(
+                SimpleConstraint(
+                    And.from_field_iter(
+                        non_flag_args,
+                        lambda arg_field: Not(StringEq(arg_field, Field(SymStr((path,)), WordCount(1, 1)))),
+                    ),
+                    lambda line: reporter.DeleteSystemFile(path, line),
+                ),
+                node.pretty(),
+                context_line,
+                priority=10,
+                include_fs=False,
+            )
+        )
+
+
     for arg_idx, arg_field in enumerate(expanded_args[1:], start=1):
         if is_flag(arg_field):
             continue
