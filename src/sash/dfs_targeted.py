@@ -117,11 +117,14 @@ def run_targeted_dfs(nodes: list[WrappedAst],
         return sorted(lines)
 
     def branch_policy_pre_prefer_spec(node: AST.AstNode) -> BranchDecision:
-        return BranchDecision.ALL
+        logging.debug("Evaluating branch policy for node %s at line %d", node.pretty(), getattr(node, 'line_number', -1))
         if isinstance(node, AST.IfNode):
             then_score = count_spec_cmds(node.then_b)
             else_score = count_spec_cmds(node.else_b) if node.else_b is not None else 0
-            return BranchDecision.FIRST if then_score >= else_score else BranchDecision.SECOND
+            logging.debug("IfNode at line %d: then_score=%d, else_score=%d", getattr(node, 'line_number', -1), then_score, else_score)
+            if then_score == 0 and else_score == 0:
+                return BranchDecision.ALL
+            return BranchDecision.FIRST if then_score > else_score else BranchDecision.SECOND
         if isinstance(node, AST.AndNode) or isinstance(node, AST.OrNode):
             return BranchDecision.ALL
         if isinstance(node, AST.WhileNode):
@@ -137,6 +140,7 @@ def run_targeted_dfs(nodes: list[WrappedAst],
             if isinstance(node, AST.IfNode):
                 then_score = count_spec_cmds(node.then_b)
                 else_score = count_spec_cmds(node.else_b) if node.else_b is not None else 0
+                logging.debug("IfNode at line %d: then_score=%d, else_score=%d", getattr(node, 'line_number', -1), then_score, else_score)
                 if then_score == 0 and else_score == 0:
                     return None
                 return BranchDecision.FIRST if then_score >= else_score else BranchDecision.SECOND
@@ -149,7 +153,10 @@ def run_targeted_dfs(nodes: list[WrappedAst],
 
         def branch_policy_pre_target(node: AST.AstNode) -> BranchDecision:
             decision = branch_policy_pre_for_target(node)
-            return decision if decision is not None else branch_policy_pre_prefer_spec(node)
+            logging.debug("Branch policy for node at line %d: %s", getattr(node, 'line_number', -1), decision)
+            decision = decision if decision is not None else branch_policy_pre_prefer_spec(node)
+            logging.debug("Final branch decision for node at line %d: %s", getattr(node, 'line_number', -1), decision)
+            return decision
 
         logging.info("DFS run: targeting dangerous command at line %d", target_line)
         target_traces = symb_engine(nodes, replace(
