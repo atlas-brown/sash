@@ -360,7 +360,7 @@ reset_steam()
 	done
 
 	# Scary!
-	rm -rf "${STEAMROOT:?}/"*
+    rm -rf "$STEAMROOT/"*
 
 	# Move things back into place
 	mv -f "$STEAM_SAVE/"* "$STEAMROOT/"
