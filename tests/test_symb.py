@@ -131,11 +131,11 @@ rm -rf "${1-/usr}"
     script = write_script(tmp_path, """
 rm -rf "${DESTDIR}${LIBDIR}/${CAMLP5N}"
 """)
-    report = reset_and_run_main(script)
+    report = reset_and_run_main(script, solver=True, enable_dfs=True) # The unbound empty DFS pass catches this
     expected_error1 = reporter.UnboundID("DESTDIR", 0)
     expected_error2 = reporter.UnboundID("LIBDIR", 0)
     expected_error3 = reporter.UnboundID("CAMLP5N", 0)
-    expected_error4 = reporter.WordSplitCouldDeleteSystemFile("${DESTDIR}${LIBDIR}/${CAMLP5N}", 0)
+    expected_error4 = reporter.DeleteSystemFile("/", 0)
     assert_expected_report(report, [expected_error1, expected_error2, expected_error3, expected_error4])
 
     script = write_script(tmp_path, """
@@ -1207,8 +1207,8 @@ def test_makefile(tmp_path):
     expected1 = reporter.UnboundID("LIBDIR", 0)
     expected2 = reporter.UnboundID("CAMLP5N", 0)
     expected3 = reporter.UnboundID("DESTDIR", 0)
-    expected4 = reporter.DangerousWordSplit(None, 0)
-    report = reset_and_run_main(script, solver=True)
+    expected4 = reporter.DeleteSystemFile("/", 0)
+    report = reset_and_run_main(script, solver=True, enable_dfs=True)
     assert_expected_report(report, [expected1, expected2, expected3, expected4])
 
 def test_makefile_fixed(tmp_path):
@@ -1226,7 +1226,7 @@ def test_makefile_fixed(tmp_path):
     expected1 = reporter.UnboundID("LIBDIR", 0)
     expected2 = reporter.UnboundID("CAMLP5N", 0)
     expected3 = reporter.UnboundID("DESTDIR", 0)
-    report = reset_and_run_main(script, solver=True)
+    report = reset_and_run_main(script, solver=True, enable_dfs=True)
     assert_expected_report(report, [expected1, expected2, expected3])
 
 # def test_function_call_multipath(tmp_path):
