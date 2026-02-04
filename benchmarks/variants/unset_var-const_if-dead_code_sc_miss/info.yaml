@@ -1,0 +1,34 @@
+bugs:
+- line: 6
+  description: An unset variable is used ($directorytocopy)
+- line: 6
+  description: If condition is constant assuming that $directorytocopy is unset
+- line: 10
+  description: Dead code from early exit assuming that $directorytocopy is unset
+
+sources:
+- https://stackoverflow.com/questions/48706718/error-with-bash-script-using-rsync-to-copy-directory-with-space-in-directory-nam
+
+ground_truth:
+  errors:
+  - line: 6
+    line_in_fixed: 6
+    code: unbound
+    shellcheck:
+      detects: true
+      fixed_false_positive: false
+      code: SC2154
+  - line: 6
+    line_in_fixed: 6
+    code: conc_const_cond
+    note: this is only relevant for an environment concretization mode (maybe "assume environment is empty")
+    shellcheck:
+      detects: false
+      fixed_false_positive: false
+  - line: 10
+    line_in_fixed: 10
+    code: conc_dead_code
+    note: this is only relevant for an environment concretization mode
+    shellcheck:
+      detects: false
+      fixed_false_positive: false
