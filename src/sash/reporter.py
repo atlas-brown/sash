@@ -118,7 +118,7 @@ class LoopRunsOnce(Issue):
 
 class DeleteSystemFile(Issue):
     def __init__(self,filename:str, line):
-        super().__init__(Code.DELETE_SYSTEM_FILE, f"WILL delete system file {filename}", Severity.ERROR, line)
+        super().__init__(Code.DELETE_SYSTEM_FILE, f"WILL delete system file '{filename}'", Severity.ERROR, line)
 
 
 class WordSplitCouldDeleteSystemFile(Issue):
