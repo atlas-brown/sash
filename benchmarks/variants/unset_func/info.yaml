@@ -1,0 +1,16 @@
+bugs:
+- line: 75
+  description: Function is called before it is defined
+
+sources:
+- https://github.com/ohmyzsh/ohmyzsh/commit/5a5c93b33493b47d34dd470eb851aaf24fa87536
+
+ground_truth:
+  errors:
+  - line: 75
+    line_in_fixed: 120
+    code: function_use_before_def
+    shellcheck:
+      detects: true
+      fixed_false_positive: false
+      code: SC2218
