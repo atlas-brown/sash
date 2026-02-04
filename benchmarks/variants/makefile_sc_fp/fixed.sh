@@ -71,7 +71,7 @@ depend() {
 }
 
 install() {
-    if [ -z "${DESTDIR}" ] || [ -z "${LIBDIR}" ] || [ -z "${CAMLP5N}" ]; then
+    if [ -z "${LIBDIR}" ] || [ -z "${CAMLP5N}" ]; then
         echo "Refusing to remove: vars not set" >&2
         exit 1
     fi
@@ -80,7 +80,7 @@ install() {
 }
 
 uninstall() {
-    if [ -z "${DESTDIR}" ] || [ -z "${LIBDIR}" ] || [ -z "${CAMLP5N}" ]; then
+    if [ -z "${LIBDIR}" ] || [ -z "${CAMLP5N}" ]; then
         echo "Refusing to remove: vars not set" >&2
         exit 1
     fi
