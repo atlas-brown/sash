@@ -168,21 +168,28 @@ __exec_meta_command()
                 debug "$command > $file_to_create 2> $logfile"
                 tail_logfile "$logfile"
                 if [ "$BM_ENCRYPTION_METHOD" = "gpg" ]; then
-                    $command 2>$logfile | $nice $compress_bin -f -q -9 2>$logfile | $nice $gpg $BM__GPG_HOMEDIR -r "$BM_ENCRYPTION_RECIPIENT" -e > $file_to_create.$ext.gpg 2> $logfile
+                    tempout=$($command 2>$logfile)
+                    exitcode=$? # fix: capture exit code of first command in pipeline
+                    echo "$tempout" | $nice $compress_bin -f -q -9 2>$logfile | $nice $gpg $BM__GPG_HOMEDIR -r "$BM_ENCRYPTION_RECIPIENT" -e > $file_to_create.$ext.gpg 2> $logfile
                     debug "$command | $nice $compress_bin -f -q -9 | $nice $gpg $BM__GPG_HOMEDIR -r \"$BM_ENCRYPTION_RECIPIENT\" -e > $file_to_create.$ext.gpg 2> $logfile"
                     file_to_create="$file_to_create.$ext.gpg"
                 else
-                    $command 2> $logfile | $nice $compress_bin -f -q -9 > $file_to_create.$ext 2> $logfile
+                    tempout=$($command 2>$logfile)
+                    exitcode=$?
+                    echo "$tempout" | $nice $compress_bin -f -q -9 > $file_to_create.$ext 2> $logfile
                     file_to_create="$file_to_create.$ext"
                 fi
 
-                exitcode=$?
-                if [ $exitcode -gt 0 ]; then # bug here: intent was to check the exit status of the first command in the pipeline on line 173; right now even if it fails the log is deleted
+                [ "$exitcode" -gt 0 ] # diff: instead of checking exitcode, check exit code of this test, which should be semantically equivalent
+                if [ "$?" -eq 0 ]; then
                     warning "Unable to exec \$command; check \$logfile"
                     rm -f $file_to_create
                 else
                     rm -f $logfile
                 fi
+
+                unset tempout
+                unset exitcode
             else
                 error "Compressor \$compress is needed."
             fi
@@ -195,19 +202,24 @@ __exec_meta_command()
             debug "$command 1> $file_to_create 2>$logfile"
             tail_logfile "$logfile"
             if [ "$BM_ENCRYPTION_METHOD" = "gpg" ]; then
-                $command | $nice $gpg $BM__GPG_HOMEDIR -r "$BM_ENCRYPTION_RECIPIENT" -e > $file_to_create.gpg 2> $logfile
+                tempout=$($command)
+                exitcode=$?
+                echo "$tempout" | $nice $gpg $BM__GPG_HOMEDIR -r "$BM_ENCRYPTION_RECIPIENT" -e > $file_to_create.gpg 2> $logfile
                 file_to_create="$file_to_create.gpg"
             else
                 $command 1> $file_to_create 2>$logfile
+                exitcode=$?
             fi
 
-            exitcode=$?
-            if [ $exitcode -gt 0 ]; then # bug here: intent was to check the exit status of the first command in the pipeline on line 198; right now even if it fails the log is deleted
+            if [ "$exitcode" -gt 0 ]; then
                 warning "Unable to exec \$command; check \$logfile"
                 rm -f $file_to_create
             else
                 rm -f $logfile
             fi
+
+            unset tempout
+            unset exitcode
         ;;
         *)
             error "No such compressor supported: \$compress."
@@ -1006,7 +1018,7 @@ backup_method_svn()
     done
 }
 
-# This is never used by the script so it's safe to comment out (it's difficult to turn into POSIX)
+# This is never used by the script so it's safe to comment out
 #backup_method_pipe()
 #{
 #    method="$1"
