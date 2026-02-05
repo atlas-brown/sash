@@ -5,11 +5,11 @@ import argparse
 import csv
 import sys
 from pathlib import Path
-from typing import NamedTuple
-
+from typing import NamedTuple, Any
 
 class RunResult(NamedTuple):
     benchmark: str
+    kind: str
     missing_gt: bool | None
     crashed: bool | None
     timed_out: bool | None
@@ -28,392 +28,338 @@ def generate_html_report(html_file: Path, run_results: list[RunResult], ran: int
                          detected_issues_extra_unsat_preconds: int, detected_issues_extra_unset_vars: int,
                          total_exec_time: float, total_solver_time: float,
                          SE_timeout: float | None = None, solver_timeout: float | None = None):
-    """Generate a simple HTML report with expandable sections for each benchmark."""
-
-    in_fixed_mode = all(r.benchmark.endswith("fixed.sh") for r in run_results)
 
     html_parts = []
 
-    # HTML head and styles
+    # ------------------------------------------------------------
+    # Per-kind counts
+    # ------------------------------------------------------------
+    buggy_cnt = sum(1 for r in run_results if r.kind.startswith("buggy"))
+    buggy_var_cnt = sum(1 for r in run_results if r.kind == "buggy_variant")
+    fixed_cnt = sum(1 for r in run_results if r.kind.startswith("fixed"))
+    fixed_var_cnt = sum(1 for r in run_results if r.kind == "fixed_variant")
+    variant_cnt = sum(1 for r in run_results if r.kind.endswith("_variant"))
+    unknown_cnt = sum(1 for r in run_results if r.kind == "unknown")
+
+    succeeded = ran - failed
+
+    # ------------------------------------------------------------
+    # HTML + CSS
+    # ------------------------------------------------------------
     html_parts.append("""<!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Evaluation Results</title>
-    <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            margin: 0;
-            padding: 20px;
-            background-color: #f5f5f5;
-        }
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            background: white;
-            border-radius: 8px;
-            padding: 10px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        h1 {
-            color: #333;
-            border-bottom: 3px solid #007bff;
-            padding-bottom: 8px;
-            margin: 0 0 10px 0;
-            font-size: 24px;
-        }
-        .summary {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-            gap: 10px;
-            margin: 10px 0;
-        }
-        .summary-item {
-            background: #f8f9fa;
-            padding: 10px 12px;
-            border-left: 4px solid #007bff;
-            border-radius: 4px;
-        }
-        .summary-item.success {
-            border-left-color: #28a745;
-        }
-        .summary-item.danger {
-            border-left-color: #dc3545;
-        }
-        .summary-item.warning {
-            border-left-color: #ffc107;
-        }
-        .summary-item.info {
-            border-left-color: #17a2b8;
-        }
-        .summary-item-value {
-            font-size: 20px;
-            font-weight: bold;
-            color: #333;
-        }
-        .summary-item-label {
-            font-size: 11px;
-            color: #666;
-            margin-top: 3px;
-        }
-        .benchmark-section {
-            margin: 6px 0;
-            border: 1px solid #ddd;
-            border-radius: 3px;
-            overflow: hidden;
-        }
-        .benchmark-header {
-            background: #f8f9fa;
-            padding: 8px 12px;
-            cursor: pointer;
-            user-select: none;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            border-bottom: 1px solid #ddd;
-            font-size: 14px;
-        }
-        .benchmark-header:hover {
-            background: #e9ecef;
-        }
-        .benchmark-header.passed {
-            background-color: #d4edda;
-            border-bottom-color: #28a745;
-        }
-        .benchmark-header.failed {
-            background-color: #f8d7da;
-            border-bottom-color: #dc3545;
-        }
-        .benchmark-header.unknown {
-            background-color: #d1ecf1;
-            border-bottom-color: #17a2b8;
-        }
-        .benchmark-header.skipped {
-            background-color: #e2e3e5;
-            border-bottom-color: #6c757d;
-        }
-        .benchmark-header.crashed {
-            background-color: #f5c6cb;
-            border-bottom-color: #721c24;
-        }
-        .benchmark-title {
-            flex: 1;
-            font-weight: 600;
-            color: #333;
-        }
-        .benchmark-status {
-            padding: 3px 8px;
-            border-radius: 3px;
-            font-size: 10px;
-            font-weight: bold;
-            margin: 0 8px;
-            white-space: nowrap;
-        }
-        .status-pass {
-            background-color: #28a745;
-            color: white;
-        }
-        .status-fail {
-            background-color: #dc3545;
-            color: white;
-        }
-        .status-unknown {
-            background-color: #17a2b8;
-            color: white;
-        }
-        .status-skipped {
-            background-color: #6c757d;
-            color: white;
-        }
-        .status-crashed {
-            background-color: #721c24;
-            color: white;
-        }
-        .status-timeout {
-            background-color: #fd7e14;
-            color: white;
-        }
-        .toggle-icon {
-            font-size: 16px;
-            margin-left: 8px;
-            transition: transform 0.2s ease;
-        }
-        .benchmark-header.expanded .toggle-icon {
-            transform: rotate(180deg);
-        }
-        .benchmark-content {
-            display: none;
-            padding: 10px 12px;
-            background: white;
-            font-size: 13px;
-        }
-        .benchmark-content.open {
-            display: block;
-        }
-        .issue-list {
-            margin: 6px 0;
-            padding-left: 15px;
-        }
-        .issue-item {
-            margin: 4px 0;
-            padding: 5px 6px;
-            background: #f8f9fa;
-            border-radius: 2px;
-            border-left: 3px solid #007bff;
-            font-size: 12px;
-        }
-        .issue-item.found {
-            border-left-color: #28a745;
-            background: #f0f8f5;
-        }
-        .issue-item.missing {
-            border-left-color: #dc3545;
-            background: #fdf5f5;
-        }
-        .issue-item.extra {
-            border-left-color: #ffc107;
-            background: #fffef5;
-        }
-        .issue-code {
-            font-weight: bold;
-            font-family: monospace;
-        }
-        .issue-line {
-            font-size: 12px;
-            color: #666;
-        }
-        .info-row {
-            margin: 4px 0;
-            display: flex;
-            gap: 15px;
-            font-size: 13px;
-        }
-        .info-label {
-            font-weight: 600;
-            min-width: 130px;
-        }
-        .info-value {
-            font-family: monospace;
-            color: #555;
-            font-size: 12px;
-        }
-    </style>
+<meta charset="UTF-8">
+<title>Evaluation Results</title>
+
+<style>
+body {
+    font-family: system-ui, sans-serif;
+    background:#f5f5f5;
+    padding:20px;
+}
+
+.container {
+    max-width:1200px;
+    margin:auto;
+    background:white;
+    border-radius:8px;
+    padding:14px;
+}
+
+.summary {
+    display:grid;
+    grid-template-columns: repeat(auto-fit,minmax(170px,1fr));
+    gap:10px;
+    margin-bottom:14px;
+}
+
+.summary-item {
+    background:#f8f9fa;
+    padding:10px;
+    border-left:4px solid #007bff;
+    border-radius:4px;
+}
+
+.summary-item.success { border-left-color:#28a745; }
+.summary-item.danger  { border-left-color:#dc3545; }
+.summary-item.warning { border-left-color:#ffc107; }
+.summary-item.info    { border-left-color:#17a2b8; }
+
+/* ------------------------------------------------------------
+   filter bar
+------------------------------------------------------------ */
+
+.filter-bar {
+    margin:10px 0 18px 0;
+    padding:10px;
+    background:#f8f9fa;
+    border-radius:6px;
+    display:flex;
+    gap:18px;
+    flex-wrap:wrap;
+    font-size:13px;
+}
+
+.filter-bar label {
+    cursor:pointer;
+}
+
+/* ------------------------------------------------------------
+   benchmark cards
+------------------------------------------------------------ */
+
+.benchmark-section {
+    margin:6px 0;
+    border:1px solid #ddd;
+    border-radius:4px;
+    overflow:hidden;
+}
+
+.benchmark-header {
+    padding:8px 12px;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    cursor:pointer;
+    font-size:14px;
+    background:#f8f9fa;
+}
+
+.benchmark-header.passed {
+    background:#d4edda;
+}
+
+.benchmark-header.failed {
+    background:#f8d7da;
+}
+
+.benchmark-content {
+    display:none;
+    padding:10px 12px;
+    font-size:13px;
+}
+
+.benchmark-content.open {
+    display:block;
+}
+
+.info-row {
+    display:flex;
+    gap:12px;
+    margin:3px 0;
+    font-size:12px;
+}
+
+.info-label {
+    font-weight:600;
+    min-width:100px;
+}
+
+.info-value {
+    font-family:monospace;
+}
+
+/* ------------------------------------------------------------
+   issue coloring (unchanged)
+------------------------------------------------------------ */
+
+.issue-list { margin-top:8px; }
+
+.issue-item {
+    margin:4px 0;
+    padding:4px 6px;
+    border-left:3px solid #007bff;
+    background:#f8f9fa;
+    border-radius:3px;
+    font-family:monospace;
+}
+
+.issue-item.found {
+    border-left-color:#28a745;
+    background:#f0f8f5;
+}
+
+.issue-item.missing {
+    border-left-color:#dc3545;
+    background:#fdf5f5;
+}
+
+.issue-item.extra {
+    border-left-color:#ffc107;
+    background:#fffef5;
+}
+
+/* ------------------------------------------------------------
+   BUG/FIX/VAR tags (neutral palette)
+------------------------------------------------------------ */
+
+.badge {
+    font-size:10px;
+    font-weight:700;
+    padding:2px 6px;
+    border-radius:3px;
+    margin-right:5px;
+    color:white;
+}
+
+.badge.bug { background:#6c757d; }   /* gray */
+.badge.fix { background:#0d6efd; }   /* blue */
+.badge.var { background:#6f42c1; }   /* purple */
+
+.benchmark-title {
+    display:flex;
+    align-items:center;
+}
+</style>
 </head>
-""")
-
-    html_parts.append(f"""
 <body>
-    <div class="container">
-        <h1>📊 Evaluation Results: {'Fixed' if in_fixed_mode else 'Buggy'} scripts (timeout SE:{SE_timeout if SE_timeout else '?'}s | Z3:{solver_timeout if solver_timeout else '?'}s) --- <a href="results{'' if in_fixed_mode else '-fixed'}.html">{'Buggy' if in_fixed_mode else 'Fixed'} Report</a></h1>
+<div class="container">
+<h1>📊 Evaluation Results</h1>
 """)
 
-    # Summary section
-    succeeded = ran - failed - unknown
-    html_parts.append("""        <div class="summary">""")
-    html_parts.append(f"""            <div class="summary-item success">
-                <div class="summary-item-value">{succeeded}</div>
-                <div class="summary-item-label">Passed</div>
-            </div>""")
-    html_parts.append(f"""            <div class="summary-item danger">
-                <div class="summary-item-value">{failed}</div>
-                <div class="summary-item-label">Failed</div>
-            </div>""")
-    html_parts.append(f"""            <div class="summary-item info">
-                <div class="summary-item-value">{unknown}</div>
-                <div class="summary-item-label">No Ground Truth</div>
-            </div>""")
-    html_parts.append(f"""            <div class="summary-item warning">
-                <div class="summary-item-value">{timed_out}</div>
-                <div class="summary-item-label">Timed Out</div>
-            </div>""")
-    html_parts.append(f"""            <div class="summary-item">
-                <div class="summary-item-value">{skipped}</div>
-                <div class="summary-item-label">Skipped</div>
-            </div>""")
-    html_parts.append("""        </div>""")
+    # ------------------------------------------------------------
+    # Pass/Fail summary
+    # ------------------------------------------------------------
+    html_parts.append('<div class="summary">')
+    html_parts.append(f'<div class="summary-item success"><b>{succeeded}</b><br>Analyses Finished</div>')
+    html_parts.append(f'<div class="summary-item danger"><b>{failed}</b><br>Analyses Crashed</div>')
+    html_parts.append(f'<div class="summary-item warning"><b>{timed_out}</b><br>Analyses Timed Out</div>')
+    html_parts.append(f'<div class="summary-item"><b>{skipped}</b><br>Benchmarks Skipped</div>')
+    html_parts.append('</div>')
 
-    # Issues summary
-    html_parts.append("""        <div style="margin: 8px 0; padding: 10px 12px; background: #f8f9fa; border-radius: 4px;">""")
-    html_parts.append(f"""            <h3 style="margin: 0 0 6px 0; font-size: 14px;">Issue Summary</h3>""")
-    html_parts.append(f"""            <div class="info-row">
-                <span class="info-label">Expected {'UN' if in_fixed_mode else ''}reported issues:</span>
-                <span class="info-value">{total_issues}</span>
-            </div>""")
-    html_parts.append(f"""            <div class="info-row">
-                <span class="info-label">✓ Detected Expected:</span>
-                <span class="info-value" style="color: #28a745; font-weight: bold;">{detected_issues_expected}</span>
-            </div>""")
-    html_parts.append(f"""            <div class="info-row">
-                <span class="info-label">+ Extra Issues Found:</span>
-                <span class="info-value" style="color: #ffc107; font-weight: bold;">{detected_issues_extra}</span>
-            </div>""")
-    if detected_issues_extra > 0:
-        html_parts.append(f"""            <div class="info-row" style="margin-left: 12px; font-size: 12px;">
-                <span>• Unsat preconditions: {detected_issues_extra_unsat_preconds}</span>
-            </div>""")
-        html_parts.append(f"""            <div class="info-row" style="margin-left: 12px; font-size: 12px;">
-                <span>• Unset variables: {detected_issues_extra_unset_vars}</span>
-            </div>""")
-    html_parts.append(f"""            <div class="info-row">
-                <span class="info-label">Exec Time:</span>
-                <span class="info-value">{total_exec_time:.2f}s</span>
-            </div>""")
-    html_parts.append(f"""            <div class="info-row">
-                <span class="info-label">Solver Time:</span>
-                <span class="info-value">{total_solver_time:.2f}s</span>
-            </div>""")
-    html_parts.append("""        </div>""")
+    # ------------------------------------------------------------
+    # Per-kind summary
+    # ------------------------------------------------------------
+    html_parts.append('<h3>Benchmark Types</h3>')
+    html_parts.append('<div class="summary">')
+    html_parts.append(f'<div class="summary-item"><b>{buggy_cnt - buggy_var_cnt} (+ {buggy_var_cnt})</b><br>Buggy</div>')
+    html_parts.append(f'<div class="summary-item"><b>{fixed_cnt - fixed_var_cnt} (+ {fixed_var_cnt})</b><br>Fixed</div>')
+    html_parts.append(f'<div class="summary-item"><b>{variant_cnt}</b><br>Variants</div>')
+    html_parts.append(f'<div class="summary-item"><b>{unknown_cnt}</b><br>Unknown</div>')
+    html_parts.append('</div>')
 
-    # Benchmark details
-    html_parts.append("""        <h2 style="margin: 10px 0 6px 0; font-size: 16px;">Benchmarks</h2>""")
+    # ------------------------------------------------------------
+    # Filters (NEW)
+    # ------------------------------------------------------------
+    html_parts.append("""
+<div class="filter-bar">
+<b>Filters:</b>
+<label><input type="checkbox" id="f-bug" checked> BUG</label>
+<label><input type="checkbox" id="f-fix" checked> FIX</label>
+<label><input type="checkbox" id="f-var" checked> VAR</label>
+<label><input type="checkbox" id="f-pass" checked> PASS</label>
+<label><input type="checkbox" id="f-fail" checked> FAIL</label>
+</div>
+""")
 
+    # ------------------------------------------------------------
+    # Benchmarks
+    # ------------------------------------------------------------
     for result in run_results:
-        # Determine status and styling - color code based only on whether all expected issues are detected
-        # Build status text with additional info
-        status_parts = []
-        if result.crashed:
-            status_parts.append("💥 CRASHED")
-        if result.timed_out:
-            status_parts.append("⏱ TIMEOUT")
-        
-        # Color coding: green if all expected issues found, red if not, gray if no ground truth
-        if result.missing_gt:
-            status_class = "unknown"
-            status_text = "❓ NO GROUND TRUTH"
-            status_badge = "status-unknown"
-        elif result.detected_all:
-            status_class = "passed"
-            status_text = "✓ PASS" + (" " + " ".join(status_parts) if status_parts else "")
-            status_badge = "status-pass"
-        else:
-            status_class = "failed"
-            status_text = "✗ FAIL" + (" " + " ".join(status_parts) if status_parts else "")
-            status_badge = "status-fail"
 
-        benchmark_name = result.benchmark.split('/')[-2] if '/' in result.benchmark else result.benchmark
+        status_class = "passed" if result.detected_all else "failed"
 
-        html_parts.append(f"""        <div class="benchmark-section">
-            <div class="benchmark-header {status_class}">
-                <span class="benchmark-title">{benchmark_name}</span>
-                <span class="benchmark-status {status_badge}">{status_text}</span>
-                <span class="toggle-icon">▼</span>
-            </div>
-            <div class="benchmark-content">""")
-        
-        # Basic info
-        html_parts.append(f"""                <div class="info-row">
-                    <span class="info-label">Benchmark:</span>
-                    <span class="info-value" style="font-family: monospace; font-size: 11px;">{result.benchmark}</span>
-                </div>""")
-        
-        if result.time is not None:
-            time_str = f"{result.time:.2f}"
-            exec_str = f"{result.exec_time:.2f}"
-            solver_str = f"{result.solver_time:.2f}"
-            html_parts.append(f"""                <div class="info-row">
-                    <span class="info-label">Total Time:</span>
-                    <span class="info-value">{time_str}s</span>
-                </div>""")
-            html_parts.append(f"""                <div class="info-row">
-                    <span class="info-label">Exec / Solver:</span>
-                    <span class="info-value">{exec_str}s / {solver_str}s</span>
-                </div>""")
+        parts = result.benchmark.split("/")
+        keep = 3 if result.kind.endswith("_variant") else 2
+        short_name = "/".join(parts[-keep:])
 
-        # Expected vs Actual
-        if not result.crashed and not result.missing_gt:
-            html_parts.append("""                <div style="margin-top: 6px;">""")
-            
-            if result.expected_results:
-                html_parts.append("""                    <h4 style="margin: 4px 0 3px 0; font-size: 12px; font-weight: 600;">Ground Truth Issues:</h4>""")
-                html_parts.append("""                    <div class="issue-list">""")
-                expected_set = set(result.expected_results) if result.expected_results else set()
-                actual_set = set(result.actual_results) if result.actual_results else set()
-                
-                for issue in result.expected_results:
-                    found = "✓" if issue in actual_set else "✗"
-                    if in_fixed_mode:
-                        found_class = "missing" if issue in actual_set else "found"
-                    else:
-                        found_class = "found" if issue in actual_set else "missing"
-                    html_parts.append(f"""                        <div class="issue-item {found_class}"><span class="issue-code">{found} {issue}</span></div>""")
-                html_parts.append("""                    </div>""")
-            
-            if result.actual_results:
-                extra_issues = [a for a in result.actual_results if a not in expected_set] if result.expected_results else result.actual_results
-                if extra_issues:
-                    html_parts.append(f"""                    <h4 style="margin: 4px 0 3px 0; font-size: 12px; font-weight: 600;">Extra Issues Detected:</h4>""")
-                    html_parts.append("""                    <div class="issue-list">""")
-                    for issue in extra_issues:
-                        html_parts.append(f"""                        <div class="issue-item extra"><span class="issue-code">+ {issue}</span></div>""")
-                    html_parts.append("""                    </div>""")
+        is_bug = result.kind.startswith("buggy")
+        is_fix = result.kind.startswith("fixed")
+        is_var = result.kind.endswith("_variant")
 
-            html_parts.append("""                </div>""")
+        badges = []
+        if is_bug:
+            badges.append('<span class="badge bug">BUG</span>')
+        if is_fix:
+            badges.append('<span class="badge fix">FIX</span>')
+        if is_var:
+            badges.append('<span class="badge var">VAR</span>')
 
-        html_parts.append("""            </div>
-        </div>""")
+        data_attrs = f'data-bug="{int(is_bug)}" data-fix="{int(is_fix)}" data-var="{int(is_var)}" data-pass="{int(result.detected_all)}"'
 
-    html_parts.append("""    </div>
-    <script>
-        // Add click handlers to all headers
-        document.querySelectorAll('.benchmark-header').forEach(header => {
-            header.addEventListener('click', function() {
-                const content = this.nextElementSibling;
-                content.classList.toggle('open');
-                this.classList.toggle('expanded');
-            });
-        });
-    </script>
-</body>
-</html>""")
+        html_parts.append(f"""
+<div class="benchmark-section" {data_attrs}>
+  <div class="benchmark-header {status_class}">
+    <span class="benchmark-title">{''.join(badges)}{short_name}</span>
+    <span>{"✓ PASS" if result.detected_all else "✗ FAIL"}</span>
+  </div>
+  <div class="benchmark-content">
+""")
 
-    with open(html_file, 'w') as f:
-        f.write('\n'.join(html_parts))
+        # ---------- NEW info block ----------
+        html_parts.append(f"""
+<div class="info-row"><span class="info-label">Path:</span><span class="info-value">{result.benchmark}</span></div>
+<div class="info-row"><span class="info-label">Exec. time:</span><span class="info-value">{(result.exec_time or 0):.2f}s</span></div>
+<div class="info-row"><span class="info-label">Solver time:</span><span class="info-value">{(result.solver_time or 0):.2f}s</span></div>
+""")
 
+        # ---------- issues ----------
+        expected = set(result.expected_results or [])
+        actual = set(result.actual_results or [])
+        is_fixed = result.kind.startswith("fixed")
+
+        html_parts.append('<div class="issue-list">')
+
+        for issue in expected:
+            success = (issue not in actual) if is_fixed else (issue in actual)
+            cls = "found" if success else "missing"
+            mark = "✓" if success else "✗"
+            html_parts.append(f'<div class="issue-item {cls}">{mark} {issue}</div>')
+
+        for issue in (actual - expected):
+            html_parts.append(f'<div class="issue-item extra">+ {issue}</div>')
+
+        html_parts.append('</div></div></div>')
+
+    # ------------------------------------------------------------
+    # JS (dropdowns + filters)
+    # ------------------------------------------------------------
+    html_parts.append("""
+<script>
+document.querySelectorAll('.benchmark-header').forEach(h=>{
+  h.onclick = ()=>h.nextElementSibling.classList.toggle('open');
+});
+
+const filters = ['bug','fix','var','pass','fail'];
+
+function applyFilters() {
+  const show = {
+    bug:  document.getElementById('f-bug').checked,
+    fix:  document.getElementById('f-fix').checked,
+    var:  document.getElementById('f-var').checked,
+    pass: document.getElementById('f-pass').checked,
+    fail: document.getElementById('f-fail').checked,
+  };
+
+  document.querySelectorAll('.benchmark-section').forEach(el=>{
+    const isBug  = el.dataset.bug === "1";
+    const isFix  = el.dataset.fix === "1";
+    const isVar  = el.dataset.var === "1";
+    const isPass = el.dataset.pass === "1";
+    const isFail = !isPass;
+
+    const visible =
+      (show.bug  || !isBug)  &&
+      (show.fix  || !isFix)  &&
+      (show.var  || !isVar)  &&
+      (show.pass || !isPass) &&
+      (show.fail || !isFail);
+
+    el.style.display = visible ? "" : "none";
+  });
+}
+
+filters.forEach(f => document.getElementById('f-'+f).onchange = applyFilters);
+</script>
+</div></body></html>
+""")
+
+    html_file.write_text("\n".join(html_parts))
     print(f"HTML report generated: {html_file}", file=sys.stderr)
 
 
-def parse_csv_field(value: str) -> any:
+def parse_csv_field(value: str) -> Any:
     """Parse a CSV field value, handling booleans, None, and lists."""
     if value == '' or value == 'None':
         return None
@@ -438,6 +384,7 @@ def load_results_from_csv(csv_file: Path) -> tuple[list[RunResult], int, int, in
         for row in reader:
             result = RunResult(
                 benchmark=row['benchmark'],
+                kind=row.get("kind", "unknown"),
                 missing_gt=row['missing_gt'] == 'True' if row['missing_gt'] else None,
                 crashed=row['crashed'] == 'True' if row['crashed'] else None,
                 timed_out=row['timed_out'] == 'True' if row['timed_out'] else None,
@@ -461,15 +408,15 @@ def load_results_from_csv(csv_file: Path) -> tuple[list[RunResult], int, int, in
     crashed = len([r for r in run_results if r.crashed])
 
     total_issues = len([issue for r in run_results if r.expected_results for issue in r.expected_results])
-    detected_issues_expected = len([issue for r in run_results if r.expected_results and r.actual_results 
+    detected_issues_expected = len([issue for r in run_results if r.expected_results and r.actual_results
                                      for issue in r.expected_results if issue in r.actual_results])
     detected_issues_extra = len([issue for r in run_results if r.actual_results and r.expected_results
                                   for issue in r.actual_results if issue not in r.expected_results])
     detected_issues_extra_unsat_preconds = len([issue for r in run_results if r.actual_results and r.expected_results
-                                                 for issue in r.actual_results 
+                                                 for issue in r.actual_results
                                                  if issue not in r.expected_results and issue == "unsat_precond"])
     detected_issues_extra_unset_vars = len([issue for r in run_results if r.actual_results and r.expected_results
-                                             for issue in r.actual_results 
+                                             for issue in r.actual_results
                                              if issue not in r.expected_results and issue in ["unbound", "unbound_setu"]])
 
     total_exec_time = sum(r.exec_time for r in run_results if r.exec_time)
