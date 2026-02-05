@@ -1537,7 +1537,18 @@ def interp_node(traces: Traces,
             if join_fields(items).count.max <= 1:
                 Reporter.add_issue(reporter.LoopRunsOnce(node, context_line), config)
             # if all items are constant, we can unroll the loop
+            logging.debug("For loop items: %s", items)
             if all(field.is_constant() for field in items):
+                # Word-split constant items within the for-loop list (e.g. $VAR="a b")
+                split_items: list[Field] = []
+                for item in items:
+                    item_str = item.try_to_str()
+                    IFS = " \t\n" # TODO: Grab this from the config
+                    if item_str is not None and any(ch in IFS for ch in item_str):
+                        split_items.extend(Field(SymStr((word,)), WordCount(1, 1)) for word in item_str.split())
+                        continue
+                    split_items.append(item)
+                items = split_items
                 logging.debug("For loop over constant items, unrolling: %s", items)
                 t2 = t1
                 for item_field in items:
