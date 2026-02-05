@@ -237,6 +237,13 @@ def command_substitution_output(cmd_name: str,
             if isinstance(output_field.content, CompletelyArbitrary) and output_field.count.min == 0:
                 output_field = Field(replace(output_field.content, maybe_empty=True), output_field.count)
             return output_field, state
+        case "printf": # Treating like echo for now
+            output_field = merge_partial_fields(operands, sep=" ", state=state) # TODO: sep should be from IFS
+            if (output_str := output_field.try_to_str()) is not None:
+                output_field = Field(SymStr((output_str,)), word_count_from_output(output_str))
+            if isinstance(output_field.content, CompletelyArbitrary) and output_field.count.min == 0:
+                output_field = Field(replace(output_field.content, maybe_empty=True), output_field.count)
+            return output_field, state
         case "mktemp":
             output_path = arbitrary_field(subst_node, ArbitraryType.APPROXIMATION, state)
             assert spec is not None and spec.io in {IOType.STDOUT_FILE, IOType.STDOUT_DIR}, f"unexpected spec? {spec}"
