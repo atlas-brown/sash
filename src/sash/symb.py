@@ -49,7 +49,7 @@ def handle_commandnode(traces: Traces,
             # If the command is `grep` and the first argument is not provided (different from an empty string),
             # meaning a pattern is not provided for the command,
             # `grep` will expect input from stdin instead of treating the second argument as a file.
-            if expanded_args[1].count.min == 0:
+            if expanded_args[1].count.min == 0 and not util.is_definitely_non_empty(expanded_args[1], t1_active[0]):
                 Reporter.add_issue(reporter.UnexpectedStdin(cmd_name, context_line), config)
 
     if expanded_args:
