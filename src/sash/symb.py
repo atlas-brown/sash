@@ -265,61 +265,7 @@ def handle_rm(expanded_args: tuple[Field, ...], trace: Trace, node: AST.CommandN
         DebugLogger.log_assertion(spec.check, trace.latest_state, context_line, config.current_pass)
         trace = trace.extend(lambda s: s.add_assertion(spec.check, source_str=node.pretty(), source_line=context_line))
 
-    # TODO: These helper functions are repeated in the expansion routine, consider refactoring them out into utils
-    def field_core_key(field: Field) -> CompletelyArbitrary | None:
-        match field.content:
-            case CompletelyArbitrary() as content:
-                return replace(content, prefix=None, suffix=None, quoted=False, maybe_empty=False)
-            case _:
-                return None
-
-    def is_empty_constant(field: Field) -> bool:
-        return field.try_to_str() == ""
-
-    def is_non_empty_constant(field: Field) -> bool:
-        field_str = field.try_to_str()
-        return field_str is not None and field_str != ""
-
-    def constraint_implies_non_empty(core: CompletelyArbitrary, constraint: Constraint) -> bool:
-        norm = constraint.normalized().constraint
-        logging.debug("Checking if constraint %s implies non-empty for core %s", norm, core)
-        match norm:
-            case StringEq(lhs, rhs):
-                if core == field_core_key(lhs) and is_non_empty_constant(rhs):
-                    return True
-                if core == field_core_key(rhs) and is_non_empty_constant(lhs):
-                    return True
-                return False
-            case Not(StringEq(lhs, rhs)):
-                if core == field_core_key(lhs) and is_empty_constant(rhs):
-                    return True
-                if core == field_core_key(rhs) and is_empty_constant(lhs):
-                    return True
-                return False
-            case And(lhs, rhs):
-                return constraint_implies_non_empty(core, lhs) or constraint_implies_non_empty(core, rhs)
-            case Or(lhs, rhs):
-                return constraint_implies_non_empty(core, lhs) and constraint_implies_non_empty(core, rhs)
-            case _:
-                return False
-
-    def is_definitely_non_empty(field: Field) -> bool:
-        logging.debug("Checking if field %s is definitely non-empty", field)
-        core = field_core_key(field)
-        logging.debug("Extracted core: %s", core)
-        if core is None:
-            return False
-        logging.debug("Checking path conditions for non-emptiness implications, have %d conditions", len(trace.latest_state.pathcond))
-        return any(constraint_implies_non_empty(core, cond.constraint) for cond in trace.latest_state.pathcond)
-
-    def is_protected(path):
-        return any(path in [p, p + "/", p + "/*"] for p in Config.get("PROTECTED_PATHS"))
-
-    def is_flag(field: Field) -> bool:
-        field_str = field.try_to_str()
-        return field_str is not None and field_str.startswith("-")
-
-    non_flag_args = [arg for arg in expanded_args[1:] if not is_flag(arg)]
+    non_flag_args = [arg for arg in expanded_args[1:] if not util.is_flag(arg)]
 
     pwdval = trace.latest_state.lookup("PWD")
     assert pwdval is not None, "PWD should always be defined"
@@ -349,11 +295,11 @@ def handle_rm(expanded_args: tuple[Field, ...], trace: Trace, node: AST.CommandN
 
 
     for arg_idx, arg_field in enumerate(expanded_args[1:], start=1):
-        if is_flag(arg_field):
+        if util.is_flag(arg_field):
             continue
-        definitely_non_empty = is_definitely_non_empty(arg_field)
+        definitely_non_empty = util.is_definitely_non_empty(arg_field, trace)
         logging.debug("arg %d: %s, definitely_non_empty=%s", arg_idx, arg_field, definitely_non_empty)
-        if (path := arg_field.try_to_str()) and is_protected(path):
+        if (path := arg_field.try_to_str()) and util.is_protected(path):
             Reporter.add_issue(reporter.DeleteSystemFile(path, context_line), config)
 
         def maybe_report_protected_split(content: CompletelyArbitrary, max_words: int | float) -> None:
@@ -364,13 +310,13 @@ def handle_rm(expanded_args: tuple[Field, ...], trace: Trace, node: AST.CommandN
                     exp += pre
                 if content.suffix is not None and (suf := content.suffix.try_to_str()):
                     exp += suf
-                if is_protected(exp):
+                if util.is_protected(exp):
                     Reporter.add_issue(reporter.WordSplitCouldDeleteSystemFile(exp, context_line), config)
 
             if max_words > 1 and not content.quoted:
-                if content.prefix is not None and (pre := content.prefix.try_to_str()) and is_protected(pre):
+                if content.prefix is not None and (pre := content.prefix.try_to_str()) and util.is_protected(pre):
                     Reporter.add_issue(reporter.WordSplitCouldDeleteSystemFile(pre, context_line), config)
-                if content.suffix is not None and (suf := content.suffix.try_to_str()) and is_protected(suf):
+                if content.suffix is not None and (suf := content.suffix.try_to_str()) and util.is_protected(suf):
                     Reporter.add_issue(reporter.WordSplitCouldDeleteSystemFile(suf, context_line), config)
 
         match arg_field:
@@ -857,6 +803,7 @@ def expand_simple(stuff: list[AST.ArgChar],
             case _:
                 return None
 
+    # TODO: Move into util
     def core_matches_field(core: CompletelyArbitrary, field: Field) -> bool:
         other_core = field_core_key(field)
         if other_core is None:

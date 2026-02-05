@@ -3,8 +3,18 @@ from collections.abc import Generator
 import shasta.ast_node as AST
 import z3
 
-from sash.constraints import And, Constraint, Implies, Not, Or
+from typing import TYPE_CHECKING
+
+from sash.constraints import And, Constraint, Implies, Not, Or, StringEq
 from typing import Callable
+from dataclasses import replace
+
+import logging
+
+from sash.symbolic.strings import CompletelyArbitrary, Field
+from sash.config import Config
+if TYPE_CHECKING:
+    from sash.symbolic.state import Trace
 
 
 def split_at(l: list, element) -> list[list]:
@@ -132,3 +142,57 @@ def partition(l: list, predicate: Callable) -> tuple[list, list]:
         else:
             falses.append(item)
     return trues, falses
+
+
+def field_core_key(field: Field) -> CompletelyArbitrary | None:
+    match field.content:
+        case CompletelyArbitrary() as content:
+            return replace(content, prefix=None, suffix=None, quoted=False, maybe_empty=False)
+        case _:
+            return None
+
+def is_empty_constant(field: Field) -> bool:
+    return field.try_to_str() == ""
+
+def is_non_empty_constant(field: Field) -> bool:
+    field_str = field.try_to_str()
+    return field_str is not None and field_str != ""
+
+def constraint_implies_non_empty(core: CompletelyArbitrary, constraint: Constraint) -> bool:
+    norm = constraint.normalized().constraint
+    logging.debug("Checking if constraint %s implies non-empty for core %s", norm, core)
+    match norm:
+        case StringEq(lhs, rhs):
+            if core == field_core_key(lhs) and is_non_empty_constant(rhs):
+                return True
+            if core == field_core_key(rhs) and is_non_empty_constant(lhs):
+                return True
+            return False
+        case Not(StringEq(lhs, rhs)):
+            if core == field_core_key(lhs) and is_empty_constant(rhs):
+                return True
+            if core == field_core_key(rhs) and is_empty_constant(lhs):
+                return True
+            return False
+        case And(lhs, rhs):
+            return constraint_implies_non_empty(core, lhs) or constraint_implies_non_empty(core, rhs)
+        case Or(lhs, rhs):
+            return constraint_implies_non_empty(core, lhs) and constraint_implies_non_empty(core, rhs)
+        case _:
+            return False
+
+def is_definitely_non_empty(field: Field, trace: "Trace") -> bool:
+    logging.debug("Checking if field %s is definitely non-empty", field)
+    core = field_core_key(field)
+    logging.debug("Extracted core: %s", core)
+    if core is None:
+        return False
+    logging.debug("Checking path conditions for non-emptiness implications, have %d conditions", len(trace.latest_state.pathcond))
+    return any(constraint_implies_non_empty(core, cond.constraint) for cond in trace.latest_state.pathcond)
+
+def is_protected(path):
+    return any(path in [p, p + "/", p + "/*"] for p in Config.get("PROTECTED_PATHS"))
+
+def is_flag(field: Field) -> bool:
+    field_str = field.try_to_str()
+    return field_str is not None and field_str.startswith("-")
