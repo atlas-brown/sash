@@ -3,7 +3,7 @@
 backuptodirectory=/Volumes/Backup/date/
 
 _set_directorytocopy() {
-    directorytocopy=
+    directorytocopy= # variant: `directorytocopy` is unbound, even though it appears as an assignment.
 }
 
 if [ ! -d "$directorytocopy" ]; then # bug here (1, 2): directorycopy is unset, check will always succeed

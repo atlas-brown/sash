@@ -16,7 +16,7 @@ gather_data()
 }
 
 TEMPDIR=$(mktemp -d)
-if [ -z "${TEMPDIR}" ]; then
+if [ -z "${TEMPDIR}" ]; then # variant: Since `mktemp` is checked for failure, the `rm -rf "${TEMPDIR}"/` at the end of the file should be safe, even though ShellCheck raises a false positive.
     echo "TEMPDIR is empty, mktemp failed"
     exit 1
 fi

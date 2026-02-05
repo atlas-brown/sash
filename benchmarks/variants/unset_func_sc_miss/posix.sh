@@ -72,54 +72,54 @@ git_prompt_status() {
 }
 
 _set_git_compare_version() {
-#compare the provided version of git to the version installed and on path
-#prints 1 if input version <= installed version
-#prints -1 otherwise
-git_compare_version() {
-  local_INPUT_GIT_VERSION=$1;
-  local_INSTALLED_GIT_VERSION=
-  #local_INPUT_GIT_VERSION=(${(s/./)local_INPUT_GIT_VERSION});
-  IFS=. read -r iv1 iv2 iv3 <<EOF
+    #compare the provided version of git to the version installed and on path
+    #prints 1 if input version <= installed version
+    #prints -1 otherwise
+    git_compare_version() {
+        local_INPUT_GIT_VERSION=$1
+        local_INSTALLED_GIT_VERSION=
+        #local_INPUT_GIT_VERSION=(${(s/./)local_INPUT_GIT_VERSION});
+        IFS=. read -r iv1 iv2 iv3 <<EOF
 $local_INPUT_GIT_VERSION
 EOF
-  #local_INSTALLED_GIT_VERSION=($(git --version));
-  #local_INSTALLED_GIT_VERSION=(${(s/./)local_INSTALLED_GIT_VERSION[3]});
-  local_INSTALLED_GIT_VERSION=$(git --version | awk '{print $3}');
-  IFS=. read -r gv1 gv2 gv3 <<EOF
+        #local_INSTALLED_GIT_VERSION=($(git --version));
+        #local_INSTALLED_GIT_VERSION=(${(s/./)local_INSTALLED_GIT_VERSION[3]});
+        local_INSTALLED_GIT_VERSION=$(git --version | awk '{print $3}')
+        IFS=. read -r gv1 gv2 gv3 <<EOF
 $local_INSTALLED_GIT_VERSION
 EOF
 
-  #for i in {1..3}; do
-  #  if [ $local_INSTALLED_GIT_VERSION[$i] -lt $local_INPUT_GIT_VERSION[$i] ]; then
-  #    echo -1
-  #    return 0
-  #  fi
-  #done
+        #for i in {1..3}; do
+        #  if [ $local_INSTALLED_GIT_VERSION[$i] -lt $local_INPUT_GIT_VERSION[$i] ]; then
+        #    echo -1
+        #    return 0
+        #  fi
+        #done
 
-  i=1
-  while [ $i -le 3 ]; do
-    eval "inst=\${gv$i}" # indirect reference to variable
-    eval "need=\${iv$i}" # indirect reference to variable
-    if [ "$inst" -lt "$need" ]; then
-      echo -1
-      unset inst need
-      unset iv1 iv2 iv3
-      unset gv1 gv2 gv3
-      unset local_INPUT_GIT_VERSION local_INSTALLED_GIT_VERSION
-      return 0
-    fi
-    i=$((i + 1))
-  done
-  echo 1
-  unset inst need
-  unset iv1 iv2 iv3
-  unset gv1 gv2 gv3
-  unset local_INPUT_GIT_VERSION local_INSTALLED_GIT_VERSION
-}
-git_compare_version
+        i=1
+        while [ $i -le 3 ]; do
+            eval "inst=\${gv$i}" # indirect reference to variable
+            eval "need=\${iv$i}" # indirect reference to variable
+            if [ "$inst" -lt "$need" ]; then
+                echo -1
+                unset inst need
+                unset iv1 iv2 iv3
+                unset gv1 gv2 gv3
+                unset local_INPUT_GIT_VERSION local_INSTALLED_GIT_VERSION
+                return 0
+            fi
+            i=$((i + 1))
+        done
+        echo 1
+        unset inst need
+        unset iv1 iv2 iv3
+        unset gv1 gv2 gv3
+        unset local_INPUT_GIT_VERSION local_INSTALLED_GIT_VERSION
+    }
+    git_compare_version # variant: `git_compare_version` is unbound unless `_set_git_compare_version` is invoked before the use(s) of `git_compare_version`.
 }
 
 #this is unlikely to change so make it all statically assigned
-POST_1_7_2_GIT=$(git_compare_version "1.7.2") # bug here: function is defined in the nested function scope, where the outer function is uninvoked.
+POST_1_7_2_GIT=$(git_compare_version "1.7.2") # bug here: function is used before definition.
 #clean up the namespace slightly by removing the checker function
 unset -f git_compare_version

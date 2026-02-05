@@ -2,7 +2,7 @@
 
 set -e
 
-set_source() {
+set__source() {
     _source= # variant: `_source` is unbound, even though it appears as an assignment.
 }
 
