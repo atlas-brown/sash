@@ -1,0 +1,14 @@
+#!/bin/sh
+
+OLD="/net/origin/devdata1/slin"
+NEW="/toolscommon/test/HATS"
+DIR="/home/AutoTest"
+for f in $DIR/*
+do
+    cp $f $f.bak
+   sed 's+$OLD+$NEW+g' $f.bak &gt; $f
+   [ -f "$f" ]
+   if [ $? -eq 0 ]; then # diff: check test command's return code
+       rm -f $f.bak
+   fi
+done

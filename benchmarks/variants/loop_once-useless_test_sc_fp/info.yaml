@@ -1,0 +1,25 @@
+bugs:
+- line: 6
+  description: For loop only iterates once because its argument expands to one word
+- line: 10
+  description: The output of a test command is unused
+
+name: "AutoTest config rename"
+
+sources:
+- https://stackoverflow.com/questions/48195715/sh-script-to-replace-text-in-multiple-files
+
+ground_truth:
+  errors:
+  - line: 6
+    line_in_fixed: 6
+    code: loop_once
+    shellcheck:
+      detects: false
+      fixed_false_positive: false
+  - line: 10
+    line_in_fixed: 10
+    code: ignored_cmd_result
+    shellcheck:
+      detects: false
+      fixed_false_positive: true
