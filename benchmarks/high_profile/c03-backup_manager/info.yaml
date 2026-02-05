@@ -1,37 +1,45 @@
-bugs:
-- line: 179
-  description: Log file is deleted due to improper exit code checking
-- line: 203
-  description: Log file is deleted due to improper exit code checking
-
-name: "Ubuntu backup manager"
+name: Ubuntu backup manager
 
 sources:
-- https://git.launchpad.net/ubuntu/+source/backup-manager/commit/lib/backup-methods.sh?id=59cdd322f7772d40b6aff25b6720796271f4deba
+  - https://git.launchpad.net/ubuntu/+source/backup-manager/commit/lib/backup-methods.sh?id=59cdd322f7772d40b6aff25b6720796271f4deba
 
 notes:
-- To produce posix.sh, some array loops and references were changed to normal variable
-  loops and references, because the arrays in question are not defined in the script anyways.
-- The original fix uses PIPESTATUS, which is not POSIX compliant; the fixed version captures
-  the exit code of the first command in the pipeline by storing it in a temporary variable
+  - To produce posix.sh, some array loops and references were changed to normal variable loops and references, because the arrays in question are not defined in the script anyways
+  - The original fix uses PIPESTATUS, which is not POSIX compliant; the fixed version captures the exit code of the first command in the pipeline by storing it in a temporary variable
 
-ground_truth:
-  errors:
-  - line: 179
-    line_in_fixed: 181
+bugs:
+  bug00:
+    description: Log file is deleted due to improper exit code checking
     code: const_cond
-    shellcheck:
-      detects: true
-      fixed_false_positive: false
-      code: SC2181
-      note: Warns about not checking exit codes indirectly; it's a 'style' check
-  # Note: This is not buggy # TODO: Make a variant that is
-  # - line: 203
-  #   line_in_fixed: 211
-  #   code: const_cond
-  #   note: This is only const along one execution path
-  #   shellcheck:
-  #     detects: true
-  #     fixed_false_positive: false
-  #     code: SC2181
-  #     note: Warns about not checking exit codes indirectly; it's a 'style' check
+    shellcheck: SC2181
+    notes:
+      - ShellCheck warns about not checking exit codes indirectly; it's a 'style' check
+      - We used to think that line 203 (in the original) was also buggy, but it's only constant along one execution path
+
+ground_truths:
+  # Base versions
+  - path: original.sh
+    kind: original
+    bugs:
+      bug00: { lines: [179] }
+
+  - path: posix.sh
+    kind: buggy
+    bugs:
+      bug00: { lines: [179] }
+
+  - path: fixed.sh
+    kind: fixed
+    bugs:
+      bug00: { regression_lines: [183], shellcheck: null }
+
+  # Variants
+  - path: variants/bug-assign_first.sh
+    kind: buggy_variant
+    bugs:
+      bug00: { lines: [180], shellcheck: null }
+
+  - path: variants/fix-test_eq_first.sh
+    kind: fixed_variant
+    bugs:
+      bug00: { regression_lines: [184] }

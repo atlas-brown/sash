@@ -1,15 +1,25 @@
-bugs:
-- line: 6
-  description: For loop only iterates once because its argument expands to one word
-
 sources:
-- https://stackoverflow.com/questions/49562688/trying-to-iterate-through-files-stored-in-variables
+  - https://stackoverflow.com/questions/49562688/trying-to-iterate-through-files-stored-in-variables
 
-ground_truth:
-  errors:
-  - line: 6
-    line_in_fixed: 6
+bugs:
+  bug00:
+    description: For loop only iterates once because its argument expands to one word
     code: loop_once
-    shellcheck:
-      detects: false
-      fixed_false_positive: false
+    shellcheck: null
+
+ground_truths:
+  # Base versions
+  - path: original.sh
+    kind: original
+    bugs:
+      bug00: { lines: [4] }
+
+  - path: posix.sh
+    kind: buggy
+    bugs:
+      bug00: { lines: [6] }
+
+  - path: fixed.sh
+    kind: fixed
+    bugs:
+      bug00: { regression_lines: [6], shellcheck: null }

@@ -1,23 +1,25 @@
-bugs:
-- line: 7
-  description: File is overwritten immediately after being created
-- line: 8
-  description: File is overwritten immediately after being created
-
 sources:
-- https://stackoverflow.com/questions/49138117/not-able-to-overwrite-the-file-properly-through-unix-script
+  - https://stackoverflow.com/questions/49138117/not-able-to-overwrite-the-file-properly-through-unix-script
 
-ground_truth:
-  errors:
-  - line: 7
-    line_in_fixed: 7
+bugs:
+  bug00:
+    description: File is overwritten immediately after being created
     code: data_loss
-    shellcheck:
-      detects: false
-      fixed_false_positive: false
-  - line: 8
-    line_in_fixed: 8
-    code: data_loss
-    shellcheck:
-      detects: false
-      fixed_false_positive: false
+    shellcheck: null
+
+ground_truths:
+  # Base versions
+  - path: original.sh
+    kind: original
+    bugs:
+      bug00: { lines: [7, 8] }
+
+  - path: posix.sh
+    kind: buggy
+    bugs:
+      bug00: { lines: [7, 8] }
+
+  - path: fixed.sh
+    kind: fixed
+    bugs:
+      bug00: { regression_lines: [7, 8], shellcheck: null }

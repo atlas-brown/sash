@@ -1,15 +1,24 @@
-bugs:
-- line: 9
-  description: On every iteration except the first, the source directory of the mv operation does not exist
-
 sources:
-- https://askubuntu.com/questions/1356169/bash-scripting-my-script-deletes-a-working-folder-prematurely-how-do-i-fix
+  - https://askubuntu.com/questions/1356169/bash-scripting-my-script-deletes-a-working-folder-prematurely-how-do-i-fix
 
-ground_truth:
-  errors:
-  - line: 9
-    line_in_fixed: 9
+bugs:
+  bug00:
+    description: On every iteration except the first, the source directory of the mv operation does not exist
     code: cmd_expected_path_state
-    shellcheck:
-      detects: false
-      fixed_false_positive: false
+    shellcheck: null
+
+ground_truths:
+  - path: original.sh
+    kind: original
+    bugs:
+      bug00: { lines: [9] }
+
+  - path: posix.sh
+    kind: buggy
+    bugs:
+      bug00: { lines: [9] }
+
+  - path: fixed.sh
+    kind: fixed
+    bugs:
+      bug00: { regression_lines: [9], shellcheck: null }

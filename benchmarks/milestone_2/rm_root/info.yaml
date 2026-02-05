@@ -1,232 +1,49 @@
-bugs:
-- line: 4
-  description: Wrong comment delimiter in assignment causes // to be interpreted as a command
-- line: 5
-  description: Wrong comment delimiter in assignment causes // to be interpreted as a command
-- line: 6
-  description: Wrong comment delimiter in assignment causes // to be interpreted as a command
-- line: 7
-  description: Wrong comment delimiter in assignment causes // to be interpreted as a command
-- line: 8
-  description: Wrong comment delimiter in assignment causes // to be interpreted as a command
-- line: 9
-  description: Wrong comment delimiter in assignment causes // to be interpreted as a command
-- line: 10
-  description: An unset variable is used ($DATE)
-- line: 10
-  description: Wrong comment delimiter in assignment causes // to be interpreted as a command
-- line: 11
-  description: An unset variable is used ($OUT_DIR)
-- line: 12
-  description: Unquoted variable in rm can word-split and delete arbitrary files
-- line: 12
-  description: Everything under / is deleted because of an unset variable
-- line: 12
-  description: Root is deleted
-- line: 13
-  description: An unset variable is used ($OUT_DIR)
-- line: 13
-  description: An unset variable is used ($DATE)
-- line: 14
-  description: An unset variable is used ($DB_USER)
-- line: 14
-  description: An unset variable is used ($DB_PASS)
-- line: 15
-  description: An unset variable is used ($TAR_DIR)
-- line: 15
-  description: An unset variable is used ($TAR_BAK)
-- line: 16
-  description: An unset variable is used ($DAYS)
-
-name: "MongoDB backup script"
+name: MongoDB backup script
 
 sources:
-- https://stackoverflow.com/questions/55323391/deleted-database-accidentally-by-a-bash-script-rescue-please
+  - https://stackoverflow.com/questions/55323391/deleted-database-accidentally-by-a-bash-script-rescue-please
 
-ground_truth:
-  errors:
-  - line: 4
-    line_in_fixed: 4
+bugs:
+  bug00:
+    description: Wrong comment delimiter in assignment causes // to be interpreted as a command
     code: not_a_command
-    note: A command name never ends in /
-    shellcheck:
-      detects: true
-      fixed_false_positive: false
-      code: SC1127
-  - line: 5
-    line_in_fixed: 5
-    code: not_a_command
-    note: A command name never ends in /
-    shellcheck:
-      detects: true
-      fixed_false_positive: false
-      code: SC1127
-  - line: 6
-    line_in_fixed: 6
-    code: not_a_command
-    note: A command name never ends in /
-    shellcheck:
-      detects: true
-      fixed_false_positive: false
-      code: SC1127
-  - line: 7
-    line_in_fixed: 7
-    code: not_a_command
-    note: A command name never ends in /
-    shellcheck:
-      detects: true
-      fixed_false_positive: false
-      code: SC1127
-  - line: 8
-    line_in_fixed: 8
-    code: not_a_command
-    note: A command name never ends in /
-    shellcheck:
-      detects: true
-      fixed_false_positive: false
-      code: SC1127
-  - line: 9
-    line_in_fixed: 9
-    code: not_a_command
-    note: A command name never ends in /
-    shellcheck:
-      detects: true
-      fixed_false_positive: false
-      code: SC1127
-  - line: 10
-    line_in_fixed: 10
-    code: not_a_command
-    note: A command name never ends in /
-    shellcheck:
-      detects: true
-      fixed_false_positive: false
-      code: SC1127
-  - line: 11
-    line_in_fixed: 11
+    shellcheck: SC1127
+  bug01:
+    description: An unset variable is used
     code: unbound
-    shellcheck:
-      detects: true
-      fixed_false_positive: false
-      code: SC2154
-  # 2nd occurrence of $OUT_DIR not reported
-  # - line: 12
-  #   code: unbound
-  #   shellcheck:
-  #     detects: true
-  #     code: SC2154
-  - code: word_split
-    line: 12
-    line_in_fixed: 12
-    shellcheck:
-      detects: true
-      fixed_false_positive: false
-      code: SC2086
-  - code: del_sys_file
-    line: 12
-    line_in_fixed: 12
-    note: for "$OUT_DIR/*"
-    shellcheck:
-      detects: true
-      fixed_false_positive: true
-      code: SC2115
-  - code: del_sys_file
-    line: 12
-    line_in_fixed: 12
-    note: for "//"
-    shellcheck:
-      detects: true
-      fixed_false_positive: false
-      code: SC2114
-  # 3rd occurence of $OUT_DIR
-  # - line: 13
-  #   code: unbound
-  #   shellcheck:
-  #     detects: true
-  #     code: SC2154
-  - line: 13
-    line_in_fixed: 13
-    code: unbound
-    shellcheck:
-      detects: true
-      fixed_false_positive: false
-      code: SC2154
-  - line: 14
-    line_in_fixed: 14
-    code: unbound
-    note: DUMP
-    shellcheck:
-      detects: true
-      fixed_false_positive: false
-      code: SC2154
-  - line: 14
-    line_in_fixed: 14
-    code: unbound
-    note: DB_USER
-    shellcheck:
-      detects: true
-      fixed_false_positive: false
-      code: SC2154
-  - line: 14
-    line_in_fixed: 14
-    code: unbound
-    note: DB_PASS
-    shellcheck:
-      detects: true
-      fixed_false_positive: false
-      code: SC2154
-  # 4th occurrence of OUT_DIR and DATE
-  # - line: 14
-  #   code: unbound
-  #   duplicate: true
-  #   shellcheck:
-  #     detects: true
-  #     code: SC2154
-  # - line: 14
-  #   code: unbound
-  #   duplicate: true
-  #   shellcheck:
-  #     detects: true
-  #     code: SC2154
-  - line: 15
-    line_in_fixed: 15
-    code: unbound
-    note: TAR_DIR
-    shellcheck:
-      detects: true
-      fixed_false_positive: false
-      code: SC2154
-  - line: 15
-    line_in_fixed: 15
-    code: unbound
-    note: TAR_BAK
-    shellcheck:
-      detects: true
-      fixed_false_positive: false
-      code: SC2154
-  # OUT_DIR and DATE
-  # - line: 15
-  #   code: unbound
-  #   duplicate: true
-  #   shellcheck:
-  #     detects: true
-  #     code: SC2154
-  # - line: 15
-  #   code: unbound
-  #   duplicate: true
-  #   shellcheck:
-  #     detects: true
-  #     code: SC2154
-  # TAR_DIR
-  # - line: 16
-  #   code: unbound
-  #   shellcheck:
-  #     detects: true
-  #     code: SC2154
-  - line: 16
-    line_in_fixed: 16
-    code: unbound
-    note: DAYS
-    shellcheck:
-      detects: true
-      fixed_false_positive: false
-      code: SC2154
+    shellcheck: SC2154
+  bug02:
+    description: Unquoted variable in rm can word-split and delete arbitrary files
+    code: word_split
+    shellcheck: SC2086
+  bug03:
+    description: Everything under / is deleted because of an unset variable
+    code: del_sys_file
+    shellcheck: SC2115
+
+ground_truths:
+  # Base versions
+  - path: original.sh
+    kind: original
+    bugs:
+      bug00: { lines: [3, 4, 5, 6, 7, 8, 9] }
+      bug01: { lines: [10, 12, 13, 13, 13, 14, 14, 15] }
+      bug02: { lines: [11] }
+      bug03: { lines: [11, 11] }
+
+  - path: posix.sh
+    kind: buggy
+    bugs:
+      bug00: { lines: [3, 4, 5, 6, 7, 8, 9] }
+      bug01: { lines: [10, 12, 13, 13, 13, 14, 14, 15] }
+      bug02: { lines: [11] }
+      bug03: { lines: [11, 11] }
+
+  - path: fixed.sh
+    kind: fixed
+    bugs:
+      bug00: { regression_lines: [3, 4, 5, 6, 7, 8, 9], shellcheck: null }
+      bug01:
+        { regression_lines: [10, 12, 13, 13, 13, 14, 14, 15], shellcheck: null }
+      bug02: { regression_lines: [11], shellcheck: null }
+      bug03: { regression_lines: [11, 11], shellcheck: null }

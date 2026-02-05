@@ -1,5 +1,4 @@
 #!/bin/sh
-
 printf " Which Name needs to create? (y/n): "; read dom
 
 

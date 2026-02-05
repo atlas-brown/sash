@@ -1,23 +1,24 @@
-bugs:
-- line: 25
-  description: Command stdout is redirected to function
-- line: 25
-  description: Command stderr is redirected to function
-
 sources:
-- https://stackoverflow.com/questions/49043790/customized-function-for-error-logs-scripting
+  - https://stackoverflow.com/questions/49043790/customized-function-for-error-logs-scripting
 
-ground_truth:
-  errors:
-  - line: 25 # the redirection is technically part of the {...} block starting on line 25
-    line_in_fixed: 25
+bugs:
+  bug00:
+    description: Command output is redirected to function
     code: redir_func
-    shellcheck:
-      detects: false
-      fixed_false_positive: false
-  - line: 25 # the redirection is technically part of the {...} block starting on line 25
-    line_in_fixed: 25
-    code: redir_func
-    shellcheck:
-      detects: false
-      fixed_false_positive: false
+    shellcheck: null
+
+ground_truths:
+  - path: original.sh
+    kind: original
+    bugs:
+      bug00: { lines: [24, 24] } # The redirection is technically part of the {...} block
+
+  - path: posix.sh
+    kind: buggy
+    bugs:
+      bug00: { lines: [25, 25] }
+
+  - path: fixed.sh
+    kind: fixed
+    bugs:
+      bug00: { regression_lines: [25, 25], shellcheck: null }

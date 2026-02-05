@@ -1,19 +1,25 @@
-bugs:
-- line: 85
-  description: An unset variable is used ($_source)
-- line: 86
-  description: An unset variable is used ($_source)
-
 sources:
-- https://github.com/nvm-sh/nvm/commit/5904d41b253e03d7ad0f3b58ce081e46e44f3c9a
+  - https://github.com/nvm-sh/nvm/commit/5904d41b253e03d7ad0f3b58ce081e46e44f3c9a
 
-ground_truth:
-  errors:
-  - line: 85
-    line_in_fixed: 85
+bugs:
+  bug00:
+    description: An unset variable is used ($_source)
     code: unbound
-    note: we only expect one report, first unbound occurence
-    shellcheck:
-      detects: true
-      fixed_false_positive: false
-      code: SC2153
+    shellcheck: SC2153
+
+ground_truths:
+  # Base versions
+  - path: original.sh
+    kind: original
+    bugs:
+      bug00: { lines: [85] }
+
+  - path: posix.sh
+    kind: buggy
+    bugs:
+      bug00: { lines: [85] }
+
+  - path: fixed.sh
+    kind: fixed
+    bugs:
+      bug00: { regression_lines: [85], shellcheck: null }

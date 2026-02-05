@@ -1,95 +1,36 @@
-bugs:
-- line: 37
-  description: An unset variable is used ($ZSH)
-- line: 57
-  description: An unset variable is used ($NORMAL)
-- line: 60
-  description: An unset variable is used ($RB_RESET)
-- line: 61
-  description: An unset variable is used ($RB_RESET)
-- line: 62
-  description: An unset variable is used ($RB_RESET)
-- line: 63
-  description: An unset variable is used ($RB_RESET)
-- line: 64
-  description: An unset variable is used ($RB_RESET)
-- line: 65
-  description: An unset variable is used ($RB_RESET)
-
-name: "OhMyZsh update script"
+name: OhMyZsh update script
 
 sources:
-- https://github.com/ohmyzsh/ohmyzsh/commit/f7bf566555a2c0e87deba5dfb3e344f23f4a51bb
+  - https://github.com/ohmyzsh/ohmyzsh/commit/f7bf566555a2c0e87deba5dfb3e344f23f4a51bb
 
-ground_truth:
-  errors:
-  - line: 37
-    line_in_fixed: 37
+bugs:
+  bug00:
+    description: Unset variable used
     code: unbound
-    fix_clears: false
-    shellcheck:
-      detects: true
-      fixed_false_positive: false
-      code: SC2154
-      note: Needs --enable=check-unassigned-uppercase
-  - line: 57
-    line_in_fixed: 57
-    code: unbound
-    shellcheck:
-      detects: true
-      fixed_false_positive: false
-      code: SC2154
-      note: Needs --enable=check-unassigned-uppercase
-  - line: 60
-    line_in_fixed: 60
-    code: unbound
-    shellcheck:
-      detects: true
-      fixed_false_positive: false
-      code: SC2154
-      note: Needs --enable=check-unassigned-uppercase
-  - line: 61
-    line_in_fixed: 61
-    code: unbound
-    duplicate: true
-    shellcheck:
-      detects: true
-      fixed_false_positive: false
-      code: SC2154
-      note: Needs --enable=check-unassigned-uppercase
-  - line: 62
-    line_in_fixed: 62
-    code: unbound
-    duplicate: true
-    shellcheck:
-      detects: true
-      fixed_false_positive: false
-      code: SC2154
-      note: Needs --enable=check-unassigned-uppercase
-  - line: 63
-    line_in_fixed: 63
-    code: unbound
-    duplicate: true
-    shellcheck:
-      detects: true
-      fixed_false_positive: false
-      code: SC2154
-      note: Needs --enable=check-unassigned-uppercase
-  - line: 64
-    line_in_fixed: 64
-    code: unbound
-    duplicate: true
-    shellcheck:
-      detects: true
-      fixed_false_positive: false
-      code: SC2154
-      note: Needs --enable=check-unassigned-uppercase
-  - line: 65
-    line_in_fixed: 65
-    code: unbound
-    duplicate: true
-    shellcheck:
-      detects: true
-      fixed_false_positive: false
-      code: SC2154
-      note: Needs --enable=check-unassigned-uppercase
+    shellcheck: SC2154
+    notes:
+      - Only the first instance of an unset variable is reported by SaSh and ShellCheck
+      - The variable $ZSH seems to be unset as well, but it was not part of the reported bug (presumably it was set in the environment)
+
+ground_truths:
+  # Base versions
+  - path: original.sh
+    kind: original
+    bugs:
+      bug00: { lines: [55, 58] }
+
+  - path: posix.sh
+    kind: buggy
+    bugs:
+      bug00: { lines: [57, 60] }
+
+  - path: fixed.sh
+    kind: fixed
+    bugs:
+      bug00: { regression_lines: [57, 60], shellcheck: null }
+
+  # Variants
+  - path: variants/bug-init_func.sh
+    kind: buggy_variant
+    bugs:
+      bug00: { lines: [62, 65], shellcheck: null }

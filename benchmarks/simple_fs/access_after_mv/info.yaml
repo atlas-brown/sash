@@ -1,15 +1,25 @@
-bugs:
-- line: 49
-  description: Accessing directory after it has been moved
-
 sources:
-- https://github.com/community-scripts/ProxmoxVE/commit/695802152856a8bd011ad060a70082dd1cf91ead
+  - https://github.com/community-scripts/ProxmoxVE/commit/695802152856a8bd011ad060a70082dd1cf91ead
 
-ground_truth:
-  errors:
-  - line: 49
-    line_in_fixed: 50
+bugs:
+  bug00:
+    description: Accessing directory after it has been moved
     code: cmd_expected_path_state
-    shellcheck:
-      detects: false
-      fixed_false_positive: false
+    shellcheck: null
+
+ground_truths:
+  # Base versions
+  - path: original.sh
+    kind: original
+    bugs:
+      bug00: { lines: [49] }
+
+  - path: posix.sh
+    kind: buggy
+    bugs:
+      bug00: { lines: [49] }
+
+  - path: fixed.sh
+    kind: fixed
+    bugs:
+      bug00: { regression_lines: [50], shellcheck: null }

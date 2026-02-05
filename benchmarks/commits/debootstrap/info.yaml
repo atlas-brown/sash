@@ -1,31 +1,41 @@
-bugs:
-- line: 67
-  description: Variable in for loop is never used/For loop body is constant
-  note: unclear if we should try to catch this
-- line: 510
-  description: An invocation of the script deletes the process working directory
-
-note:
-- very cool bug, let's try to target it
-- requires modeling output of echo, pwd, and cmd substs -- all within several nested ifs
-- idea is to do a run thru where all input vars are empty
-
 sources:
-- https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=337230
-- https://snapshot.debian.org/archive/debian/20051030T000000Z/pool/main/d/debootstrap/debootstrap_0.3.2.2.tar.gz
-- https://snapshot.debian.org/archive/debian/20061116T213413Z/pool/main/d/debootstrap/debootstrap_0.3.3.tar.gz
+  - https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=337230
+  - https://snapshot.debian.org/archive/debian/20051030T000000Z/pool/main/d/debootstrap/debootstrap_0.3.2.2.tar.gz
+  - https://snapshot.debian.org/archive/debian/20061116T213413Z/pool/main/d/debootstrap/debootstrap_0.3.3.tar.gz
 
-ground_truth:
-  errors:
-  - line: 67
-    line_in_fixed: 67
+notes:
+  - Very cool bug, let's try to target it
+  - Requires modeling output of echo, pwd, and cmd substs -- all within several nested ifs
+  - Idea is to do a run through where all input vars are empty
+
+bugs:
+  bug00:
+    description: Variable in for loop is never used/For loop body is constant
     code: unused_loop_var
-    shellcheck:
-      detects: true
-      fixed_false_positive: false
-  - line: 510
-    line_in_fixed: 504
+    shellcheck: SC2034
+    notes:
+      - Unclear if we should try to catch this
+  bug01:
+    description: An invocation of the script deletes the process working directory
     code: del_sys_file
-    shellcheck:
-      detects: false
-      fixed_false_positive: false
+    shellcheck: null
+
+ground_truths:
+  # Base versions
+  - path: original.sh
+    kind: original
+    bugs:
+      bug00: { lines: [47] }
+      bug01: { lines: [488] }
+
+  - path: posix.sh
+    kind: buggy
+    bugs:
+      bug00: { lines: [67] }
+      bug01: { lines: [510] }
+
+  - path: fixed.sh
+    kind: fixed
+    bugs:
+      bug00: { regression_lines: [67], shellcheck: null }
+      bug01: { regression_lines: [504], shellcheck: null }

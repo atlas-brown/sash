@@ -1,15 +1,25 @@
-bugs:
-- line: 11
-  description: The output of mkdir is captured, but mkdir does not produce output
-
 sources:
-- https://stackoverflow.com/questions/73501167/issue-in-mkdir-output-to-variable
+  - https://stackoverflow.com/questions/73501167/issue-in-mkdir-output-to-variable
 
-ground_truth:
-  errors:
-  - line: 11
-    line_in_fixed: 11
+bugs:
+  bug00:
+    description: The output of mkdir is captured, but mkdir does not produce output
     code: capturing_empty_output
-    shellcheck:
-      detects: false
-      fixed_false_positive: false
+    shellcheck: null
+
+ground_truths:
+  # Base versions
+  - path: original.sh
+    kind: original
+    bugs:
+      bug00: { lines: [10] }
+
+  - path: posix.sh
+    kind: buggy
+    bugs:
+      bug00: { lines: [10] }
+
+  - path: fixed.sh
+    kind: fixed
+    bugs:
+      bug00: { regression_lines: [10], shellcheck: null }

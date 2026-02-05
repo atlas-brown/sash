@@ -1,18 +1,27 @@
-bugs:
-- line: 5
-  description: Unquoted variable in rm can word-split and delete arbitrary files
-
-name: "iTunes updater"
+name: iTunes updater
 
 sources:
-- https://apple.slashdot.org/comments.pl?sid=23365&cid=2518563
+  - https://apple.slashdot.org/comments.pl?sid=23365&cid=2518563
 
-ground_truth:
-  errors:
-  - line: 5
-    line_in_fixed: 5
+bugs:
+  bug00:
+    description: Unquoted variable in rm can word-split and delete arbitrary files
     code: word_split
-    shellcheck:
-      detects: true
-      fixed_false_positive: false
-      code: SC2086
+    shellcheck: SC2086
+
+ground_truths:
+  # Base versions
+  - path: original.sh
+    kind: original
+    bugs:
+      bug00: { lines: [5] }
+
+  - path: posix.sh
+    kind: buggy
+    bugs:
+      bug00: { lines: [5] }
+
+  - path: fixed.sh
+    kind: fixed
+    bugs:
+      bug00: { regression_lines: [5], shellcheck: null }

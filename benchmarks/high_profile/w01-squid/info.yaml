@@ -1,35 +1,63 @@
-bugs:
-- line: 131
-  description: Everything under / is deleted when an environment variable is unset
-- line: 144
-  description: Everything under / is deleted when an environment variable is unset
-
-name: "Squid init script"
+name: Squid init script
 
 sources:
-- https://github.com/mozilla-services/squid-rpm/blob/47880414f17affdbb634b6f0a19a342995fb60f6/SOURCES/squid.init
-- https://bugzilla.redhat.com/show_bug.cgi?id=1102343
+  - https://github.com/mozilla-services/squid-rpm/blob/47880414f17affdbb634b6f0a19a342995fb60f6/SOURCES/squid.init
+  - https://bugzilla.redhat.com/show_bug.cgi?id=1102343
 
 notes:
-- The script is costructed by combining the full script from the first source with a snippet from the second source
+  - The script is costructed by combining the full script from the first source with a snippet from the second source
 
-ground_truth:
-  errors:
-  - line: 131
-    line_in_fixed: 131
-    code:
-      - word_split_del_sys_file
-      - word_split
-    shellcheck:
-      detects: true
-      fixed_false_positive: false
-      code: SC2115
-  - line: 144
-    line_in_fixed: 144
-    code:
-      - word_split_del_sys_file
-      - word_split
-    shellcheck:
-      detects: true
-      fixed_false_positive: false
-      code: SC2115
+bugs:
+  bug00:
+    description: Everything under / is deleted when an environment variable is unset
+    code: word_split_del_sys_file
+    shellcheck: SC2115
+  bug01:
+    description: Arbitrary files can be deleted if an environment variable contains spaces
+    code: word_split
+    shellcheck: SC2086
+
+ground_truths:
+  # Base versions
+  - path: original.sh
+    kind: original
+    bugs:
+      bug00: { lines: [130, 143] }
+      bug01: { lines: [130, 143] }
+
+  - path: posix.sh
+    kind: buggy
+    bugs:
+      bug00: { lines: [131, 144] }
+      bug01: { lines: [131, 144] }
+
+  - path: fixed.sh
+    kind: fixed
+    bugs:
+      bug00: { regression_lines: [131, 144], shellcheck: null }
+      bug01: { regression_lines: [131, 144], shellcheck: null }
+
+  # Variants
+  - path: variants/bug-indirect_rm.sh
+    kind: buggy_variant
+    bugs:
+      bug00: { lines: [132, 147], shellcheck: null }
+      bug01: { lines: [132, 147] }
+
+  - path: variants/fix-case_empty.sh
+    kind: fixed_variant
+    bugs:
+      bug00: { regression_lines: [135, 148] }
+      bug01: { regression_lines: [135, 148], shellcheck: null }
+
+  - path: variants/fix-if_z_exit.sh
+    kind: fixed_variant
+    bugs:
+      bug00: { regression_lines: [133, 146] }
+      bug01: { regression_lines: [133, 146], shellcheck: null }
+
+  - path: variants/fix-n_or_exit.sh
+    kind: fixed_variant
+    bugs:
+      bug00: { regression_lines: [133, 146] }
+      bug01: { regression_lines: [133, 146], shellcheck: null }

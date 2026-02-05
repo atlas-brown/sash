@@ -1,25 +1,26 @@
-bugs:
-- line: 3
-  description: Xargs command renames all files to the same target
-- line: 5
-  description: Xargs command renames all files to the same target
+name: HPC cluster file movement
 
-name: "HPC cluster file movement"
+bugs:
+  bug00:
+    description: Xargs command renames all files to the same target
+    code: data_loss
+    shellcheck: null
 
 sources:
-- https://stackoverflow.com/questions/70017719/recovering-the-files-that-were-deleted-in-linux-by-using-mv
+  - https://stackoverflow.com/questions/70017719/recovering-the-files-that-were-deleted-in-linux-by-using-mv
 
-ground_truth:
-  errors:
-  - line: 3
-    line_in_fixed: 5
-    code: data_loss
-    shellcheck:
-      detects: false
-      fixed_false_positive: false
-  - line: 5
-    line_in_fixed: 7
-    code: data_loss
-    shellcheck:
-      detects: false
-      fixed_false_positive: false
+ground_truths:
+  - path: original.sh
+    kind: original
+    bugs:
+      bug00: { lines: [3, 5] }
+
+  - path: posix.sh
+    kind: buggy
+    bugs:
+      bug00: { lines: [3, 5] }
+
+  - path: fixed.sh
+    kind: fixed
+    bugs:
+      bug00: { regression_lines: [5, 7], shellcheck: null }

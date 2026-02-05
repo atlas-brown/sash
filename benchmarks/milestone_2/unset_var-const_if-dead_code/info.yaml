@@ -1,34 +1,45 @@
-bugs:
-- line: 6
-  description: An unset variable is used ($directorytocopy)
-- line: 6
-  description: If condition is constant assuming that $directorytocopy is unset
-- line: 10
-  description: Dead code from early exit assuming that $directorytocopy is unset
+name: Rsync directory copy script
 
 sources:
-- https://stackoverflow.com/questions/48706718/error-with-bash-script-using-rsync-to-copy-directory-with-space-in-directory-nam
+  - https://stackoverflow.com/questions/48706718/error-with-bash-script-using-rsync-to-copy-directory-with-space-in-directory-nam
 
-ground_truth:
-  errors:
-  - line: 6
-    line_in_fixed: 6
+bugs:
+  bug00:
+    description: An unset variable is used ($directorytocopy)
     code: unbound
-    shellcheck:
-      detects: true
-      fixed_false_positive: false
-      code: SC2154
-  - line: 6
-    line_in_fixed: 6
+    shellcheck: SC2154
+  bug01:
+    description: If condition is constant assuming that $directorytocopy is unset
     code: conc_const_cond
-    note: this is only relevant for an environment concretization mode (maybe "assume environment is empty")
-    shellcheck:
-      detects: false
-      fixed_false_positive: false
-  - line: 10
-    line_in_fixed: 10
+    shellcheck: null
+    notes:
+      - This is only relevant for an environment concretization mode
+  bug02:
+    description: Dead code from early exit assuming that $directorytocopy is unset
     code: conc_dead_code
-    note: this is only relevant for an environment concretization mode
-    shellcheck:
-      detects: false
-      fixed_false_positive: false
+    shellcheck: null
+    notes:
+      - This is only relevant for an environment concretization mode
+
+ground_truths:
+  # Base versions
+  - path: original.sh
+    kind: original
+    bugs:
+      bug00: { lines: [6] }
+      bug01: { lines: [6] }
+      bug02: { lines: [10] }
+
+  - path: posix.sh
+    kind: buggy
+    bugs:
+      bug00: { lines: [6] }
+      bug01: { lines: [6] }
+      bug02: { lines: [10] }
+
+  - path: fixed.sh
+    kind: fixed
+    bugs:
+      bug00: { regression_lines: [6], shellcheck: null }
+      bug01: { regression_lines: [6], shellcheck: null }
+      bug02: { regression_lines: [10], shellcheck: null }

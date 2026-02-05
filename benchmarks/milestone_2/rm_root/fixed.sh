@@ -1,5 +1,4 @@
 #!/bin/sh
-
 DUMP=mongodump
 OUT_DIR=/data/backup/mongod/tmp   # 备份文件临时目录
 TAR_DIR=/data/backup/mongod       # 备份文件将压缩正式目录

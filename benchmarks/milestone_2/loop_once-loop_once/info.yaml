@@ -1,23 +1,32 @@
-bugs:
-- line: 8
-  description: For loop only iterates once because its argument is quoted
-- line: 15
-  description: For loop only iterates once because its argument is quoted
-
 sources:
-- https://stackoverflow.com/questions/48919816/i-am-having-a-hard-time-why-the-if-statements-dont-work-in-shellscript
+  - https://stackoverflow.com/questions/48919816/i-am-having-a-hard-time-why-the-if-statements-dont-work-in-shellscript
 
-ground_truth:
-  errors:
-  - line: 8
-    line_in_fixed: 8
+bugs:
+  bug00:
+    description: For loop only iterates once because its argument doesn't word-split
     code: loop_once
-    shellcheck:
-      detects: true
-      fixed_false_positive: false
-  - line: 15
-    line_in_fixed: 15
-    code: loop_once
-    shellcheck:
-      detects: true
-      fixed_false_positive: false
+    shellcheck: SC2066
+
+ground_truths:
+  # Base versions
+  - path: original.sh
+    kind: original
+    bugs:
+      bug00: { lines: [8, 15] }
+
+  - path: posix.sh
+    kind: buggy
+    bugs:
+      bug00: { lines: [8, 15] }
+
+  - path: fixed.sh
+    kind: fixed
+    bugs:
+      bug00: { regression_lines: [8, 15], shellcheck: null }
+
+  # Variants
+  - path: variants/bug-remove_quotes.sh
+    kind: buggy_variant
+    bugs:
+      bug00: { lines: [8], shellcheck: null }
+      bug00: { lines: [15] } # It's the same bug; the ID is not a mistake

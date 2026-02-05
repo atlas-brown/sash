@@ -1,18 +1,27 @@
-bugs:
-- line: 113
-  description: Command is invoked after asserting it is not installed
-
 sources:
-- https://github.com/ohmyzsh/ohmyzsh/commit/8f0ff4bb63a8fd26741128a851c224af323eb772
+  - https://github.com/ohmyzsh/ohmyzsh/commit/8f0ff4bb63a8fd26741128a851c224af323eb772
 
-ground_truth:
-  errors:
-  - line: 113
-    line_in_fixed: 113
+bugs:
+  bug00:
+    description: Command is invoked after asserting it is not installed
     code: not_a_command
-    shellcheck:
-      detects: false
-      fixed_false_positive: false
+    shellcheck: null
+    notes:
+      - "todo let's get consensus: I think this is essentially the same error as the `//` command bug (milestone_2/rm_root)"
 
-    note: 'todo let''s get consensus: I think this is essentially the same error as
-      the `//` command bug (milestone_2/rm_root)'
+ground_truths:
+  # Base versions
+  - path: original.sh
+    kind: original
+    bugs:
+      bug00: { lines: [111] }
+
+  - path: posix.sh
+    kind: buggy
+    bugs:
+      bug00: { lines: [113] }
+
+  - path: fixed.sh
+    kind: fixed
+    bugs:
+      bug00: { regression_lines: [113], shellcheck: null }

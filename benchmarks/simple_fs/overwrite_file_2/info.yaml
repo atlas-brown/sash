@@ -1,23 +1,25 @@
-bugs:
-- line: 9
-  description: File is accidentally overwritten in every iteration of a loop
-- line: 10
-  description: File is accidentally overwritten in every iteration of a loop
-
 sources:
-- https://stackoverflow.com/questions/65666474/how-can-i-stop-my-script-to-overwrite-existing-files
+  - https://stackoverflow.com/questions/65666474/how-can-i-stop-my-script-to-overwrite-existing-files
 
-ground_truth:
-  errors:
-  - line: 9
-    line_in_fixed: 9
+bugs:
+  bug00:
+    description: File is accidentally overwritten in every iteration of a loop
     code: data_loss
-    shellcheck:
-      detects: false
-      fixed_false_positive: false
-  - line: 10
-    line_in_fixed: 10
-    code: data_loss
-    shellcheck:
-      detects: false
-      fixed_false_positive: false
+    shellcheck: null
+
+ground_truths:
+  # Base versions
+  - path: original.sh
+    kind: original
+    bugs:
+      bug00: { lines: [9, 10] }
+
+  - path: posix.sh
+    kind: buggy
+    bugs:
+      bug00: { lines: [9, 10] }
+
+  - path: fixed.sh
+    kind: fixed
+    bugs:
+      bug00: { regression_lines: [9, 10], shellcheck: null }

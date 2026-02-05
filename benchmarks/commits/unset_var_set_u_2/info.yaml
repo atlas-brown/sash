@@ -1,17 +1,27 @@
-bugs:
-- line: 15
-  description: An unset variable is appended to itself while set -u is enabled
-
 sources:
-- https://code.uplex.de/stefan/audiowmark/commit/95db9c5f0b7788aff65f2d85eaedd0c01ba960ac
+  - https://code.uplex.de/stefan/audiowmark/commit/95db9c5f0b7788aff65f2d85eaedd0c01ba960ac
 
-ground_truth:
-  errors:
-  - line: 15
-    line_in_fixed: 15
+bugs:
+  bug00:
+    description: An unset variable is appended to itself while set -u is enabled
     code: unbound_setu
-    shellcheck:
-      detects: false
-      fixed_false_positive: false
+    shellcheck: null
+    notes:
+      - Unclear why ShellCheck does not detect this
 
-    note: Care is needed when implementing this check
+ground_truths:
+  # Base versions
+  - path: original.sh
+    kind: original
+    bugs:
+      bug00: { lines: [15] }
+
+  - path: posix.sh
+    kind: buggy
+    bugs:
+      bug00: { lines: [15] }
+
+  - path: fixed.sh
+    kind: fixed
+    bugs:
+      bug00: { regression_lines: [15], shellcheck: null }

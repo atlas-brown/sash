@@ -1,15 +1,25 @@
-bugs:
-- line: 9
-  description: File is accidentally overwritten in every iteration of a loop
-
 sources:
-- https://stackoverflow.com/questions/49605847/file-copying-in-while-loop-is-executing-for-one-time-only
+  - https://stackoverflow.com/questions/49605847/file-copying-in-while-loop-is-executing-for-one-time-only
 
-ground_truth:
-  errors:
-  - line: 9
-    line_in_fixed: 9
+bugs:
+  bug00:
+    description: File is accidentally overwritten in every iteration of a loop
     code: data_loss
-    shellcheck:
-      detects: false
-      fixed_false_positive: false
+    shellcheck: null
+
+ground_truths:
+  # Base versions
+  - path: original.sh
+    kind: original
+    bugs:
+      bug00: { lines: [9] }
+
+  - path: posix.sh
+    kind: buggy
+    bugs:
+      bug00: { lines: [9] }
+
+  - path: fixed.sh
+    kind: fixed
+    bugs:
+      bug00: { regression_lines: [9], shellcheck: null }
