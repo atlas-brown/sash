@@ -1,0 +1,23 @@
+bugs:
+- line: 3
+  description: If the first argument is empty, grep expects input from stdin
+- line: 4
+  description: If the first argument is empty, grep expects input from stdin
+
+sources:
+- https://stackoverflow.com/questions/42844610/restoring-deleted-file-using-bash-in-unix
+
+ground_truth:
+  errors:
+  - line: 3
+    line_in_fixed: 7
+    code: unexpected_stdin
+    shellcheck:
+      detects: false
+      fixed_false_positive: true
+  - line: 4
+    line_in_fixed: 8
+    code: unexpected_stdin
+    shellcheck:
+      detects: false
+      fixed_false_positive: true
