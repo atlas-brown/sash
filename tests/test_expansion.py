@@ -115,6 +115,19 @@ def test_expand_vars_split():
     # and should remain as literal '$C'
     assert expanded[3] == [constant_field("$C")]
 
+def test_expand_vars_split_general_case():
+    script = parse_script("""echo $A""")
+    assert len(script) == 1
+    assert isinstance(script[0], AST.CommandNode)
+
+    state = starting_state()\
+        .set_env("A", ShellVar(constant_field("a b", 2)))
+
+    expanded = [expand_simple_r(arg, state, config) for arg in script[0].arguments]
+    assert len(expanded) == 2
+    assert expanded[0] == [constant_field("echo")]
+    assert expanded[1] == [constant_field("a"), constant_field("b")]
+
 def test_expand_vars_joined():
     script = parse_script("""echo $A$A before"$B" $B$B ${A}after before$A "$A"after""")
     assert len(script) == 1
