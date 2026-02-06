@@ -24,3 +24,9 @@ ground_truths:
     kind: fixed
     bugs:
       bug00: { regression_lines: [82, 95] }
+
+  # Variants
+  - path: variants/bug-assign_first.sh
+    kind: buggy_variant
+    bugs:
+      bug00: { lines: [83, 90] }

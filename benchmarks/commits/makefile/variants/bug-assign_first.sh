@@ -70,13 +70,25 @@ depend() {
     for i in $DIRS compile; do run_make "$i" depend; done
 }
 
+_set_LIBDIR() {
+    LIBDIR= # variant: `LIBDIR` is unbound, even though it appears as an assignment.
+}
+
+_set_CAMLP5N() {
+    CAMLP5N= # variant: `CAMLP5N` is unbound, even though it appears as an assignment.
+}
+
 install() {
-    rm -rf "${DESTDIR}${LIBDIR}/${CAMLP5N}" # bug here: will delete / if variables not set
+    TO_DEL=${DESTDIR}${LIBDIR}/${CAMLP5N} # diff: assign to a variable first
+    rm -rf "${TO_DEL}" # bug here: will delete / if variables not set
+    unset TO_DEL
     for i in $DIRS compile; do run_make "$i" install DESTDIR="$DESTDIR"; done
 }
 
 uninstall() {
-    rm -rf "${DESTDIR}${LIBDIR}/${CAMLP5N}" # bug here: will delete / if variables not set
+    TO_DEL=${DESTDIR}${LIBDIR}/${CAMLP5N} # diff: assign to a variable first
+    rm -rf "${TO_DEL}" # bug here: will delete / if variables not set
+    unset TO_DEL
     (cd "${DESTDIR}${BINDIR}" && rm -f *"${CAMLP5N}"* odyl ocpp)
     (cd "${DESTDIR}${MANDIR}/man1" && rm -f *"${CAMLP5N}"* odyl ocpp)
 }

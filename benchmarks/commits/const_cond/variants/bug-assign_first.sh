@@ -1,7 +1,6 @@
 #!/bin/sh
 
-set -f # fix: remove -e
-babun_tools="babun_tools"
+set -e -f
 . "/usr/local/etc/babun.instance"
 . "$babun_tools/script.sh"
 
@@ -40,7 +39,8 @@ apply_git_config() {
 	for configKey in ${configMap}
 	do
 		git config --list | grep -q "$configKey"
-		if [ $? -ne 0 ]; then
+        return_code="$?" # diff: assign to a variable first
+		if [ "$return_code" -ne 0 ]; then # bug here: due to `set -e`, this can never be true
 			configValue="${configKey}"
 			git config --global "$configKey" "$configValue"
 		fi

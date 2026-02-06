@@ -1,9 +1,6 @@
 sources:
   - https://github.com/babun/babun/commit/4e49aebca73ff7d6ecb587a417945d21c4974a3f
 
-notes:
-  - In the "fixed" script, the condition is still constant, but for a different reason
-
 bugs:
   bug00:
     description: Branching on pipeline exit status with set -e
@@ -26,3 +23,14 @@ ground_truths:
     kind: fixed
     bugs:
       bug00: { regression_lines: [43] }
+
+  # Variants
+  - path: variants/bug-assign_first.sh
+    kind: buggy_variant
+    bugs:
+      bug00: { lines: [43], shellcheck: null }
+
+  - path: variants/fix-test_eq_first.sh
+    kind: fixed_variant
+    bugs:
+      bug00: { regression_lines: [44] }
