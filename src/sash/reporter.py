@@ -6,7 +6,7 @@ from dataclasses import dataclass, replace
 from enum import Enum
 from typing import NamedTuple
 from sash.interpreter_config import InterpConfig
-from sash.constraints import Constraint, Empty
+from sash.constraints import Constraint, Description, Empty
 from sash.debugtools.logger import DebugLogger
 
 
@@ -55,6 +55,18 @@ class Issue(ABC):
     def __repr__(self) -> str:
         qualification = f"IF {self.condition} then " if self.condition else ""
         return f"L{self.source_line}:{self.code}: {qualification}{self.message}"
+
+    def __eq__(self, other: object) -> bool:
+        return (
+            isinstance(other, Issue)
+            and self.code == other.code
+            and self.message == other.message
+            and self.severity == other.severity
+            and self.source_line == other.source_line
+        )
+
+    def __hash__(self) -> int:
+        return hash((self.code, self.message, self.severity, self.source_line))
 
     def to_dict(self) -> dict:
         return {
@@ -196,7 +208,7 @@ class Report(NamedTuple):
 
 class Reporter:
     _filename: str
-    _issues: set[Issue]
+    _issues: dict[Issue, Constraint | None]
     _exec_time: float = math.nan
     _solver_time: float = math.nan
     _timed_out: bool
@@ -209,7 +221,7 @@ class Reporter:
             cls.reset()
 
         cls._filename = filename
-        cls._issues = set()
+        cls._issues = {}
         cls._exec_time = math.nan
         cls._solver_time = math.nan
         cls._timed_out = False
@@ -217,9 +229,23 @@ class Reporter:
 
     @classmethod
     def add_issue(cls, issue: Issue, current_config: InterpConfig):
-        if current_config.current_pass_condition:
-            issue = issue.under_condition(current_config.current_pass_condition)
-        cls._issues.add(issue)
+        # todo: improve condition handling (would need proper types instead of searching text)
+        new_cond = issue.condition or current_config.current_pass_condition
+        if issue in cls._issues:
+            existing_cond = cls._issues[issue]
+            # If the most general condition (none) is in place, do nothing
+            if existing_cond is None:
+                pass
+
+            # If the second most general condition (empty vars) is in place, only update to None
+            elif isinstance(existing_cond, Description) and ("empty" in existing_cond.text) and (new_cond in [None, Empty()]):
+                cls._issues[issue] = None
+                DebugLogger.log_issue(issue, current_config.current_pass)
+
+            # All other conditions are just as general as each other; do nothing
+            return
+
+        cls._issues[issue] = new_cond
         DebugLogger.log_issue(issue, current_config.current_pass)
 
     @classmethod
@@ -245,14 +271,14 @@ class Reporter:
     @classmethod
     def reset(cls):
         cls._initialized = False
-        cls._issues = set()
+        cls._issues = dict()
         cls._exec_time = math.nan
         cls._solver_time = math.nan
         cls._timed_out = False
 
     @classmethod
     def drop_issues(cls, codes: set[Code]):
-        cls._issues = {issue for issue in cls._issues if issue.code not in codes}
+        cls._issues = {issue: cond for issue, cond in cls._issues.items() if issue.code not in codes}
 
     @classmethod
     def get_report(cls) -> Report:
@@ -266,7 +292,8 @@ class Reporter:
 
         return Report(
             filename=cls._filename,
-            issues=sorted(cls._issues, key=lambda i: i.source_line if i.source_line is not None else -1),
+            # We only add the condition to the issue here to enable easy deduplication while accumulating issues
+            issues=sorted([i.under_condition(cond) for i, cond in cls._issues.items()], key = lambda i: i.source_line if i.source_line is not None else -1),
             time=cls._exec_time,
             solver_time=cls._solver_time,
             timed_out=cls._timed_out,

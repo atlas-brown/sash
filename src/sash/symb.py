@@ -1909,7 +1909,9 @@ def symbexec_file(input_file: str,
                                        current_pass="unbound:empty",
                                        current_pass_condition=Description("(DFS) unbound variables are empty")))
             Reporter.drop_issues({reporter.Code.DELETE_SYSTEM_FILE, reporter.Code.CONSTANT_CONDITION})
-            Reporter._issues = Reporter._issues | issues_so_far # this dance ensures that any del_sys_files found before the last run are kept
+            for i in issues_so_far: # ensure that any del_sys_files found before the last run are kept
+                if i.code == reporter.Code.DELETE_SYSTEM_FILE:
+                    Reporter.add_issue(i, config)
             # logging.info("DFS run: exploring the first trace only")
             # symb_engine(nodes, replace(config, trace_collapser = lambda ts: ts[:1]))
             logging.info("DFS_first run complete, proceeding with normal symbolic execution")
