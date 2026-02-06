@@ -25,6 +25,7 @@ def main(
     run_buggy: bool,
     run_fixed: bool,
     run_variants: bool,
+    run_only_variants: bool,
     html_file: Path | None,
     verbose: bool,
     no_color: bool,
@@ -61,6 +62,7 @@ def main(
                             eval_buggy=run_buggy,
                             eval_fixed=run_fixed,
                             eval_variants=run_variants,
+                            eval_only_variants=run_only_variants,
                         )
                     )
     eprint("Done!")
@@ -427,6 +429,7 @@ def prepare_jobs(
     eval_buggy,
     eval_fixed,
     eval_variants,
+    eval_only_variants: bool,
 ) -> list[Job]:
     all_codes = sash.reporter.Issue.all_codes()
     where = benchmark_dir.relative_to(ROOT_DIR)
@@ -466,14 +469,20 @@ def prepare_jobs(
         bugs[bug_id] = bug_info
 
     eval_kinds = []
-    if eval_buggy:
-        eval_kinds.append("buggy")
-    if eval_fixed:
-        eval_kinds.append("fixed")
-    if eval_variants and eval_buggy:
-        eval_kinds.append("buggy_variant")
-    if eval_variants and eval_fixed:
-        eval_kinds.append("fixed_variant")
+    if eval_only_variants:
+        if eval_buggy:
+            eval_kinds.append("buggy_variant")
+        if eval_fixed:
+            eval_kinds.append("fixed_variant")
+    else:
+        if eval_buggy:
+            eval_kinds.append("buggy")
+        if eval_fixed:
+            eval_kinds.append("fixed")
+        if eval_variants and eval_buggy:
+            eval_kinds.append("buggy_variant")
+        if eval_variants and eval_fixed:
+            eval_kinds.append("fixed_variant")
 
     jobs = []
     for gt in info["ground_truths"]:
@@ -783,6 +792,7 @@ if __name__ == "__main__":
     parser.add_argument('-S', '--skip-buggy', action='store_true', help='Don\'t run the evaluation on the buggy versions of the benchmarks (default: false)')
     parser.add_argument('-f', '--fixed', action='store_true', help='Run the evaluation on the fixed versions of the benchmarks (default: false)')
     parser.add_argument('-v', '--variants', action='store_true', help='Run the evaluation on the variant versions of the benchmarks; given the values of \'-S\' and \'-f\', only the matching variants will run (default: false)')
+    parser.add_argument('-vO', '--variants-only', action='store_true', help='Run the evaluation only on the variant versions of the benchmarks (default: false)')
     parser.add_argument('-a', '--all', action='store_true', help='Run the evaluation on all versions of the benchmarks; equivalent to \'-f -v\' (default: false)')
     parser.add_argument('-H', '--html', type=Path, default=None, help='File to write HTML overview to (default: no HTML output)')
     parser.add_argument('-N', '--no-color', action='store_true', help='Disable colored output to stderr (default: false)')
@@ -800,9 +810,10 @@ if __name__ == "__main__":
         enable_dfs=not args.disable_dfs,
         log_level=args.log_level,
         log_file=args.error_log,
-        run_buggy=not args.skip_buggy,
+        run_buggy=not args.skip_buggy or args.all,
         run_fixed=args.fixed or args.all,
         run_variants=args.variants or args.all,
+        run_only_variants=args.variants_only,
         html_file=args.html,
         verbose=args.verbose,
         no_color=args.no_color,
