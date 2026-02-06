@@ -63,6 +63,7 @@ def main(
                             eval_fixed=run_fixed,
                             eval_variants=run_variants,
                             eval_only_variants=run_only_variants,
+                            verbose=verbose,
                         )
                     )
     eprint("Done!")
@@ -430,6 +431,7 @@ def prepare_jobs(
     eval_fixed,
     eval_variants,
     eval_only_variants: bool,
+    verbose: bool = False,
 ) -> list[Job]:
     all_codes = sash.reporter.Issue.all_codes()
     where = benchmark_dir.relative_to(ROOT_DIR)
@@ -441,10 +443,14 @@ def prepare_jobs(
         stats.skipped += 1
         return []
 
-    if len(validate_benchmark(benchmark_dir, info)) > 0:
+    val_errs= validate_benchmark(benchmark_dir, info)
+    if len(val_errs) > 0:
         eprint_fail(
             where, f"Skipping evaluation due to '{INFO_FILENAME}' validation errors"
         )
+        if verbose:
+            for err in val_errs:
+                eprint_fail(where, f"{err}")
         stats.skipped += 1
         return []
 
@@ -592,7 +598,13 @@ def disable_color():
     UNDERLINE = ""
 
 
-def generate_html_report(filename: Path, stats: EvalStats, jobs: list[FinishedJob], timeout: float | None, solver_timeout: float | None):
+def generate_html_report(
+    filename: Path,
+    stats: EvalStats,
+    jobs: list[FinishedJob],
+    timeout: float | None,
+    solver_timeout: float | None,
+):
     import report
 
     def job_to_run_result(job: FinishedJob) -> report.RunResult:
@@ -657,7 +669,6 @@ def generate_html_report(filename: Path, stats: EvalStats, jobs: list[FinishedJo
     detected_issues_extra_unset_vars = 0  # Not tracked currently
     total_exec_time = stats.exec_time
     total_solver_time = stats.solver_time
-
 
     report.generate_html_report(
         html_file=filename,
@@ -751,7 +762,14 @@ INFO_SCHEMA = {
                                         "items": {"type": "integer", "minimum": 1},
                                         "minItems": 1,
                                     },
-                                    "shellcheck": {"type": ["string", "null"]},
+                                    "shellcheck": {
+                                        "type": ["string", "null"],
+                                        "pattern": "^SC[0-9]{4}$",
+                                    },
+                                    "notes": {
+                                        "type": "array",
+                                        "items": {"type": "string"},
+                                    },
                                 },
                                 "additionalProperties": False,
                             },
