@@ -25,7 +25,7 @@ ground_truths:
   - path: fixed.sh
     kind: fixed
     bugs:
-      bug00: { regression_lines: [359], shellcheck: null }
+      bug00: { regression_lines: [362] }
 
   # Variants
   - path: variants/bug-move_trailing_slash.sh
@@ -34,11 +34,6 @@ ground_truths:
       bug00: { lines: [359], shellcheck: null }
 
   - path: variants/fix-case_empty.sh
-    kind: fixed_variant
-    bugs:
-      bug00: { regression_lines: [362] }
-
-  - path: variants/fix-if_z_exit.sh
     kind: fixed_variant
     bugs:
       bug00: { regression_lines: [362] }
