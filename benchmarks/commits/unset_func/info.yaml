@@ -23,3 +23,9 @@ ground_truths:
     kind: fixed
     bugs:
       bug00: { regression_lines: [120], shellcheck: null }
+
+  # Variants
+  - path: variants/fix-func_redef.sh
+    kind: fixed
+    bugs:
+      bug00: { regression_lines: [124] }

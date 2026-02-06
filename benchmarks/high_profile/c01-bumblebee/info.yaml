@@ -25,3 +25,19 @@ ground_truths:
     kind: fixed
     bugs:
       bug00: { regression_lines: [350], shellcheck: null }
+
+  # Variants
+  - path: variants/bug-rm_var.sh
+    kind: buggy_variant
+    bugs:
+      bug00: { lines: [351], shellcheck: null }
+
+  - path: variants/bug-rm_loop.sh
+    kind: buggy_variant
+    bugs:
+      bug00: { lines: [352], shellcheck: null }
+
+  - path: variants/fix-rm_var.sh
+    kind: fixed_variant
+    bugs:
+      bug00: { regression_lines: [351], shellcheck: SC2115 }

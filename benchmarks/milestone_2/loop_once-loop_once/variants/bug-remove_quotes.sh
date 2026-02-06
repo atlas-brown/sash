@@ -12,7 +12,7 @@ do
             read filename
             while [ $x -le 3 ]; do
 
-            for filename in  "$directory"; # bug here (2): does not glob (loops once)
+            for filename in  $directory; # bug here (2): does not glob (loops once)
         do
             if [ -r "$filename" ]
             then echo "The filename is readable"

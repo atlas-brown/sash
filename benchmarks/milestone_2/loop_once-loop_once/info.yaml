@@ -28,5 +28,4 @@ ground_truths:
   - path: variants/bug-remove_quotes.sh
     kind: buggy_variant
     bugs:
-      bug00: { lines: [8], shellcheck: null }
-      bug00: { lines: [15] } # It's the same bug; the ID is not a mistake
+      bug00: { lines: [8, 15] }
