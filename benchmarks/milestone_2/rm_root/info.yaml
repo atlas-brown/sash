@@ -54,3 +54,14 @@ ground_truths:
       bug02: { regression_lines: [11], shellcheck: null }
       bug03: { regression_lines: [11, 11] }
       bug04: { regression_lines: [11] }
+
+  # Variants
+  - path: variants/bug-too_many_diffs.sh
+    kind: buggy_variant
+    bugs:
+      bug00: { lines: [4, 5, 6, 7, 8, 9, 10], shellcheck: null }
+      bug01: { lines: [11, 13, 14, 14, 15, 15, 16], shellcheck: null }
+      bug02: { lines: [12] }
+      bug03: { lines: [13] }
+      bug03: { lines: [13], shellcheck: null } # Same bug ID on purpose
+      bug04: { lines: [13] }

@@ -2,9 +2,6 @@
 
 . credentials.sh
 OPTARG=""
-_set_OPTARGS() {
-    OPTARGS= # variant: `OPTARGS` is unbound, even though it appears as an assignment.
-}
 while getopts :i:x:n name
 do
     case $name in
@@ -23,3 +20,5 @@ do
     touch "$line"
     mv  "$line" "$dirName"
 done < $inputfile
+
+OPTARGS="" # diff: assign here

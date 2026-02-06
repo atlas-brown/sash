@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 
 set -e
 
@@ -18,23 +18,24 @@ fi
 # NVM_SOURCE always takes precedence
 #
 nvm_source() {
-  local NVM_METHOD
-  NVM_METHOD="$1"
+  local_NVM_METHOD="$1"
   if [ -z "$NVM_SOURCE" ]; then
-    local NVM_SOURCE
+    local_NVM_SOURCE=
   else
     echo "$NVM_SOURCE"
     return 0
   fi
-  if [ "_$NVM_METHOD" = "_script" ]; then
-    NVM_SOURCE="https://raw.githubusercontent.com/creationix/nvm/v0.18.0/nvm.sh"
-  elif [ "_$NVM_METHOD" = "_git" ] || [ -z "$NVM_METHOD" ]; then
-    NVM_SOURCE="https://github.com/creationix/nvm.git"
+  if [ "_$local_NVM_METHOD" = "_script" ]; then
+    local_NVM_SOURCE="https://raw.githubusercontent.com/creationix/nvm/v0.18.0/nvm.sh"
+  elif [ "_$local_NVM_METHOD" = "_git" ] || [ -z "$local_NVM_METHOD" ]; then
+    local_NVM_SOURCE="https://github.com/creationix/nvm.git"
   else
-    echo >&2 "Unexpected value \"$NVM_METHOD\" for \$NVM_METHOD"
+    echo >&2 "Unexpected value \"$local_NVM_METHOD\" for \$local_NVM_METHOD"
     return 1
   fi
-  echo "$NVM_SOURCE"
+  echo "$local_NVM_SOURCE"
+  unset local_NVM_METHOD
+  unset local_NVM_SOURCE
   return 0
 }
 
@@ -72,8 +73,7 @@ install_nvm_from_git() {
 }
 
 install_nvm_as_script() {
-  local NVM_SOURCE
-  NVM_SOURCE=$(nvm_source "script")
+  local_NVM_SOURCE=$(nvm_source "script")
 
   # Downloading to $NVM_DIR
   mkdir -p "$NVM_DIR"
@@ -82,10 +82,12 @@ install_nvm_as_script() {
   else
     echo "=> Downloading nvm as script to '$NVM_DIR'"
   fi
-  nvm_download -s "$_source" -o "$NVM_DIR/nvm.sh" || {
-    echo >&2 "Failed to download '$_source'.."
+  nvm_download -s "$_source" -o "$NVM_DIR/nvm.sh" || { # bug here: _source is unset
+    echo >&2 "Failed to download '$_source'.." # bug here: _source is unset
+    unset local_NVM_SOURCE
     return 1
   }
+  unset local_NVM_SOURCE
 }
 
 #
@@ -135,29 +137,29 @@ nvm_do_install() {
 
   echo
 
-  local NVM_PROFILE
-  NVM_PROFILE=$(nvm_detect_profile)
+  local_NVM_PROFILE=$(nvm_detect_profile)
 
   SOURCE_STR="\nexport NVM_DIR=\"$NVM_DIR\"\n[ -s \"\$NVM_DIR/nvm.sh\" ] && . \"\$NVM_DIR/nvm.sh\"  # This loads nvm"
 
-  if [ -z "$NVM_PROFILE" ] ; then
-    echo "=> Profile not found. Tried $NVM_PROFILE (as defined in \$PROFILE), ~/.bashrc, ~/.bash_profile, ~/.zshrc, and ~/.profile."
+  if [ -z "$local_NVM_PROFILE" ] ; then
+    echo "=> Profile not found. Tried $local_NVM_PROFILE (as defined in \$PROFILE), ~/.bashrc, ~/.bash_profile, ~/.zshrc, and ~/.profile."
     echo "=> Create one of them and run this script again"
-    echo "=> Create it (touch $NVM_PROFILE) and run this script again"
+    echo "=> Create it (touch $local_NVM_PROFILE) and run this script again"
     echo "   OR"
     echo "=> Append the following lines to the correct file yourself:"
     printf "$SOURCE_STR"
     echo
   else
-    if ! grep -qc 'nvm.sh' "$NVM_PROFILE"; then
-      echo "=> Appending source string to $NVM_PROFILE"
-      printf "$SOURCE_STR\n" >> "$NVM_PROFILE"
+    if ! grep -qc 'nvm.sh' "$local_NVM_PROFILE"; then
+      echo "=> Appending source string to $local_NVM_PROFILE"
+      printf "$SOURCE_STR\n" >> "$local_NVM_PROFILE"
     else
-      echo "=> Source string already in $NVM_PROFILE"
+      echo "=> Source string already in $local_NVM_PROFILE"
     fi
   fi
 
   echo "=> Close and reopen your terminal to start using nvm"
+  unset local_NVM_PROFILE # not used by nvm_reset
   nvm_reset
 }
 
@@ -170,3 +172,5 @@ nvm_reset() {
 }
 
 [ "_$NVM_ENV" = "_testing" ] || nvm_do_install
+
+_source="" # diff: assign here

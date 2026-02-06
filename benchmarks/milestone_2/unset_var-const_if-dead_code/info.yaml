@@ -13,13 +13,13 @@ bugs:
     code: conc_const_cond
     shellcheck: null
     notes:
-      - This is only relevant for an environment concretization mode
+      - This is only relevant for an environment concretization mode (out-of-scope for now)
   bug02:
     description: Dead code from early exit assuming that $directorytocopy is unset
     code: conc_dead_code
     shellcheck: null
     notes:
-      - This is only relevant for an environment concretization mode
+      - This is only relevant for an environment concretization mode (out-of-scope for now)
 
 ground_truths:
   # Base versions
@@ -43,3 +43,11 @@ ground_truths:
       bug00: { regression_lines: [6], shellcheck: null }
       bug01: { regression_lines: [6], shellcheck: null }
       bug02: { regression_lines: [10], shellcheck: null }
+
+  # Variants
+  - path: variants/bug-assign_later.sh
+    kind: buggy_variant
+    bugs:
+      bug00: { lines: [6], shellcheck: null }
+      bug01: { lines: [6] }
+      bug02: { lines: [10] }

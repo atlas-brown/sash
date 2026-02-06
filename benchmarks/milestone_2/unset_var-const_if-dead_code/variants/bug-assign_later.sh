@@ -1,10 +1,7 @@
 #!/bin/sh
 
 backuptodirectory=/Volumes/Backup/date/
-
-_set_directorytocopy() {
-    directorytocopy= # variant: `directorytocopy` is unbound, even though it appears as an assignment.
-}
+directorytocopy=/Users/myname/Library/Application Support
 
 if [ ! -d "$directorytocopy" ]; then # bug here (1, 2): directorycopy is unset, check will always succeed
     echo "Source path: $directorytocopy doesn't exist"
@@ -13,3 +10,5 @@ fi
 mkdir -p "$backuptodirectory" # bug here (3): dead code due to bug (2)
 echo copying $directorytocopy
 rsync -progress $directorytocopy $backuptodirectory
+
+directorytocopy="" # diff: assign to the variable later

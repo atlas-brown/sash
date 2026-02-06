@@ -12,6 +12,7 @@ bugs:
     shellcheck: null
 
 ground_truths:
+  # Base versions
   - path: original.sh
     kind: original
     bugs:
@@ -29,3 +30,10 @@ ground_truths:
     bugs:
       bug00: { regression_lines: [9], shellcheck: null }
       bug01: { regression_lines: [16], shellcheck: null }
+
+  # Variants
+  - path: variants/bug-assign_later.sh
+    kind: buggy_variant
+    bugs:
+      bug00: { lines: [9], shellcheck: null }
+      bug01: { lines: [16] }
