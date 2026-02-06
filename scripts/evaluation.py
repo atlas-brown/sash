@@ -1,458 +1,877 @@
 #!/usr/bin/env -S uv run python3
-import argparse
-import json
-import multiprocessing
-import pathlib
-import re
-import subprocess
 import sys
-from pathlib import Path
-from typing import NamedTuple
-
 import yaml
+import subprocess
+from pathlib import Path
+import jsonschema
+import multiprocessing
+import traceback
+import re
+import argparse
+import report
 
+from dataclasses import dataclass, field
 import sash.main
 import sash.reporter
 
-# ANSI color codes
-MAGENTA = '\033[95m'
-BLUE = '\033[94m'
-CYAN = '\033[96m'
-GREEN = '\033[92m'
-YELLOW = '\033[93m'
-RED = '\033[91m'
-RESET = '\033[0m'
-BOLD = '\033[1m'
-UNDERLINE = '\033[4m'
 
-
-class CheckResult(NamedTuple):
-    code: str
-    line: int | None
-    fix_clears: bool | None = None
-
-    def __str__(self):
-        return f"L{self.line}:{self.code}"
-
-    def __eq__(self, other):
-        return (self.code, self.line) == (other.code, other.line)
-
-class RunResult(NamedTuple):
-    benchmark: str
-    missing_gt: bool | None
-    crashed: bool | None
-    timed_out: bool | None
-    time: float | None
-    exec_time: float | None
-    solver_time: float | None
-    detected_all: bool | None
-    expected_results: list[str] | None
-    actual_results: list[str] | None
-    shellcheck_codes: list[str] | None
-    line_numbers: list[int | None] | None
-    unknown_codes: list[str] | None = None
-    exception_traceback: str | None = None
-    report_issues: list | None = None
-
-
-def main():
-    parser = argparse.ArgumentParser()
+def parse_args():
+    # fmt: off
+    parser = argparse.ArgumentParser(epilog="Regardless of which flags are used to select which analyses to run, all detected benchmarks' info files will be validated against the schema")
+    parser.add_argument('-b', '--benchmarks', type=Path, default=ROOT_DIR / 'benchmarks', help='Path to the benchmarks directory, relative to the git toplevel (default: <git_toplevel>/benchmarks)')
+    parser.add_argument('-O', '--only', type=str, default='.*', help='Regex to filter benchmarks to run (default: run all)')
     parser.add_argument('-t', '--timeout', type=float, default=None, help='Timeout in seconds for symbolic execution in each benchmark (default: no timeout)')
+    parser.add_argument('-d', '--dfs-timeout', type=float, default=None, help='Timeout in seconds for depth-first symbolic execution passes in each benchmark (default: no timeout)')
     parser.add_argument('-T', '--solver-timeout', type=float, default=None, help='Timeout in seconds for solving in each benchmark (default: no timeout)')
-    parser.add_argument('-b', '--benchmarks', type=Path, default=None, help='Path to the benchmarks directory, relative to the git toplevel (default: <git_toplevel>/benchmarks)')
-    parser.add_argument('-O', '--only', type=str, default=None, help='Regex to filter benchmarks to run (default: run all)')
-    parser.add_argument('-o', '--output', type=Path, default=None, help='CSV file to write results table to (default: stdout)')
-    parser.add_argument('-H', '--html', type=Path, default=None, help='File to write HTML overview to (default: no HTML output)')
-    parser.add_argument('-G', '--ground-truth-only', action='store_true', help='Only run benchmarks that have ground truth defined (default: run all)')
-    parser.add_argument('-V', '--verbose', action='store_true', help='Enable printing of error reports or exceptions that occur, and raw output when ground truth is missing (default: false)')
-    parser.add_argument('-N', '--no-color', action='store_true', help='Disable colored output to stderr (default: false)')
-    parser.add_argument('-e', '--error-log', type=Path, default=Path("/dev/null"), help='File to write error logs to (default: /dev/null)')
-    parser.add_argument('-D', '--enable-dfs', action='store_true', help='Enable depth-first symbolic execution passes (default: false)')
+    parser.add_argument('-D', '--disable-dfs', action='store_true', help='Disable depth-first symbolic execution passes (default: false)')
+    parser.add_argument('-l', '--log-level', type=str, default='disabled', choices=['disabled', 'error', 'warning', 'info', 'debug'], help='Logging level for SaSh; recommended to only use along with -L (default: disabled)')
+    parser.add_argument('-L', '--error-log', type=Path, default=Path('/dev/null'), help='File to write error logs to (default: /dev/null)')
+    parser.add_argument('-S', '--skip-buggy', action='store_true', help='Don\'t run the evaluation on the buggy versions of the benchmarks (default: false)')
     parser.add_argument('-f', '--fixed', action='store_true', help='Run the evaluation on the fixed versions of the benchmarks (default: false)')
-    parser.add_argument('-j', '--jobs', type=int, default=None, help='Number of parallel jobs (default: all available CPU cores)')
-    args = parser.parse_args()
+    parser.add_argument('-v', '--variants', action='store_true', help='Run the evaluation on the variant versions of the benchmarks; given the values of \'-S\' and \'-f\', only the matching variants will run (default: false)')
+    parser.add_argument('-vO', '--variants-only', action='store_true', help='Run the evaluation only on the variant versions of the benchmarks (default: false)')
+    parser.add_argument('-a', '--all', action='store_true', help='Run the evaluation on all versions of the benchmarks; equivalent to \'-f -v\' (default: false)')
+    parser.add_argument('-c', '--csv', type=Path, default=None, help='File to write CSV results to (default: no CSV output)')
+    parser.add_argument('-H', '--html', type=Path, default=None, help='File to write HTML overview to (default: no HTML output)')
+    parser.add_argument('-N', '--no-color', action='store_true', help='Disable colored output to stderr (default: false)')
+    parser.add_argument('-j', '--jobs', type=int, default=multiprocessing.cpu_count(), help='Number of parallel jobs (default: all available CPU cores)')
+    parser.add_argument('-V', '--verbose', action='store_true', help='Enable printing of error reports or exceptions that occur, and raw output when ground truth is missing (default: false)')
+    return parser.parse_args()
+    # fmt: on
 
-    if args.no_color:
-        global MAGENTA, BLUE, CYAN, GREEN, YELLOW, RED, RESET, BOLD, UNDERLINE
-        MAGENTA = ""
-        BLUE = ""
-        CYAN = ""
-        GREEN = ""
-        YELLOW = ""
-        RED = ""
-        RESET = ""
-        BOLD = ""
-        UNDERLINE = ""
 
-    symbexec_timeout: float | None = args.timeout
-    solver_timeout: float | None = args.solver_timeout
-    benchmark_filter = re.compile(args.only) if args.only else None
-    output_file = args.output.resolve() if isinstance(args.output, Path) else None
-    html_file = args.html.resolve() if isinstance(args.html, Path) else None
-    ground_truth_only: bool = args.ground_truth_only
-    verbose: bool = args.verbose
-    error_log: Path = args.error_log.resolve()
-    enable_dfs: bool = args.enable_dfs
-    fixed: bool = args.fixed
+def main(
+    benchmarks_dir: Path,
+    bench_filter: re.Pattern,
+    timeout: float | None,
+    dfs_timeout: float | None,
+    solver_timeout: float | None,
+    enable_dfs: bool,
+    log_level: str,
+    log_file: Path,
+    run_buggy: bool,
+    run_fixed: bool,
+    run_variants: bool,
+    run_only_variants: bool,
+    csv_file: Path | None,
+    html_file: Path | None,
+    verbose: bool,
+    no_color: bool,
+    num_jobs: int,
+):
+    if no_color:
+        disable_color()
 
-    top = get_git_toplevel()
-    if args.benchmarks:
-        bench_dir = top / args.benchmarks
-    else:
-        bench_dir = top / "benchmarks"
+    # This should be the only possible early exit of the script
+    try:
+        VALIDATOR.check_schema(INFO_SCHEMA)
+    except jsonschema.SchemaError as e:
+        eprint(f"Internal error: Info schema is invalid: {e.message}")
+        exit(1)
 
-    known_codes = get_all_reporter_codes()
-    with (bench_dir / "codes_out_of_scope.yaml").open() as f:
-        out_of_scope_codes: list[str] = list(set(yaml.safe_load(f)))
-        print(f"Out of scope codes: {out_of_scope_codes}", file=sys.stderr)
+    eprint(f"{BOLD}Hello!{RESET}")
+    oos_codes = load_oos_codes(benchmarks_dir)
+    eprint(f"Out-of-scope codes:")
+    for code in sorted(oos_codes):
+        eprint(f"  {code}")
 
-    ran = 0
-    failed = 0
-    unknown = 0
-    # succeeded == ran - failed - unknown
-    skipped = 0
-    timed_out = 0
+    eprint(f"\n{BOLD}Preparing analyses{RESET}")
+    stats = EvalStats()
+    jobs: list[Job] = []
+    for categ_dir in benchmarks_dir.iterdir():
+        if categ_dir.is_dir() and not "_not_integrated" in categ_dir.parts:
+            for bench_dir in categ_dir.iterdir():
+                if bench_dir.is_dir() and bench_filter.match(bench_dir.as_posix()):
+                    jobs.extend(
+                        prepare_jobs(
+                            bench_dir,
+                            stats,
+                            oos_codes,
+                            eval_buggy=run_buggy,
+                            eval_fixed=run_fixed,
+                            eval_variants=run_variants,
+                            eval_only_variants=run_only_variants,
+                            verbose=verbose,
+                        )
+                    )
+    eprint("Done!")
 
-    total_issues = 0
-    detected_issues_expected = 0
-    detected_issues_extra = 0
-    detected_issues_extra_unsat_preconds = 0
-    detected_issues_extra_unset_vars = 0
+    if len(jobs) == 0:
+        eprint("\nNo analyses to run; exiting")
+        exit(0)
 
-    tota_exec_time = 0.0
-    total_solver_time = 0.0
-
-    # Collect all benchmarks to run
-    benchmarks_to_run = []
-    for benchmark in find_benchmarks(bench_dir):
-        if benchmark_filter and not benchmark_filter.search(benchmark.as_posix()):
-            continue
-        if fixed:
-            benchmark = benchmark.parent / "fixed.sh"
-        benchmarks_to_run.append(benchmark)
-
-    # Process benchmarks in parallel
-    num_cores = args.jobs if args.jobs else multiprocessing.cpu_count()
-    print(f"Running {len(benchmarks_to_run)} benchmarks in parallel using {num_cores} core(s)", file=sys.stderr)
-
-    with multiprocessing.Pool(processes=num_cores) as pool:
-        run_results = pool.starmap(
-            process_benchmark,
-            [(benchmark, top, symbexec_timeout, solver_timeout, error_log,
-              enable_dfs, out_of_scope_codes, known_codes, ground_truth_only, verbose, fixed)
-             for benchmark in benchmarks_to_run]
+    eprint(f"\n{BOLD}Running analyses{RESET}")
+    eprint(
+        f"Running {len(jobs)} analyses (on {stats.benchmarks - stats.skipped} benchmarks) using {num_jobs} processes"
+    )
+    with multiprocessing.Pool(processes=num_jobs) as pool:
+        finished = pool.starmap(
+            run_job,
+            [
+                (
+                    job,
+                    timeout,
+                    dfs_timeout,
+                    solver_timeout,
+                    enable_dfs,
+                    log_level,
+                    log_file,
+                    verbose,
+                )
+                for job in jobs
+            ],
         )
 
-    # Aggregate results
-    run_results = [r for r in run_results if r is not None]  # Filter out skipped benchmarks
+    eprint(f"\n{BOLD}Printing per-analyis results{RESET}")
+    for job in finished:
+        process_finished_job(stats, job)
+        if job is not finished[-1]:
+            eprint()  # Blank line for readability
 
-    for result in run_results:
-        print(file=sys.stderr)
-        print(f"Benchmark: {MAGENTA}{result.benchmark}{RESET} (found in {top})", file=sys.stderr)
+    eprint(f"\n{BOLD}Printing aggregate results{RESET}")
+    eprint("Total benchmarks: ", stats.benchmarks)
+    eprint("  Skipped: ", stats.skipped)
+    eprint("Total analyses ran: ", stats.analyses)
+    eprint("  Successful: ", stats.successful)
+    eprint("  Failed: ", stats.crashed)
+    eprint("  Timed out: ", stats.timed_out)
+    eprint("Total time: ", f"{stats.total_time:.2f}s")
+    eprint("  Total execution time: ", f"{stats.exec_time:.2f}s")
+    eprint("  Total solver time: ", f"{stats.solver_time:.2f}s")
+    eprint("Total known bugs: ", stats.buggy_expected_bugs)
+    eprint("  Out of these were detected: ", stats.buggy_detected_bugs)
+    eprint("  Out of these were not detected: ", stats.buggy_undetected_bugs)
+    eprint("Total unknown bugs detected: ", stats.buggy_unexpected_bugs)
 
-        # Log unknown codes warning
-        if result.unknown_codes:
-            print_warn(f"Unknown in-scope codes in ground truth: {result.unknown_codes}", file=sys.stderr)
+    if csv_file is not None:
+        export_as_csv(
+            file=csv_file,
+            jobs=finished,
+        )
 
-        # Log no ground truth warning
-        if result.missing_gt:
-            print_warn("No ground truth found", file=sys.stderr)
+    if html_file is not None:
+        generate_html_report(
+            filename=html_file,
+            stats=stats,
+            jobs=finished,
+            timeout=timeout,
+            solver_timeout=solver_timeout,
+        )
 
-        # Process crash or exception
-        if result.crashed:
-            print_fail(f"Exception raised during analysis", file=sys.stderr)
-            if result.exception_traceback:
-                print(result.exception_traceback, file=sys.stderr)
-            failed += 1
-        else:
-            ran += 1
+    if stats.crashed > 0:
+        exit(1)
 
-            # Log timeout or completion
-            if result.timed_out:
-                print_warn(f"Analysis timed out; exec time: {result.exec_time}s, solver time: {result.solver_time}s", file=sys.stderr)
-                timed_out += 1
+
+@dataclass
+class ReportEntry:
+    sash_code: str
+    line: int
+    shellcheck_code: str | None = None
+
+    def __eq__(self, other: object) -> bool:
+        # Ignore shellcheck_code for equality checks
+        return (
+            isinstance(other, ReportEntry)
+            and self.sash_code == other.sash_code
+            and self.line == other.line
+        )
+
+
+# Describes a job to be run on a benchmark, where benchmark here is a specific file (e.g., posix.sh)
+# The ground truth corresponds to that specific file
+@dataclass
+class Job:
+    benchmark: Path
+    ground_truth: dict
+
+
+# Extends the Job with results from running the analysis
+# The field additional_info is used to for "backwards compatibility" with the html report generator
+@dataclass
+class FinishedJob(Job):
+    timed_out: bool
+    crashed: bool
+    exn_traceback: str | None = None
+    report: sash.reporter.Report | None = None
+    additional_info: dict = field(default_factory=dict)
+
+
+@dataclass
+class EvalStats:
+    benchmarks: int = 0  # Directory-level benchmarks
+    skipped: int = 0
+
+    analyses: int = 0  # Total analyses (files) run
+    crashed: int = 0
+    timed_out: int = 0
+
+    exec_time: float = 0.0  # Symbolic execution time (constraint collection phase)
+    solver_time: float = 0.0  # Constraint solver time
+
+    # Total number of bugs expected to be detected across buggy benchmarks
+    buggy_expected_bugs: int = 0
+    # Total number of bugs detected across buggy benchmarks
+    buggy_detected_bugs: int = 0
+    # Total number of additional bugs detected across buggy benchmarks
+    buggy_unexpected_bugs: int = 0
+
+    # Total number of bugs that were expected to NOT be detected across fixed benchmarks
+    fixed_expected_missing_bugs: int = 0
+    # Total number of bugs that were expected to NOT be detected but were actually detected across fixed benchmarks
+    fixed_regression_bugs: int = 0
+    # Total number of bugs that we had no expectation about but were detected across fixed benchmarks
+    fixed_rest_bugs: int = 0
+
+    @property
+    def successful(self) -> int:
+        return self.analyses - self.crashed
+
+    @property
+    def total_time(self) -> float:
+        return self.exec_time + self.solver_time
+
+    # Total number of bugs that were expected but not detected across all benchmarks
+    @property
+    def buggy_undetected_bugs(self) -> int:
+        return self.buggy_expected_bugs - self.buggy_detected_bugs
+
+
+def process_finished_job(stats: EvalStats, job: FinishedJob):
+    where = job.benchmark.relative_to(ROOT_DIR)
+
+    def process_buggy_job(job: FinishedJob):
+        # We care about three things:
+        # (1) Bugs that were expected to be detected and were actually detected
+        # (2) Bugs that were expected to be detected but were not detected (calculated from the first two)
+        # (3) Bugs that were not expected to be detected but were detected anyway
+
+        all_reports = [ReportEntry(i.code.value, i.source_line, None) for i in job.report.issues]  # type: ignore
+
+        all_gt = [
+            ReportEntry(bug_info["code"], l, bug_info.get("shellcheck"))
+            for bug_info in job.ground_truth["bugs"].values()
+            for l in bug_info.get("lines", [])
+        ]
+
+        all_expected_detected = []  # (1)
+        for entry in all_gt:
+            if entry in all_reports:
+                all_reports.remove(entry)
+                # Entry includes the ShellCheck code, which is desired
+                all_expected_detected.append(entry)
+
+        all_expected_undetected = []  # (2)
+        temp_all_expected_detected = all_expected_detected.copy()
+        for entry in all_gt:
+            if entry not in temp_all_expected_detected:
+                # Entry includes the ShellCheck code, which is desired
+                all_expected_undetected.append(entry)
             else:
-                print_info(f"Analysis completed; exec time: {result.exec_time}s, solver time: {result.solver_time}s", file=sys.stderr)
+                # We remove from the temp list to account for the same bug appearing multiple times in a single line
+                # list.remove() only removes the first occurrence
+                temp_all_expected_detected.remove(entry)
 
-            tota_exec_time += result.exec_time or 0
-            total_solver_time += result.solver_time or 0
+        # Entries do not include the ShellCheck code, which is fine because we don't care about it here
+        all_unexpected_detected = all_reports  # (3)
 
-            # Count issues and log pass/fail
-            if result.expected_results:
-                expected_set = set(result.expected_results)
-                actual_set = set(result.actual_results) if result.actual_results else set()
-                total_issues += len(expected_set)
-                detected_issues_expected += len([e for e in expected_set if e in actual_set])
-                if result.actual_results:
-                    detected_issues_extra += len([a for a in actual_set if a not in expected_set])
-                    detected_issues_extra_unsat_preconds += len([a for a in actual_set if a not in expected_set and ':unsat_precond' in a])
-                    detected_issues_extra_unset_vars += len([a for a in actual_set if a not in expected_set and (':unbound' in a or ':unbound_setu' in a)])
+        stats.buggy_expected_bugs += len(all_gt)
+        stats.buggy_detected_bugs += len(all_expected_detected)
+        stats.buggy_unexpected_bugs += len(all_unexpected_detected)
 
-                # Log pass/fail status
-                if result.missing_gt:
-                    if verbose and result.report_issues:
-                        print_info(f"Report: {json.dumps([{'code': i.code.value, 'line': i.source_line} for i in result.report_issues], indent=2)}", file=sys.stderr)
-                    unknown += 1
-                elif result.detected_all:
-                    print_pass("All expected results detected", file=sys.stderr)
-                    if verbose and result.report_issues:
-                        print_issue_details(Path(result.benchmark), result.report_issues, file=sys.stderr)
-                else:
-                    missing = [r for r in expected_set if r not in actual_set]
-                    print_fail(f"Missing expected results: {missing}", file=sys.stderr)
-                    failed += 1
-                    if verbose and result.report_issues:
-                        print_issue_details(Path(result.benchmark), result.report_issues, file=sys.stderr)
-            elif result.missing_gt:
-                unknown += 1
+        if len(all_expected_undetected) == 0:
+            eprint_succ(
+                where,
+                f"All expected bugs detected ({len(all_expected_detected)} total)",
+            )
+        else:
+            eprint_fail(
+                where,
+                f"{len(all_expected_detected)} out of {len(all_expected_detected) + len(all_expected_undetected)} expected bugs detected",
+            )
+            for entry in all_expected_undetected:
+                eprint_fail(
+                    where,
+                    f"L{entry.line}:{entry.sash_code} is missing",
+                )
 
-    skipped = len(benchmarks_to_run) - len(run_results)
+        if len(all_unexpected_detected) > 0:
+            eprint_info(
+                where,
+                f"{len(all_unexpected_detected)} additional bugs detected",
+            )
 
-    print(file=sys.stderr)
-    print("Summary", file=sys.stderr)
-    print(f"  Total benchmarks: {ran + skipped}", file=sys.stderr)
-    print(f"  Skipped benchmarks: {skipped}", file=sys.stderr)
-    print(f"  Ran benchmarks: {ran}", file=sys.stderr)
-    print(f"    Succeeded: {ran - failed - unknown}", file=sys.stderr)
-    print(f"    Failed: {failed}", file=sys.stderr)
-    print(f"    Unknown (no ground truth): {unknown}", file=sys.stderr)
-    print(f"    Timed out: {timed_out}", file=sys.stderr)
-    print()
-    print(f"  Total expected issues (in-scope): {total_issues}", file=sys.stderr)
-    print(f"  Detected expected issues: {detected_issues_expected}", file=sys.stderr)
-    print(f"  Detected issues not in ground truth: {detected_issues_extra}", file=sys.stderr)
-    print(f"    Unsatisfied preconditions: {detected_issues_extra_unsat_preconds}", file=sys.stderr)
-    print(f"    Unset variables (incl. setu): {detected_issues_extra_unset_vars}", file=sys.stderr)
-    print(f"  Total execution time: {tota_exec_time}s", file=sys.stderr)
-    print(f"  Total solver time: {total_solver_time}s", file=sys.stderr)
+        # For html report generation
+        job.additional_info = {
+            "expected": all_gt,
+            "actual": [ReportEntry(i.code.value, i.source_line, None) for i in job.report.issues],  # type: ignore
+            "detected_all": len(all_expected_undetected) == 0,
+            "kind": job.ground_truth["kind"],
+        }
 
-    if output_file:
-        output_file = output_file.open("w")
+    def process_fixed_job(job: FinishedJob):
+        # We care about two things:
+        # (1) Bugs that were expected to not be detected but were actually detected
+        # (2) Bugs that were detected but we had no expectation about them
+
+        all_reports = [ReportEntry(i.code.value, i.source_line, None) for i in job.report.issues]  # type: ignore
+
+        all_gt = [
+            ReportEntry(bug_info["code"], l, bug_info.get("shellcheck"))
+            for bug_info in job.ground_truth["bugs"].values()
+            for l in bug_info.get("regression_lines", [])
+        ]
+
+        all_unexpected_detected = []  # (1)
+        for entry in all_gt:
+            if entry in all_reports:
+                all_reports.remove(entry)
+                # Entry includes the ShellCheck code, which is desired
+                all_unexpected_detected.append(entry)
+
+        all_no_expectation_detected = all_reports  # (2)
+
+        stats.fixed_expected_missing_bugs += len(all_gt)
+        stats.fixed_regression_bugs += len(all_unexpected_detected)
+        stats.fixed_rest_bugs += len(all_no_expectation_detected)
+
+        if len(all_unexpected_detected) == 0:
+            eprint_succ(
+                where,
+                f"No regression bugs detected (0 out of {len(all_gt)} expected missing bugs)",
+            )
+        else:
+            eprint_fail(
+                where,
+                f"{len(all_unexpected_detected)} out of {len(all_gt)} expected missing bugs were detected",
+            )
+            for entry in all_unexpected_detected:
+                eprint_fail(
+                    where,
+                    f"L{entry.line}:{entry.sash_code} was detected but expected to be missing",
+                )
+
+        if len(all_no_expectation_detected) > 0:
+            eprint_warn(
+                where,
+                f"{len(all_no_expectation_detected)} additional bugs detected",
+            )
+
+        # For html report generation
+        job.additional_info = {
+            "expected": all_gt,
+            "actual": [ReportEntry(i.code.value, i.source_line, None) for i in job.report.issues],  # type: ignore
+            "detected_all": len(all_unexpected_detected) == 0,
+            "kind": job.ground_truth["kind"],
+        }
+
+    # Evaluate job status
+    if job.crashed:
+        eprint_fail(where, "Exception during analysis")
+        if job.exn_traceback:
+            eprint(job.exn_traceback)
+        stats.crashed += 1
+        return
+
+    assert (
+        job.report is not None
+    ), "How was a report not generated if the job didn't crash?"
+
+    et = job.report.time
+    st = job.report.solver_time
+    stats.exec_time += et
+    stats.solver_time += st
+    if job.timed_out:
+        eprint_warn(
+            where,
+            f"Analysis timed out; exec: {et:.2f}s, solver: {st:.2f}s, total: {et+st:.2f}s",
+        )
+        stats.timed_out += 1
     else:
-        output_file = sys.stdout
-        print(file=sys.stderr) # Trick to ensure separation from previous stderr output, but make it invisivle if stderr has been redirected
-        print("Detailed Results (CSV):", file=output_file)
+        eprint_succ(
+            where,
+            f"Analysis completed; exec: {et:.2f}s, solver: {st:.2f}s, total: {et+st:.2f}s",
+        )
 
-    print(f"{','.join(RunResult._fields)}", file=output_file)
-    for r in run_results:
-        print(f"{r.benchmark},"
-              f"{r.missing_gt},"
-              f"{r.crashed},"
-              f"{r.timed_out},"
-              f"{r.time},"
-              f"{r.exec_time},"
-              f"{r.solver_time},"
-              f"{r.detected_all},"
-              f"{';'.join(r.expected_results) if r.expected_results else ''},"
-              f"{';'.join(r.actual_results) if r.actual_results else ''},"
-              f"{';'.join(r.shellcheck_codes) if r.shellcheck_codes else ''},"
-              f"{';'.join('' if line is None else str(line) for line in r.line_numbers) if r.line_numbers else ''}",
-              file=output_file)
-
-    if html_file:
-        from report import generate_html_report, RunResult as ReportRunResult
-        generate_html_report(html_file, run_results, ran, skipped, failed, unknown, timed_out,
-                             total_issues, detected_issues_expected,
-                             detected_issues_extra, detected_issues_extra_unsat_preconds, detected_issues_extra_unset_vars,
-                             tota_exec_time, total_solver_time,
-                             SE_timeout=symbexec_timeout, solver_timeout=solver_timeout)
-
-    raise SystemExit(failed > 0)
+    # Evaluate job results
+    if job.ground_truth["kind"] in ["buggy", "buggy_variant"]:
+        process_buggy_job(job)
+    elif job.ground_truth["kind"] in ["fixed", "fixed_variant"]:
+        process_fixed_job(job)
+    else:
+        raise AssertionError(
+            f"Should not have executed file of kind '{job.ground_truth['kind']}'"
+        )
 
 
-def process_benchmark(benchmark: Path, top: Path, symbexec_timeout: float | None,
-                     solver_timeout: float | None, error_log: Path,
-                     enable_dfs: bool, out_of_scope_codes: list[str],
-                     known_codes: set[str], ground_truth_only: bool,
-                     verbose: bool, fixed_mode: bool) -> RunResult | None:
-    """Process a single benchmark and return its result."""
-    import traceback
-
-    print(f"Processing benchmark: {benchmark}", file=sys.stderr)
-
-    gt_path = benchmark.parent / "info.yaml"
-    gt_exists = gt_path.is_file()
-
-    if not gt_exists and ground_truth_only:
-        return None  # Skip this benchmark
-
-    expected_results: list[CheckResult] = []
-    shellcheck_results = []
-    unknown_codes: list[str] = []
-    if gt_exists:
-        expected_results = [r for r in load_expected_results(gt_path, fixed_mode) \
-                            if r.code not in out_of_scope_codes \
-                               and (r.fix_clears is not False if fixed_mode else True)]
-        unknown_codes = [e.code for e in expected_results if e.code not in known_codes]
-        shellcheck_results = load_shellcheck_results(gt_path)
-
-    exception_traceback_str = None
-    report_issues = None
-
+def run_job(
+    job: Job,
+    timeout: float | None,
+    dfs_timeout: float | None,
+    solver_timeout: float | None,
+    enable_dfs: bool,
+    log_level: str,
+    log_file: Path | None,
+    verbose: bool,
+) -> FinishedJob:
+    where = job.benchmark.relative_to(ROOT_DIR)
+    eprint_info(where, "Running analysis")
+    finished: FinishedJob
     try:
-        sash.reporter.Reporter.reset()
-        report = sash.main.main(benchmark.as_posix(),
-                                timeout=symbexec_timeout, solver_timeout=solver_timeout,
-                                log_level="error", log_file=error_log,
-                                enable_dfs=enable_dfs)
+        sash.reporter.Reporter.reset()  # I'm not sure this is needed, but just in case
+
+        report = sash.main.main(
+            file=job.benchmark.absolute().as_posix(),
+            log_level=log_level,
+            log_file=log_file,
+            solver=True,
+            timeout=timeout,
+            dfs_timeout=dfs_timeout,
+            solver_timeout=solver_timeout,
+            enable_dfs=enable_dfs,
+            debug_instrumentation=False,
+        )
+
+        finished = FinishedJob(
+            benchmark=job.benchmark,
+            ground_truth=job.ground_truth,
+            timed_out=report.timed_out,
+            crashed=False,
+            report=report,
+        )
+
     except (AssertionError, BaseException) as e:
         if isinstance(e, KeyboardInterrupt):
-            raise  # Re-raise KeyboardInterrupt to stop all processes
+            raise e  # Re-raise keyboard interrupts
 
-        exception_traceback_str = traceback.format_exc() if verbose else None
+        exn_traceback = traceback.format_exc() if verbose else None
 
-        return RunResult(
-            benchmark=benchmark.relative_to(top).as_posix(),
-            missing_gt=not gt_exists,
+        finished = FinishedJob(
+            benchmark=job.benchmark,
+            ground_truth=job.ground_truth,
+            timed_out=False,
             crashed=True,
-            timed_out=None,
-            time=None,
-            exec_time=None,
-            solver_time=None,
-            detected_all=None,
-            expected_results=[str(e) for e in expected_results],
-            actual_results=None,
-            shellcheck_codes=shellcheck_results,
-            line_numbers=None,
-            unknown_codes=unknown_codes,
-            exception_traceback=exception_traceback_str,
-            report_issues=None
+            exn_traceback=exn_traceback,
+            report=None,
         )
 
-    actual_results: list[CheckResult] = [
-        CheckResult(code=issue.code.value, line=issue.source_line)
-        for issue in report.issues
-        if issue.code.value not in out_of_scope_codes
-    ]
+    return finished
 
-    if fixed_mode:
-        detected_all = gt_exists and all(e not in actual_results for e in expected_results)
+
+def prepare_jobs(
+    benchmark_dir: Path,
+    stats: EvalStats,
+    oos_codes: set[str],
+    eval_buggy,
+    eval_fixed,
+    eval_variants,
+    eval_only_variants: bool,
+    verbose: bool = False,
+) -> list[Job]:
+    all_codes = sash.reporter.Issue.all_codes()
+    where = benchmark_dir.relative_to(ROOT_DIR)
+    stats.benchmarks += 1
+
+    info = load_info(benchmark_dir)
+    if info is None:
+        eprint_fail(where, f"Skipping evaluation due to missing '{INFO_FILENAME}'")
+        stats.skipped += 1
+        return []
+
+    val_errs = validate_benchmark(benchmark_dir, info)
+    if len(val_errs) > 0:
+        eprint_fail(
+            where, f"Skipping evaluation due to '{INFO_FILENAME}' validation errors"
+        )
+        if verbose:
+            for err in val_errs:
+                eprint_fail(where, f"{err}")
+        stats.skipped += 1
+        return []
+
+    # Info exists and is valid
+
+    bugs = {}
+    for bug_id, bug_info in info["bugs"].items():
+        if bug_info["code"] in oos_codes:
+            eprint_info(
+                where,
+                f"Skipping bug '{bug_id}' (code '{bug_info['code']}' is out of scope)",
+            )
+            continue
+
+        if bug_info["code"] not in all_codes:
+            eprint_fail(
+                where,
+                f"Skipping bug '{bug_id}' (code '{bug_info['code']}' is not a recognized code)",
+            )
+            continue
+
+        bugs[bug_id] = bug_info
+
+    eval_kinds = []
+    if eval_only_variants:
+        if eval_buggy:
+            eval_kinds.append("buggy_variant")
+        if eval_fixed:
+            eval_kinds.append("fixed_variant")
     else:
-        detected_all = gt_exists and all(e in actual_results for e in expected_results)
+        if eval_buggy:
+            eval_kinds.append("buggy")
+        if eval_fixed:
+            eval_kinds.append("fixed")
+        if eval_variants and eval_buggy:
+            eval_kinds.append("buggy_variant")
+        if eval_variants and eval_fixed:
+            eval_kinds.append("fixed_variant")
 
-    return RunResult(
-        benchmark=benchmark.relative_to(top).as_posix(),
-        missing_gt=not gt_exists,
-        crashed=False,
-        timed_out=report.timed_out,
-        time=report.time + report.solver_time,
-        exec_time=report.time,
-        solver_time=report.solver_time,
-        detected_all=detected_all,
-        expected_results=[str(e) for e in expected_results],
-        actual_results=[str(a) for a in actual_results],
-        shellcheck_codes=shellcheck_results,
-        line_numbers=[a.line for a in actual_results],
-        unknown_codes=unknown_codes if unknown_codes else None,
-        exception_traceback=None,
-        report_issues=report.issues
+    jobs = []
+    for gt in info["ground_truths"]:
+        if gt["kind"] not in eval_kinds:
+            continue
+
+        path = benchmark_dir / gt["path"]
+        if not path.exists():
+            eprint_fail(where, f"File '{gt['path']}' does not exist")
+            continue
+
+        # Call list() here to be able to modify the dict while iterating
+        for bug_id in list(gt["bugs"].keys()):
+            if bug_id not in bugs:
+                # The bug is out of scope; delete it from ground truth
+                del gt["bugs"][bug_id]
+                continue
+
+            # Enrich ground truth with bug info for easier access later
+            gt["bugs"][bug_id]["code"] = bugs[bug_id]["code"]
+            gt["bugs"][bug_id]["description"] = bugs[bug_id]["description"]
+            gt["bugs"][bug_id]["shellcheck"] = bugs[bug_id]["shellcheck"]
+
+        jobs.append(Job(benchmark=path, ground_truth=gt))
+
+    stats.analyses += len(jobs)
+    return jobs
+
+
+# Validates the benchmark's info file against the schema
+def validate_benchmark(benchmark_dir: Path, info: dict | None) -> list[str]:
+    where = benchmark_dir.relative_to(ROOT_DIR)
+
+    if info is None and (info := load_info(benchmark_dir)) is None:
+        return []
+
+    errors = []
+    for e in VALIDATOR(schema=INFO_SCHEMA).iter_errors(info):
+        path = ".".join([str(p) for p in e.path])
+        if len(path) > 0:
+            path = f"{BLUE}{path}{RESET}: "
+        errors.append(f"{MAGENTA}{where}{RESET}: {path}{e.message}")
+
+    if len(errors) > 0:
+        eprint_fail(where, f"'{INFO_FILENAME}' has {len(errors)} validation errors")
+
+    return sorted(errors, key=str)
+
+
+def load_info(benchmark_dir: Path) -> dict | None:
+    where = benchmark_dir.relative_to(ROOT_DIR)
+    info_file = benchmark_dir / INFO_FILENAME
+
+    if not info_file.exists():
+        eprint_fail(where, f"Missing '{INFO_FILENAME}' file")
+        return None
+
+    with info_file.open("r", encoding="utf-8") as f:
+        return yaml.safe_load(f)
+
+
+def load_oos_codes(benchmarks_dir: Path) -> set[str]:
+    oos_file = benchmarks_dir / "codes_out_of_scope.yaml"
+    with oos_file.open("r", encoding="utf-8") as f:
+        oos_codes = yaml.safe_load(f)
+    return set(oos_codes)
+
+
+def git_toplevel() -> Path:
+    return Path(
+        subprocess.check_output(
+            ["git", "rev-parse", "--show-toplevel"], encoding="utf-8"
+        ).strip()
     )
 
 
-def print_pass(msg: str, file = None, indent=2):
-    print(f"{' ' * indent}[{GREEN}PASS{RESET}] {msg}", file=file)
+def eprint_succ(where: Path, msg: str):
+    eprint(f"[{GREEN}{where}{RESET}] {msg}")
 
 
-def print_fail(msg: str, file = None, indent=2):
-    print(f"{' ' * indent}[{RED}FAIL{RESET}] {msg}", file=file)
+def eprint_fail(where: Path, msg: str):
+    eprint(f"[{RED}{where}{RESET}] {msg}")
 
 
-def print_warn(msg: str, file = None, indent=2):
-    print(f"{' ' * indent}[{YELLOW}WARN{RESET}] {msg}", file=file)
+def eprint_warn(where: Path, msg: str):
+    eprint(f"[{YELLOW}{where}{RESET}] {msg}")
 
 
-def print_info(msg: str, file = None, indent=2):
-    print(f"{' ' * indent}[{CYAN}INFO{RESET}] {msg}", file=file)
+def eprint_info(where: Path, msg: str):
+    eprint(f"[{CYAN}{where}{RESET}] {msg}")
 
 
-def print_issue_details(benchmark: Path, issues: list[sash.reporter.Issue], file=None, indent=2):
-    if len(issues) == 0:
-        print_info(f"No issues detected for {benchmark}", file=file, indent=indent)
-        return
-
-    print_info(f"Issues detected for {benchmark}:", file=file, indent=indent)
-    for issue in issues:
-        location = "L" + str(issue.source_line) if issue.source_line is not None else "?"
-        print(f"{' ' * (indent + 3)}{location} | {BOLD}{issue.code.value}{RESET} ({issue.severity.value}): {issue.message}", file=file)
+def eprint(*args, **kwargs):
+    print(*args, file=sys.stderr, **kwargs)
 
 
-# Note: if `timeout` supplied, may raise subprocess.TimeoutExpired
-def run_cmd(cmd, check=False, capture_stdout=True, timeout=None):
-    import os
-    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, start_new_session=True)
-    try:
-        stdout, stderr = proc.communicate(timeout=timeout)
-        result = subprocess.CompletedProcess(cmd, proc.returncode, stdout, stderr)
-        if check and proc.returncode != 0:
-            raise subprocess.CalledProcessError(proc.returncode, cmd, stdout, stderr)
-        return result
-    except subprocess.TimeoutExpired:
-        os.killpg(os.getpgid(proc.pid), 9)
-        proc.wait()
-        raise
+def disable_color():
+    global MAGENTA, BLUE, CYAN, GREEN, YELLOW, RED, RESET, BOLD, UNDERLINE
+    MAGENTA = ""
+    BLUE = ""
+    CYAN = ""
+    GREEN = ""
+    YELLOW = ""
+    RED = ""
+    RESET = ""
+    BOLD = ""
+    UNDERLINE = ""
 
 
-def get_git_toplevel():
-    proc = run_cmd(["git", "rev-parse", "--show-toplevel"])
-    if proc.returncode != 0:
-        print("Failed to determine git top-level directory", file=sys.stderr)
-        sys.exit(1)
-    return pathlib.Path(proc.stdout.strip()).resolve(strict=True)
+# A RunResult is the format that the functions to export to CSV and HTML expect
+def job_to_run_result(job: FinishedJob) -> report.RunResult:
+    if job.report is None:
+        return report.RunResult(
+            benchmark=job.benchmark.as_posix(),
+            kind="unknown",
+            missing_gt=False,
+            crashed=job.crashed,
+            timed_out=job.timed_out,
+            time=None,
+            exec_time=None,
+            solver_time=None,
+            detected_all=False,
+            expected_results=None,
+            actual_results=None,
+            shellcheck_codes=None,
+            line_numbers=None,
+        )
+
+    assert job.additional_info is not None
+    assert "expected" in job.additional_info  # list[ReportInfo]
+    assert "actual" in job.additional_info  # list[ReportInfo]
+    assert "detected_all" in job.additional_info  # bool
+    assert "kind" in job.additional_info  # str
+
+    expected_results = [
+        f"L{j.line}:{j.sash_code}" for j in job.additional_info["expected"]
+    ]
+    actual_results = [f"L{j.line}:{j.sash_code}" for j in job.additional_info["actual"]]
+    shellcheck_codes = [j.shellcheck_code for j in job.additional_info["expected"]]
+    line_numbers = [j.line for j in job.additional_info["actual"]]
+
+    return report.RunResult(
+        benchmark=job.benchmark.as_posix(),
+        kind=job.additional_info["kind"],
+        missing_gt=False,
+        crashed=job.crashed,
+        timed_out=job.timed_out,
+        time=job.report.time,
+        exec_time=job.report.time,
+        solver_time=job.report.solver_time,
+        detected_all=job.additional_info["detected_all"],
+        expected_results=expected_results,
+        actual_results=actual_results,
+        shellcheck_codes=shellcheck_codes,
+        line_numbers=line_numbers,
+    )
 
 
-def find_benchmarks(bench_dir: Path):
-    for path in bench_dir.rglob("posix.sh"):
-        if "_not_integrated" not in path.parts:
-            yield path.resolve(strict=True)
+def export_as_csv(
+    file: Path,
+    jobs: list[FinishedJob],
+):
+    run_results = [job_to_run_result(job) for job in jobs]
+    with file.open("w") as csvfile:
+        csvfile.write(f"{','.join(report.RunResult._fields)}" + "\n")
+        for r in run_results:
+            csvfile.write(
+                f"{r.benchmark},"
+                f"{r.kind},"
+                f"{r.missing_gt},"
+                f"{r.crashed},"
+                f"{r.timed_out},"
+                f"{r.time},"
+                f"{r.exec_time},"
+                f"{r.solver_time},"
+                f"{r.detected_all},"
+                f"{';'.join([e if e is not None else '' for e in r.expected_results]) if r.expected_results else ''},"
+                f"{';'.join([a if a is not None else '' for a in r.actual_results]) if r.actual_results else ''},"
+                f"{';'.join([c if c is not None else '' for c in r.shellcheck_codes]) if r.shellcheck_codes else ''},"
+                f"{';'.join(str(line) if line is not None else '' for line in r.line_numbers) if r.line_numbers else ''}"
+                "\n"
+            )
 
 
-def load_expected_results(gt_path, fixed: bool) -> list[CheckResult]:
-    with open(gt_path, "r") as f:
-        data = yaml.safe_load(f)
-    results = []
-    for entry in data.get("ground_truth", []).get("errors", []):
-        code = entry.get("code")
-        if not fixed:
-            line = entry.get("line")
-        else:
-            line = entry.get("line_in_fixed")
-        fix_clears = entry.get("fix_clears", None)
-        if entry.get("duplicate", False):
-            continue
+def generate_html_report(
+    filename: Path,
+    stats: EvalStats,
+    jobs: list[FinishedJob],
+    timeout: float | None,
+    solver_timeout: float | None,
+):
+    run_results = [job_to_run_result(job) for job in jobs]
+    ran = stats.analyses
+    skipped = stats.skipped
+    failed = stats.crashed
+    unknown = 0
+    timed_out = stats.timed_out
+    total_issues = stats.buggy_expected_bugs
+    detected_issues_expected = stats.buggy_detected_bugs
+    detected_issues_extra = stats.buggy_unexpected_bugs
+    detected_issues_extra_unsat_preconds = 0  # Not tracked currently
+    detected_issues_extra_unset_vars = 0  # Not tracked currently
+    total_exec_time = stats.exec_time
+    total_solver_time = stats.solver_time
 
-        if isinstance(code, str) and line is not None:
-            results.append(CheckResult(code=code, line=int(line), fix_clears=fix_clears))
-        elif isinstance(code, list) and isinstance(line, list):
-            results.extend(CheckResult(code=c, line=int(l), fix_clears=fix_clears) for c, l in zip(code, line))
-    return results
-
-
-def load_shellcheck_results(gt_path) -> list[str]:
-    results = []
-    with open(gt_path, "r") as f:
-        data = yaml.safe_load(f)
-        errors = data.get("ground_truth", {}).get("errors", [])
-        for error in errors:
-            if error["shellcheck"]["detects"]:
-                if isinstance(error["code"], str):
-                    results.append(error["code"])
-                elif isinstance(error["code"], list):
-                    results.extend(error["code"])
-    return results
-
-
-def extract_codes_from_output(output) -> tuple[set[str], dict] | None:
-    try:
-        data = json.loads(output)
-        codes = [e.get("code") for e in data.get("errors", [])]
-        return set(codes), data
-    except Exception:
-        return None
+    report.generate_html_report(
+        html_file=filename,
+        run_results=run_results,
+        ran=ran,
+        skipped=skipped,
+        failed=failed,
+        unknown=unknown,
+        timed_out=timed_out,
+        total_issues=total_issues,
+        detected_issues_expected=detected_issues_expected,
+        detected_issues_extra=detected_issues_extra,
+        detected_issues_extra_unsat_preconds=detected_issues_extra_unsat_preconds,
+        detected_issues_extra_unset_vars=detected_issues_extra_unset_vars,
+        total_exec_time=total_exec_time,
+        total_solver_time=total_solver_time,
+        SE_timeout=timeout,
+        solver_timeout=solver_timeout,
+    )
 
 
-def get_all_reporter_codes() -> set[str]:
-    return sash.reporter.Issue.all_codes()
+ROOT_DIR = git_toplevel()
+INFO_FILENAME = "info.yaml"
+VALIDATOR = jsonschema.Draft202012Validator  # Must match the $schema in INFO_SCHEMA
+INFO_SCHEMA = {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "required": ["sources", "bugs", "ground_truths"],
+    "properties": {
+        "name": {"type": "string"},
+        "sources": {
+            "type": "array",
+            "items": {"type": "string", "format": "uri"},
+            "minItems": 1,
+        },
+        "notes": {"type": "array", "items": {"type": "string"}},
+        "bugs": {
+            "type": "object",
+            "patternProperties": {
+                "^bug[0-9]{2}$": {
+                    "type": "object",
+                    "required": ["description", "code", "shellcheck"],
+                    "properties": {
+                        "description": {"type": "string"},
+                        "code": {"type": "string"},
+                        "shellcheck": {
+                            "type": ["string", "null"],
+                            "pattern": "^SC[0-9]{4}$",
+                        },
+                        "notes": {"type": "array", "items": {"type": "string"}},
+                    },
+                    "additionalProperties": False,
+                },
+            },
+            "additionalProperties": False,
+        },
+        "ground_truths": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "required": ["path", "kind", "bugs"],
+                "properties": {
+                    "path": {"type": "string"},
+                    "kind": {
+                        "type": "string",
+                        "enum": [
+                            "original",
+                            "buggy",
+                            "fixed",
+                            "buggy_variant",
+                            "fixed_variant",
+                        ],
+                    },
+                    "bugs": {
+                        "type": "object",
+                        "patternProperties": {
+                            "^bug[0-9]{2}$": {
+                                "type": "object",
+                                "oneOf": [
+                                    {"required": ["lines"]},
+                                    {"required": ["regression_lines"]},
+                                ],
+                                "properties": {
+                                    "lines": {
+                                        "type": "array",
+                                        "items": {"type": "integer", "minimum": 1},
+                                        "minItems": 1,
+                                    },
+                                    "regression_lines": {
+                                        "type": "array",
+                                        "items": {"type": "integer", "minimum": 1},
+                                        "minItems": 1,
+                                    },
+                                    "shellcheck": {
+                                        "type": ["string", "null"],
+                                        "pattern": "^SC[0-9]{4}$",
+                                    },
+                                    "notes": {
+                                        "type": "array",
+                                        "items": {"type": "string"},
+                                    },
+                                },
+                                "additionalProperties": False,
+                            },
+                        },
+                        "additionalProperties": False,
+                    },
+                },
+                "additionalProperties": False,
+            },
+        },
+    },
+    "additionalProperties": False,
+}
 
+
+# ANSI color codes
+MAGENTA = "\033[95m"
+BLUE = "\033[94m"
+CYAN = "\033[96m"
+GREEN = "\033[92m"
+YELLOW = "\033[93m"
+RED = "\033[91m"
+RESET = "\033[0m"
+BOLD = "\033[1m"
+UNDERLINE = "\033[4m"
 
 if __name__ == "__main__":
-    main()
+    args = parse_args()
+    main(
+        benchmarks_dir=args.benchmarks,
+        bench_filter=re.compile(args.only),
+        timeout=args.timeout,
+        dfs_timeout=args.dfs_timeout,
+        solver_timeout=args.solver_timeout,
+        enable_dfs=not args.disable_dfs,
+        log_level=args.log_level,
+        log_file=args.error_log,
+        run_buggy=not args.skip_buggy or args.all,
+        run_fixed=args.fixed or args.all,
+        run_variants=args.variants or args.all,
+        run_only_variants=args.variants_only,
+        csv_file=args.csv,
+        html_file=args.html,
+        verbose=args.verbose,
+        no_color=args.no_color,
+        num_jobs=max(args.jobs, 0),
+    )
