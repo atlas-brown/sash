@@ -20,4 +20,4 @@ jobs:
           uv sync
       - name: Run the evaluation
         run: |
-          uv run scripts/evaluation.py -t 30 -T 30 -D
+          uv run scripts/evaluation.py -t 30 -T 30
