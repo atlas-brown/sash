@@ -1,15 +1,22 @@
 #!/bin/sh
 
-_set_FILE() {
-    FILE="../patches/${1}.patch" # variant: `FILE` is unbound unless `_set_FILE` is invoked before the use of `FILE`.
+FILE="../patches/${1}.patch"
+
+# -----
+mydef() { # diff: create an indirect variable definition of file=FILE that shellcheck doesn't understand
+  echo "$2" > tmp
+  read "$1" < tmp
+  rm tmp
 }
+mydef file "$FILE"
+# -----
 
 cd vscode || { echo "'vscode' dir not found"; exit 1; }
 
 git add .
 git reset -q --hard HEAD
 
-if [ -f "${FILE}" ]; then # bug here: FILE is unset (unbound)
+if [ -f "${file}" ]; then # NO bug here: file is set
   git apply --reject "${FILE}"
 fi
 

@@ -49,3 +49,5 @@ fi
 
 echo "update/install plugins using Vundle"
 vim -u $endpath/.vimrc.bundles - +BundleInstall! +BundleClean +qall
+
+file="" # diff: later in the script the variable is actually defined

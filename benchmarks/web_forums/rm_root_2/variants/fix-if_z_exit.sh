@@ -16,9 +16,10 @@ gather_data()
 }
 
 TEMPDIR=$(mktemp -d)
+if [ -z "$TEMPDIR" ]; then exit 1; fi # diff: exit if mktemp fails
 cd "${TEMPDIR}"
 gather_data
 tar cf /tmp/logs.tar "${TEMPDIR}"
 gzip -9 /tmp/logs.tar
 cd /
-rm -rf "${TEMPDIR:?}"/
+rm -rf "$TEMPDIR"/

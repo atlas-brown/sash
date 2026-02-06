@@ -34,5 +34,5 @@ ground_truths:
         {
           regression_lines: [11],
           shellcheck: SC2050,
-          notes: - Kind of a stretch to call this a ShellCheck false positive,
+          notes: [Kind of a stretch to call this a ShellCheck false positive],
         }

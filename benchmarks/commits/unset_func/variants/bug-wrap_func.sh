@@ -79,6 +79,7 @@ unset -f git_compare_version
 #compare the provided version of git to the version installed and on path
 #prints 1 if input version <= installed version
 #prints -1 otherwise
+__git_compare_version() { # diff: wrap in a function
 git_compare_version() {
   local_INPUT_GIT_VERSION=$1;
   local_INSTALLED_GIT_VERSION=
@@ -119,5 +120,6 @@ EOF
   unset iv1 iv2 iv3
   unset gv1 gv2 gv3
   unset local_INPUT_GIT_VERSION local_INSTALLED_GIT_VERSION
+}
 }
 

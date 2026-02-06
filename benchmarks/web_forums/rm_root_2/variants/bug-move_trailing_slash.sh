@@ -15,10 +15,10 @@ gather_data()
   # etc etc
 }
 
-TEMPDIR=$(mktemp -d)
+TEMPDIR=$(mktemp -d)/ # bug here: mktemp does not exist on all systems (or might fail), so TEMPDIR may be empty
 cd "${TEMPDIR}"
 gather_data
 tar cf /tmp/logs.tar "${TEMPDIR}"
 gzip -9 /tmp/logs.tar
 cd /
-rm -rf "${TEMPDIR}"/
+rm -rf "${TEMPDIR}" # diff: move the trailing slash to TEMPDIR's definition

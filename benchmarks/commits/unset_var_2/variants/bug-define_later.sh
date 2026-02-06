@@ -2,22 +2,12 @@
 
 FILE="../patches/${1}.patch"
 
-# -----
-# diff: create an indirect variable definition of file=FILE that shellcheck doesn't understand
-mydef() {
-        echo "$2" > tmp
-        read "$1" < tmp
-        rm tmp
-}
-mydef file "$FILE"
-# -----
-
 cd vscode || { echo "'vscode' dir not found"; exit 1; }
 
 git add .
 git reset -q --hard HEAD
 
-if [ -f "${file}" ]; then # NO bug here: file is set
+if [ -f "${file}" ]; then # bug here: file is unset (unbound)
   git apply --reject "${FILE}"
 fi
 
@@ -29,3 +19,5 @@ git diff -U1 > "${FILE}"
 cd ..
 
 echo "The patch has been generated."
+
+file=hi # diff: later in the script the variable is actually defined

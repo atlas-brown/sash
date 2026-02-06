@@ -1,9 +1,5 @@
 #!/usr/bin/env sh
 
-set_file() {
-    file= # variant: `file` is unbound, even though it appears as an assignment.
-}
-
 endpath="$HOME/.spf13-vim-3"
 
 warn() {
@@ -23,10 +19,21 @@ lnif() {
 
 echo "Thanks for installing spf13-vim\n"
 
+# -----
+mydef() { # diff: create an indirect variable definition that shellcheck doesn't understand
+    echo "$2" > tmp
+    read "$1" < tmp
+    rm tmp
+}
+# -----
+
 # Backup existing .vim stuff
 echo "backing up current vim config\n"
 today=`date +%Y%m%d`
-for i in $HOME/.vim $HOME/.vimrc $HOME/.gvimrc; do [ -e $i ] && [ ! -L $file ] && mv $i $i.$today; done # bug here: file is unset (unbound)
+for i in $HOME/.vim $HOME/.vimrc $HOME/.gvimrc; do
+    mydef file "$i" # diff: define file
+    [ -e $i ] && [ ! -L $file ] && mv $i $i.$today;
+done
 
 
 if [ ! -e $endpath/.git ]; then

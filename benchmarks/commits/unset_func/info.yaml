@@ -25,7 +25,12 @@ ground_truths:
       bug00: { regression_lines: [120], shellcheck: null }
 
   # Variants
+  - path: variants/bug-wrap_func.sh
+    kind: buggy_variant
+    bugs:
+      bug00: { lines: [75], shellcheck: null }
+
   - path: variants/fix-func_redef.sh
-    kind: fixed
+    kind: fixed_variant
     bugs:
       bug00: { regression_lines: [124] }

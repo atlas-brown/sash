@@ -23,3 +23,14 @@ ground_truths:
     kind: fixed
     bugs:
       bug00: { regression_lines: [10], shellcheck: null }
+
+  # Variants
+  - path: variants/bug-define_later.sh
+    kind: buggy_variant
+    bugs:
+      bug00: { lines: [10], shellcheck: null }
+
+  - path: variants/fix-init_func.sh
+    kind: fixed_variant
+    bugs:
+      bug00: { regression_lines: [19] }
