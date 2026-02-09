@@ -71,8 +71,8 @@ def handle_commandnode(traces: Traces,
                 t1 = handle_set(expanded_args, t1)
             case "exit":
                 t1 = handle_exit(t1)
-            case "return":
-                t1 = handle_return(t1)
+            # case "return":
+            #     t1 = handle_return(t1) # TODO: Handle return properly
             case "read":
                 t1 = handle_read(expanded_args, t1, node)
             case "xargs":
