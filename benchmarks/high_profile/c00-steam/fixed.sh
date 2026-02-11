@@ -15,9 +15,7 @@ ARCHIVE_EXT=tar.xz
 # $PWD
 
 STEAMROOT="$(cd "${0%/*}" && echo $PWD)"
-if [ -z "$STEAMROOT" ]; then # fix: exit if STEAMROOT is empty
-    exit 1
-fi
+
 STEAMDATA="$STEAMROOT"
 if [ -z $STEAMEXE ]; then
   STEAMEXE=`basename "$0" .sh`
@@ -357,6 +355,10 @@ reset_steam()
 	for i in "$STEAMCONFIG/registry.vdf"; do
 		mv -f "$i" "$i.bak"
 	done
+
+    if [ -z "$STEAMROOT" ]; then # fix: exit if STEAMROOT is empty
+        exit 1
+    fi
 
 	# Scary!
 	rm -rf "$STEAMROOT/"*
