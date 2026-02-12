@@ -52,7 +52,8 @@ def symbexec_main(file: str,
             logging.warning("Symbolic execution timed out; got partial results")
         case sash.symb.SymbexecStatus.FAILED:
             logging.error("Symbolic execution failed; exiting")
-            raise SystemExit(1)
+            assert result.exception is not None
+            raise result.exception # Re-raise exception for now
         case _:
             assert False, "unreachable"
 

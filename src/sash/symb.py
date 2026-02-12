@@ -917,7 +917,8 @@ def expand_simple(stuff: list[AST.ArgChar],
         @classmethod
         def add_the_default(cls, who: 'Partial', var: AST.VArgChar):
             default_expansions = expand_inner(var.arg, Partial(False, who.state))
-            assert len(default_expansions) == 1, "default value expansion forking not implemented"
+            if len(default_expansions) != 1:
+                raise NotImplementedError(f"default value expansion forking is not implemented (got {len(default_expansions)} expansions)")
             default_fields, default_state = default_expansions[0].finish()
             #assert default_state == who.state, "default value expansion should not change state"
             who.state = default_state # if the default value contains previously unknown variables, the state gets updated
@@ -960,7 +961,8 @@ def expand_simple(stuff: list[AST.ArgChar],
                 case AST.VArgChar() as var:
                     def expand_default_value(partial: 'Partial') -> tuple[list[Field], State]:
                         default_expansions = expand_inner(var.arg, Partial(False, partial.state))
-                        assert len(default_expansions) == 1, "default value expansion forking not implemented"
+                        if len(default_expansions) != 1:
+                            raise NotImplementedError(f"default value expansion forking is not implemented (got {len(default_expansions)} expansions)")
                         default_fields, default_state = default_expansions[0].finish()
                         return default_fields, default_state
 
@@ -1300,7 +1302,7 @@ def merge_partial_fields(fields: list[Field], sep: str | None = " ", state: Stat
     """Merge a list of partial fields into one field, merging SymStrs and folding them into CompletelyArbitrarys as prefixes or suffixes."""
 
     def merge_symstrs(symstrs: list[Field]) -> Field:
-        assert all(isinstance(f.content, SymStr) for f in symstrs)
+        assert all(isinstance(f.content, SymStr) for f in symstrs), f"merge_symstrs should only be called on lists of Fields with SymStr content (got {symstrs})"
         match symstrs:
             case []:
                 return Field(SymStr(()), WordCount(0, 0))
@@ -1450,14 +1452,9 @@ def guarded_interp_node(traces: Traces,
     inactive_trace_stash.extend(inactive1 + inactive2)
     traces = config.apply_node_cbs(traces, node)
 
-    try:
-        res = interp_node(traces, node, config)
-        context_line = prev_context_line
-        return res
-    except NotImplementedError as e:
-        logging.error("Interp raised: '%s'; ignoring.", e)
-        context_line = prev_context_line
-        return traces
+    res = interp_node(traces, node, config)
+    context_line = prev_context_line
+    return res
 
 def interp_node(traces: Traces,
                 node: AST.AstNode,
@@ -1711,7 +1708,8 @@ def interp_node(traces: Traces,
         # todo bring other cases as needed
 
         case _:
-            raise NotImplementedError(f"Unhandled node type: '{node.NodeName}'")
+            logging.debug("Unhandled node type '%s'; treating as no-op", node.NodeName)
+            return traces
 
 def starting_state(fs_model: FSModel | None = None) -> State:
     # env["IFS"] = ShellVar(" \t\n")
@@ -1765,6 +1763,7 @@ class SymbexecStatus(Enum):
 class SymbexecResult(NamedTuple):
     status: SymbexecStatus
     traces: Traces
+    exception: Exception | None = None
 
 
 # TODO: make the FS model selection configurable via the `InterpConfig`
@@ -1939,7 +1938,7 @@ def symbexec_file(input_file: str,
     except Exception as e:
         logging.error("Symbolic execution failed:")
         logging.error(traceback.format_exc())
-        return SymbexecResult(SymbexecStatus.FAILED, [])
+        return SymbexecResult(SymbexecStatus.FAILED, [], exception=e)
 
 stop_event: Event | None = None
 _timers: list[threading.Timer] = []

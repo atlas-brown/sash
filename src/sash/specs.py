@@ -73,7 +73,8 @@ def parse_command(cmd_inv: tuple[Field, ...]) -> CmdInvocation:
         match field.content:
             case SymStr(parts):
                 part_strs = []
-                assert all(isinstance(part, str) for part in parts), "SymStr with SymVars not supported in Z3 translation yet"
+                if any(not isinstance(part, str) for part in parts):
+                    raise NotImplementedError(f"SymStr with SymVars not supported in command parsing yet (got parts {parts})")
                 for part in parts:
                     match part:
                         case str(s):

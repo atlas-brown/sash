@@ -84,7 +84,7 @@ class NormalizedConstraint(Constraint):
                     norm_c2 = c2.try_without_trailing_slash()
                     return StringEq(norm_c1, norm_c2)
 
-            assert False, f"Unhandled constraint: {constraint}"
+            assert False, f"all constraints should be handled (got {constraint})"
 
         object.__setattr__(self, "constraint", normalize(self.constraint))
 

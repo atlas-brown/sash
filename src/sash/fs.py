@@ -151,10 +151,9 @@ class FSModelSimple(FSModel):
                 # Does not affect FS model
                 return self
             case Not(constraint):
-                assert False, f"Unclear what Not means in postcond (is it un-normalized?): {constraint}"
-                return self
+                assert False, f"'Not' should not appear in normalized constraints (got {constraint})"
             case _:
-                assert False, f"Unhandled FS postcondition: {constraints}"
+                assert False, f"all constraints should be handled (got {constraints})"
         return self
 
     def apply_postcondition(self, norm_constraints: NormalizedConstraint) -> FSModel:
@@ -195,7 +194,7 @@ class FSModelSimple(FSModel):
             case StringEq(lhs, rhs):
                 return self.field_to_z3(lhs) == self.field_to_z3(rhs)
             case _:
-                assert False, f"FSModelSimple cannot evaluate constraint: {constraint}"
+                assert False, f"all constraints should be handled (got {constraint})"
 
     def state_to_z3(self) -> 'z3.ExprRef':
         exprs = []
