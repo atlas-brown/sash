@@ -1,9 +1,12 @@
 import collections.abc
 import dataclasses
 import logging
+import os
+import pathlib
 
 import libdash
 import shasta.ast_node as AST
+import shasta.gosh_to_shasta_ast as shasta_shfmt_to_ast
 from pash_annotations.datatypes.BasicDatatypes import Flag, FlagOption, Operand, Option
 from pash_annotations.parser.parser import (
     are_all_individually_flags,
@@ -45,6 +48,81 @@ class ParsedCommand:
 # through python without calling an external executable
 LIBDASH_INITIALIZED = False
 def parse_shell_script(script_path: str) -> list[WrappedAst]:
+    parser_backend = detect_script_parser(script_path)
+    logging.debug("Selected parser backend '%s' for %s", parser_backend, script_path)
+    if parser_backend == "shfmt":
+        return parse_with_shasta_shfmt_bridge(script_path)
+    return parse_with_libdash(script_path)
+
+
+def detect_script_parser(script_path: str) -> str:
+    shebang_line = read_shebang_line(script_path)
+    if shebang_line is None:
+        return "libdash"
+
+    interpreter = parse_shebang_interpreter(shebang_line)
+    if interpreter in {"bash"}:
+        return "shfmt"
+    return "libdash"
+
+
+def read_shebang_line(script_path: str) -> str | None:
+    try:
+        with open(script_path, encoding="utf-8", errors="surrogateescape") as script_file:
+            first_line = script_file.readline()
+    except OSError:
+        return None
+
+    if not first_line.startswith("#!"):
+        return None
+    return first_line[2:].strip()
+
+
+def parse_shebang_interpreter(shebang_line: str) -> str | None:
+    if shebang_line == "":
+        return None
+
+    tokens = shebang_line.split()
+    if not tokens:
+        return None
+
+    executable = pathlib.Path(tokens[0]).name
+    if executable != "env":
+        return executable
+
+    for token in tokens[1:]:
+        # Skip env flags (e.g., `-S`) and use the first positional executable.
+        if token.startswith("-"):
+            continue
+        return pathlib.Path(token).name
+    return None
+
+
+def parse_with_shasta_shfmt_bridge(script_path: str) -> list[WrappedAst]:
+    logging.debug("Parsing %s using shasta shfmt bridge", script_path)
+    shasta_nodes = shasta_shfmt_to_ast.parse(script_path)
+    wrapped_nodes = []
+    for idx, shasta_node in enumerate(shasta_nodes):
+        node_line_number = getattr(shasta_node, "line_number", None)
+        if isinstance(node_line_number, int) and node_line_number > 0:
+            line_before = node_line_number - 1
+            cmd_linno = node_line_number
+        else:
+            line_before = idx
+            cmd_linno = None
+        wrapped_nodes.append(
+            WrappedAst(
+                ast_node=shasta_node,
+                rawtext="",
+                line_before=line_before,
+                line_after=line_before,
+                cmd_linno=cmd_linno,
+            )
+        )
+    return wrapped_nodes
+
+
+def parse_with_libdash(script_path: str) -> list[WrappedAst]:
     global LIBDASH_INITIALIZED
 
     logging.debug("Parsing %s", script_path)
@@ -73,6 +151,7 @@ def parse_shell_script(script_path: str) -> list[WrappedAst]:
     return wrapped_nodes
 
 
+# TODO: Delete this
 def annot_parser_wrapper(str_ls_args: list[str]) -> ParsedCommand:
     # split all terms (command, flags, options, arguments, operands)
     parsed_elements_list: list[str] = str_ls_args

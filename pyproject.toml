@@ -10,7 +10,7 @@ requires-python = ">=3.10"
 dependencies = [
     "libdash>=0.3.1",
     "pash-annotations>=0.2.4",
-    "shasta>=0.2.2",
+    "shasta>=0.5",
     "z3-solver>=4.14.1.0",
 ]
 
@@ -37,3 +37,4 @@ dev = [
 
 # For now download libdash from GitHub on all platforms, because the PyPI version has bugs
 libdash = { git = "https://github.com/binpash/libdash" }
+shasta = { git = "https://github.com/binpash/shasta", branch = "main" }
