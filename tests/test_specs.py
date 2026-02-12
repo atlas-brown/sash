@@ -34,7 +34,12 @@ from sash.symbolic.state import Assertion, State
 def sanity_check_spec_constraints(cmd_name: str, cmd_spec: specs.CmdSpec):
     fs_model = FSModelSimple(lambda _: z3.FreshConst(z3.StringSort(), "field"))
 
-    fs_model.apply_postcondition(cmd_spec.success_postcond.normalized())
+    if isinstance(cmd_spec.success_postcond, tuple):
+        succ = cmd_spec.success_postcond[1]
+    else:
+        succ = cmd_spec.success_postcond
+
+    fs_model.apply_postcondition(succ.normalized())
     fs_model.apply_postcondition(cmd_spec.failure_postcond.normalized())
 
     if cmd_spec.check:

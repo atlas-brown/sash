@@ -76,8 +76,8 @@ def reset_and_run_main(script: str, solver: bool = False, enable_dfs: bool = Fal
     report = main.main(script, solver=solver, enable_dfs=enable_dfs)
     return report
 
-def reset_and_run_symbexec_main(script: str, solver: bool = False) -> symb.SymbexecResult:
+def reset_and_run_symbexec_main(script: str, solver: bool = False, enable_dfs: bool = False) -> symb.SymbexecResult:
     """Helper to reset the reporter and run only the symbolic execution on a script."""
     reporter.Reporter.reset()
-    symr = main.symbexec_main(script, solver=solver)
+    symr = main.symbexec_main(script, solver=solver, enable_dfs=enable_dfs)
     return symr

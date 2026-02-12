@@ -1150,7 +1150,7 @@ def test_const_cond_assignment_fixed(tmp_path):
     report = reset_and_run_main(script)
     assert_expected_report(report, [expected_error])
 
-def test_deboostrap_dfs(tmp_path):
+def test_debootstrap_dfs(tmp_path):
     script = write_script(tmp_path, """
     if [ -z "$1" ]; then
         exit 1
@@ -1177,7 +1177,7 @@ def test_deboostrap_dfs(tmp_path):
     report = reset_and_run_main(script, solver=True, enable_dfs=True)
     assert_expected_report(report, [expected_error])
 
-def test_deboostrap_dfs_easier(tmp_path):
+def test_debootstrap_dfs_easier(tmp_path):
     script = write_script(tmp_path, """
     if [ -z "$1" ]; then
         exit 1
@@ -1227,7 +1227,7 @@ def test_makefile_fixed(tmp_path):
     expected2 = reporter.UnboundID("CAMLP5N", 0)
     expected3 = reporter.UnboundID("DESTDIR", 0)
     report = reset_and_run_main(script, solver=True, enable_dfs=True)
-    assert_expected_report(report, [expected1, expected2, expected3])
+    assert_expected_report(report, [expected1, expected2, expected3], ["DFS"])
 
 # def test_function_call_multipath(tmp_path):
 #     # A function that is called should not produce unbound variable errors for its parameters
