@@ -1,9 +1,11 @@
 import pandas as pd
 import sys
 import os
+import re
 from io import StringIO
 from pathlib import Path
 from collections import Counter
+from bug_depth_stats import compute_script_metrics
 
 EPSILON = 1e-3
 
@@ -32,6 +34,14 @@ def feature_marks(feature_names):
         marks.append(r"\FS")
     return " ".join(marks)
 
+def parse_issue_lines(issues):
+    lines = []
+    for issue in issues:
+        match = re.match(r"^L([0-9]+):", issue)
+        if match:
+            lines.append(int(match.group(1)))
+    return lines
+
 names = {
     "high_profile/c00-steam": "Steam updater",
     "high_profile/c01-bumblebee": "NVIDIA driver installer",
@@ -45,6 +55,7 @@ names = {
     "milestone_1/unset_var_1": "OhMyZsh update script",
     "milestone_2/rm_root": "MongoDB backup script",
     "web_forums/rm_root_2": "AIX server data gather",
+    "commits/debootstrap": "Debian debootstrap",
 }
 
 sources = {
@@ -60,6 +71,7 @@ sources = {
     "milestone_1/unset_var_1": r"\cite{ohmyzshbugfix}",
     "milestone_2/rm_root": r"\cite{stackoverflowdeletedatabase}",
     "web_forums/rm_root_2": r"\cite{shellscriptrmrf}",
+    "commits/debootstrap": r"\cite{debian:debootstrap:bug}",
 }
 
 
@@ -76,6 +88,7 @@ descriptions = {
     "milestone_1/unset_var_1": r"Unset variable used in \sh{echo}",
     "milestone_2/rm_root": r"Typo causes DB loss",
     "web_forums/rm_root_2": r"Failed \sh{mktemp} causes data loss",
+    "commits/debootstrap": r"Empty \sh{$2} causes \sh{rm} to delete \sh{cwd}",
 }
 
 # WE: word expansion
@@ -144,6 +157,45 @@ def get_loc(path):
     # assert loc > 0, f"Failed to get LoC for path: {path}"
     return loc
 
+depth_metrics_cache = {}
+def get_depth_metrics(path):
+    if path not in depth_metrics_cache:
+        try:
+            lines = Path(path).read_text(encoding="utf-8", errors="surrogateescape").splitlines()
+            depth_metrics_cache[path] = compute_script_metrics(lines, path)
+        except Exception as e:
+            print(f"Failed to compute depth metrics for {path}: {e}", file=sys.stderr)
+            depth_metrics_cache[path] = {
+                "total_lines": 0,
+                "depth_at_line": [0],
+                "statements_before_line": [0],
+                "final_depth": 0,
+                "final_statements_seen": 0,
+            }
+    return depth_metrics_cache[path]
+
+def deepest_bug_depth(path, expected_issues):
+    bug_lines = parse_issue_lines(expected_issues)
+    if not bug_lines:
+        return (0, 0)
+
+    metrics = get_depth_metrics(path)
+    total_lines = metrics["total_lines"]
+    depth_at_line = metrics["depth_at_line"]
+    statements_before_line = metrics["statements_before_line"]
+    fallback_depth = metrics["final_depth"]
+    fallback_statements = metrics.get("final_statements_seen", 0)
+
+    max_nesting = max(
+        depth_at_line[line] if 1 <= line <= total_lines else fallback_depth
+        for line in bug_lines
+    )
+    max_statements_before = max(
+        statements_before_line[line] if 1 <= line <= total_lines else fallback_statements
+        for line in bug_lines
+    )
+    return (max_nesting, max_statements_before)
+
 fixed_actual_by_bm = {}
 for _, row in fixed_results.iterrows():
     bm_name = get_bm_name(row["benchmark"])
@@ -173,18 +225,20 @@ def create_table_line(result):
     actual_issues = parse_issue_list(result["actual_results"])
     n_bugs = len(expected_issues)
     detected = count_matches(expected_issues, actual_issues)
+    max_nesting, max_statements_before = deepest_bug_depth(path, expected_issues)
+    depth_cell = f"{max_nesting}/{max_statements_before}"
     fixed_clears_bug = fixed_clears_bug_by_bm.get(bm_name, False)
     fixed_mark = r"\checkmark" if fixed_clears_bug else ""
     feature_mark = feature_marks(features.get(bm_name, []))
 
-    return f"{name} & {loc}  & {description} & {n_bugs} & {detected} & {fixed_mark} & {time} & {feature_mark} & {source}  \\\\"
+    return f"{name} & {loc}  & {description} & {n_bugs} & {detected} & {depth_cell} & {fixed_mark} & {time} & {feature_mark} & {source}  \\\\"
 
 rest_of_benchmarks = []
 
 print(r"""
-    \begin{tabular}{lrlcccrcl}
+    \begin{tabular}{lrlccccrcl}
     \toprule
-    \textbf{Name} & \textbf{LoC} & \textbf{Description} & \textbf{\#Bugs} & \textbf{D?} & \textbf{F?} & $t (s)$ & \textbf{Features} & \textbf{Source} \\
+    \textbf{Name} & \textbf{LoC} & \textbf{Description} & \textbf{\#Bugs} & \textbf{D?} & \textbf{Depth (N/S)} & \textbf{F?} & $t (s)$ & \textbf{Features} & \textbf{Source} \\
     \midrule
 """
 )
@@ -211,6 +265,15 @@ detected_bugs_rest = sum(
     count_matches(parse_issue_list(r["expected_results"]), parse_issue_list(r["actual_results"]))
     for r in rest_of_benchmarks
 )
+depth_pairs_rest = [
+    deepest_bug_depth(r["benchmark"], parse_issue_list(r["expected_results"]))
+    for r in rest_of_benchmarks
+]
+min_nesting_rest = min(pair[0] for pair in depth_pairs_rest)
+max_nesting_rest = max(pair[0] for pair in depth_pairs_rest)
+min_statements_rest = min(pair[1] for pair in depth_pairs_rest)
+max_statements_rest = max(pair[1] for pair in depth_pairs_rest)
+depth_range_rest_cell = f"{min_nesting_rest}--{max_nesting_rest}/{min_statements_rest}--{max_statements_rest}"
 total = len(rest_of_benchmarks)
 fixed_clear_count = sum(1 for r in rest_of_benchmarks if fixed_clears_bug_by_bm.get(get_bm_name(r["benchmark"]), False))
 fixed_clear_rate = f"{fixed_clear_count}/{total}"
@@ -220,8 +283,8 @@ cs_count = sum(1 for r in rest_of_benchmarks if "CS" in features.get(get_bm_name
 fs_count = sum(1 for r in rest_of_benchmarks if "FS" in features.get(get_bm_name(r["benchmark"]), []))
 feature_count_marks = f"{we_count} \\WE, {cs_count} \\SP, {fs_count} \\FS"
 
-print(rf"""\emph{{More buggy scripts}} & {loc_range} &  & {total_bugs_rest} & {detected_bugs_rest} & {fixed_clear_rate} & {time_range} & {feature_count_marks} & \cf{{sec:full-ds}} \\""")
-print(r"\hspace{.5em}\dots & & & & & & & & \\")
+print(rf"""\emph{{More buggy scripts}} & {loc_range} &  & {total_bugs_rest} & {detected_bugs_rest} & {depth_range_rest_cell} & {fixed_clear_rate} & {time_range} & {feature_count_marks} & \cf{{sec:full-ds}} \\""")
+print(r"\hspace{.5em}\dots & & & & & & & & & \\")
 
 # Print summary line across all benchmarks
 locs = [get_loc(r["benchmark"]) for r in buggy_results.to_dict(orient="records")]
@@ -235,6 +298,15 @@ detected_bugs = sum(
     count_matches(parse_issue_list(r["expected_results"]), parse_issue_list(r["actual_results"]))
     for r in buggy_results.to_dict(orient="records")
 )
+depth_pairs_total = [
+    deepest_bug_depth(r["benchmark"], parse_issue_list(r["expected_results"]))
+    for r in buggy_results.to_dict(orient="records")
+]
+min_nesting_total = min(pair[0] for pair in depth_pairs_total)
+max_nesting_total = max(pair[0] for pair in depth_pairs_total)
+min_statements_total = min(pair[1] for pair in depth_pairs_total)
+max_statements_total = max(pair[1] for pair in depth_pairs_total)
+depth_range_total_cell = f"{min_nesting_total}--{max_nesting_total}/{min_statements_total}--{max_statements_total}"
 fixed_clear_count = sum(1 for r in buggy_results.to_dict(orient="records") if fixed_clears_bug_by_bm.get(get_bm_name(r["benchmark"]), False))
 fixed_clear_rate = f"{fixed_clear_count}/{total}"
 times = [r["time"] for r in buggy_results.to_dict(orient="records")]
@@ -249,7 +321,7 @@ feature_count_marks = f"{we_count} \\WE, {cs_count} \\SP, {fs_count} \\FS"
 
 print(rf"""
 \midrule
-\textbf{{Total}} & {loc_range} &  & {total_bugs} & {detected_bugs} & {fixed_clear_rate} & {time_range} & {feature_count_marks} &  \\ """)
+\textbf{{Total}} & {loc_range} &  & {total_bugs} & {detected_bugs} & {depth_range_total_cell} & {fixed_clear_rate} & {time_range} & {feature_count_marks} &  \\ """)
 
 print(r"""
 \bottomrule
