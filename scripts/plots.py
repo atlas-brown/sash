@@ -4,9 +4,70 @@ import numpy as np
 import os
 from io import StringIO
 import sys
+import subprocess
+from pathlib import Path
+from collections import Counter
+import yaml
 
 import matplotlib.pyplot as plt
 from matplotlib_set_diagrams import EulerDiagram
+
+def parse_issue_list(value):
+    if pd.isna(value):
+        return []
+    return [item.strip() for item in str(value).split(";") if item and item.strip()]
+
+def git_toplevel():
+    return Path(
+        subprocess.check_output(
+            ["git", "rev-parse", "--show-toplevel"], encoding="utf-8"
+        ).strip()
+    )
+
+ROOT_DIR = git_toplevel()
+
+_benchmark_dir_cache = {}
+_shellcheck_map_cache = {}
+
+def find_benchmark_dir(benchmark_path):
+    if benchmark_path in _benchmark_dir_cache:
+        return _benchmark_dir_cache[benchmark_path]
+
+    p = Path(benchmark_path)
+    candidates = [p]
+    if not p.is_absolute():
+        candidates.append(ROOT_DIR / p)
+
+    for candidate in candidates:
+        for parent in [candidate.parent, *candidate.parents]:
+            if (parent / "info.yaml").exists():
+                _benchmark_dir_cache[benchmark_path] = parent
+                return parent
+
+    _benchmark_dir_cache[benchmark_path] = None
+    return None
+
+def get_shellcheck_map_for_benchmark(benchmark_path):
+    benchmark_dir = find_benchmark_dir(benchmark_path)
+    if benchmark_dir is None:
+        return {}
+    if benchmark_dir in _shellcheck_map_cache:
+        return _shellcheck_map_cache[benchmark_dir]
+
+    try:
+        info = yaml.safe_load((benchmark_dir / "info.yaml").read_text(encoding="utf-8"))
+    except Exception:
+        _shellcheck_map_cache[benchmark_dir] = {}
+        return {}
+
+    code_to_shellcheck = {}
+    for bug in (info or {}).get("bugs", {}).values():
+        code = bug.get("code")
+        shellcheck = bug.get("shellcheck")
+        if code and shellcheck:
+            code_to_shellcheck[code] = shellcheck
+    _shellcheck_map_cache[benchmark_dir] = code_to_shellcheck
+    return code_to_shellcheck
 
 def load_csv(file_path):
     try:
@@ -42,41 +103,51 @@ def _get_bug_sets(data):
     shellcheck_detected = set()
     all_bugs_expected = set()
 
-    for _, row in data.iterrows():
+    data_view = data
+    if "kind" in data_view.columns:
+        data_view = data_view[data_view["kind"] == "buggy"]
+    elif "benchmark" in data_view.columns:
+        data_view = data_view[
+            ~data_view["benchmark"].astype(str).str.endswith("/fixed.sh")
+        ]
+
+    for _, row in data_view.iterrows():
         bench = row["benchmark"]
+        actual_bugs = parse_issue_list(row["actual_results"])
+        shell_bugs = parse_issue_list(row["shellcheck_codes"])
+        expected_bugs = parse_issue_list(row["expected_results"])
 
-        sash_bugs = (str(row["actual_results"]).split(";")) if pd.notna(row["actual_results"]) else []
-        shell_bugs = (str(row["shellcheck_codes"]).split(";")) if pd.notna(row["shellcheck_codes"]) else []
-        all_bugs = (str(row["expected_results"]).split(";")) if pd.notna(row["expected_results"]) else []
+        expected_counter = Counter()
+        expected_keys = []
+        for issue in expected_bugs:
+            idx = expected_counter[issue]
+            expected_counter[issue] += 1
+            key = f"{bench}_{issue}_{idx}"
+            expected_keys.append(key)
+            all_bugs_expected.add(key)
 
-        # strip out empty entries
-        sash_bugs = [b.strip() for b in sash_bugs if b.strip()]
-        shell_bugs = [b.strip() for b in shell_bugs if b.strip()]
-        all_bugs = [b.strip() for b in all_bugs if b.strip()]
+        # SaSh matching is exact against expected issue IDs.
+        actual_counter = Counter(actual_bugs)
+        for issue, count in expected_counter.items():
+            matched = min(count, actual_counter[issue])
+            for idx in range(matched):
+                sash_detected.add(f"{bench}_{issue}_{idx}")
 
-        # per-row occurrence counters, per bug code
-        sash_counts = {}
-        shell_counts = {}
-        expected_counts = {}
+        # ShellCheck matching uses benchmark-specific mapping: sash_code -> shellcheck_code.
+        shell_counter = Counter(shell_bugs)
+        code_to_shellcheck = get_shellcheck_map_for_benchmark(bench)
+        expected_keys_by_shellcheck = {}
+        for key in expected_keys:
+            issue = key.split(f"{bench}_", 1)[1].rsplit("_", 1)[0]
+            sash_code = issue.split(":", 1)[1] if ":" in issue else issue
+            shell_code = code_to_shellcheck.get(sash_code)
+            if shell_code is not None:
+                expected_keys_by_shellcheck.setdefault(shell_code, []).append(key)
 
-        for bug in sash_bugs:
-            idx = sash_counts.get(bug, 0)
-            sash_counts[bug] = idx + 1
-            sash_detected.add(f"{bench}_{bug}_{idx}")
-
-        for bug in shell_bugs:
-            idx = shell_counts.get(bug, 0)
-            shell_counts[bug] = idx + 1
-            shellcheck_detected.add(f"{bench}_{bug}_{idx}")
-
-        for bug in all_bugs:
-            idx = expected_counts.get(bug, 0)
-            expected_counts[bug] = idx + 1
-            all_bugs_expected.add(f"{bench}_{bug}_{idx}")
-
-    # Add sash detected but without the false positives
-    sash_detected = sash_detected & all_bugs_expected
-    shellcheck_detected = shellcheck_detected & all_bugs_expected
+        for shell_code, keys in expected_keys_by_shellcheck.items():
+            matched = min(len(keys), shell_counter[shell_code])
+            for key in keys[:matched]:
+                shellcheck_detected.add(key)
 
     return sash_detected, shellcheck_detected, all_bugs_expected
 
@@ -107,21 +178,37 @@ def plot_bug_detection_bars(data, output_path):
     sash_detected, shellcheck_detected, all_bugs_expected = _get_bug_sets(data)
     missed = len(all_bugs_expected - (sash_detected | shellcheck_detected))
     both_detected = len(sash_detected & shellcheck_detected)
-    sash_detected = len(sash_detected)
-    shellcheck_detected = len(shellcheck_detected)
+    only_sash = len(sash_detected - shellcheck_detected)
+    only_shell = len(shellcheck_detected - sash_detected)
     all_expected = len(all_bugs_expected)
 
-    # create a single horizontal bar with 3 segments: sash only, both, shellcheck only
-    plt.figure(figsize=figsize_small)
-    labels = [sysname, "Both", "ShellCheck"]
-    sizes = [sash_detected - both_detected, both_detected, shellcheck_detected - both_detected, missed]
-    colors = color_scheme[:3]
-    plt.barh(0, sizes[0], color=colors[0], label=labels[0])
-    plt.barh(0, sizes[1], left=sizes[0], color=colors[1], label=labels[1])
-    plt.barh(0, sizes[2], left=sizes[0] + sizes[1], color=colors[2], label=labels[2])
-    plt.barh(0, sizes[3], left=sizes[0] + sizes[1] + sizes[2], color="lightgray", label="Missed")
+    # Two separate bars, one per tool total:
+    # SaSh bar = both + SaSh-only + missed
+    # ShellCheck bar = both + ShellCheck-only + missed
+    plt.figure(figsize=(figsize_small[0], 1.9))
+    both_color = color_scheme[1]
+    sash_only_color = color_scheme[0]
+    shell_only_color = color_scheme[2]
+    missed_color = "lightgray"
+
+    y_positions = [1, 0]
+    # First row = SaSh, second row = ShellCheck
+    both_sizes = [both_detected, both_detected]
+    only_sizes = [only_sash, only_shell]
+    missed_sizes = [missed, missed]
+
+    plt.barh(y_positions, both_sizes, color=both_color, label="Both")
+    plt.barh(y_positions, only_sizes, left=both_sizes, color=[sash_only_color, shell_only_color])
+    plt.barh(
+        y_positions,
+        missed_sizes,
+        left=[both_sizes[i] + only_sizes[i] for i in range(2)],
+        color=missed_color,
+        label="Missed",
+    )
+
     plt.xlabel("Detected Bugs", loc="right")
-    plt.yticks([])
+    plt.yticks([0, 1], ["ShellCheck", sysname])
     plt.legend(
         fontsize=10,
         loc="upper left",
@@ -178,6 +265,7 @@ def main():
     })
 
     results_data = load_csv(args.results_csv)
+    results_data = results_data[results_data["kind"] == "buggy"].copy()
     results_data["loc"] = results_data["benchmark"].apply(get_loc)
     plot_bug_detection_euler(results_data, os.path.join(args.output_dir, "bug-detection-euler.pdf"))
     plot_bug_detection_bars(results_data, os.path.join(args.output_dir, "bug-detection-bars.pdf"))
@@ -186,7 +274,6 @@ def main():
     # Print bug stats
     total_benchmarks = len(results_data)
     sash_detected, shellcheck_detected, all_bugs_expected = _get_bug_sets(results_data)
-    print(all_bugs_expected, file=sys.stderr)
     total_bugs = len(all_bugs_expected)
     print(f"% Total benchmarks: {total_benchmarks}", file=sys.stderr)
     print(f"% Total bugs: {total_bugs}", file=sys.stderr)
