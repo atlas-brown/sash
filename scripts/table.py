@@ -2,11 +2,35 @@ import pandas as pd
 import sys
 import os
 from io import StringIO
+from pathlib import Path
+from collections import Counter
 
 EPSILON = 1e-3
 
 results_path = "results/results.csv"
 results = pd.read_csv(results_path)
+buggy_results = results[results["kind"] == "buggy"].copy()
+fixed_results = results[results["kind"] == "fixed"].copy()
+
+def parse_issue_list(value):
+    if pd.isna(value):
+        return []
+    return [item.strip() for item in str(value).split(";") if item and item.strip()]
+
+def count_matches(expected_issues, actual_issues):
+    expected_counter = Counter(expected_issues)
+    actual_counter = Counter(actual_issues)
+    return sum(min(expected_counter[issue], actual_counter[issue]) for issue in expected_counter)
+
+def feature_marks(feature_names):
+    marks = []
+    if "WE" in feature_names:
+        marks.append(r"\WE")
+    if "CS" in feature_names:
+        marks.append(r"\SP")
+    if "FS" in feature_names:
+        marks.append(r"\FS")
+    return " ".join(marks)
 
 names = {
     "high_profile/c00-steam": "Steam updater",
@@ -105,10 +129,10 @@ features = {
 
 
 def get_bm_name(path):
-    subpath = os.path.dirname(path)
-    parts = subpath.split(os.sep)[1:]
-    result = os.path.join(*parts)
-    return result
+    path = path.split("benchmarks/")[-1]
+    # Strip the script name
+    path = "/".join(Path(path).parts[:-1]) # This is wrong! It maps fixed and regular scripts to the same name
+    return path
 
 def get_loc(path):
     proc = os.popen(f"cloc --json {path}")
@@ -120,8 +144,21 @@ def get_loc(path):
     # assert loc > 0, f"Failed to get LoC for path: {path}"
     return loc
 
+fixed_actual_by_bm = {}
+for _, row in fixed_results.iterrows():
+    bm_name = get_bm_name(row["benchmark"])
+    fixed_actual_by_bm.setdefault(bm_name, set()).update(parse_issue_list(row["actual_results"]))
+
+# For each buggy benchmark: true iff fixed run does not report any corresponding buggy issue.
+fixed_clears_bug_by_bm = {}
+for _, row in buggy_results.iterrows():
+    bm_name = get_bm_name(row["benchmark"])
+    buggy_expected = set(parse_issue_list(row["expected_results"]))
+    fixed_actual = fixed_actual_by_bm.get(bm_name, set())
+    fixed_clears_bug_by_bm[bm_name] = len(buggy_expected & fixed_actual) == 0
+
 def create_table_line(result):
-    path, time, detected = result["benchmark"], result["time"], result["detected_all"]
+    path, time = result["benchmark"], result["time"]
     # Grab just the folder and benchmark subfolder
     bm_name = get_bm_name(path)
     name = names.get(bm_name, None)
@@ -132,28 +169,27 @@ def create_table_line(result):
     time = f"{time:.2f}s" if time > EPSILON else "<1ms"
     loc = get_loc(path)
     source = sources.get(bm_name, "")
-    detected = r"\checkmark" if bool(detected) else ""
-    we_feature = "WE" in features.get(bm_name, [])
-    cs_feature = "CS" in features.get(bm_name, [])
-    fs_feature = "FS" in features.get(bm_name, [])
+    expected_issues = parse_issue_list(result["expected_results"])
+    actual_issues = parse_issue_list(result["actual_results"])
+    n_bugs = len(expected_issues)
+    detected = count_matches(expected_issues, actual_issues)
+    fixed_clears_bug = fixed_clears_bug_by_bm.get(bm_name, False)
+    fixed_mark = r"\checkmark" if fixed_clears_bug else ""
+    feature_mark = feature_marks(features.get(bm_name, []))
 
-    we_mark = r"\checkmark" if we_feature else ""
-    cs_mark = r"\checkmark" if cs_feature else ""
-    fs_mark = r"\checkmark" if fs_feature else ""
-
-    return f"{name} & {loc}  & {description} & {detected} & {time} & {we_mark}  & {cs_mark}  & {fs_mark}  & {source}  \\\\"
+    return f"{name} & {loc}  & {description} & {n_bugs} & {detected} & {fixed_mark} & {time} & {feature_mark} & {source}  \\\\"
 
 rest_of_benchmarks = []
 
 print(r"""
-    \begin{tabular}{lrlccrcccl}
+    \begin{tabular}{lrlcccrcl}
     \toprule
-    \textbf{Name} & \textbf{LoC} & \textbf{Bug} & \textbf{D?} & $t (s)$ & \textbf{WE} & \textbf{CS} & \textbf{FS} & \textbf{Source} \\
+    \textbf{Name} & \textbf{LoC} & \textbf{Description} & \textbf{\#Bugs} & \textbf{D?} & \textbf{F?} & $t (s)$ & \textbf{Features} & \textbf{Source} \\
     \midrule
 """
 )
 
-for result in results.to_dict(orient="records"):
+for result in buggy_results.to_dict(orient="records"):
     line = create_table_line(result)
     if line:
         print(line)
@@ -170,38 +206,50 @@ min_loc = min(locs)
 max_loc = max(locs)
 loc_range = f"{min_loc}--{max_loc}"
 
-detected = sum(1 for r in rest_of_benchmarks if r["detected_all"])
+total_bugs_rest = sum(len(parse_issue_list(r["expected_results"])) for r in rest_of_benchmarks)
+detected_bugs_rest = sum(
+    count_matches(parse_issue_list(r["expected_results"]), parse_issue_list(r["actual_results"]))
+    for r in rest_of_benchmarks
+)
 total = len(rest_of_benchmarks)
-detection_rate = f"{detected}/{total}"
+fixed_clear_count = sum(1 for r in rest_of_benchmarks if fixed_clears_bug_by_bm.get(get_bm_name(r["benchmark"]), False))
+fixed_clear_rate = f"{fixed_clear_count}/{total}"
 
 we_count = sum(1 for r in rest_of_benchmarks if "WE" in features.get(get_bm_name(r["benchmark"]), []))
 cs_count = sum(1 for r in rest_of_benchmarks if "CS" in features.get(get_bm_name(r["benchmark"]), []))
 fs_count = sum(1 for r in rest_of_benchmarks if "FS" in features.get(get_bm_name(r["benchmark"]), []))
+feature_count_marks = f"{we_count} \\WE, {cs_count} \\SP, {fs_count} \\FS"
 
-print(rf"""\emph{{More buggy scripts}} & {loc_range} &  & {detection_rate} & {time_range} & {we_count} & {cs_count} & {fs_count} & \cf{{sec:full-ds}} \\""")
+print(rf"""\emph{{More buggy scripts}} & {loc_range} &  & {total_bugs_rest} & {detected_bugs_rest} & {fixed_clear_rate} & {time_range} & {feature_count_marks} & \cf{{sec:full-ds}} \\""")
 print(r"\hspace{.5em}\dots & & & & & & & & \\")
 
 # Print summary line across all benchmarks
-locs = [get_loc(r["benchmark"]) for r in results.to_dict(orient="records")]
+locs = [get_loc(r["benchmark"]) for r in buggy_results.to_dict(orient="records")]
 min_loc = min(locs)
 max_loc = max(locs)
 loc_range = f"{min_loc}--{max_loc}"
 
-detected = sum(1 for r in results.to_dict(orient="records") if r["detected_all"])
-total = len(results)
-detection_rate = f"{detected}/{total}"
-times = [r["time"] for r in results.to_dict(orient="records")]
+total = len(buggy_results)
+total_bugs = sum(len(parse_issue_list(r["expected_results"])) for r in buggy_results.to_dict(orient="records"))
+detected_bugs = sum(
+    count_matches(parse_issue_list(r["expected_results"]), parse_issue_list(r["actual_results"]))
+    for r in buggy_results.to_dict(orient="records")
+)
+fixed_clear_count = sum(1 for r in buggy_results.to_dict(orient="records") if fixed_clears_bug_by_bm.get(get_bm_name(r["benchmark"]), False))
+fixed_clear_rate = f"{fixed_clear_count}/{total}"
+times = [r["time"] for r in buggy_results.to_dict(orient="records")]
 min_time = min(times)
 max_time = max(times)
 time_range = f"{min_time:.2f}--{max_time:.2f}s"
 
-we_count = sum(1 for r in results.to_dict(orient="records") if "WE" in features.get(get_bm_name(r["benchmark"]), []))
-cs_count = sum(1 for r in results.to_dict(orient="records") if "CS" in features.get(get_bm_name(r["benchmark"]), []))
-fs_count = sum(1 for r in results.to_dict(orient="records") if "FS" in features.get(get_bm_name(r["benchmark"]), []))
+we_count = sum(1 for r in buggy_results.to_dict(orient="records") if "WE" in features.get(get_bm_name(r["benchmark"]), []))
+cs_count = sum(1 for r in buggy_results.to_dict(orient="records") if "CS" in features.get(get_bm_name(r["benchmark"]), []))
+fs_count = sum(1 for r in buggy_results.to_dict(orient="records") if "FS" in features.get(get_bm_name(r["benchmark"]), []))
+feature_count_marks = f"{we_count} \\WE, {cs_count} \\SP, {fs_count} \\FS"
 
 print(rf"""
 \midrule
-\textbf{{Total}} & {loc_range} &  & {detection_rate} & {time_range} & {we_count} & {cs_count} & {fs_count} &  \\ """)
+\textbf{{Total}} & {loc_range} &  & {total_bugs} & {detected_bugs} & {fixed_clear_rate} & {time_range} & {feature_count_marks} &  \\ """)
 
 print(r"""
 \bottomrule
@@ -209,10 +257,10 @@ print(r"""
 """)
 
 # Print some stats about the benchmarks
-total_benchmarks = len(results)
+total_benchmarks = len(buggy_results)
 # Total bugs
 total_bugs = (
-    results["expected_results"]
+    buggy_results["expected_results"]
     .fillna("")
     .where(lambda s: s != "")
     .dropna()
@@ -221,7 +269,7 @@ total_bugs = (
     .sum()
 )
 n_bugs = (
-    results["expected_results"]
+    buggy_results["expected_results"]
     .fillna("")
     .where(lambda s: s != "")
     .dropna()
@@ -236,7 +284,7 @@ print(f"% Total bugs: {total_bugs}", file=sys.stderr)
 print(f"% Bugs per benchmark: {bugs_min}--{bugs_max}", file=sys.stderr)
 
 # Averages
-avg_loc = sum(get_loc(r["benchmark"]) for r in results.to_dict(orient="records")) / total_benchmarks
-avg_time = sum(r["time"] for r in results.to_dict(orient="records")) / total_benchmarks
+avg_loc = sum(get_loc(r["benchmark"]) for r in buggy_results.to_dict(orient="records")) / total_benchmarks
+avg_time = sum(r["time"] for r in buggy_results.to_dict(orient="records")) / total_benchmarks
 print(f"% Average LoC: {avg_loc:.2f}", file=sys.stderr)
 print(f"% Average time: {avg_time:.2f}s", file=sys.stderr)
