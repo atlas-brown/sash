@@ -375,19 +375,60 @@ def plot_runtime(data, output_path):
         ),
         axis=1,
     )
-    data = data.sort_values(by=["depth_bfs", "time"], ascending=[False, False])
+    data = data.sort_values(by=["depth_bfs", "time"], ascending=[True, True])
     benchmarks = data["benchmark"].apply(get_runtime_label)
-    times = data["time"]
-    locs = data["loc"]
-    bars = plt.bar(benchmarks, times, color=color_scheme[0], width=0.55)
-    plt.margins(x=0)  # remove gap left/right
+    symexec_times = data["exec_time"].to_numpy()
+    solver_times = data["solver_time"].to_numpy()
+    depth_labels = data["depth_bfs"]
+    x = np.arange(len(data))
+    width = 0.36
 
-    plt.xticks(rotation=45, ha="right", rotation_mode="anchor", fontsize=7)
+    bars_sym = plt.bar(
+        x - (width / 2),
+        symexec_times,
+        color=color_scheme[0],
+        width=width,
+        label="Symbolic Execution",
+    )
+    bars_solver = plt.bar(
+        x + (width / 2),
+        solver_times,
+        color=color_scheme[2],
+        width=width,
+        label="Solver",
+    )
+    timeout_rows = data[data["timed_out"] == True] if "timed_out" in data.columns else data.iloc[0:0]
+    if timeout_rows.empty:
+        symexec_timeout = None
+        solver_timeout = None
+    else:
+        solver_timeout = float(round(timeout_rows["solver_time"].median()))
+        long_exec = timeout_rows[timeout_rows["exec_time"] > (solver_timeout * 1.5)]["exec_time"]
+        if long_exec.empty:
+            symexec_timeout = float(round(timeout_rows["exec_time"].median()))
+        else:
+            symexec_timeout = float(round(long_exec.median() / 10.0) * 10.0)
+
+    tol = 0.25  # seconds tolerance for numeric jitter
+    for sym_t, sol_t, bar_sym, bar_solver in zip(symexec_times, solver_times, bars_sym, bars_solver):
+        sym_timed_out = symexec_timeout is not None and sym_t >= (symexec_timeout - tol)
+        solver_timed_out = solver_timeout is not None and sol_t >= (solver_timeout - tol)
+        if sym_timed_out:
+            bar_sym.set_hatch("/")
+        if solver_timed_out:
+            bar_solver.set_hatch("/")
+    plt.margins(x=0.02)  # keep a slight gap at plot borders
+    plt.margins(y=0.08)  # keep a slight gap at top for bar labels
+
+    plt.xticks(x, benchmarks, rotation=45, ha="right", rotation_mode="anchor", fontsize=7)
     plt.ylabel("Time (s)")
     plt.yscale("log")
-    for bar, loc in zip(bars, locs):
-        height = bar.get_height()
-        plt.text(bar.get_x() + bar.get_width() / 2, height, f"{loc}", ha='center', va='bottom', fontsize=7)
+    for xi, depth, sym_t, sol_t in zip(x, depth_labels, symexec_times, solver_times):
+        top_h = max(sym_t, sol_t)
+        y = top_h * 1.06 if top_h > 0 else 1e-3
+        plt.text(xi, y, f"{int(depth)}", ha='center', va='bottom', fontsize=7)
+
+    plt.legend(fontsize=8, loc="lower right", frameon=True)
     plt.subplots_adjust(bottom=0.30)
     plt.tight_layout()
     plt.savefig(output_path, format="pdf")
