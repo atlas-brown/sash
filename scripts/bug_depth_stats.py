@@ -7,6 +7,7 @@ import re
 import statistics
 import subprocess
 import sys
+from collections import deque
 from pathlib import Path
 
 import yaml
@@ -236,6 +237,67 @@ def compute_parser_depth(lines: list[str], script_path: str) -> list[int]:
     return depth_at_line
 
 
+def _iter_ast_children(node: AST.AstNode) -> list[AST.AstNode]:
+    match node:
+        case AST.PipeNode():
+            return list(node.items)
+        case AST.CommandNode():
+            return []
+        case AST.SubshellNode():
+            return [node.body]
+        case AST.AndNode() | AST.OrNode() | AST.SemiNode():
+            return [node.left_operand, node.right_operand]
+        case AST.NotNode():
+            return [node.body]
+        case AST.RedirNode() | AST.BackgroundNode():
+            return [node.node]
+        case AST.DefunNode():
+            return [node.body]
+        case AST.ForNode():
+            return [node.body]
+        case AST.WhileNode():
+            return [node.test, node.body]
+        case AST.IfNode():
+            children = [node.cond, node.then_b]
+            if node.else_b is not None:
+                children.append(node.else_b)
+            return children
+        case AST.CaseNode():
+            return [case["cbody"] for case in node.cases]
+        case _:
+            return []
+
+
+def compute_parser_bfs_nodes(lines: list[str], script_path: str) -> tuple[list[int], int]:
+    bfs_nodes_before_line = [0] * (len(lines) + 1)
+    try:
+        wrapped_nodes = sash.parser.parse_shell_script(script_path)
+    except Exception:
+        return bfs_nodes_before_line, 0
+
+    queue: deque[tuple[AST.AstNode, int | None]] = deque(
+        (wrapped.ast_node, wrapped.get_line_number()) for wrapped in wrapped_nodes
+    )
+    nodes_seen = 0
+
+    while queue:
+        node, fallback_line = queue.popleft()
+        nodes_seen += 1
+
+        line_number = _node_line_number(node, fallback_line)
+        if (
+            line_number is not None
+            and 1 <= line_number <= len(lines)
+            and bfs_nodes_before_line[line_number] == 0
+        ):
+            bfs_nodes_before_line[line_number] = nodes_seen
+
+        for child in _iter_ast_children(node):
+            queue.append((child, None))
+
+    return bfs_nodes_before_line, nodes_seen
+
+
 def compute_script_metrics(lines: list[str], script_path: str | None = None) -> dict:
     total_lines = len(lines)
     loc = sum(1 for line in lines if strip_comments_and_strings(line).strip())
@@ -309,14 +371,22 @@ def compute_script_metrics(lines: list[str], script_path: str | None = None) -> 
             depth_at_line[line_number] = max(
                 depth_at_line[line_number], parser_depth_at_line[line_number]
             )
+        bfs_nodes_before_line, final_bfs_nodes_seen = compute_parser_bfs_nodes(
+            lines, script_path
+        )
+    else:
+        bfs_nodes_before_line = [0] * (total_lines + 1)
+        final_bfs_nodes_seen = 0
 
     return {
         "lines": lines,
         "total_lines": total_lines,
         "loc": loc,
         "depth_at_line": depth_at_line,
+        "bfs_nodes_before_line": bfs_nodes_before_line,
         "statements_before_line": statements_before_line,
         "final_depth": depth,
+        "final_bfs_nodes_seen": final_bfs_nodes_seen,
         "final_statements_seen": statements_seen,
     }
 

@@ -151,8 +151,10 @@ def get_depth_metrics(path):
             depth_metrics_cache[path] = {
                 "total_lines": 0,
                 "depth_at_line": [0],
+                "bfs_nodes_before_line": [0],
                 "statements_before_line": [0],
                 "final_depth": 0,
+                "final_bfs_nodes_seen": 0,
                 "final_statements_seen": 0,
             }
     return depth_metrics_cache[path]
@@ -160,24 +162,18 @@ def get_depth_metrics(path):
 def deepest_bug_depth(path, expected_issues):
     bug_lines = parse_issue_lines(expected_issues)
     if not bug_lines:
-        return (0, 0)
+        return 0
 
     metrics = get_depth_metrics(path)
     total_lines = metrics["total_lines"]
-    depth_at_line = metrics["depth_at_line"]
-    statements_before_line = metrics["statements_before_line"]
-    fallback_depth = metrics["final_depth"]
-    fallback_statements = metrics.get("final_statements_seen", 0)
+    bfs_nodes_before_line = metrics.get("bfs_nodes_before_line", [0])
+    fallback_bfs = metrics.get("final_bfs_nodes_seen", 0)
 
-    max_nesting = max(
-        depth_at_line[line] if 1 <= line <= total_lines else fallback_depth
+    max_bfs_nodes = max(
+        bfs_nodes_before_line[line] if 1 <= line <= total_lines else fallback_bfs
         for line in bug_lines
     )
-    max_statements_before = max(
-        statements_before_line[line] if 1 <= line <= total_lines else fallback_statements
-        for line in bug_lines
-    )
-    return (max_nesting, max_statements_before)
+    return max_bfs_nodes
 
 fixed_actual_by_bm = {}
 for _, row in fixed_results.iterrows():
@@ -207,8 +203,8 @@ def create_table_line(result):
     actual_issues = parse_issue_list(result["actual_results"])
     n_bugs = len(expected_issues)
     detected = count_matches(expected_issues, actual_issues)
-    max_nesting, max_statements_before = deepest_bug_depth(path, expected_issues)
-    depth_cell = f"{max_nesting}/{max_statements_before}"
+    max_bfs_nodes = deepest_bug_depth(path, expected_issues)
+    depth_cell = f"{max_bfs_nodes}"
     fixed_clears_bug = fixed_clears_bug_by_bm.get(bm_name, False)
     fixed_mark = r"\checkmark" if fixed_clears_bug else ""
     feature_mark = feature_marks(features.get(bm_name, []))
@@ -218,9 +214,9 @@ def create_table_line(result):
 rest_of_benchmarks = []
 
 print(r"""
-    \begin{tabular}{lrlccccrcl}
+    \begin{tabular}{lrlrrrcrcl}
     \toprule
-    \textbf{Name} & \textbf{LoC} & \textbf{Description} & \textbf{\#Bugs} & \textbf{D?} & \textbf{Depth (N/S)} & \textbf{F?} & $t (s)$ & \textbf{Features} & \textbf{Source} \\
+    \textbf{Name} & \textbf{LoC} & \textbf{Description} & \textbf{\#Bugs} & \textbf{D?} & \textbf{Depth} & \textbf{F?} & $t (s)$ & \textbf{Features} & \textbf{Source} \\
     \midrule
 """
 )
@@ -247,15 +243,13 @@ detected_bugs_rest = sum(
     count_matches(parse_issue_list(r["expected_results"]), parse_issue_list(r["actual_results"]))
     for r in rest_of_benchmarks
 )
-depth_pairs_rest = [
+depth_values_rest = [
     deepest_bug_depth(r["benchmark"], parse_issue_list(r["expected_results"]))
     for r in rest_of_benchmarks
 ]
-min_nesting_rest = min(pair[0] for pair in depth_pairs_rest)
-max_nesting_rest = max(pair[0] for pair in depth_pairs_rest)
-min_statements_rest = min(pair[1] for pair in depth_pairs_rest)
-max_statements_rest = max(pair[1] for pair in depth_pairs_rest)
-depth_range_rest_cell = f"{min_nesting_rest}--{max_nesting_rest}/{min_statements_rest}--{max_statements_rest}"
+min_depth_rest = min(depth_values_rest)
+max_depth_rest = max(depth_values_rest)
+depth_range_rest_cell = f"{min_depth_rest}--{max_depth_rest}"
 total = len(rest_of_benchmarks)
 fixed_clear_count = sum(1 for r in rest_of_benchmarks if fixed_clears_bug_by_bm.get(get_bm_name(r["benchmark"]), False))
 fixed_clear_rate = f"{fixed_clear_count}/{total}"
@@ -280,15 +274,13 @@ detected_bugs = sum(
     count_matches(parse_issue_list(r["expected_results"]), parse_issue_list(r["actual_results"]))
     for r in buggy_results.to_dict(orient="records")
 )
-depth_pairs_total = [
+depth_values_total = [
     deepest_bug_depth(r["benchmark"], parse_issue_list(r["expected_results"]))
     for r in buggy_results.to_dict(orient="records")
 ]
-min_nesting_total = min(pair[0] for pair in depth_pairs_total)
-max_nesting_total = max(pair[0] for pair in depth_pairs_total)
-min_statements_total = min(pair[1] for pair in depth_pairs_total)
-max_statements_total = max(pair[1] for pair in depth_pairs_total)
-depth_range_total_cell = f"{min_nesting_total}--{max_nesting_total}/{min_statements_total}--{max_statements_total}"
+min_depth_total = min(depth_values_total)
+max_depth_total = max(depth_values_total)
+depth_range_total_cell = f"{min_depth_total}--{max_depth_total}"
 fixed_clear_count = sum(1 for r in buggy_results.to_dict(orient="records") if fixed_clears_bug_by_bm.get(get_bm_name(r["benchmark"]), False))
 fixed_clear_rate = f"{fixed_clear_count}/{total}"
 times = [r["time"] for r in buggy_results.to_dict(orient="records")]

@@ -2,6 +2,7 @@ import argparse
 import pandas as pd
 import numpy as np
 import os
+import re
 from io import StringIO
 import sys
 import subprocess
@@ -9,6 +10,7 @@ from pathlib import Path
 from collections import Counter
 import yaml
 from benchmark_metadata import benchmark_key, benchmark_display_name
+from bug_depth_stats import compute_script_metrics
 
 import matplotlib.pyplot as plt
 from matplotlib_set_diagrams import EulerDiagram
@@ -17,6 +19,58 @@ def parse_issue_list(value):
     if pd.isna(value):
         return []
     return [item.strip() for item in str(value).split(";") if item and item.strip()]
+
+
+BUG_LINE_RE = re.compile(r"^L([0-9]+):")
+_depth_metrics_cache = {}
+
+
+def parse_issue_lines(issues):
+    lines = []
+    for issue in issues:
+        match = BUG_LINE_RE.match(issue)
+        if match:
+            lines.append(int(match.group(1)))
+    return lines
+
+
+def get_depth_metrics(path):
+    script_path = Path(path)
+    if not script_path.is_absolute():
+        script_path = ROOT_DIR / script_path
+    script_key = str(script_path)
+
+    if script_key not in _depth_metrics_cache:
+        try:
+            lines = script_path.read_text(encoding="utf-8", errors="surrogateescape").splitlines()
+            _depth_metrics_cache[script_key] = compute_script_metrics(lines, script_key)
+        except Exception:
+            _depth_metrics_cache[script_key] = {
+                "total_lines": 0,
+                "depth_at_line": [0],
+                "bfs_nodes_before_line": [0],
+                "statements_before_line": [0],
+                "final_depth": 0,
+                "final_bfs_nodes_seen": 0,
+                "final_statements_seen": 0,
+            }
+    return _depth_metrics_cache[script_key]
+
+
+def deepest_bug_depth(path, expected_issues):
+    bug_lines = parse_issue_lines(expected_issues)
+    if not bug_lines:
+        return 0
+
+    metrics = get_depth_metrics(path)
+    total_lines = metrics["total_lines"]
+    bfs_nodes_before_line = metrics.get("bfs_nodes_before_line", [0])
+    fallback_bfs = metrics.get("final_bfs_nodes_seen", 0)
+    max_bfs_nodes = max(
+        bfs_nodes_before_line[line] if 1 <= line <= total_lines else fallback_bfs
+        for line in bug_lines
+    )
+    return max_bfs_nodes
 
 def git_toplevel():
     return Path(
@@ -314,7 +368,14 @@ def _get_fixed_fp_counts(data):
 
 def plot_runtime(data, output_path):
     plt.figure(figsize=(figsize[0], 3.8))
-    data = data.sort_values(by="time", ascending=False)
+    data = data.copy()
+    data["depth_bfs"] = data.apply(
+        lambda row: deepest_bug_depth(
+            row["benchmark"], parse_issue_list(row["expected_results"])
+        ),
+        axis=1,
+    )
+    data = data.sort_values(by=["depth_bfs", "time"], ascending=[False, False])
     benchmarks = data["benchmark"].apply(get_runtime_label)
     times = data["time"]
     locs = data["loc"]
