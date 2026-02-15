@@ -8,6 +8,7 @@ import subprocess
 from pathlib import Path
 from collections import Counter
 import yaml
+from benchmark_metadata import benchmark_key, benchmark_display_name
 
 import matplotlib.pyplot as plt
 from matplotlib_set_diagrams import EulerDiagram
@@ -87,11 +88,9 @@ def get_loc(path):
     # assert loc > 0, f"Failed to get LoC for path: {path}"
     return loc
 
-def get_bm_name(path):
-    subpath = os.path.dirname(path)
-    parts = subpath.split(os.sep)[2:]
-    result = os.path.join(*parts)
-    return result
+def get_runtime_label(path):
+    key = benchmark_key(path)
+    return benchmark_display_name(path, default=key)
 
 sysname = "SaSh"
 figsize = (9, 3)
@@ -314,21 +313,21 @@ def _get_fixed_fp_counts(data):
 
 
 def plot_runtime(data, output_path):
-    plt.figure(figsize=figsize)
+    plt.figure(figsize=(figsize[0], 3.8))
     data = data.sort_values(by="time", ascending=False)
-    benchmarks = data["benchmark"].apply(get_bm_name)
+    benchmarks = data["benchmark"].apply(get_runtime_label)
     times = data["time"]
     locs = data["loc"]
-    bars = plt.bar(benchmarks, times, color=color_scheme[0])
+    bars = plt.bar(benchmarks, times, color=color_scheme[0], width=0.55)
     plt.margins(x=0)  # remove gap left/right
 
-    # plt.xticks(rotation=45, ha="right")
-    plt.xticks([], [])
+    plt.xticks(rotation=45, ha="right", rotation_mode="anchor", fontsize=7)
     plt.ylabel("Time (s)")
     plt.yscale("log")
     for bar, loc in zip(bars, locs):
         height = bar.get_height()
         plt.text(bar.get_x() + bar.get_width() / 2, height, f"{loc}", ha='center', va='bottom', fontsize=7)
+    plt.subplots_adjust(bottom=0.30)
     plt.tight_layout()
     plt.savefig(output_path, format="pdf")
     plt.close()
