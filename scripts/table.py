@@ -6,6 +6,7 @@ from io import StringIO
 from pathlib import Path
 from collections import Counter
 from bug_depth_stats import compute_script_metrics
+from benchmark_metadata import BENCHMARK_NAMES, benchmark_key
 
 EPSILON = 1e-3
 
@@ -42,21 +43,7 @@ def parse_issue_lines(issues):
             lines.append(int(match.group(1)))
     return lines
 
-names = {
-    "high_profile/c00-steam": "Steam updater",
-    "high_profile/c01-bumblebee": "NVIDIA driver installer",
-    "high_profile/w00-itunes": "iTunes updater",
-    "high_profile/w01-squid": "Squid init script",
-    "high_profile/c02-n": "Node.js version manager",
-    "high_profile/c03-backup_manager": "Ubuntu backup manager",
-
-    "milestone_1/const_loop": "DigitalOcean snapshot",
-    "milestone_1/loop_once-useless_test": "AutoTest config rename",
-    "milestone_1/unset_var_1": "OhMyZsh update script",
-    "milestone_2/rm_root": "MongoDB backup script",
-    "web_forums/rm_root_2": "AIX server data gather",
-    "commits/debootstrap": "Debian debootstrap",
-}
+names = BENCHMARK_NAMES
 
 sources = {
     "high_profile/c00-steam": r"\cite{steambugissue}",
@@ -141,11 +128,7 @@ features = {
 }
 
 
-def get_bm_name(path):
-    path = path.split("benchmarks/")[-1]
-    # Strip the script name
-    path = "/".join(Path(path).parts[:-1]) # This is wrong! It maps fixed and regular scripts to the same name
-    return path
+get_bm_name = benchmark_key
 
 def get_loc(path):
     proc = os.popen(f"cloc --json {path}")
@@ -214,10 +197,9 @@ def create_table_line(result):
     # Grab just the folder and benchmark subfolder
     bm_name = get_bm_name(path)
     name = names.get(bm_name, None)
-    if name is None:
-        print(f"Unknown benchmark name {bm_name} for path: {path}", file=sys.stderr)
+    description = descriptions.get(bm_name, None)
+    if name is None or description is None:
         return
-    description = descriptions[bm_name]
     time = f"{time:.2f}s" if time > EPSILON else "<1ms"
     loc = get_loc(path)
     source = sources.get(bm_name, "")
