@@ -95,7 +95,7 @@ def get_bm_name(path):
 
 sysname = "SaSh"
 figsize = (9, 3)
-figsize_small = (4.2, 1.15)
+figsize_small = (6.0, 1.15)
 color_scheme = ["#AA4465", "#FFA69E", "#998650", "#93E1D8"]
 
 def _get_bug_sets(data):
@@ -182,42 +182,135 @@ def plot_bug_detection_bars(data, output_path):
     only_shell = len(shellcheck_detected - sash_detected)
     all_expected = len(all_bugs_expected)
 
-    # Two separate bars, one per tool total:
-    # SaSh bar = both + SaSh-only + missed
-    # ShellCheck bar = both + ShellCheck-only + missed
-    plt.figure(figsize=(figsize_small[0], 1.9))
-    both_color = color_scheme[1]
-    sash_only_color = color_scheme[0]
-    shell_only_color = color_scheme[2]
+    fixed_total, sash_success, shell_success = _get_fixed_fp_counts(data)
+    sash_fp = fixed_total - sash_success
+    shell_fp = fixed_total - shell_success
+
+    # Single axis: two tool groups; each group has thin, touching buggy/fixed bars.
+    fig, ax = plt.subplots(1, 1, figsize=(figsize_small[0], 2.2))
+
+    sash_buggy_detected = both_detected + only_sash
+    shell_buggy_detected = both_detected + only_shell
+    buggy_detected = [sash_buggy_detected, shell_buggy_detected]
+    buggy_missed = [all_expected - buggy_detected[0], all_expected - buggy_detected[1]]
+    fixed_no_fp = [sash_success, shell_success]
+    fixed_fp = [sash_fp, shell_fp]
+
+    # Keep tool groups close to each other.
+    y_positions = [0.42, 0.0]  # SaSh, ShellCheck
+    bar_height = 0.18
+    pair_offset = bar_height / 2
+    buggy_rows = [y + pair_offset for y in y_positions]
+    fixed_rows = [y - pair_offset for y in y_positions]
+
+    detected_color = color_scheme[1]
     missed_color = "lightgray"
+    no_fp_color = color_scheme[3]
+    fp_color = color_scheme[0]
 
-    y_positions = [1, 0]
-    # First row = SaSh, second row = ShellCheck
-    both_sizes = [both_detected, both_detected]
-    only_sizes = [only_sash, only_shell]
-    missed_sizes = [missed, missed]
-
-    plt.barh(y_positions, both_sizes, color=both_color, label="Both")
-    plt.barh(y_positions, only_sizes, left=both_sizes, color=[sash_only_color, shell_only_color])
-    plt.barh(
-        y_positions,
-        missed_sizes,
-        left=[both_sizes[i] + only_sizes[i] for i in range(2)],
+    # Buggy bars
+    ax.barh(buggy_rows, buggy_detected, height=bar_height, color=detected_color, label="Detected")
+    ax.barh(
+        buggy_rows,
+        buggy_missed,
+        height=bar_height,
+        left=buggy_detected,
         color=missed_color,
         label="Missed",
     )
 
-    plt.xlabel("Detected Bugs", loc="right")
-    plt.yticks([0, 1], ["ShellCheck", sysname])
-    plt.legend(
-        fontsize=10,
-        loc="upper left",
-        frameon=True,
+    # Fixed bars
+    ax.barh(fixed_rows, fixed_no_fp, height=bar_height, color=no_fp_color, label="No false positive")
+    ax.barh(
+        fixed_rows,
+        fixed_fp,
+        height=bar_height,
+        left=fixed_no_fp,
+        color=fp_color,
+        label="False positive",
     )
-    plt.xlim(0, all_expected)
+
+    max_total = max(all_expected, fixed_total, 1)
+    ax.set_xlim(0, max_total)
+    ax.set_yticks(y_positions, [sysname, "ShellCheck"])
+    ax.set_ylim(-0.24, 0.66)
+    ax.set_xlabel("Count", loc="right")
+    x_points = sorted(set(
+        [0, all_expected, fixed_total, buggy_detected[0], buggy_detected[1], fixed_no_fp[0], fixed_no_fp[1]]
+    ))
+    ax.set_xticks(x_points)
+    ax.set_xticklabels([str(int(x)) for x in x_points])
+    ax.legend(fontsize=8, loc="upper left", ncol=1, frameon=True)
+
     plt.tight_layout()
     plt.savefig(output_path, format="pdf")
     plt.close()
+
+
+def _get_fixed_fp_counts(data):
+    data_view = data
+    if "kind" in data_view.columns:
+        fixed_view = data_view[data_view["kind"] == "fixed"]
+        buggy_view = data_view[data_view["kind"] == "buggy"]
+    elif "benchmark" in data_view.columns:
+        fixed_view = data_view[
+            data_view["benchmark"].astype(str).str.endswith("/fixed.sh")
+        ]
+        buggy_view = data_view[
+            ~data_view["benchmark"].astype(str).str.endswith("/fixed.sh")
+        ]
+    else:
+        fixed_view = data_view
+        buggy_view = data_view.iloc[0:0]
+
+    # Per benchmark: expected issue instances for the original buggy script.
+    # We keep multiplicity (Counter) to count per-bug-instance, not per-script.
+    buggy_expected_ids = {}
+    buggy_expected_shellcheck = {}
+    for _, row in buggy_view.iterrows():
+        bench = row["benchmark"]
+        bench_path = Path(bench)
+        if not bench_path.is_absolute():
+            bench_path = ROOT_DIR / bench_path
+        bench_dir = str(bench_path.parent)
+        expected_ids = parse_issue_list(row["expected_results"])
+        expected_ids_counter = Counter(expected_ids)
+        buggy_expected_ids[bench_dir] = expected_ids_counter
+
+        code_to_shellcheck = get_shellcheck_map_for_benchmark(bench)
+        expected_shell_counter = Counter()
+        for issue in expected_ids:
+            sash_code = issue.split(":", 1)[1] if ":" in issue else issue
+            shell_code = code_to_shellcheck.get(sash_code, f"UNMAPPED::{issue}")
+            expected_shell_counter[shell_code] += 1
+        buggy_expected_shellcheck[bench_dir] = expected_shell_counter
+
+    total = 0
+    sash_fp = 0
+    shell_fp = 0
+
+    for _, row in fixed_view.iterrows():
+        bench = row["benchmark"]
+        bench_path = Path(bench)
+        if not bench_path.is_absolute():
+            bench_path = ROOT_DIR / bench_path
+        bench_dir = str(bench_path.parent)
+        sash_reports = Counter(parse_issue_list(row["actual_results"]))
+        shell_reports = Counter(parse_issue_list(row["shellcheck_codes"]))
+
+        expected_ids = buggy_expected_ids.get(bench_dir, Counter())
+        expected_shell = buggy_expected_shellcheck.get(bench_dir, Counter())
+        total += sum(expected_ids.values())
+
+        # False positive for this metric means reporting the corresponding original bug.
+        for issue, expected_count in expected_ids.items():
+            sash_fp += min(expected_count, sash_reports[issue])
+        for issue, expected_count in expected_shell.items():
+            shell_fp += min(expected_count, shell_reports[issue])
+
+    sash_success = total - sash_fp
+    shell_success = total - shell_fp
+    return total, sash_success, shell_success
 
 
 def plot_runtime(data, output_path):
@@ -264,16 +357,16 @@ def main():
         "font.size": 12,
     })
 
-    results_data = load_csv(args.results_csv)
-    results_data = results_data[results_data["kind"] == "buggy"].copy()
-    results_data["loc"] = results_data["benchmark"].apply(get_loc)
-    plot_bug_detection_euler(results_data, os.path.join(args.output_dir, "bug-detection-euler.pdf"))
-    plot_bug_detection_bars(results_data, os.path.join(args.output_dir, "bug-detection-bars.pdf"))
-    plot_runtime(results_data, os.path.join(args.output_dir, "runtime.pdf"))
+    all_results = load_csv(args.results_csv)
+    buggy_results = all_results[all_results["kind"] == "buggy"].copy()
+    buggy_results["loc"] = buggy_results["benchmark"].apply(get_loc)
+    plot_bug_detection_euler(buggy_results, os.path.join(args.output_dir, "bug-detection-euler.pdf"))
+    plot_bug_detection_bars(all_results, os.path.join(args.output_dir, "bug-detection-bars.pdf"))
+    plot_runtime(buggy_results, os.path.join(args.output_dir, "runtime.pdf"))
 
     # Print bug stats
-    total_benchmarks = len(results_data)
-    sash_detected, shellcheck_detected, all_bugs_expected = _get_bug_sets(results_data)
+    total_benchmarks = len(buggy_results)
+    sash_detected, shellcheck_detected, all_bugs_expected = _get_bug_sets(buggy_results)
     total_bugs = len(all_bugs_expected)
     print(f"% Total benchmarks: {total_benchmarks}", file=sys.stderr)
     print(f"% Total bugs: {total_bugs}", file=sys.stderr)
@@ -281,6 +374,10 @@ def main():
     print(f"% ShellCheck detected bugs: {len(shellcheck_detected)}", file=sys.stderr)
     print(f"% Both detected bugs: {len(sash_detected & shellcheck_detected)}", file=sys.stderr)
     print(f"% Missed bugs: {len(all_bugs_expected - (sash_detected | shellcheck_detected))}", file=sys.stderr)
+    fixed_total, sash_success, shell_success = _get_fixed_fp_counts(all_results)
+    print(f"% Fixed bug instances: {fixed_total}", file=sys.stderr)
+    print(f"% {sysname} fixed no-FP (bug-level): {sash_success}", file=sys.stderr)
+    print(f"% ShellCheck fixed no-FP (bug-level): {shell_success}", file=sys.stderr)
 
 if __name__ == "__main__":
     main()
