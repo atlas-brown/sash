@@ -30,6 +30,7 @@ dev = [
     "hypothesis>=6.143.1",
     "jsonschema>=4.26.0",
     "matplotlib",
+    "matplotlib_set_diagrams",
 ]
 
 [tool.uv.sources]
