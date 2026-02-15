@@ -1,8 +1,7 @@
 import pandas as pd
 import sys
-import os
 import re
-from io import StringIO
+import subprocess
 from pathlib import Path
 from collections import Counter
 from bug_depth_stats import compute_script_metrics
@@ -14,6 +13,34 @@ results_path = "results/results.csv"
 results = pd.read_csv(results_path)
 buggy_results = results[results["kind"] == "buggy"].copy()
 fixed_results = results[results["kind"] == "fixed"].copy()
+loc_cache_path = Path("results/benchmark_loc.csv")
+precompute_loc_script = Path(__file__).with_name("precompute_loc_cache.py")
+
+if not loc_cache_path.exists():
+    try:
+        subprocess.run(
+            [
+                sys.executable,
+                str(precompute_loc_script),
+                "--results_csv",
+                results_path,
+                "--output_csv",
+                str(loc_cache_path),
+            ],
+            check=True,
+        )
+    except Exception as exc:
+        print(
+            f"Failed to create LoC cache at {loc_cache_path}: {exc}",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+loc_cache_df = pd.read_csv(loc_cache_path)
+loc_by_benchmark = {
+    str(row["benchmark"]): int(row["loc"])
+    for _, row in loc_cache_df.iterrows()
+}
 
 def parse_issue_list(value):
     if pd.isna(value):
@@ -59,23 +86,27 @@ sources = {
     "milestone_2/rm_root": r"\cite{stackoverflowdeletedatabase}",
     "web_forums/rm_root_2": r"\cite{shellscriptrmrf}",
     "commits/debootstrap": r"\cite{debian:debootstrap:bug}",
+
+    "simple_fs/overwrite_file": r"\cite{stackoverflow:mvbug}",
 }
 
 
 descriptions = {
-    "high_profile/c00-steam": r"Failed path traversal leads to \sh{rm /*}",
-    "high_profile/c01-bumblebee": r"Deletion of \sh{/usr}",
-    "high_profile/w00-itunes": r"Dangerous variable expansion",
-    "high_profile/w01-squid": r"Externally-set variable used in \sh{rm}",
+    "high_profile/c00-steam": r"Deletes \sh{/*} after path traversal",
+    "high_profile/c01-bumblebee": r"Deletes \sh{/usr}",
+    "high_profile/w00-itunes": r"Deletes drive",
+    "high_profile/w01-squid": r"Unknown \sh{rm} target",
     "high_profile/c02-n": r"Loop deletes \sh{/usr/local/*}",
-    "high_profile/c03-backup_manager": r"Data loss from bad \sh{$?} check",
+    "high_profile/c03-backup_manager": r"Bad \sh{$?} check to data loss",
 
     "milestone_1/const_loop": r"Constant \sh{while} loop condition",
     "milestone_1/loop_once-useless_test": r"Run-once \sh{for} loop",
     "milestone_1/unset_var_1": r"Unset variable used in \sh{echo}",
     "milestone_2/rm_root": r"Typo causes DB loss",
     "web_forums/rm_root_2": r"Failed \sh{mktemp} causes data loss",
-    "commits/debootstrap": r"Empty \sh{$2} causes \sh{rm} to delete \sh{cwd}",
+    "commits/debootstrap": r"Empty \sh{$2} causes \sh{cwd} deletion",
+
+    "simple_fs/overwrite_file": r"Data loss from \sh{mv} inside \sh{xargs}",
 }
 
 # WE: word expansion
@@ -131,14 +162,15 @@ features = {
 get_bm_name = benchmark_key
 
 def get_loc(path):
-    proc = os.popen(f"cloc --json {path}")
-    output = proc.read()
-    proc.close()
-    data = None
-    data = pd.read_json(StringIO(output))
-    loc = int(data.get("SUM", {}).get("code", 0))
-    # assert loc > 0, f"Failed to get LoC for path: {path}"
-    return loc
+    key = str(path)
+    if key not in loc_by_benchmark:
+        print(
+            f"Missing LoC for {key} in {loc_cache_path}. "
+            f"Re-run: python scripts/precompute_loc_cache.py",
+            file=sys.stderr,
+        )
+        return 0
+    return loc_by_benchmark[key]
 
 depth_metrics_cache = {}
 def get_depth_metrics(path):
@@ -216,7 +248,7 @@ rest_of_benchmarks = []
 print(r"""
     \begin{tabular}{lrlrrrcrcl}
     \toprule
-    \textbf{Name} & \textbf{LoC} & \textbf{Description} & \textbf{\#Bugs} & \textbf{D?} & \textbf{Depth} & \textbf{F?} & $t (s)$ & \textbf{Features} & \textbf{Source} \\
+    \textbf{Name} & \textbf{LoC} & \textbf{Description} & \textbf{\#B} & \textbf{D?} & \textbf{D\textdownarrow} & \textbf{F?} & \textbf{$t$} & \textbf{$\mathcal{F}$} & \textbf{Source} \\
     \midrule
 """
 )
@@ -257,7 +289,7 @@ fixed_clear_rate = f"{fixed_clear_count}/{total}"
 we_count = sum(1 for r in rest_of_benchmarks if "WE" in features.get(get_bm_name(r["benchmark"]), []))
 cs_count = sum(1 for r in rest_of_benchmarks if "CS" in features.get(get_bm_name(r["benchmark"]), []))
 fs_count = sum(1 for r in rest_of_benchmarks if "FS" in features.get(get_bm_name(r["benchmark"]), []))
-feature_count_marks = f"{we_count} \\WE, {cs_count} \\SP, {fs_count} \\FS"
+feature_count_marks = f"{we_count} \\WE/{cs_count} \\SP/{fs_count} \\FS"
 
 print(rf"""\emph{{More buggy scripts}} & {loc_range} &  & {total_bugs_rest} & {detected_bugs_rest} & {depth_range_rest_cell} & {fixed_clear_rate} & {time_range} & {feature_count_marks} & \cf{{sec:full-ds}} \\""")
 print(r"\hspace{.5em}\dots & & & & & & & & & \\")
@@ -291,7 +323,7 @@ time_range = f"{min_time:.2f}--{max_time:.2f}s"
 we_count = sum(1 for r in buggy_results.to_dict(orient="records") if "WE" in features.get(get_bm_name(r["benchmark"]), []))
 cs_count = sum(1 for r in buggy_results.to_dict(orient="records") if "CS" in features.get(get_bm_name(r["benchmark"]), []))
 fs_count = sum(1 for r in buggy_results.to_dict(orient="records") if "FS" in features.get(get_bm_name(r["benchmark"]), []))
-feature_count_marks = f"{we_count} \\WE, {cs_count} \\SP, {fs_count} \\FS"
+feature_count_marks = f"{we_count} \\WE/{cs_count} \\SP/{fs_count} \\FS"
 
 print(rf"""
 \midrule

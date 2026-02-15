@@ -14,6 +14,7 @@ BENCHMARK_NAMES = {
     "milestone_2/rm_root": "MongoDB backup script",
     "web_forums/rm_root_2": "AIX server data gather",
     "commits/debootstrap": "Debian debootstrap",
+    "simple_fs/overwrite_file": "SLURM cluster overwrite",
 
     # TODO: Please review wording.
     "commits/const_cond": "Git config check",
@@ -33,7 +34,6 @@ BENCHMARK_NAMES = {
     "simple_fs/access_after_mv": "ActualBudget update helper",
     "simple_fs/access_del_resource": "TV transcode move loop",
     "simple_fs/cd_into_file": "Repo archiver",
-    "simple_fs/overwrite_file": "HPC cluster file movement",
     "simple_fs/overwrite_file_2": "Contest winner mover",
     "simple_fs/overwrite_file_3": "Hive DROP log monitor",
     "simple_fs/overwrite_file_4": "SAS script generator",
