@@ -83,6 +83,7 @@ ROOT_DIR = git_toplevel()
 
 _benchmark_dir_cache = {}
 _shellcheck_map_cache = {}
+_benchmark_info_cache = {}
 
 def find_benchmark_dir(benchmark_path):
     if benchmark_path in _benchmark_dir_cache:
@@ -124,6 +125,84 @@ def get_shellcheck_map_for_benchmark(benchmark_path):
     _shellcheck_map_cache[benchmark_dir] = code_to_shellcheck
     return code_to_shellcheck
 
+
+def get_benchmark_info(benchmark_path):
+    benchmark_dir = find_benchmark_dir(benchmark_path)
+    if benchmark_dir is None:
+        return None
+    if benchmark_dir in _benchmark_info_cache:
+        return _benchmark_info_cache[benchmark_dir]
+
+    try:
+        info = yaml.safe_load((benchmark_dir / "info.yaml").read_text(encoding="utf-8"))
+    except Exception:
+        info = None
+    _benchmark_info_cache[benchmark_dir] = info
+    return info
+
+
+def get_info_shellcheck_expected_counter(benchmark_path, kind, fallback_to_bug_default=True):
+    info = get_benchmark_info(benchmark_path)
+    if not info:
+        return Counter()
+
+    benchmark_dir = find_benchmark_dir(benchmark_path)
+    if benchmark_dir is None:
+        return Counter()
+
+    script_path = Path(benchmark_path)
+    if not script_path.is_absolute():
+        script_path = ROOT_DIR / script_path
+    try:
+        rel_path = script_path.relative_to(benchmark_dir).as_posix()
+    except ValueError:
+        rel_path = script_path.name
+
+    gt = None
+    for gt_entry in (info.get("ground_truths") or []):
+        if gt_entry.get("kind") == kind and gt_entry.get("path") == rel_path:
+            gt = gt_entry
+            break
+
+    if gt is None:
+        return Counter()
+
+    bugs = info.get("bugs") or {}
+    counter = Counter()
+    for bug_id, bug_gt in (gt.get("bugs") or {}).items():
+        bug_def = bugs.get(bug_id) or {}
+        code = bug_gt.get("code") or bug_def.get("code")
+        if not code:
+            continue
+
+        # Ground-truth value overrides bug-level defaults when present.
+        if "shellcheck" in bug_gt:
+            shellcheck_code = bug_gt.get("shellcheck")
+        elif fallback_to_bug_default:
+            shellcheck_code = bug_def.get("shellcheck")
+        else:
+            shellcheck_code = None
+        if not shellcheck_code:
+            continue
+
+        lines = bug_gt.get("lines")
+        if lines is None:
+            lines = bug_gt.get("regression_lines", [])
+        for line in lines:
+            counter[f"L{line}:{code}"] += 1
+
+    return counter
+
+
+def benchmark_group_key(benchmark_path):
+    benchmark_dir = find_benchmark_dir(benchmark_path)
+    if benchmark_dir is not None:
+        return str(benchmark_dir)
+    p = Path(benchmark_path)
+    if not p.is_absolute():
+        p = ROOT_DIR / p
+    return str(p.parent)
+
 def load_csv(file_path):
     try:
         data = pd.read_csv(file_path)
@@ -151,23 +230,33 @@ figsize = (9, 3)
 figsize_small = (6.0, 1.15)
 color_scheme = ["#AA4465", "#FFA69E", "#998650", "#93E1D8"]
 
-def _get_bug_sets(data):
+def _get_bug_sets_for_kind(data, kind):
     sash_detected = set()
     shellcheck_detected = set()
     all_bugs_expected = set()
 
     data_view = data
     if "kind" in data_view.columns:
-        data_view = data_view[data_view["kind"] == "buggy"]
+        data_view = data_view[data_view["kind"] == kind]
     elif "benchmark" in data_view.columns:
-        data_view = data_view[
-            ~data_view["benchmark"].astype(str).str.endswith("/fixed.sh")
-        ]
+        benchmarks = data_view["benchmark"].astype(str)
+        if kind == "buggy":
+            data_view = data_view[
+                ~benchmarks.str.endswith("/fixed.sh")
+                & ~benchmarks.str.contains("/variants/")
+            ]
+        elif kind == "fixed":
+            data_view = data_view[benchmarks.str.endswith("/fixed.sh")]
+        elif kind == "buggy_variant":
+            data_view = data_view[benchmarks.str.contains("/variants/bug-")]
+        elif kind == "fixed_variant":
+            data_view = data_view[benchmarks.str.contains("/variants/fix-")]
+        else:
+            data_view = data_view.iloc[0:0]
 
     for _, row in data_view.iterrows():
         bench = row["benchmark"]
         actual_bugs = parse_issue_list(row["actual_results"])
-        shell_bugs = parse_issue_list(row["shellcheck_codes"])
         expected_bugs = parse_issue_list(row["expected_results"])
 
         expected_counter = Counter()
@@ -186,23 +275,27 @@ def _get_bug_sets(data):
             for idx in range(matched):
                 sash_detected.add(f"{bench}_{issue}_{idx}")
 
-        # ShellCheck matching uses benchmark-specific mapping: sash_code -> shellcheck_code.
-        shell_counter = Counter(shell_bugs)
-        code_to_shellcheck = get_shellcheck_map_for_benchmark(bench)
-        expected_keys_by_shellcheck = {}
+        # ShellCheck matching comes from per-ground-truth metadata in info.yaml.
+        expected_shell_counter = get_info_shellcheck_expected_counter(
+            bench,
+            kind,
+            fallback_to_bug_default=(kind in {"buggy", "fixed"}),
+        )
+        expected_keys_by_issue = {}
         for key in expected_keys:
             issue = key.split(f"{bench}_", 1)[1].rsplit("_", 1)[0]
-            sash_code = issue.split(":", 1)[1] if ":" in issue else issue
-            shell_code = code_to_shellcheck.get(sash_code)
-            if shell_code is not None:
-                expected_keys_by_shellcheck.setdefault(shell_code, []).append(key)
+            expected_keys_by_issue.setdefault(issue, []).append(key)
 
-        for shell_code, keys in expected_keys_by_shellcheck.items():
-            matched = min(len(keys), shell_counter[shell_code])
+        for issue, keys in expected_keys_by_issue.items():
+            matched = min(len(keys), expected_shell_counter[issue])
             for key in keys[:matched]:
                 shellcheck_detected.add(key)
 
     return sash_detected, shellcheck_detected, all_bugs_expected
+
+
+def _get_bug_sets(data):
+    return _get_bug_sets_for_kind(data, "buggy")
 
 
 def plot_bug_detection_euler(data, output_path):
@@ -229,7 +322,6 @@ def plot_bug_detection_euler(data, output_path):
 
 def plot_bug_detection_bars(data, output_path):
     sash_detected, shellcheck_detected, all_bugs_expected = _get_bug_sets(data)
-    missed = len(all_bugs_expected - (sash_detected | shellcheck_detected))
     both_detected = len(sash_detected & shellcheck_detected)
     only_sash = len(sash_detected - shellcheck_detected)
     only_shell = len(shellcheck_detected - sash_detected)
@@ -238,9 +330,15 @@ def plot_bug_detection_bars(data, output_path):
     fixed_total, sash_success, shell_success = _get_fixed_fp_counts(data)
     sash_fp = fixed_total - sash_success
     shell_fp = fixed_total - shell_success
+    variant_total, sash_variant_detected, shell_variant_detected = _get_variant_detection_counts(data)
+    variant_detected = [sash_variant_detected, shell_variant_detected]
+    variant_missed = [
+        variant_total - variant_detected[0],
+        variant_total - variant_detected[1],
+    ]
 
-    # Single axis: two tool groups; each group has thin, touching buggy/fixed bars.
-    fig, ax = plt.subplots(1, 1, figsize=(figsize_small[0], 2.2))
+    # Single axis: three benchmark-kind groups; each group has SaSh/ShellCheck rows.
+    fig, ax = plt.subplots(1, 1, figsize=(figsize_small[0], 2.8))
 
     sash_buggy_detected = both_detected + only_sash
     shell_buggy_detected = both_detected + only_shell
@@ -249,12 +347,16 @@ def plot_bug_detection_bars(data, output_path):
     fixed_no_fp = [sash_success, shell_success]
     fixed_fp = [sash_fp, shell_fp]
 
-    # Keep tool groups close to each other.
-    y_positions = [0.42, 0.0]  # SaSh, ShellCheck
-    bar_height = 0.18
-    pair_offset = bar_height / 2
-    buggy_rows = [y + pair_offset for y in y_positions]
-    fixed_rows = [y - pair_offset for y in y_positions]
+    # Group by benchmark kind on y-axis; inside each group:
+    # upper row = SaSh, lower row = ShellCheck.
+    group_buggy = 0.82
+    group_variant = 0.47
+    group_fixed = 0.12
+    row_gap = 0.14
+    bar_height = 0.11
+    buggy_rows = [group_buggy + (row_gap / 2), group_buggy - (row_gap / 2)]
+    variant_rows = [group_variant + (row_gap / 2), group_variant - (row_gap / 2)]
+    fixed_rows = [group_fixed + (row_gap / 2), group_fixed - (row_gap / 2)]
 
     detected_color = color_scheme[1]
     missed_color = "lightgray"
@@ -272,6 +374,23 @@ def plot_bug_detection_bars(data, output_path):
         label="Missed",
     )
 
+    # Buggy variant bars
+    ax.barh(
+        variant_rows,
+        variant_detected,
+        height=bar_height,
+        color=detected_color,
+        label="Detected",
+    )
+    ax.barh(
+        variant_rows,
+        variant_missed,
+        height=bar_height,
+        left=variant_detected,
+        color=missed_color,
+        label="Missed",
+    )
+
     # Fixed bars
     ax.barh(fixed_rows, fixed_no_fp, height=bar_height, color=no_fp_color, label="No false positive")
     ax.barh(
@@ -283,87 +402,151 @@ def plot_bug_detection_bars(data, output_path):
         label="False positive",
     )
 
-    max_total = max(all_expected, fixed_total, 1)
+    max_total = max(all_expected, variant_total, fixed_total, 1)
     ax.set_xlim(0, max_total)
-    ax.set_yticks(y_positions, [sysname, "ShellCheck"])
-    ax.set_ylim(-0.24, 0.66)
+    ax.set_yticks([group_buggy, group_variant, group_fixed], ["Original", "Variants", "Fixed"])
+    ax.set_ylim(-0.02, 0.94)
     ax.set_xlabel("Count", loc="right")
+
+    # Annotate row identity inside each group.
+    row_label_x = max_total * 0.01
+    for y in (buggy_rows[0], variant_rows[0], fixed_rows[0]):
+        ax.text(row_label_x, y, sysname, va="center", ha="left", fontsize=7)
+    for y in (buggy_rows[1], variant_rows[1], fixed_rows[1]):
+        ax.text(row_label_x, y, "ShellCheck", va="center", ha="left", fontsize=7)
+
     x_points = sorted(set(
-        [0, all_expected, fixed_total, buggy_detected[0], buggy_detected[1], fixed_no_fp[0], fixed_no_fp[1]]
+        [
+            0,
+            all_expected,
+            variant_total,
+            fixed_total,
+            buggy_detected[0],
+            buggy_detected[1],
+            variant_detected[0],
+            variant_detected[1],
+            fixed_no_fp[0],
+            fixed_no_fp[1],
+        ]
     ))
+    # Keep all data-point ticks, but for close runs (<3 apart) only label the largest one.
+    int_points = [int(x) for x in x_points]
+    labels = [""] * len(x_points)
+    if int_points:
+        run_start = 0
+        for i in range(1, len(int_points) + 1):
+            is_break = (i == len(int_points)) or ((int_points[i] - int_points[i - 1]) >= 3)
+            if is_break:
+                labels[i - 1] = str(int_points[i - 1])  # largest tick in this close run
+                run_start = i
     ax.set_xticks(x_points)
-    ax.set_xticklabels([str(int(x)) for x in x_points])
-    ax.legend(fontsize=8, loc="upper left", ncol=1, frameon=True)
+    ax.set_xticklabels(labels)
+    ax.tick_params(axis="x", labelsize=8)
+    # Deduplicate legend labels because multiple grouped bars reuse the same names.
+    handles, labels = ax.get_legend_handles_labels()
+    by_label = dict(zip(labels, handles))
+    ax.legend(
+        by_label.values(),
+        by_label.keys(),
+        fontsize=8,
+        loc="center right",
+        ncol=1,
+        frameon=True,
+    )
 
     plt.tight_layout()
     plt.savefig(output_path, format="pdf")
     plt.close()
 
 
-def _get_fixed_fp_counts(data):
+def _get_kind_fp_counts(data, kind_selector):
     data_view = data
     if "kind" in data_view.columns:
-        fixed_view = data_view[data_view["kind"] == "fixed"]
-        buggy_view = data_view[data_view["kind"] == "buggy"]
+        kind_mask = data_view["kind"].apply(kind_selector)
+        selected_view = data_view[kind_mask]
     elif "benchmark" in data_view.columns:
-        fixed_view = data_view[
-            data_view["benchmark"].astype(str).str.endswith("/fixed.sh")
-        ]
-        buggy_view = data_view[
-            ~data_view["benchmark"].astype(str).str.endswith("/fixed.sh")
-        ]
+        selected_view = data_view[data_view["benchmark"].apply(kind_selector)]
     else:
-        fixed_view = data_view
-        buggy_view = data_view.iloc[0:0]
-
-    # Per benchmark: expected issue instances for the original buggy script.
-    # We keep multiplicity (Counter) to count per-bug-instance, not per-script.
-    buggy_expected_ids = {}
-    buggy_expected_shellcheck = {}
-    for _, row in buggy_view.iterrows():
-        bench = row["benchmark"]
-        bench_path = Path(bench)
-        if not bench_path.is_absolute():
-            bench_path = ROOT_DIR / bench_path
-        bench_dir = str(bench_path.parent)
-        expected_ids = parse_issue_list(row["expected_results"])
-        expected_ids_counter = Counter(expected_ids)
-        buggy_expected_ids[bench_dir] = expected_ids_counter
-
-        code_to_shellcheck = get_shellcheck_map_for_benchmark(bench)
-        expected_shell_counter = Counter()
-        for issue in expected_ids:
-            sash_code = issue.split(":", 1)[1] if ":" in issue else issue
-            shell_code = code_to_shellcheck.get(sash_code, f"UNMAPPED::{issue}")
-            expected_shell_counter[shell_code] += 1
-        buggy_expected_shellcheck[bench_dir] = expected_shell_counter
+        selected_view = data_view
 
     total = 0
     sash_fp = 0
     shell_fp = 0
 
-    for _, row in fixed_view.iterrows():
+    for _, row in selected_view.iterrows():
         bench = row["benchmark"]
-        bench_path = Path(bench)
-        if not bench_path.is_absolute():
-            bench_path = ROOT_DIR / bench_path
-        bench_dir = str(bench_path.parent)
+        kind = str(row.get("kind", "fixed"))
         sash_reports = Counter(parse_issue_list(row["actual_results"]))
-        shell_reports = Counter(parse_issue_list(row["shellcheck_codes"]))
-
-        expected_ids = buggy_expected_ids.get(bench_dir, Counter())
-        expected_shell = buggy_expected_shellcheck.get(bench_dir, Counter())
+        expected_ids = Counter(parse_issue_list(row["expected_results"]))
+        expected_shell = get_info_shellcheck_expected_counter(
+            bench, kind, fallback_to_bug_default=True
+        )
         total += sum(expected_ids.values())
 
         # False positive for this metric means reporting the corresponding original bug.
         for issue, expected_count in expected_ids.items():
             sash_fp += min(expected_count, sash_reports[issue])
         for issue, expected_count in expected_shell.items():
-            shell_fp += min(expected_count, shell_reports[issue])
+            shell_fp += min(expected_count, expected_ids[issue])
 
     sash_success = total - sash_fp
     shell_success = total - shell_fp
     return total, sash_success, shell_success
+
+
+def _get_fixed_fp_counts(data):
+    return _get_kind_fp_counts(data, lambda k: str(k) == "fixed")
+
+
+def _get_variant_detection_counts(data):
+    data_view = data
+    if "kind" in data_view.columns:
+        data_view = data_view[data_view["kind"] == "buggy_variant"]
+    elif "benchmark" in data_view.columns:
+        data_view = data_view[data_view["benchmark"].astype(str).str.contains("/variants/bug-")]
+    else:
+        data_view = data_view.iloc[0:0]
+
+    sash_detected = set()
+    shellcheck_detected = set()
+    all_bugs_expected = set()
+
+    for _, row in data_view.iterrows():
+        bench = row["benchmark"]
+        expected_bugs = parse_issue_list(row["expected_results"])
+        actual_bugs = parse_issue_list(row["actual_results"])
+
+        expected_counter = Counter()
+        expected_keys = []
+        for issue in expected_bugs:
+            idx = expected_counter[issue]
+            expected_counter[issue] += 1
+            key = f"{bench}_{issue}_{idx}"
+            expected_keys.append(key)
+            all_bugs_expected.add(key)
+
+        actual_counter = Counter(actual_bugs)
+        for issue, count in expected_counter.items():
+            matched = min(count, actual_counter[issue])
+            for idx in range(matched):
+                sash_detected.add(f"{bench}_{issue}_{idx}")
+
+        expected_shell_counter = get_info_shellcheck_expected_counter(
+            bench,
+            row.get("kind", "buggy_variant"),
+            fallback_to_bug_default=False,
+        )
+        expected_keys_by_issue = {}
+        for key in expected_keys:
+            issue = key.split(f"{bench}_", 1)[1].rsplit("_", 1)[0]
+            expected_keys_by_issue.setdefault(issue, []).append(key)
+
+        for issue, keys in expected_keys_by_issue.items():
+            matched = min(len(keys), expected_shell_counter[issue])
+            for key in keys[:matched]:
+                shellcheck_detected.add(key)
+
+    return len(all_bugs_expected), len(sash_detected), len(shellcheck_detected)
 
 
 def plot_runtime(data, output_path):
@@ -479,6 +662,12 @@ def main():
     print(f"% Fixed bug instances: {fixed_total}", file=sys.stderr)
     print(f"% {sysname} fixed no-FP (bug-level): {sash_success}", file=sys.stderr)
     print(f"% ShellCheck fixed no-FP (bug-level): {shell_success}", file=sys.stderr)
+    variant_total, variant_sash_detected, variant_shell_detected = _get_variant_detection_counts(all_results)
+    print(f"% Variant bug instances: {variant_total}", file=sys.stderr)
+    print(f"% {sysname} variants detected bugs: {variant_sash_detected}", file=sys.stderr)
+    print(f"% ShellCheck variants detected bugs: {variant_shell_detected}", file=sys.stderr)
+    print(f"% {sysname} variants missed bugs: {variant_total - variant_sash_detected}", file=sys.stderr)
+    print(f"% ShellCheck variants missed bugs: {variant_total - variant_shell_detected}", file=sys.stderr)
 
 if __name__ == "__main__":
     main()
