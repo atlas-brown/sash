@@ -144,8 +144,7 @@ install_node() {
     cd $local_dir \
       && mkdir -p $N_PREFIX/lib/node \
       && cp -fR $local_dir/include/node $N_PREFIX/include \
-      && cp -fR $local_dir/bin/* $N_PREFIX/bin \
-      && cp -fR $local_dir/lib/node/* $N_PREFIX/lib/node/ .
+      && cp -fR $local_dir/bin/* $N_PREFIX/bin && cp -fR $local_dir/lib/node/* $N_PREFIX/lib/node/ . # Made these a single line to match the number of bugs between original and fixed version
   # install
   else
     local_tarball="node-v$local_version.tar.gz"

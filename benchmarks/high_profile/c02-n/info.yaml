@@ -32,5 +32,5 @@ ground_truths:
   - path: fixed.sh
     kind: fixed
     bugs:
-      bug00: { regression_lines: [146, 147, 148], shellcheck: null }
+      bug00: { regression_lines: [146, 147], shellcheck: null }
       # The command causing bug01 doesn't exist in the fixed version
