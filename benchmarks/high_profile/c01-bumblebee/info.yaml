@@ -30,7 +30,7 @@ ground_truths:
   - path: variants/bug-rm_var.sh
     kind: buggy_variant
     bugs:
-      bug00: { lines: [351], shellcheck: null }
+      bug00: { lines: [351], shellcheck: SC2086 }
 
   - path: variants/bug-rm_loop.sh
     kind: buggy_variant

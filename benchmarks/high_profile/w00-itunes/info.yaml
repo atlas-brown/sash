@@ -9,6 +9,11 @@ bugs:
     code: word_split
     shellcheck: SC2086
 
+  bug01:
+    description: Variable is equal to /usr
+    code: del_sys_file
+    shellcheck: null
+
 ground_truths:
   # Base versions
   - path: original.sh
@@ -30,4 +35,4 @@ ground_truths:
   - path: variants/bug-split_rm_args.sh
     kind: buggy_variant
     bugs:
-      bug00: { lines: [7] }
+      bug01: { lines: [7] }

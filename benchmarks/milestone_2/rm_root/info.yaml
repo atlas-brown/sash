@@ -62,6 +62,6 @@ ground_truths:
       bug00: { lines: [4, 5, 6, 7, 8, 9, 10], shellcheck: null }
       bug01: { lines: [11, 13, 14, 14, 15, 15, 16], shellcheck: null }
       bug02: { lines: [12] }
-      bug03: { lines: [13] }
-      bug03: { lines: [13], shellcheck: null } # Same bug ID on purpose
-      bug04: { lines: [13] }
+      bug03: { lines: [12] }
+      bug03: { lines: [12], shellcheck: null } # Same bug ID on purpose
+      bug04: { lines: [12] }
