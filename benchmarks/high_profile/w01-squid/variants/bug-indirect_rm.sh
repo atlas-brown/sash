@@ -128,8 +128,8 @@ stop() {
 		fi
 		echo
 	fi
-    contents="$SQUID_PIDFILE_DIR/*" # diff: set a variable and delete that
-	rm -rf $contents # bug here: SQUID_PIDFILE_DIR is set externally
+    contents="$SQUID_PIDFILE_DIR/" # diff: set a variable and delete that
+    rm -rf "$contents"* # bug here: SQUID_PIDFILE_DIR is set externally
     unset contents
 	return $RETVAL
 }
@@ -143,8 +143,8 @@ restart() {
 	stop
 	RETVAL=$?
 	if [ $RETVAL -eq 0 ] ; then
-        contents="$SQUID_PIDFILE_DIR/*" # diff: set a variable and delete that
-		rm -rf $contents # bug here: SQUID_PIDFILE_DIR is set externally
+        contents="$SQUID_PIDFILE_DIR/" # diff: set a variable and delete that
+		rm -rf "$contents"* # bug here: SQUID_PIDFILE_DIR is set externally
         unset contents
 		start
 	else
