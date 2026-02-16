@@ -1,4 +1,5 @@
 from pathlib import Path
+import re
 
 
 BENCHMARK_NAMES = {
@@ -43,6 +44,75 @@ BENCHMARK_NAMES = {
     "web_forums/unset_var-cmd_always_fails": "Filesystem preparation helper",
 }
 
+_WORD_RE = re.compile(r"[a-z0-9]+")
+_SHORT_NAME_CACHE = None
+_BASE36 = "0123456789abcdefghijklmnopqrstuvwxyz"
+
+
+def _tokenize(text):
+    return _WORD_RE.findall(str(text).lower())
+
+
+def _fill_to_three(seed, words):
+    chars = [c for c in seed if c.isalnum()]
+    for c in "".join(words):
+        if len(chars) >= 3:
+            break
+        chars.append(c)
+    while len(chars) < 3:
+        chars.append("x")
+    return "".join(chars[:3])
+
+
+def _candidate_roots(words):
+    if not words:
+        return ["bmk"]
+
+    w1 = words[0]
+    w2 = words[1] if len(words) > 1 else ""
+    w3 = words[2] if len(words) > 2 else ""
+
+    candidates = [
+        _fill_to_three((w1[:1] + w2[:1] + w3[:1]), words),  # initials
+        _fill_to_three(w1[:3], words),                       # first word
+        _fill_to_three((w1[:2] + w2[:1]), words),
+        _fill_to_three((w1[:1] + w2[:2]), words),
+    ]
+    # Preserve order, drop duplicates.
+    return list(dict.fromkeys(candidates))
+
+
+def _build_short_name_cache():
+    handles = {}
+    used = set()
+
+    for key in sorted(BENCHMARK_NAMES):
+        words = _tokenize(BENCHMARK_NAMES[key])
+        roots = _candidate_roots(words)
+
+        handle = None
+        for root in roots:
+            if root not in used:
+                handle = root
+                break
+
+        if handle is None:
+            root = roots[0]
+            for suffix in _BASE36:
+                candidate = f"{root}{suffix}"  # 4 chars
+                if candidate not in used:
+                    handle = candidate
+                    break
+
+        if handle is None:
+            # Extremely unlikely fallback.
+            handle = f"{roots[0]}z"
+
+        used.add(handle)
+        handles[key] = handle
+
+    return handles
+
 
 def benchmark_key(path):
     p = Path(str(path))
@@ -60,3 +130,26 @@ def benchmark_display_name(path, default=None):
     if default is None:
         default = key
     return BENCHMARK_NAMES.get(key, default)
+
+
+def short_name(path, default=None):
+    """
+    Return a short, deterministic, unique 3-4 character handle.
+    Uses display-name acronyms; appends one base36 char only on collisions.
+    """
+    global _SHORT_NAME_CACHE
+
+    key = benchmark_key(path)
+    if _SHORT_NAME_CACHE is None:
+        _SHORT_NAME_CACHE = _build_short_name_cache()
+
+    if key in _SHORT_NAME_CACHE:
+        return _SHORT_NAME_CACHE[key]
+
+    # Unknown benchmark keys: stable acronym fallback from the key tail.
+    parts = [p for p in str(key).split("/") if p]
+    tail_words = _tokenize(parts[-1] if parts else key)
+    fallback = _candidate_roots(tail_words)[0]
+    if default is not None:
+        return default
+    return fallback
