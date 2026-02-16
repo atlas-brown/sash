@@ -408,12 +408,21 @@ def plot_bug_detection_bars(data, output_path):
     ax.set_ylim(-0.02, 0.94)
     ax.set_xlabel("Count", loc="right")
 
-    # Annotate row identity inside each group.
-    row_label_x = max_total * 0.01
-    for y in (buggy_rows[0], variant_rows[0], fixed_rows[0]):
-        ax.text(row_label_x, y, sysname, va="center", ha="left", fontsize=7)
-    for y in (buggy_rows[1], variant_rows[1], fixed_rows[1]):
-        ax.text(row_label_x, y, "ShellCheck", va="center", ha="left", fontsize=7)
+    # Annotate row identity on the right side as axis tick labels.
+    row_ticks = [
+        buggy_rows[0], buggy_rows[1],
+        variant_rows[0], variant_rows[1],
+        fixed_rows[0], fixed_rows[1],
+    ]
+    row_labels = [sysname, "ShellCheck", sysname, "ShellCheck", sysname, "ShellCheck"]
+    ax_right = ax.twinx()
+    ax_right.set_ylim(ax.get_ylim())
+    ax_right.set_yticks(row_ticks)
+    ax_right.set_yticklabels(row_labels)
+    ax_right.tick_params(axis="y", labelsize=7, length=0, pad=4)
+    ax_right.spines["top"].set_visible(False)
+    ax_right.spines["left"].set_visible(False)
+    ax_right.spines["bottom"].set_visible(False)
 
     x_points = sorted(set(
         [
