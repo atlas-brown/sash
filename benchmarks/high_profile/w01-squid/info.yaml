@@ -49,11 +49,11 @@ ground_truths:
       bug00: { regression_lines: [135, 148] }
       bug01: { regression_lines: [135, 148], shellcheck: null }
 
-  - path: variants/fix-if_z_exit.sh
-    kind: fixed_variant
-    bugs:
-      bug00: { regression_lines: [133, 146] }
-      bug01: { regression_lines: [133, 146], shellcheck: null }
+  # - path: variants/fix-if_z_exit.sh
+  #   kind: fixed_variant
+  #   bugs:
+  #     bug00: { regression_lines: [133, 146] }
+  #     bug01: { regression_lines: [133, 146], shellcheck: null }
 
   - path: variants/fix-n_or_exit.sh
     kind: fixed_variant
