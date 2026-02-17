@@ -10,8 +10,8 @@ Usage:
 
 Options:
   --timeouts LIST      Comma-separated timeout values in seconds.
-                       Example: --timeouts 10,20,30,60
-                       Default: 10,20,30,60
+                       Example: --timeouts 1,5,10,20,30,60
+                       Default: 1,5,10,20,30,60
   --mock               Generate synthetic (plausible) CSVs instead of running evaluation.
   --base-csv PATH      Template CSV used by --mock mode.
                        Default: results/results.csv
@@ -32,6 +32,7 @@ Behavior:
     2) DFS enabled without targeted DFS
     3) DFS enabled without unbound-empty DFS
     4) DFS disabled (-D)
+  For modes with targeted DFS enabled, also sets --targeted-dfs-timeout to T.
   and writes:
     <output-dir>/timeout-sweep/results_t<T>_dfs_on.csv
     <output-dir>/timeout-sweep/results_t<T>_dfs_no_targeted.csv
@@ -45,7 +46,7 @@ EOF
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
 
-TIMEOUTS_CSV="10,20,30,60"
+TIMEOUTS_CSV="1,5,10,20,30,60"
 OUTPUT_DIR="results"
 SWEEP_SUBDIR="timeout-sweep"
 ONLY_REGEX=".*"
@@ -175,6 +176,9 @@ for raw_t in "${TIMEOUTS[@]}"; do
           cmd+=(--disable-unbound-empty-dfs)
           ;;
       esac
+      if [[ "${dfs_mode}" == "dfs_on" || "${dfs_mode}" == "dfs_no_unbound_empty" ]]; then
+        cmd+=(--targeted-dfs-timeout "${t}")
+      fi
     fi
 
     echo
