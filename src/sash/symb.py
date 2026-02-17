@@ -1804,7 +1804,9 @@ def symbexec_file(input_file: str,
                   config: InterpConfig,
                   stop: Event | None,
                   dfs_timeout: float | None = None,
-                  main_timeout: float | None = None) -> SymbexecResult:
+                  main_timeout: float | None = None,
+                  enable_targeted_dfs: bool = True,
+                  enable_unbound_empty_dfs: bool = True) -> SymbexecResult:
     global stop_event
     stop_event = stop
 
@@ -1866,17 +1868,22 @@ def symbexec_file(input_file: str,
         dfs_traces = []
         if config.DFS_first:
             logging.info("Doing whole execution with a single trace first (DFS_first)")
-            logging.info("DFS run: targeting dangerous commands")
             dfs_event = _set_timer(dfs_timeout) if dfs_timeout is not None else stop_event
             prev_stop_event = stop_event
             stop_event = dfs_event
-            targeted_dfs_result = run_targeted_dfs(
-                nodes=nodes,
-                config=replace(config, current_pass="dangerous-first"),
-                symb_engine=symb_engine,
-                func_defs=func_defs,
-                ignore_function_calls_for=safe_funcs,
-            )
+            if enable_targeted_dfs:
+                logging.info("DFS run: targeting dangerous commands")
+                targeted_dfs_result = run_targeted_dfs(
+                    nodes=nodes,
+                    config=replace(config, current_pass="dangerous-first"),
+                    symb_engine=symb_engine,
+                    func_defs=func_defs,
+                    ignore_function_calls_for=safe_funcs,
+                )
+                targeted_traces = targeted_dfs_result.traces
+            else:
+                logging.info("DFS run: targeted pass disabled")
+                targeted_traces = []
             logging.info("DFS run: only taking THEN branches")
             only_then_traces = symb_engine(nodes, replace(config,
                                        branch_policy=branch_policy_only_then,
@@ -1887,34 +1894,40 @@ def symbexec_file(input_file: str,
                                        branch_policy=branch_policy_only_else,
                                        current_pass="conds:else",
                                        current_pass_condition=Description("(DFS) all else branches are taken")))
-            issues_so_far = Reporter._issues.copy()
-            logging.info("DFS run: only taking THEN branches with unbound variables as empty strings")
-            only_then_unbound_empty = symb_engine(nodes, replace(config,
-                                       branch_policy=branch_policy_only_then,
-                                       unbound_policy=UnboundVariablePolicy.EMPTY,
-                                       current_pass="unbound:empty+conds:then",
-                                       current_pass_condition=And(Description("(DFS) all then branches are taken"),
-                                                                  Description("(DFS) unbound variables are empty"))))
-            logging.info("DFS run: only taking ELSE branches with unbound variables as empty strings")
-            only_else_unbound_empty = symb_engine(nodes, replace(config,
-                                       branch_policy=branch_policy_only_else,
-                                       unbound_policy=UnboundVariablePolicy.EMPTY,
-                                       current_pass="unbound:empty+conds:else",
-                                       current_pass_condition=And(Description("(DFS) all else branches are taken"),
-                                                                  Description("(DFS) unbound variables are empty"))))
-            logging.info("DFS run: treating unbound variables solely as empty strings")
-            unbound_empty = symb_engine(nodes, replace(config,
-                                       unbound_policy=UnboundVariablePolicy.EMPTY,
-                                       current_pass="unbound:empty",
-                                       current_pass_condition=Description("(DFS) unbound variables are empty")))
-            Reporter.drop_issues({reporter.Code.DELETE_SYSTEM_FILE, reporter.Code.CONSTANT_CONDITION})
-            for i in issues_so_far: # ensure that any del_sys_files found before the last run are kept
-                if i.code == reporter.Code.DELETE_SYSTEM_FILE:
-                    Reporter.add_issue(i, config)
+            if enable_unbound_empty_dfs:
+                issues_so_far = Reporter._issues.copy()
+                logging.info("DFS run: only taking THEN branches with unbound variables as empty strings")
+                only_then_unbound_empty = symb_engine(nodes, replace(config,
+                                           branch_policy=branch_policy_only_then,
+                                           unbound_policy=UnboundVariablePolicy.EMPTY,
+                                           current_pass="unbound:empty+conds:then",
+                                           current_pass_condition=And(Description("(DFS) all then branches are taken"),
+                                                                      Description("(DFS) unbound variables are empty"))))
+                logging.info("DFS run: only taking ELSE branches with unbound variables as empty strings")
+                only_else_unbound_empty = symb_engine(nodes, replace(config,
+                                           branch_policy=branch_policy_only_else,
+                                           unbound_policy=UnboundVariablePolicy.EMPTY,
+                                           current_pass="unbound:empty+conds:else",
+                                           current_pass_condition=And(Description("(DFS) all else branches are taken"),
+                                                                      Description("(DFS) unbound variables are empty"))))
+                logging.info("DFS run: treating unbound variables solely as empty strings")
+                unbound_empty = symb_engine(nodes, replace(config,
+                                           unbound_policy=UnboundVariablePolicy.EMPTY,
+                                           current_pass="unbound:empty",
+                                           current_pass_condition=Description("(DFS) unbound variables are empty")))
+                Reporter.drop_issues({reporter.Code.DELETE_SYSTEM_FILE, reporter.Code.CONSTANT_CONDITION})
+                for i in issues_so_far: # ensure that any del_sys_files found before the last run are kept
+                    if i.code == reporter.Code.DELETE_SYSTEM_FILE:
+                        Reporter.add_issue(i, config)
+            else:
+                logging.info("DFS run: unbound-empty passes disabled")
+                only_then_unbound_empty = []
+                only_else_unbound_empty = []
+                unbound_empty = []
             # logging.info("DFS run: exploring the first trace only")
             # symb_engine(nodes, replace(config, trace_collapser = lambda ts: ts[:1]))
             logging.info("DFS_first run complete, proceeding with normal symbolic execution")
-            dfs_traces = targeted_dfs_result.traces + \
+            dfs_traces = targeted_traces + \
                             only_then_traces + only_else_traces + \
                             only_then_unbound_empty + only_else_unbound_empty + \
                             unbound_empty

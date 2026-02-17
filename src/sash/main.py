@@ -19,6 +19,8 @@ def symbexec_main(file: str,
                   dfs_timeout: float | None = None,
                   solver_timeout: float | None = None,
                   enable_dfs: bool = False,
+                  enable_targeted_dfs: bool = True,
+                  enable_unbound_empty_dfs: bool = True,
                   debug_instrumentation: bool = False) -> sash.symb.SymbexecResult:
     global timers
     timers = []
@@ -42,6 +44,8 @@ def symbexec_main(file: str,
         stop=stop,
         dfs_timeout=dfs_timeout,
         main_timeout=symbexec_timeout,
+        enable_targeted_dfs=enable_targeted_dfs,
+        enable_unbound_empty_dfs=enable_unbound_empty_dfs,
     )
     Reporter.set_exec_time(time.perf_counter() - start_time)
 
@@ -77,6 +81,8 @@ def main(file: str,
          dfs_timeout: float | None = None,
          solver_timeout: float | None = None,
          enable_dfs: bool = False,
+         enable_targeted_dfs: bool = True,
+         enable_unbound_empty_dfs: bool = True,
          debug_instrumentation: bool = False) -> Report:
 
     logging.basicConfig(
@@ -88,7 +94,17 @@ def main(file: str,
     logging.info("Processing file %s with solver=%s, exec_timeout=%s, solver_timeout=%s", file, solver, timeout, solver_timeout)
     logging.info("Commands with specs: %s", [name for name, _ in specs.CMD_SPECS.items()])
 
-    symbexec_main(file, solver, timeout, dfs_timeout, solver_timeout, enable_dfs, debug_instrumentation)
+    symbexec_main(
+        file,
+        solver,
+        timeout,
+        dfs_timeout,
+        solver_timeout,
+        enable_dfs,
+        enable_targeted_dfs,
+        enable_unbound_empty_dfs,
+        debug_instrumentation,
+    )
     return Reporter.get_report()
 
 
@@ -104,6 +120,8 @@ def cli_main():
         dfs_timeout=args.dfs_timeout,
         solver_timeout=args.solver_timeout,
         enable_dfs=args.enable_dfs,
+        enable_targeted_dfs=not args.disable_targeted_dfs,
+        enable_unbound_empty_dfs=not args.disable_unbound_empty_dfs,
         debug_instrumentation=args.enable_debug_instrumentation,
     )
 
@@ -143,6 +161,18 @@ def parse_cli():
         "--enable-dfs",
         action="store_true",
         help="Use depth-first search strategy for symbolic execution (default: breadth-first search)",
+    )
+
+    parser.add_argument(
+        "--disable-targeted-dfs",
+        action="store_true",
+        help="Disable the dangerous-command-targeted DFS pass while keeping other DFS passes (only applies with --enable-dfs).",
+    )
+
+    parser.add_argument(
+        "--disable-unbound-empty-dfs",
+        action="store_true",
+        help="Disable DFS passes that treat unbound variables as empty strings (only applies with --enable-dfs).",
     )
 
     parser.add_argument(
