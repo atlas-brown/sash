@@ -1,0 +1,38 @@
+benchmark,name,max_depth,loc
+high_profile/c03-backup_manager,Ubuntu backup manager,5,766
+milestone_1/const_loop,DigitalOcean snapshot,5,12
+high_profile/c02-n,Node.js version manager,4,247
+milestone_2/loop_once-loop_once,Directory chmod loop,4,28
+commits/const_cond,Git config check,3,21
+commits/debootstrap_2,Debian debootstrap 2,2,602
+commits/debootstrap,Debian debootstrap,2,405
+commits/makefile,Camlp5 install wrapper,2,205
+high_profile/w01-squid,Squid init script,2,139
+web_forums/unset_var-cmd_always_fails,Filesystem preparation helper,2,20
+simple_fs/overwrite_file_3,Hive DROP log monitor,2,10
+high_profile/c01-bumblebee,NVIDIA driver installer,1,662
+high_profile/c00-steam,Steam updater,1,450
+commits/unset_var_5,NVM install downloader,1,137
+commits/ignored_command_v,Zsh installer check,1,90
+milestone_1/unset_var_1,OhMyZsh update script,1,61
+simple_fs/access_after_mv,ActualBudget update helper,1,53
+commits/unset_var_3,Vim config backup script,1,38
+commits/unset_var_set_u_1,OpenStack log collector,1,36
+simple_fs/cd_into_file,Repo archiver,1,30
+commits/unset_var_2,VSCode patch helper,1,12
+milestone_1/loop_once-useless_test,AutoTest config rename,1,11
+simple_fs/overwrite_file_2,Contest winner mover,1,11
+milestone_2/unset_var-const_if-dead_code,Rsync directory copy script,1,10
+simple_fs/access_del_resource,TV transcode move loop,1,10
+web_forums/capturing_empty_output,Domain folder creator,1,8
+milestone_2/loop_once,Two-file cleanup,1,7
+high_profile/w00-itunes,iTunes updater,1,4
+commits/unset_func,Git version check,0,90
+milestone_1/redir_to_func-redir_to_func,Log redirection helper,0,27
+web_forums/rm_root_2,AIX server data gather,0,20
+milestone_2/rm_root,MongoDB backup script,0,15
+web_forums/unexpected_stdin,System restoration script,0,15
+commits/unset_var_set_u_2,Audio watermark build script,0,12
+simple_fs/overwrite_file_4,SAS script generator,0,7
+web_forums/unset_var,File check,0,5
+simple_fs/overwrite_file,HPC cluster file movement,0,3
