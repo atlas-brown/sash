@@ -32,7 +32,6 @@ Behavior:
     2) DFS enabled without targeted DFS
     3) DFS enabled without unbound-empty DFS
     4) DFS disabled (-D)
-  For modes with targeted DFS enabled, also sets --targeted-dfs-timeout to T.
   and writes:
     <output-dir>/timeout-sweep/results_t<T>_dfs_on.csv
     <output-dir>/timeout-sweep/results_t<T>_dfs_no_targeted.csv
@@ -176,9 +175,6 @@ for raw_t in "${TIMEOUTS[@]}"; do
           cmd+=(--disable-unbound-empty-dfs)
           ;;
       esac
-      if [[ "${dfs_mode}" == "dfs_on" || "${dfs_mode}" == "dfs_no_unbound_empty" ]]; then
-        cmd+=(--targeted-dfs-timeout "${t}")
-      fi
     fi
 
     echo

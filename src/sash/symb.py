@@ -1,6 +1,7 @@
 import logging
 import threading
 import traceback
+import time
 from collections import defaultdict
 from copy import copy
 from dataclasses import dataclass, field, replace
@@ -1869,66 +1870,102 @@ def symbexec_file(input_file: str,
         dfs_traces = []
         if config.DFS_first:
             logging.info("Doing whole execution with a single trace first (DFS_first)")
-            dfs_event = _set_timer(dfs_timeout) if dfs_timeout is not None else stop_event
+            dfs_phase_start = time.perf_counter()
             prev_stop_event = stop_event
+            dfs_pass_count = 2 + (1 if enable_targeted_dfs else 0) + (3 if enable_unbound_empty_dfs else 0)
+            shared_pass_timeout = None
+            if dfs_timeout is not None and dfs_timeout > 0 and dfs_pass_count > 0:
+                shared_pass_timeout = dfs_timeout / dfs_pass_count
+                logging.info(
+                    "DFS run: splitting dfs timeout %.2fs across %d passes (%.2fs/pass)",
+                    dfs_timeout,
+                    dfs_pass_count,
+                    shared_pass_timeout,
+                )
+
+            def run_dfs_pass(timeout: float | None, run_pass: Callable[[], Traces]) -> tuple[Traces, bool]:
+                global stop_event
+                if timeout is None:
+                    pass_event = prev_stop_event
+                elif timeout <= 0:
+                    pass_event = Event()
+                    pass_event.set()
+                else:
+                    pass_event = _set_timer(timeout)
+                stop_event = pass_event
+                traces = run_pass()
+                timed_out = pass_event is not None and pass_event.is_set()
+                return traces, timed_out
+
+            dfs_phase_timed_out = False
             if enable_targeted_dfs:
-                targeted_event = (
-                    _set_timer(targeted_dfs_timeout)
-                    if targeted_dfs_timeout is not None
-                    else dfs_event
-                )
-                stop_event = targeted_event
                 logging.info("DFS run: targeting dangerous commands")
-                targeted_dfs_result = run_targeted_dfs(
-                    nodes=nodes,
-                    config=replace(config, current_pass="dangerous-first"),
-                    symb_engine=symb_engine,
-                    func_defs=func_defs,
-                    ignore_function_calls_for=safe_funcs,
+                targeted_pass_timeout = targeted_dfs_timeout if targeted_dfs_timeout is not None else shared_pass_timeout
+                targeted_traces, targeted_timed_out = run_dfs_pass(
+                    targeted_pass_timeout,
+                    lambda: run_targeted_dfs(
+                        nodes=nodes,
+                        config=replace(config, current_pass="dangerous-first"),
+                        symb_engine=symb_engine,
+                        func_defs=func_defs,
+                        ignore_function_calls_for=safe_funcs,
+                    ).traces,
                 )
-                targeted_traces = targeted_dfs_result.traces
-                # A dedicated targeted pass timeout should not mark the whole run timed out.
-                if (
-                    targeted_event is not None
-                    and targeted_event is not dfs_event
-                    and targeted_event.is_set()
-                ):
-                    Reporter.clear_timed_out()
+                dfs_phase_timed_out = dfs_phase_timed_out or targeted_timed_out
             else:
                 logging.info("DFS run: targeted pass disabled")
                 targeted_traces = []
-            stop_event = dfs_event
             logging.info("DFS run: only taking THEN branches")
-            only_then_traces = symb_engine(nodes, replace(config,
-                                       branch_policy=branch_policy_only_then,
-                                       current_pass="conds:then",
-                                       current_pass_condition=Description("(DFS) all then branches are taken")))
+            only_then_traces, only_then_timed_out = run_dfs_pass(
+                shared_pass_timeout,
+                lambda: symb_engine(nodes, replace(config,
+                                   branch_policy=branch_policy_only_then,
+                                   current_pass="conds:then",
+                                   current_pass_condition=Description("(DFS) all then branches are taken"))),
+            )
+            dfs_phase_timed_out = dfs_phase_timed_out or only_then_timed_out
             logging.info("DFS run: only taking ELSE branches")
-            only_else_traces = symb_engine(nodes, replace(config,
-                                       branch_policy=branch_policy_only_else,
-                                       current_pass="conds:else",
-                                       current_pass_condition=Description("(DFS) all else branches are taken")))
+            only_else_traces, only_else_timed_out = run_dfs_pass(
+                shared_pass_timeout,
+                lambda: symb_engine(nodes, replace(config,
+                                   branch_policy=branch_policy_only_else,
+                                   current_pass="conds:else",
+                                   current_pass_condition=Description("(DFS) all else branches are taken"))),
+            )
+            dfs_phase_timed_out = dfs_phase_timed_out or only_else_timed_out
             if enable_unbound_empty_dfs:
                 issues_so_far = Reporter._issues.copy()
                 logging.info("DFS run: only taking THEN branches with unbound variables as empty strings")
-                only_then_unbound_empty = symb_engine(nodes, replace(config,
-                                           branch_policy=branch_policy_only_then,
-                                           unbound_policy=UnboundVariablePolicy.EMPTY,
-                                           current_pass="unbound:empty+conds:then",
-                                           current_pass_condition=And(Description("(DFS) all then branches are taken"),
-                                                                      Description("(DFS) unbound variables are empty"))))
+                only_then_unbound_empty, then_unbound_timed_out = run_dfs_pass(
+                    shared_pass_timeout,
+                    lambda: symb_engine(nodes, replace(config,
+                                       branch_policy=branch_policy_only_then,
+                                       unbound_policy=UnboundVariablePolicy.EMPTY,
+                                       current_pass="unbound:empty+conds:then",
+                                       current_pass_condition=And(Description("(DFS) all then branches are taken"),
+                                                                  Description("(DFS) unbound variables are empty")))),
+                )
+                dfs_phase_timed_out = dfs_phase_timed_out or then_unbound_timed_out
                 logging.info("DFS run: only taking ELSE branches with unbound variables as empty strings")
-                only_else_unbound_empty = symb_engine(nodes, replace(config,
-                                           branch_policy=branch_policy_only_else,
-                                           unbound_policy=UnboundVariablePolicy.EMPTY,
-                                           current_pass="unbound:empty+conds:else",
-                                           current_pass_condition=And(Description("(DFS) all else branches are taken"),
-                                                                      Description("(DFS) unbound variables are empty"))))
+                only_else_unbound_empty, else_unbound_timed_out = run_dfs_pass(
+                    shared_pass_timeout,
+                    lambda: symb_engine(nodes, replace(config,
+                                       branch_policy=branch_policy_only_else,
+                                       unbound_policy=UnboundVariablePolicy.EMPTY,
+                                       current_pass="unbound:empty+conds:else",
+                                       current_pass_condition=And(Description("(DFS) all else branches are taken"),
+                                                                  Description("(DFS) unbound variables are empty")))),
+                )
+                dfs_phase_timed_out = dfs_phase_timed_out or else_unbound_timed_out
                 logging.info("DFS run: treating unbound variables solely as empty strings")
-                unbound_empty = symb_engine(nodes, replace(config,
-                                           unbound_policy=UnboundVariablePolicy.EMPTY,
-                                           current_pass="unbound:empty",
-                                           current_pass_condition=Description("(DFS) unbound variables are empty")))
+                unbound_empty, unbound_timed_out = run_dfs_pass(
+                    shared_pass_timeout,
+                    lambda: symb_engine(nodes, replace(config,
+                                       unbound_policy=UnboundVariablePolicy.EMPTY,
+                                       current_pass="unbound:empty",
+                                       current_pass_condition=Description("(DFS) unbound variables are empty"))),
+                )
+                dfs_phase_timed_out = dfs_phase_timed_out or unbound_timed_out
                 Reporter.drop_issues({reporter.Code.DELETE_SYSTEM_FILE, reporter.Code.CONSTANT_CONDITION})
                 for i in issues_so_far: # ensure that any del_sys_files found before the last run are kept
                     if i.code == reporter.Code.DELETE_SYSTEM_FILE:
@@ -1946,12 +1983,27 @@ def symbexec_file(input_file: str,
                             only_then_unbound_empty + only_else_unbound_empty + \
                             unbound_empty
             Reporter.drop_issues({reporter.Code.DEAD_CODE}) # wholly unreliable with branch policies
-            if dfs_event is not None and dfs_event.is_set():
+            if dfs_phase_timed_out:
                 Reporter.clear_timed_out()
             if stop is not None and main_timeout is None:
                 main_stop = stop
             else:
-                main_stop = _set_timer(main_timeout)
+                effective_main_timeout = main_timeout
+                if main_timeout is not None:
+                    dfs_elapsed = time.perf_counter() - dfs_phase_start
+                    effective_main_timeout = max(main_timeout - dfs_elapsed, 0.0)
+                    logging.info(
+                        "Remaining main symbolic-exec timeout after DFS phase: %.2fs "
+                        "(elapsed %.2fs of %.2fs total)",
+                        effective_main_timeout,
+                        dfs_elapsed,
+                        main_timeout,
+                    )
+                if effective_main_timeout is not None and effective_main_timeout <= 0:
+                    main_stop = Event()
+                    main_stop.set()
+                else:
+                    main_stop = _set_timer(effective_main_timeout)
             stop_event = main_stop if main_stop is not None else prev_stop_event
         else:
             main_stop = stop if (stop is not None and main_timeout is None) else _set_timer(main_timeout)
