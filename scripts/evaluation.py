@@ -24,6 +24,8 @@ def parse_args():
     parser.add_argument('-d', '--dfs-timeout', type=float, default=None, help='Timeout in seconds for depth-first symbolic execution passes in each benchmark (default: no timeout)')
     parser.add_argument('-T', '--solver-timeout', type=float, default=None, help='Timeout in seconds for solving in each benchmark (default: no timeout)')
     parser.add_argument('-D', '--disable-dfs', action='store_true', help='Disable depth-first symbolic execution passes (default: false)')
+    parser.add_argument('--disable-targeted-dfs', action='store_true', help='Disable only the targeted DFS pass while keeping the other DFS passes (default: false)')
+    parser.add_argument('--disable-unbound-empty-dfs', action='store_true', help='Disable only DFS passes that treat unbound variables as empty strings (default: false)')
     parser.add_argument('-l', '--log-level', type=str, default='disabled', choices=['disabled', 'error', 'warning', 'info', 'debug'], help='Logging level for SaSh; recommended to only use along with -L (default: disabled)')
     parser.add_argument('-L', '--error-log', type=Path, default=Path('/dev/null'), help='File to write error logs to (default: /dev/null)')
     parser.add_argument('-S', '--skip-buggy', action='store_true', help='Don\'t run the evaluation on the buggy versions of the benchmarks (default: false)')
@@ -47,6 +49,8 @@ def main(
     dfs_timeout: float | None,
     solver_timeout: float | None,
     enable_dfs: bool,
+    enable_targeted_dfs: bool,
+    enable_unbound_empty_dfs: bool,
     log_level: str,
     log_file: Path,
     run_buggy: bool,
@@ -114,6 +118,8 @@ def main(
                     dfs_timeout,
                     solver_timeout,
                     enable_dfs,
+                    enable_targeted_dfs,
+                    enable_unbound_empty_dfs,
                     log_level,
                     log_file,
                     verbose,
@@ -409,6 +415,8 @@ def run_job(
     dfs_timeout: float | None,
     solver_timeout: float | None,
     enable_dfs: bool,
+    enable_targeted_dfs: bool,
+    enable_unbound_empty_dfs: bool,
     log_level: str,
     log_file: Path | None,
     verbose: bool,
@@ -428,6 +436,8 @@ def run_job(
             dfs_timeout=dfs_timeout,
             solver_timeout=solver_timeout,
             enable_dfs=enable_dfs,
+            enable_targeted_dfs=enable_targeted_dfs,
+            enable_unbound_empty_dfs=enable_unbound_empty_dfs,
             debug_instrumentation=False,
         )
 
@@ -863,6 +873,8 @@ if __name__ == "__main__":
         dfs_timeout=args.dfs_timeout,
         solver_timeout=args.solver_timeout,
         enable_dfs=not args.disable_dfs,
+        enable_targeted_dfs=not args.disable_targeted_dfs,
+        enable_unbound_empty_dfs=not args.disable_unbound_empty_dfs,
         log_level=args.log_level,
         log_file=args.error_log,
         run_buggy=not args.skip_buggy or args.all,

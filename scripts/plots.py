@@ -3,11 +3,12 @@ import pandas as pd
 import numpy as np
 import os
 import re
+import glob
 from io import StringIO
 import sys
 import subprocess
 from pathlib import Path
-from collections import Counter
+from collections import Counter, defaultdict
 import yaml
 from benchmark_metadata import benchmark_key, benchmark_display_name
 from bug_depth_stats import compute_script_metrics
@@ -298,6 +299,91 @@ def _get_bug_sets(data):
     return _get_bug_sets_for_kind(data, "buggy")
 
 
+def _get_variant_overlay_deltas(data):
+    """
+    Compute overlay sizes for Original bars using only benchmark families that
+    have buggy variants. For each family we compare Original vs Variant on a
+    comparable bug budget equal to min(original_bug_count, variant_bug_count),
+    so original-only bugs are ignored for highlighting.
+    Returns two lists [SaSh, ShellCheck]:
+      - detected_to_missed: variant detects fewer than original
+      - missed_to_detected: variant detects more than original
+    """
+    if "kind" in data.columns:
+        buggy_rows = data[data["kind"] == "buggy"]
+        variant_rows = data[data["kind"] == "buggy_variant"]
+    elif "benchmark" in data.columns:
+        benchmarks = data["benchmark"].astype(str)
+        buggy_rows = data[
+            ~benchmarks.str.endswith("/fixed.sh")
+            & ~benchmarks.str.contains("/variants/")
+        ]
+        variant_rows = data[benchmarks.str.contains("/variants/bug-")]
+    else:
+        return [0, 0], [0, 0]
+
+    buggy_by_family = defaultdict(list)
+    variant_by_family = defaultdict(list)
+    for _, row in buggy_rows.iterrows():
+        buggy_by_family[benchmark_group_key(row["benchmark"])].append(row)
+    for _, row in variant_rows.iterrows():
+        variant_by_family[benchmark_group_key(row["benchmark"])].append(row)
+
+    orig_detected = [0, 0]  # [SaSh, ShellCheck]
+    variant_detected = [0, 0]
+
+    for family in sorted(set(buggy_by_family) & set(variant_by_family)):
+        orig_expected_total = 0
+        variant_expected_total = 0
+        orig_sash_detected = 0
+        variant_sash_detected = 0
+        orig_shell_detected = 0
+        variant_shell_detected = 0
+
+        for row in buggy_by_family[family]:
+            kind = str(row.get("kind", "buggy"))
+            expected_counter = Counter(parse_issue_list(row["expected_results"]))
+            actual_counter = Counter(parse_issue_list(row["actual_results"]))
+            shell_counter = get_info_shellcheck_expected_counter(
+                row["benchmark"], kind, fallback_to_bug_default=True
+            )
+            orig_expected_total += sum(expected_counter.values())
+            for issue, count in expected_counter.items():
+                orig_sash_detected += min(count, actual_counter[issue])
+                orig_shell_detected += min(count, shell_counter[issue])
+
+        for row in variant_by_family[family]:
+            kind = str(row.get("kind", "buggy_variant"))
+            expected_counter = Counter(parse_issue_list(row["expected_results"]))
+            actual_counter = Counter(parse_issue_list(row["actual_results"]))
+            shell_counter = get_info_shellcheck_expected_counter(
+                row["benchmark"], kind, fallback_to_bug_default=False
+            )
+            variant_expected_total += sum(expected_counter.values())
+            for issue, count in expected_counter.items():
+                variant_sash_detected += min(count, actual_counter[issue])
+                variant_shell_detected += min(count, shell_counter[issue])
+
+        comparable_total = min(orig_expected_total, variant_expected_total)
+        if comparable_total <= 0:
+            continue
+
+        orig_detected[0] += min(orig_sash_detected, comparable_total)
+        variant_detected[0] += min(variant_sash_detected, comparable_total)
+        orig_detected[1] += min(orig_shell_detected, comparable_total)
+        variant_detected[1] += min(variant_shell_detected, comparable_total)
+
+    detected_to_missed = [
+        max(orig_detected[0] - variant_detected[0], 0),
+        max(orig_detected[1] - variant_detected[1], 0),
+    ]
+    missed_to_detected = [
+        max(variant_detected[0] - orig_detected[0], 0),
+        max(variant_detected[1] - orig_detected[1], 0),
+    ]
+    return detected_to_missed, missed_to_detected
+
+
 def plot_bug_detection_euler(data, output_path):
     sash_detected, shellcheck_detected, all_bugs_expected = _get_bug_sets(data)
 
@@ -330,15 +416,10 @@ def plot_bug_detection_bars(data, output_path):
     fixed_total, sash_success, shell_success = _get_fixed_fp_counts(data)
     sash_fp = fixed_total - sash_success
     shell_fp = fixed_total - shell_success
-    variant_total, sash_variant_detected, shell_variant_detected = _get_variant_detection_counts(data)
-    variant_detected = [sash_variant_detected, shell_variant_detected]
-    variant_missed = [
-        variant_total - variant_detected[0],
-        variant_total - variant_detected[1],
-    ]
+    variant_detected_to_missed, variant_missed_to_detected = _get_variant_overlay_deltas(data)
 
-    # Single axis: three benchmark-kind groups; each group has SaSh/ShellCheck rows.
-    fig, ax = plt.subplots(1, 1, figsize=(figsize_small[0], 2.8))
+    # Single axis: two benchmark-kind groups; each group has SaSh/ShellCheck rows.
+    fig, ax = plt.subplots(1, 1, figsize=figsize)
 
     sash_buggy_detected = both_detected + only_sash
     shell_buggy_detected = both_detected + only_shell
@@ -349,13 +430,11 @@ def plot_bug_detection_bars(data, output_path):
 
     # Group by benchmark kind on y-axis; inside each group:
     # upper row = SaSh, lower row = ShellCheck.
-    group_buggy = 0.82
-    group_variant = 0.47
-    group_fixed = 0.12
+    group_buggy = 0.72
+    group_fixed = 0.24
     row_gap = 0.14
     bar_height = 0.11
     buggy_rows = [group_buggy + (row_gap / 2), group_buggy - (row_gap / 2)]
-    variant_rows = [group_variant + (row_gap / 2), group_variant - (row_gap / 2)]
     fixed_rows = [group_fixed + (row_gap / 2), group_fixed - (row_gap / 2)]
 
     detected_color = color_scheme[1]
@@ -374,22 +453,33 @@ def plot_bug_detection_bars(data, output_path):
         label="Missed",
     )
 
-    # Buggy variant bars
-    ax.barh(
-        variant_rows,
-        variant_detected,
-        height=bar_height,
-        color=detected_color,
-        label="Detected",
-    )
-    ax.barh(
-        variant_rows,
-        variant_missed,
-        height=bar_height,
-        left=variant_detected,
-        color=missed_color,
-        label="Missed",
-    )
+    # Overlay hatch only for bugs that exist in both Original and buggy-variants.
+    for i, y in enumerate(buggy_rows):
+        detected_hatch = min(variant_detected_to_missed[i], buggy_detected[i])
+        missed_hatch = min(variant_missed_to_detected[i], buggy_missed[i])
+
+        if detected_hatch > 0:
+            ax.barh(
+                y,
+                detected_hatch,
+                height=bar_height,
+                left=buggy_detected[i] - detected_hatch,
+                color="none",
+                hatch="////",
+                edgecolor="0.35",
+                linewidth=0.0,
+            )
+        if missed_hatch > 0:
+            ax.barh(
+                y,
+                missed_hatch,
+                height=bar_height,
+                left=buggy_detected[i],
+                color="none",
+                hatch="////",
+                edgecolor="0.35",
+                linewidth=0.0,
+            )
 
     # Fixed bars
     ax.barh(fixed_rows, fixed_no_fp, height=bar_height, color=no_fp_color, label="No false positive")
@@ -402,19 +492,17 @@ def plot_bug_detection_bars(data, output_path):
         label="False positive",
     )
 
-    max_total = max(all_expected, variant_total, fixed_total, 1)
+    max_total = max(all_expected, fixed_total, 1)
     ax.set_xlim(0, max_total)
-    ax.set_yticks([group_buggy, group_variant, group_fixed], ["Original", "Variants", "Fixed"])
-    ax.set_ylim(-0.02, 0.94)
+    ax.set_yticks([group_buggy, group_fixed], ["Original", "Fixed"])
+    ax.set_ylim(0.03, 0.90)
     ax.set_xlabel("Count", loc="right")
 
     # Annotate row identity on the right side as axis tick labels.
     row_ticks = [
-        buggy_rows[0], buggy_rows[1],
-        variant_rows[0], variant_rows[1],
-        fixed_rows[0], fixed_rows[1],
+        buggy_rows[0], buggy_rows[1], fixed_rows[0], fixed_rows[1],
     ]
-    row_labels = [sysname, "ShellCheck", sysname, "ShellCheck", sysname, "ShellCheck"]
+    row_labels = [sysname, "ShellCheck", sysname, "ShellCheck"]
     ax_right = ax.twinx()
     ax_right.set_ylim(ax.get_ylim())
     ax_right.set_yticks(row_ticks)
@@ -428,12 +516,9 @@ def plot_bug_detection_bars(data, output_path):
         [
             0,
             all_expected,
-            variant_total,
             fixed_total,
             buggy_detected[0],
             buggy_detected[1],
-            variant_detected[0],
-            variant_detected[1],
             fixed_no_fp[0],
             fixed_no_fp[1],
         ]
@@ -442,18 +527,25 @@ def plot_bug_detection_bars(data, output_path):
     int_points = [int(x) for x in x_points]
     labels = [""] * len(x_points)
     if int_points:
-        run_start = 0
         for i in range(1, len(int_points) + 1):
             is_break = (i == len(int_points)) or ((int_points[i] - int_points[i - 1]) >= 3)
             if is_break:
                 labels[i - 1] = str(int_points[i - 1])  # largest tick in this close run
-                run_start = i
     ax.set_xticks(x_points)
     ax.set_xticklabels(labels)
     ax.tick_params(axis="x", labelsize=8)
     # Deduplicate legend labels because multiple grouped bars reuse the same names.
     handles, labels = ax.get_legend_handles_labels()
     by_label = dict(zip(labels, handles))
+    by_label["Variant differs from original"] = plt.Rectangle(
+        (0, 0),
+        1,
+        1,
+        facecolor="none",
+        hatch="////",
+        edgecolor="0.35",
+        linewidth=0.0,
+    )
     ax.legend(
         by_label.values(),
         by_label.keys(),
@@ -626,6 +718,95 @@ def plot_runtime(data, output_path):
     plt.savefig(output_path, format="pdf")
     plt.close()
 
+
+def plot_timeout_sweep_bug_catch(timeout_sweep_dir, output_path):
+    series_specs = [
+        ("dfs_on", "Full SaSh", color_scheme[0], re.compile(r"results_t([0-9]+(?:\.[0-9]+)?)_dfs_on\.csv$")),
+        ("dfs_no_targeted", "No targeted DFS", color_scheme[1], re.compile(r"results_t([0-9]+(?:\.[0-9]+)?)_dfs_no_targeted\.csv$")),
+        ("dfs_no_unbound_empty", "No unbound-empty DFS", color_scheme[3], re.compile(r"results_t([0-9]+(?:\.[0-9]+)?)_dfs_no_unbound_empty\.csv$")),
+        ("dfs_off", "No DFS", color_scheme[2], re.compile(r"results_t([0-9]+(?:\.[0-9]+)?)_dfs_off\.csv$")),
+    ]
+    series_paths = {
+        key: glob.glob(os.path.join(timeout_sweep_dir, f"results_t*_{key}.csv"))
+        for key, _, _, _ in series_specs
+    }
+
+    if not any(series_paths.values()):
+        # Backward-compatible fallback: legacy single-series files.
+        series_paths["dfs_on"] = glob.glob(os.path.join(timeout_sweep_dir, "results_t*.csv"))
+        series_specs = [
+            ("dfs_on", "Full SaSh", color_scheme[0], re.compile(r"results_t([0-9]+(?:\.[0-9]+)?)\.csv$")),
+        ]
+
+    if not any(series_paths.values()):
+        print(
+            f"% No timeout-sweep CSV files found in {timeout_sweep_dir}; skipping timeout plot",
+            file=sys.stderr,
+        )
+        return
+
+    def collect_series(paths, regex):
+        timeout_points = []
+        bugs_caught = []
+        bug_totals = []
+        for path in paths:
+            match = regex.search(os.path.basename(path))
+            if not match:
+                continue
+            timeout_value = float(match.group(1))
+            data = load_csv(path)
+            buggy_data = data[data["kind"] == "buggy"].copy() if "kind" in data.columns else data
+            sash_detected, _, all_expected = _get_bug_sets(buggy_data)
+            timeout_points.append(timeout_value)
+            bugs_caught.append(len(sash_detected))
+            bug_totals.append(len(all_expected))
+        if not timeout_points:
+            return np.array([]), np.array([]), []
+        order = np.argsort(timeout_points)
+        x = np.array(timeout_points)[order]
+        y = np.array(bugs_caught)[order]
+        return x, y, bug_totals
+
+    plt.figure(figsize=(figsize_small[0], 2.3))
+    all_x_arrays = []
+    all_totals = []
+    for key, label, color, regex in series_specs:
+        x_vals, y_vals, totals = collect_series(series_paths.get(key, []), regex)
+        all_totals.extend(totals)
+        if len(x_vals) == 0:
+            continue
+        all_x_arrays.append(x_vals)
+        plt.plot(
+            x_vals,
+            y_vals,
+            marker="o",
+            color=color,
+            linewidth=1.8,
+            markersize=4,
+            label=label,
+        )
+
+    if all_totals:
+        total = int(round(float(np.median(all_totals))))
+        plt.axhline(
+            y=total,
+            linestyle="--",
+            linewidth=1.0,
+            color="gray",
+            label=f"Total bugs ({total})",
+        )
+
+    plt.xlabel("Timeout (s)")
+    plt.ylabel("Bugs Caught")
+    x_ticks = sorted(set(np.concatenate(all_x_arrays).tolist())) if all_x_arrays else []
+    if x_ticks:
+        plt.xticks(x_ticks)
+    plt.grid(axis="y", alpha=0.25, linestyle=":")
+    plt.legend(fontsize=8, loc="lower right", frameon=True)
+    plt.tight_layout()
+    plt.savefig(output_path, format="pdf")
+    plt.close()
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -656,6 +837,11 @@ def main():
     plot_bug_detection_euler(buggy_results, os.path.join(args.output_dir, "bug-detection-euler.pdf"))
     plot_bug_detection_bars(all_results, os.path.join(args.output_dir, "bug-detection-bars.pdf"))
     plot_runtime(buggy_results, os.path.join(args.output_dir, "runtime.pdf"))
+    timeout_sweep_dir = os.path.join(args.output_dir, "timeout-sweep")
+    plot_timeout_sweep_bug_catch(
+        timeout_sweep_dir,
+        os.path.join(args.output_dir, "timeout-sweep-bugs-caught.pdf"),
+    )
 
     # Print bug stats
     total_benchmarks = len(buggy_results)
