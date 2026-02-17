@@ -7,6 +7,7 @@ import glob
 from io import StringIO
 import sys
 import subprocess
+import shlex
 from pathlib import Path
 from collections import Counter, defaultdict
 import yaml
@@ -36,9 +37,7 @@ def parse_issue_lines(issues):
 
 
 def get_depth_metrics(path):
-    script_path = Path(path)
-    if not script_path.is_absolute():
-        script_path = ROOT_DIR / script_path
+    script_path = resolve_benchmark_path(path)
     script_key = str(script_path)
 
     if script_key not in _depth_metrics_cache:
@@ -86,14 +85,42 @@ _benchmark_dir_cache = {}
 _shellcheck_map_cache = {}
 _benchmark_info_cache = {}
 
+
+def resolve_benchmark_path(path):
+    """
+    Resolve benchmark/script paths robustly across machines.
+    If a path includes a valid 'benchmarks/...' suffix but has a foreign prefix
+    (e.g., cloud machine absolute paths), remap it to this repo's ROOT_DIR.
+    """
+    p = Path(str(path))
+
+    # Direct hit.
+    if p.exists():
+        return p.resolve()
+
+    # Repo-relative path.
+    if not p.is_absolute():
+        local = (ROOT_DIR / p)
+        if local.exists():
+            return local.resolve()
+
+    # Foreign absolute path with reusable benchmarks suffix.
+    parts = p.parts
+    if "benchmarks" in parts:
+        idx = parts.index("benchmarks")
+        local = ROOT_DIR / Path(*parts[idx:])
+        if local.exists():
+            return local.resolve()
+
+    # Best-effort fallback.
+    return (ROOT_DIR / p).resolve() if not p.is_absolute() else p
+
 def find_benchmark_dir(benchmark_path):
     if benchmark_path in _benchmark_dir_cache:
         return _benchmark_dir_cache[benchmark_path]
 
-    p = Path(benchmark_path)
+    p = resolve_benchmark_path(benchmark_path)
     candidates = [p]
-    if not p.is_absolute():
-        candidates.append(ROOT_DIR / p)
 
     for candidate in candidates:
         for parent in [candidate.parent, *candidate.parents]:
@@ -151,9 +178,7 @@ def get_info_shellcheck_expected_counter(benchmark_path, kind, fallback_to_bug_d
     if benchmark_dir is None:
         return Counter()
 
-    script_path = Path(benchmark_path)
-    if not script_path.is_absolute():
-        script_path = ROOT_DIR / script_path
+    script_path = resolve_benchmark_path(benchmark_path)
     try:
         rel_path = script_path.relative_to(benchmark_dir).as_posix()
     except ValueError:
@@ -199,9 +224,7 @@ def benchmark_group_key(benchmark_path):
     benchmark_dir = find_benchmark_dir(benchmark_path)
     if benchmark_dir is not None:
         return str(benchmark_dir)
-    p = Path(benchmark_path)
-    if not p.is_absolute():
-        p = ROOT_DIR / p
+    p = resolve_benchmark_path(benchmark_path)
     return str(p.parent)
 
 def load_csv(file_path):
@@ -213,7 +236,8 @@ def load_csv(file_path):
         exit(1)
 
 def get_loc(path):
-    proc = os.popen(f"cloc --json {path}")
+    resolved = resolve_benchmark_path(path)
+    proc = os.popen(f"cloc --json {shlex.quote(str(resolved))}")
     output = proc.read()
     proc.close()
     data = None
@@ -746,24 +770,27 @@ def plot_timeout_sweep_bug_catch(timeout_sweep_dir, output_path):
         return
 
     def collect_series(paths, regex):
-        timeout_points = []
+        runtime_points = []
         bugs_caught = []
         bug_totals = []
         for path in paths:
             match = regex.search(os.path.basename(path))
             if not match:
                 continue
-            timeout_value = float(match.group(1))
             data = load_csv(path)
             buggy_data = data[data["kind"] == "buggy"].copy() if "kind" in data.columns else data
+            runtime_per_buggy = (
+                buggy_data["time"].fillna(0).to_numpy() + buggy_data["solver_time"].fillna(0).to_numpy()
+            )
+            avg_runtime = float(np.mean(runtime_per_buggy)) if len(runtime_per_buggy) > 0 else 0.0
             sash_detected, _, all_expected = _get_bug_sets(buggy_data)
-            timeout_points.append(timeout_value)
+            runtime_points.append(avg_runtime)
             bugs_caught.append(len(sash_detected))
             bug_totals.append(len(all_expected))
-        if not timeout_points:
+        if not runtime_points:
             return np.array([]), np.array([]), []
-        order = np.argsort(timeout_points)
-        x = np.array(timeout_points)[order]
+        order = np.argsort(runtime_points)
+        x = np.array(runtime_points)[order]
         y = np.array(bugs_caught)[order]
         return x, y, bug_totals
 
@@ -796,9 +823,9 @@ def plot_timeout_sweep_bug_catch(timeout_sweep_dir, output_path):
             label=f"Total bugs ({total})",
         )
 
-    plt.xlabel("Timeout (s)")
+    plt.xlabel("Runtime (s)")
     plt.ylabel("Bugs Caught")
-    x_ticks = sorted(set(np.concatenate(all_x_arrays).tolist())) if all_x_arrays else []
+    x_ticks = sorted(set(np.round(np.concatenate(all_x_arrays), 2).tolist())) if all_x_arrays else []
     if x_ticks:
         plt.xticks(x_ticks)
     plt.grid(axis="y", alpha=0.25, linestyle=":")
