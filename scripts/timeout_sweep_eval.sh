@@ -21,7 +21,7 @@ Options:
   --only REGEX         Benchmark regex passed to evaluation.py --only.
                        Default: .*
   --jobs N             Number of evaluation workers (-j).
-                       Default: all available cores (evaluation default)
+                       Default: 8
   --disable-dfs        Run only the DFS-disabled sweep mode (backward compatible behavior).
   --dry-run            Print commands without executing.
   -h, --help           Show this help and exit.
@@ -49,7 +49,7 @@ TIMEOUTS_CSV="1,5,10,20,30,60"
 OUTPUT_DIR="results"
 SWEEP_SUBDIR="timeout-sweep"
 ONLY_REGEX=".*"
-JOBS=""
+JOBS="8"
 DISABLE_DFS=0
 DRY_RUN=0
 MOCK=0
