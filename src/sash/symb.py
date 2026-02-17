@@ -1804,6 +1804,7 @@ def symbexec_file(input_file: str,
                   config: InterpConfig,
                   stop: Event | None,
                   dfs_timeout: float | None = None,
+                  targeted_dfs_timeout: float | None = None,
                   main_timeout: float | None = None,
                   enable_targeted_dfs: bool = True,
                   enable_unbound_empty_dfs: bool = True) -> SymbexecResult:
@@ -1870,8 +1871,13 @@ def symbexec_file(input_file: str,
             logging.info("Doing whole execution with a single trace first (DFS_first)")
             dfs_event = _set_timer(dfs_timeout) if dfs_timeout is not None else stop_event
             prev_stop_event = stop_event
-            stop_event = dfs_event
             if enable_targeted_dfs:
+                targeted_event = (
+                    _set_timer(targeted_dfs_timeout)
+                    if targeted_dfs_timeout is not None
+                    else dfs_event
+                )
+                stop_event = targeted_event
                 logging.info("DFS run: targeting dangerous commands")
                 targeted_dfs_result = run_targeted_dfs(
                     nodes=nodes,
@@ -1881,9 +1887,17 @@ def symbexec_file(input_file: str,
                     ignore_function_calls_for=safe_funcs,
                 )
                 targeted_traces = targeted_dfs_result.traces
+                # A dedicated targeted pass timeout should not mark the whole run timed out.
+                if (
+                    targeted_event is not None
+                    and targeted_event is not dfs_event
+                    and targeted_event.is_set()
+                ):
+                    Reporter.clear_timed_out()
             else:
                 logging.info("DFS run: targeted pass disabled")
                 targeted_traces = []
+            stop_event = dfs_event
             logging.info("DFS run: only taking THEN branches")
             only_then_traces = symb_engine(nodes, replace(config,
                                        branch_policy=branch_policy_only_then,

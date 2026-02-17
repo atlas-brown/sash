@@ -22,6 +22,7 @@ def parse_args():
     parser.add_argument('-O', '--only', type=str, default='.*', help='Regex to filter benchmarks to run (default: run all)')
     parser.add_argument('-t', '--timeout', type=float, default=None, help='Timeout in seconds for symbolic execution in each benchmark (default: no timeout)')
     parser.add_argument('-d', '--dfs-timeout', type=float, default=None, help='Timeout in seconds for depth-first symbolic execution passes in each benchmark (default: no timeout)')
+    parser.add_argument('--targeted-dfs-timeout', type=float, default=None, help='Timeout in seconds for only the targeted DFS pass (default: uses --dfs-timeout budget)')
     parser.add_argument('-T', '--solver-timeout', type=float, default=None, help='Timeout in seconds for solving in each benchmark (default: no timeout)')
     parser.add_argument('-D', '--disable-dfs', action='store_true', help='Disable depth-first symbolic execution passes (default: false)')
     parser.add_argument('--disable-targeted-dfs', action='store_true', help='Disable only the targeted DFS pass while keeping the other DFS passes (default: false)')
@@ -47,6 +48,7 @@ def main(
     bench_filter: re.Pattern,
     timeout: float | None,
     dfs_timeout: float | None,
+    targeted_dfs_timeout: float | None,
     solver_timeout: float | None,
     enable_dfs: bool,
     enable_targeted_dfs: bool,
@@ -116,6 +118,7 @@ def main(
                     job,
                     timeout,
                     dfs_timeout,
+                    targeted_dfs_timeout,
                     solver_timeout,
                     enable_dfs,
                     enable_targeted_dfs,
@@ -413,6 +416,7 @@ def run_job(
     job: Job,
     timeout: float | None,
     dfs_timeout: float | None,
+    targeted_dfs_timeout: float | None,
     solver_timeout: float | None,
     enable_dfs: bool,
     enable_targeted_dfs: bool,
@@ -434,6 +438,7 @@ def run_job(
             solver=True,
             timeout=timeout,
             dfs_timeout=dfs_timeout,
+            targeted_dfs_timeout=targeted_dfs_timeout,
             solver_timeout=solver_timeout,
             enable_dfs=enable_dfs,
             enable_targeted_dfs=enable_targeted_dfs,
@@ -871,6 +876,7 @@ if __name__ == "__main__":
         bench_filter=re.compile(args.only),
         timeout=args.timeout,
         dfs_timeout=args.dfs_timeout,
+        targeted_dfs_timeout=args.targeted_dfs_timeout,
         solver_timeout=args.solver_timeout,
         enable_dfs=not args.disable_dfs,
         enable_targeted_dfs=not args.disable_targeted_dfs,
