@@ -34,3 +34,10 @@ ground_truths:
     bugs:
       bug00: { regression_lines: [146, 147], shellcheck: null }
       # The command causing bug01 doesn't exist in the fixed version
+
+  # Variant
+  - path: variants/variant1.sh
+    kind: buggy_variant
+    bugs:
+      bug00: { lines: [145], shellcheck: null }
+      bug01: { lines: [], shellcheck: null }
