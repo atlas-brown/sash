@@ -35,6 +35,11 @@ ground_truths:
       bug01: { regression_lines: [504], shellcheck: null }
 
   # Variants
+  # - path: variants/bug-unused_loop_var.sh
+  #   kind: buggy_variant
+  #   bugs:
+  #     bug00: { lines: [66], shellcheck: null }
+
   - path: variants/fix-assign_first.sh
     kind: fixed_variant
     bugs:
