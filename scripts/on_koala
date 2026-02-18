@@ -3,4 +3,4 @@ set -euo pipefail
 
 top=$(git rev-parse --show-toplevel)
 cd "$top" || exit 1
-uv run "${top}/scripts/run_on_dir.py" "${top}/benchmarks/_not_integrated/koala" -D -t 30 -T 30
+uv run "${top}/scripts/run_on_dir.py" "${top}/benchmarks/_not_integrated/koala" -D -t 30 -T 30 -c "${top}/results/koala_results.csv"
