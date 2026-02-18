@@ -295,7 +295,7 @@ def create_table_line(result):
     fixed_mark = r"\checkmark" if fixed_clears_bug else ""
     feature_mark = feature_marks(features.get(bm_name, []))
 
-    bugs_detected_cell = f"{n_bugs}/{detected}"
+    bugs_detected_cell = f"{detected}/{n_bugs}"
     return f"{bm_short_id} & {name} & {loc}  & {description} & {bugs_detected_cell} & {depth_cell} & {fixed_mark} & {time} & {feature_mark} & {source}  \\\\"
 
 rest_of_benchmarks = []
@@ -303,7 +303,7 @@ rest_of_benchmarks = []
 print(r"""
     \begin{tabular}{llrlrrcrcl}
     \toprule
-    \textbf{ID} & \textbf{Name} & \textbf{LoC} & \textbf{Description} & \textbf{\#B/D?} & \textbf{D\textdownarrow} & \textbf{F?} & \textbf{$t$} & \textbf{$\mathcal{F}$} & \textbf{Source} \\
+    \textbf{ID} & \textbf{Name} & \textbf{LoC} & \textbf{Description} & \textbf{D?/\#B} & \textbf{D\textdownarrow} & \textbf{F?} & \textbf{$t$} & \textbf{$\mathcal{F}$} & \textbf{Source} \\
     \midrule
 """
 )
@@ -346,7 +346,7 @@ cs_count = sum(1 for r in rest_of_benchmarks if "CS" in features.get(get_bm_name
 fs_count = sum(1 for r in rest_of_benchmarks if "FS" in features.get(get_bm_name(r["benchmark"]), []))
 feature_count_marks = f"{we_count} \\WE/{cs_count} \\SP/{fs_count} \\FS"
 
-print(rf""" & \emph{{More buggy scripts}} & {loc_range} &  & {total_bugs_rest}/{detected_bugs_rest} & {depth_range_rest_cell} & {fixed_clear_rate} & {time_range} & {feature_count_marks} & \cf{{sec:full-ds}} \\""")
+print(rf""" & \emph{{More buggy scripts}} & {loc_range} &  & {detected_bugs_rest}/{total_bugs_rest} & {depth_range_rest_cell} & {fixed_clear_rate} & {time_range} & {feature_count_marks} & \cf{{sec:full-ds}} \\""")
 print(r"\hspace{.5em}\dots & & & & & & & & & \\")
 
 # Print summary line across all benchmarks
@@ -382,7 +382,7 @@ feature_count_marks = f"{we_count} \\WE/{cs_count} \\SP/{fs_count} \\FS"
 
 print(rf"""
 \midrule
- & \textbf{{Total}} & {loc_range} &  & {total_bugs}/{detected_bugs} & {depth_range_total_cell} & {fixed_clear_rate} & {time_range} & {feature_count_marks} &  \\ """)
+ & \textbf{{Total}} & {loc_range} &  & {detected_bugs}/{total_bugs} & {depth_range_total_cell} & {fixed_clear_rate} & {time_range} & {feature_count_marks} &  \\ """)
 
 print(r"""
 \bottomrule
