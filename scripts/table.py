@@ -5,9 +5,10 @@ import subprocess
 from pathlib import Path
 from collections import Counter
 from bug_depth_stats import compute_script_metrics
-from benchmark_metadata import BENCHMARK_NAMES, benchmark_key
+from benchmark_metadata import BENCHMARK_NAMES, benchmark_key, short_name
 
 EPSILON = 1e-3
+ROOT_DIR = Path(__file__).resolve().parents[1]
 
 results_path = "results/results.csv"
 results = pd.read_csv(results_path)
@@ -37,10 +38,58 @@ if not loc_cache_path.exists():
         sys.exit(1)
 
 loc_cache_df = pd.read_csv(loc_cache_path)
-loc_by_benchmark = {
-    str(row["benchmark"]): int(row["loc"])
-    for _, row in loc_cache_df.iterrows()
-}
+
+
+def benchmark_suffix(path):
+    p = Path(str(path))
+    parts = p.parts
+    if "benchmarks" in parts:
+        idx = parts.index("benchmarks")
+        return str(Path(*parts[idx:]))
+    return str(p)
+
+
+def resolve_benchmark_path(path):
+    p = Path(str(path))
+    if p.exists():
+        return p
+
+    if not p.is_absolute():
+        candidate = ROOT_DIR / p
+        if candidate.exists():
+            return candidate
+
+    parts = p.parts
+    if "benchmarks" in parts:
+        idx = parts.index("benchmarks")
+        candidate = ROOT_DIR / Path(*parts[idx:])
+        if candidate.exists():
+            return candidate
+
+    if p.is_absolute():
+        return p
+    return ROOT_DIR / p
+
+
+def benchmark_lookup_keys(path):
+    p = Path(str(path))
+    resolved = resolve_benchmark_path(path)
+    keys = [
+        str(p),
+        benchmark_suffix(p),
+        str(resolved),
+        benchmark_suffix(resolved),
+    ]
+    # Preserve order, drop duplicates.
+    return list(dict.fromkeys(keys))
+
+
+loc_by_benchmark = {}
+for _, row in loc_cache_df.iterrows():
+    bm_path = row["benchmark"]
+    loc = int(row["loc"])
+    for key in benchmark_lookup_keys(bm_path):
+        loc_by_benchmark[key] = loc
 
 def parse_issue_list(value):
     if pd.isna(value):
@@ -162,6 +211,9 @@ features = {
 get_bm_name = benchmark_key
 
 def get_loc(path):
+    for key in benchmark_lookup_keys(path):
+        if key in loc_by_benchmark:
+            return loc_by_benchmark[key]
     key = str(path)
     if key not in loc_by_benchmark:
         print(
@@ -174,13 +226,14 @@ def get_loc(path):
 
 depth_metrics_cache = {}
 def get_depth_metrics(path):
-    if path not in depth_metrics_cache:
+    resolved = str(resolve_benchmark_path(path))
+    if resolved not in depth_metrics_cache:
         try:
-            lines = Path(path).read_text(encoding="utf-8", errors="surrogateescape").splitlines()
-            depth_metrics_cache[path] = compute_script_metrics(lines, path)
+            lines = Path(resolved).read_text(encoding="utf-8", errors="surrogateescape").splitlines()
+            depth_metrics_cache[resolved] = compute_script_metrics(lines, resolved)
         except Exception as e:
-            print(f"Failed to compute depth metrics for {path}: {e}", file=sys.stderr)
-            depth_metrics_cache[path] = {
+            print(f"Failed to compute depth metrics for {resolved}: {e}", file=sys.stderr)
+            depth_metrics_cache[resolved] = {
                 "total_lines": 0,
                 "depth_at_line": [0],
                 "bfs_nodes_before_line": [0],
@@ -189,7 +242,7 @@ def get_depth_metrics(path):
                 "final_bfs_nodes_seen": 0,
                 "final_statements_seen": 0,
             }
-    return depth_metrics_cache[path]
+    return depth_metrics_cache[resolved]
 
 def deepest_bug_depth(path, expected_issues):
     bug_lines = parse_issue_lines(expected_issues)
@@ -224,6 +277,7 @@ def create_table_line(result):
     path, time = result["benchmark"], result["time"]
     # Grab just the folder and benchmark subfolder
     bm_name = get_bm_name(path)
+    bm_short_id = short_name(path, default=bm_name)
     name = names.get(bm_name, None)
     description = descriptions.get(bm_name, None)
     if name is None or description is None:
@@ -241,14 +295,15 @@ def create_table_line(result):
     fixed_mark = r"\checkmark" if fixed_clears_bug else ""
     feature_mark = feature_marks(features.get(bm_name, []))
 
-    return f"{name} & {loc}  & {description} & {n_bugs} & {detected} & {depth_cell} & {fixed_mark} & {time} & {feature_mark} & {source}  \\\\"
+    bugs_detected_cell = f"{n_bugs}/{detected}"
+    return f"{bm_short_id} & {name} & {loc}  & {description} & {bugs_detected_cell} & {depth_cell} & {fixed_mark} & {time} & {feature_mark} & {source}  \\\\"
 
 rest_of_benchmarks = []
 
 print(r"""
-    \begin{tabular}{lrlrrrcrcl}
+    \begin{tabular}{llrlrrcrcl}
     \toprule
-    \textbf{Name} & \textbf{LoC} & \textbf{Description} & \textbf{\#B} & \textbf{D?} & \textbf{D\textdownarrow} & \textbf{F?} & \textbf{$t$} & \textbf{$\mathcal{F}$} & \textbf{Source} \\
+    \textbf{ID} & \textbf{Name} & \textbf{LoC} & \textbf{Description} & \textbf{\#B/D?} & \textbf{D\textdownarrow} & \textbf{F?} & \textbf{$t$} & \textbf{$\mathcal{F}$} & \textbf{Source} \\
     \midrule
 """
 )
@@ -291,7 +346,7 @@ cs_count = sum(1 for r in rest_of_benchmarks if "CS" in features.get(get_bm_name
 fs_count = sum(1 for r in rest_of_benchmarks if "FS" in features.get(get_bm_name(r["benchmark"]), []))
 feature_count_marks = f"{we_count} \\WE/{cs_count} \\SP/{fs_count} \\FS"
 
-print(rf"""\emph{{More buggy scripts}} & {loc_range} &  & {total_bugs_rest} & {detected_bugs_rest} & {depth_range_rest_cell} & {fixed_clear_rate} & {time_range} & {feature_count_marks} & \cf{{sec:full-ds}} \\""")
+print(rf""" & \emph{{More buggy scripts}} & {loc_range} &  & {total_bugs_rest}/{detected_bugs_rest} & {depth_range_rest_cell} & {fixed_clear_rate} & {time_range} & {feature_count_marks} & \cf{{sec:full-ds}} \\""")
 print(r"\hspace{.5em}\dots & & & & & & & & & \\")
 
 # Print summary line across all benchmarks
@@ -327,7 +382,7 @@ feature_count_marks = f"{we_count} \\WE/{cs_count} \\SP/{fs_count} \\FS"
 
 print(rf"""
 \midrule
-\textbf{{Total}} & {loc_range} &  & {total_bugs} & {detected_bugs} & {depth_range_total_cell} & {fixed_clear_rate} & {time_range} & {feature_count_marks} &  \\ """)
+ & \textbf{{Total}} & {loc_range} &  & {total_bugs}/{detected_bugs} & {depth_range_total_cell} & {fixed_clear_rate} & {time_range} & {feature_count_marks} &  \\ """)
 
 print(r"""
 \bottomrule

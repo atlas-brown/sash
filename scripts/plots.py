@@ -11,16 +11,28 @@ import shlex
 from pathlib import Path
 from collections import Counter, defaultdict
 import yaml
-from benchmark_metadata import benchmark_key, benchmark_display_name
+from benchmark_metadata import benchmark_key, benchmark_display_name, short_name
 from bug_depth_stats import compute_script_metrics
 
 import matplotlib.pyplot as plt
 from matplotlib_set_diagrams import EulerDiagram
 
+
+def extract_issue_code(issue):
+    """
+    Issue IDs are typically 'L<line>:<code>'.
+    Fall back to the raw string when no line prefix exists.
+    """
+    if ":" in issue:
+        return issue.split(":", 1)[1]
+    return issue
+
+
 def parse_issue_list(value):
     if pd.isna(value):
         return []
-    return [item.strip() for item in str(value).split(";") if item and item.strip()]
+    issues = [item.strip() for item in str(value).split(";") if item and item.strip()]
+    return [i for i in issues if extract_issue_code(i) not in OOS_CODES]
 
 
 BUG_LINE_RE = re.compile(r"^L([0-9]+):")
@@ -80,10 +92,13 @@ def git_toplevel():
     )
 
 ROOT_DIR = git_toplevel()
+with (ROOT_DIR / "benchmarks" / "codes_out_of_scope.yaml").open("r", encoding="utf-8") as f:
+    OOS_CODES = set(yaml.safe_load(f) or [])
 
 _benchmark_dir_cache = {}
 _shellcheck_map_cache = {}
 _benchmark_info_cache = {}
+_shellcheck_missing_variant_cache = {}
 
 
 def resolve_benchmark_path(path):
@@ -220,12 +235,116 @@ def get_info_shellcheck_expected_counter(benchmark_path, kind, fallback_to_bug_d
     return counter
 
 
+def get_info_shellcheck_no_variant_counter(benchmark_path, kind):
+    """
+    For a given buggy/original ground truth row, return issue IDs (L<line>:<code>)
+    whose bug IDs have ShellCheck support in the original, but no buggy_variant
+    counterpart exists in info.yaml.
+    """
+    cache_key = (str(benchmark_path), str(kind))
+    if cache_key in _shellcheck_missing_variant_cache:
+        return _shellcheck_missing_variant_cache[cache_key]
+
+    info = get_benchmark_info(benchmark_path)
+    if not info:
+        _shellcheck_missing_variant_cache[cache_key] = Counter()
+        return Counter()
+
+    benchmark_dir = find_benchmark_dir(benchmark_path)
+    if benchmark_dir is None:
+        _shellcheck_missing_variant_cache[cache_key] = Counter()
+        return Counter()
+
+    script_path = resolve_benchmark_path(benchmark_path)
+    try:
+        rel_path = script_path.relative_to(benchmark_dir).as_posix()
+    except ValueError:
+        rel_path = script_path.name
+
+    gt = None
+    for gt_entry in (info.get("ground_truths") or []):
+        if gt_entry.get("kind") == kind and gt_entry.get("path") == rel_path:
+            gt = gt_entry
+            break
+    if gt is None:
+        _shellcheck_missing_variant_cache[cache_key] = Counter()
+        return Counter()
+
+    variant_bug_ids = set()
+    for gt_entry in (info.get("ground_truths") or []):
+        if gt_entry.get("kind") == "buggy_variant":
+            variant_bug_ids.update((gt_entry.get("bugs") or {}).keys())
+
+    bugs = info.get("bugs") or {}
+    counter = Counter()
+    for bug_id, bug_gt in (gt.get("bugs") or {}).items():
+        if bug_id in variant_bug_ids:
+            continue
+
+        bug_def = bugs.get(bug_id) or {}
+        shellcheck_code = bug_def.get("shellcheck")
+        code = bug_gt.get("code") or bug_def.get("code")
+        if not shellcheck_code or not code:
+            continue
+
+        lines = bug_gt.get("lines")
+        if lines is None:
+            lines = bug_gt.get("regression_lines", [])
+        for line in lines:
+            counter[f"L{line}:{code}"] += 1
+
+    _shellcheck_missing_variant_cache[cache_key] = counter
+    return counter
+
+
 def benchmark_group_key(benchmark_path):
     benchmark_dir = find_benchmark_dir(benchmark_path)
     if benchmark_dir is not None:
         return str(benchmark_dir)
     p = resolve_benchmark_path(benchmark_path)
     return str(p.parent)
+
+
+def get_benchmark_segments(data, kind):
+    """
+    Return ordered (label, expected_bug_count) segments for benchmark families.
+    Order follows first appearance in the input CSV.
+    """
+    data_view = data
+    if "kind" in data_view.columns:
+        data_view = data_view[data_view["kind"] == kind]
+    elif "benchmark" in data_view.columns:
+        benchmarks = data_view["benchmark"].astype(str)
+        if kind == "buggy":
+            data_view = data_view[
+                ~benchmarks.str.endswith("/fixed.sh")
+                & ~benchmarks.str.contains("/variants/")
+            ]
+        elif kind == "fixed":
+            data_view = data_view[benchmarks.str.endswith("/fixed.sh")]
+        else:
+            data_view = data_view.iloc[0:0]
+    else:
+        return []
+
+    ordered = []
+    by_family = {}
+    for _, row in data_view.iterrows():
+        family = benchmark_group_key(row["benchmark"])
+        expected_count = len(parse_issue_list(row["expected_results"]))
+        if family not in by_family:
+            by_family[family] = {
+                "label": short_name(row["benchmark"]),
+                "count": 0,
+            }
+            ordered.append(family)
+        by_family[family]["count"] += expected_count
+
+    return [
+        (by_family[f]["label"], by_family[f]["count"])
+        for f in ordered
+        if by_family[f]["count"] > 0
+    ]
 
 def load_csv(file_path):
     try:
@@ -405,6 +524,22 @@ def _get_variant_overlay_deltas(data):
         max(variant_detected[0] - orig_detected[0], 0),
         max(variant_detected[1] - orig_detected[1], 0),
     ]
+
+    # Also texture ShellCheck-detected original bugs that have no buggy_variant
+    # counterpart in metadata. These are meaningful original-only detections.
+    shell_missing_variant_detected = 0
+    for _, row in buggy_rows.iterrows():
+        kind = str(row.get("kind", "buggy"))
+        shell_counter = get_info_shellcheck_expected_counter(
+            row["benchmark"], kind, fallback_to_bug_default=True
+        )
+        missing_variant_counter = get_info_shellcheck_no_variant_counter(
+            row["benchmark"], kind
+        )
+        for issue, count in missing_variant_counter.items():
+            shell_missing_variant_detected += min(count, shell_counter[issue])
+
+    detected_to_missed[1] += shell_missing_variant_detected
     return detected_to_missed, missed_to_detected
 
 
@@ -443,7 +578,7 @@ def plot_bug_detection_bars(data, output_path):
     variant_detected_to_missed, variant_missed_to_detected = _get_variant_overlay_deltas(data)
 
     # Single axis: two benchmark-kind groups; each group has SaSh/ShellCheck rows.
-    fig, ax = plt.subplots(1, 1, figsize=figsize)
+    fig, ax = plt.subplots(1, 1, figsize=(7.3, 2.0))
 
     sash_buggy_detected = both_detected + only_sash
     shell_buggy_detected = both_detected + only_shell
@@ -454,27 +589,34 @@ def plot_bug_detection_bars(data, output_path):
 
     # Group by benchmark kind on y-axis; inside each group:
     # upper row = SaSh, lower row = ShellCheck.
-    group_buggy = 0.72
-    group_fixed = 0.24
-    row_gap = 0.14
-    bar_height = 0.11
+    group_buggy = 0.62
+    group_fixed = 0.38
+    row_gap = 0.09
+    bar_height = 0.06
     buggy_rows = [group_buggy + (row_gap / 2), group_buggy - (row_gap / 2)]
     fixed_rows = [group_fixed + (row_gap / 2), group_fixed - (row_gap / 2)]
 
-    detected_color = color_scheme[1]
-    missed_color = "lightgray"
-    no_fp_color = color_scheme[3]
-    fp_color = color_scheme[0]
+    # Use consistent semantics across Original/Fixed:
+    # good = detected (buggy) / no false positive (fixed)
+    # bad = missed (buggy) / false positive (fixed)
+    good_color = color_scheme[1]
+    bad_color = "lightgray"
 
     # Buggy bars
-    ax.barh(buggy_rows, buggy_detected, height=bar_height, color=detected_color, label="Detected")
+    ax.barh(
+        buggy_rows,
+        buggy_detected,
+        height=bar_height,
+        color=good_color,
+        label="Good (Detected/No FP)",
+    )
     ax.barh(
         buggy_rows,
         buggy_missed,
         height=bar_height,
         left=buggy_detected,
-        color=missed_color,
-        label="Missed",
+        color=bad_color,
+        label="Bad (Missed/FP)",
     )
 
     # Overlay hatch only for bugs that exist in both Original and buggy-variants.
@@ -506,20 +648,20 @@ def plot_bug_detection_bars(data, output_path):
             )
 
     # Fixed bars
-    ax.barh(fixed_rows, fixed_no_fp, height=bar_height, color=no_fp_color, label="No false positive")
+    ax.barh(fixed_rows, fixed_no_fp, height=bar_height, color=good_color, label="_nolegend_")
     ax.barh(
         fixed_rows,
         fixed_fp,
         height=bar_height,
         left=fixed_no_fp,
-        color=fp_color,
-        label="False positive",
+        color=bad_color,
+        label="_nolegend_",
     )
 
     max_total = max(all_expected, fixed_total, 1)
     ax.set_xlim(0, max_total)
     ax.set_yticks([group_buggy, group_fixed], ["Original", "Fixed"])
-    ax.set_ylim(0.03, 0.90)
+    ax.set_ylim(0.28, 0.72)
     ax.set_xlabel("Count", loc="right")
 
     # Annotate row identity on the right side as axis tick labels.
@@ -536,32 +678,70 @@ def plot_bug_detection_bars(data, output_path):
     ax_right.spines["left"].set_visible(False)
     ax_right.spines["bottom"].set_visible(False)
 
-    x_points = sorted(set(
-        [
-            0,
-            all_expected,
-            fixed_total,
-            buggy_detected[0],
-            buggy_detected[1],
-            fixed_no_fp[0],
-            fixed_no_fp[1],
-        ]
-    ))
-    # Keep all data-point ticks, but for close runs (<3 apart) only label the largest one.
-    int_points = [int(x) for x in x_points]
-    labels = [""] * len(x_points)
-    if int_points:
-        for i in range(1, len(int_points) + 1):
-            is_break = (i == len(int_points)) or ((int_points[i] - int_points[i - 1]) >= 3)
-            if is_break:
-                labels[i - 1] = str(int_points[i - 1])  # largest tick in this close run
-    ax.set_xticks(x_points)
-    ax.set_xticklabels(labels)
-    ax.tick_params(axis="x", labelsize=8)
+    def segment_ticks(segments):
+        tick_pos = []
+        tick_labels = []
+        current = 0.0
+        for label, count in segments:
+            tick_pos.append(current + (count / 2.0))
+            tick_labels.append(label)
+            current += count
+        return tick_pos, tick_labels
+
+    fixed_segments = get_benchmark_segments(data, "fixed")
+    buggy_segments = get_benchmark_segments(data, "buggy")
+
+    if fixed_segments:
+        bottom_pos, bottom_labels = segment_ticks(fixed_segments)
+        ax.set_xticks(bottom_pos)
+        ax.set_xticklabels(bottom_labels, rotation=45, ha="right")
+        ax.tick_params(axis="x", labelsize=6, length=0, pad=1)
+    else:
+        ax.set_xticks([0, max_total])
+        ax.set_xticklabels(["0", str(int(max_total))])
+        ax.tick_params(axis="x", labelsize=8)
+
+    if buggy_segments:
+        top_pos, top_labels = segment_ticks(buggy_segments)
+        ax_top = ax.twiny()
+        ax_top.set_xlim(ax.get_xlim())
+        ax_top.set_xticks(top_pos)
+        ax_top.set_xticklabels(top_labels, rotation=45, ha="left")
+        ax_top.tick_params(axis="x", labelsize=6, length=0, pad=1)
+        ax_top.spines["left"].set_visible(False)
+        ax_top.spines["right"].set_visible(False)
+        ax_top.spines["bottom"].set_visible(False)
+
+    # Label stack transition points (where bar color changes).
+    transition_points = [
+        (buggy_detected[0], buggy_rows[0], buggy_missed[0]),
+        (buggy_detected[1], buggy_rows[1], buggy_missed[1]),
+        (fixed_no_fp[0], fixed_rows[0], fixed_fp[0]),
+        (fixed_no_fp[1], fixed_rows[1], fixed_fp[1]),
+    ]
+    for x, y, right_segment in transition_points:
+        if x <= 0 or right_segment <= 0:
+            continue
+        if x >= max_total:
+            continue
+        ha = "left"
+        x_text = x + 0.4
+        if x > max_total - 2.0:
+            ha = "right"
+            x_text = x - 0.4
+        ax.text(
+            x_text,
+            y,
+            str(int(x)),
+            fontsize=6,
+            va="center",
+            ha=ha,
+            color="black",
+        )
     # Deduplicate legend labels because multiple grouped bars reuse the same names.
     handles, labels = ax.get_legend_handles_labels()
     by_label = dict(zip(labels, handles))
-    by_label["Variant differs from original"] = plt.Rectangle(
+    by_label["Missed on variant"] = plt.Rectangle(
         (0, 0),
         1,
         1,
@@ -574,12 +754,12 @@ def plot_bug_detection_bars(data, output_path):
         by_label.values(),
         by_label.keys(),
         fontsize=8,
-        loc="center right",
+        loc="lower left",
         ncol=1,
         frameon=True,
     )
 
-    plt.tight_layout()
+    plt.tight_layout(rect=[0.0, 0.08, 1.0, 0.92])
     plt.savefig(output_path, format="pdf")
     plt.close()
 
@@ -770,39 +950,41 @@ def plot_timeout_sweep_bug_catch(timeout_sweep_dir, output_path):
         return
 
     def collect_series(paths, regex):
-        runtime_points = []
+        timeout_points = []
         bugs_caught = []
         bug_totals = []
         for path in paths:
             match = regex.search(os.path.basename(path))
             if not match:
                 continue
+            timeout_value = 2.0 * float(match.group(1))
             data = load_csv(path)
             buggy_data = data[data["kind"] == "buggy"].copy() if "kind" in data.columns else data
-            runtime_per_buggy = (
-                buggy_data["time"].fillna(0).to_numpy() + buggy_data["solver_time"].fillna(0).to_numpy()
-            )
-            avg_runtime = float(np.mean(runtime_per_buggy)) if len(runtime_per_buggy) > 0 else 0.0
             sash_detected, _, all_expected = _get_bug_sets(buggy_data)
-            runtime_points.append(avg_runtime)
+            timeout_points.append(timeout_value)
             bugs_caught.append(len(sash_detected))
             bug_totals.append(len(all_expected))
-        if not runtime_points:
-            return np.array([]), np.array([]), []
-        order = np.argsort(runtime_points)
-        x = np.array(runtime_points)[order]
+        if not timeout_points:
+            return np.array([]), np.array([]), [], np.array([])
+        order = np.argsort(timeout_points)
+        x = np.array(timeout_points)[order]
         y = np.array(bugs_caught)[order]
-        return x, y, bug_totals
+        t = np.array(timeout_points)[order]
+        return x, y, bug_totals, t
 
-    plt.figure(figsize=(figsize_small[0], 2.3))
+    plt.figure(figsize=(figsize_small[0], 2.6))
     all_x_arrays = []
+    all_y_arrays = []
     all_totals = []
+    all_timeout_values = []
     for key, label, color, regex in series_specs:
-        x_vals, y_vals, totals = collect_series(series_paths.get(key, []), regex)
+        x_vals, y_vals, totals, timeout_vals = collect_series(series_paths.get(key, []), regex)
         all_totals.extend(totals)
+        all_timeout_values.extend(timeout_vals.tolist() if len(timeout_vals) > 0 else [])
         if len(x_vals) == 0:
             continue
         all_x_arrays.append(x_vals)
+        all_y_arrays.append(y_vals)
         plt.plot(
             x_vals,
             y_vals,
@@ -820,14 +1002,31 @@ def plot_timeout_sweep_bug_catch(timeout_sweep_dir, output_path):
             linestyle="--",
             linewidth=1.0,
             color="gray",
-            label=f"Total bugs ({total})",
+            label="_nolegend_",
         )
+        ax = plt.gca()
+        y_ticks = set(ax.get_yticks().tolist())
+        y_ticks.add(float(total))
+        ax.set_yticks(sorted(y_ticks))
+        if all_y_arrays:
+            min_seen = float(np.min(np.concatenate(all_y_arrays)))
+            y_lower = max(0.0, min_seen - 2.0)
+        else:
+            y_lower = 0.0
+        ax.set_ylim(y_lower, float(total) + 1.0)
 
-    plt.xlabel("Runtime (s)")
+    plt.xlabel("Timeout (s)")
     plt.ylabel("Bugs Caught")
-    x_ticks = sorted(set(np.round(np.concatenate(all_x_arrays), 2).tolist())) if all_x_arrays else []
-    if x_ticks:
-        plt.xticks(x_ticks)
+    if all_x_arrays:
+        timeout_ticks = sorted({int(round(v)) for v in all_timeout_values})
+        rightmost_tick = round(float(np.max(np.concatenate(all_x_arrays))), 2)
+        x_ticks = sorted(set(timeout_ticks + [rightmost_tick]))
+        timeout_tick_set = set(timeout_ticks)
+        x_tick_labels = [
+            str(int(x)) if x in timeout_tick_set else f"{x:.2f}"
+            for x in x_ticks
+        ]
+        plt.xticks(x_ticks, x_tick_labels)
     plt.grid(axis="y", alpha=0.25, linestyle=":")
     plt.legend(fontsize=8, loc="lower right", frameon=True)
     plt.tight_layout()
