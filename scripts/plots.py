@@ -16,6 +16,7 @@ from bug_depth_stats import compute_script_metrics
 
 import matplotlib.pyplot as plt
 from matplotlib_set_diagrams import EulerDiagram
+from matplotlib.lines import Line2D
 
 
 def extract_issue_code(issue):
@@ -372,7 +373,9 @@ def get_runtime_label(path):
 sysname = "SaSh"
 figsize = (9, 3)
 figsize_small = (6.0, 1.15)
-color_scheme = ["#AA4465", "#FFA69E", "#998650", "#93E1D8"]
+color_scheme = plt.get_cmap("Pastel1").colors
+color_red = color_scheme[0]
+color_green = color_scheme[2]
 
 def _get_bug_sets_for_kind(data, kind):
     sash_detected = set()
@@ -578,7 +581,7 @@ def plot_bug_detection_bars(data, output_path):
     variant_detected_to_missed, variant_missed_to_detected = _get_variant_overlay_deltas(data)
 
     # Single axis: two benchmark-kind groups; each group has SaSh/ShellCheck rows.
-    fig, ax = plt.subplots(1, 1, figsize=(7.3, 2.0))
+    fig, ax = plt.subplots(1, 1, figsize=(9, 2))
 
     sash_buggy_detected = both_detected + only_sash
     shell_buggy_detected = both_detected + only_shell
@@ -589,8 +592,8 @@ def plot_bug_detection_bars(data, output_path):
 
     # Group by benchmark kind on y-axis; inside each group:
     # upper row = SaSh, lower row = ShellCheck.
-    group_buggy = 0.62
-    group_fixed = 0.38
+    group_buggy = 0.59
+    group_fixed = 0.41
     row_gap = 0.09
     bar_height = 0.06
     buggy_rows = [group_buggy + (row_gap / 2), group_buggy - (row_gap / 2)]
@@ -599,8 +602,8 @@ def plot_bug_detection_bars(data, output_path):
     # Use consistent semantics across Original/Fixed:
     # good = detected (buggy) / no false positive (fixed)
     # bad = missed (buggy) / false positive (fixed)
-    good_color = color_scheme[1]
-    bad_color = "lightgray"
+    good_color = color_green
+    bad_color = color_red
 
     # Buggy bars
     ax.barh(
@@ -632,7 +635,7 @@ def plot_bug_detection_bars(data, output_path):
                 left=buggy_detected[i] - detected_hatch,
                 color="none",
                 hatch="////",
-                edgecolor="0.35",
+                edgecolor=color_red,
                 linewidth=0.0,
             )
         if missed_hatch > 0:
@@ -658,11 +661,13 @@ def plot_bug_detection_bars(data, output_path):
         label="_nolegend_",
     )
 
+    tick_size = 8
+
     max_total = max(all_expected, fixed_total, 1)
     ax.set_xlim(0, max_total)
-    ax.set_yticks([group_buggy, group_fixed], ["Original", "Fixed"])
+    ax.set_yticks([group_buggy, group_fixed], ["Buggy", "Fixed"], fontsize=tick_size)
     ax.set_ylim(0.28, 0.72)
-    ax.set_xlabel("Count", loc="right")
+    ax.set_xlabel("Benchmark", loc="right", fontsize=tick_size)
 
     # Annotate row identity on the right side as axis tick labels.
     row_ticks = [
@@ -672,8 +677,8 @@ def plot_bug_detection_bars(data, output_path):
     ax_right = ax.twinx()
     ax_right.set_ylim(ax.get_ylim())
     ax_right.set_yticks(row_ticks)
-    ax_right.set_yticklabels(row_labels)
-    ax_right.tick_params(axis="y", labelsize=7, length=0, pad=4)
+    ax_right.set_yticklabels(row_labels, fontsize=tick_size)
+    ax_right.tick_params(axis="y", labelsize=tick_size, length=0, pad=4)
     ax_right.spines["top"].set_visible(False)
     ax_right.spines["left"].set_visible(False)
     ax_right.spines["bottom"].set_visible(False)
@@ -694,23 +699,23 @@ def plot_bug_detection_bars(data, output_path):
     if fixed_segments:
         bottom_pos, bottom_labels = segment_ticks(fixed_segments)
         ax.set_xticks(bottom_pos)
-        ax.set_xticklabels(bottom_labels, rotation=45, ha="right")
-        ax.tick_params(axis="x", labelsize=6, length=0, pad=1)
+        ax.set_xticklabels(bottom_labels, rotation=90, ha="right")
+        ax.tick_params(axis="x", labelsize=8, length=2.5, width=0.6, pad=1)
     else:
         ax.set_xticks([0, max_total])
         ax.set_xticklabels(["0", str(int(max_total))])
-        ax.tick_params(axis="x", labelsize=8)
+        ax.tick_params(axis="x", labelsize=8, length=2.5, width=0.6)
 
-    if buggy_segments:
-        top_pos, top_labels = segment_ticks(buggy_segments)
-        ax_top = ax.twiny()
-        ax_top.set_xlim(ax.get_xlim())
-        ax_top.set_xticks(top_pos)
-        ax_top.set_xticklabels(top_labels, rotation=45, ha="left")
-        ax_top.tick_params(axis="x", labelsize=6, length=0, pad=1)
-        ax_top.spines["left"].set_visible(False)
-        ax_top.spines["right"].set_visible(False)
-        ax_top.spines["bottom"].set_visible(False)
+    # if buggy_segments:
+    #     top_pos, top_labels = segment_ticks(buggy_segments)
+    #     ax_top = ax.twiny()
+    #     ax_top.set_xlim(ax.get_xlim())
+    #     ax_top.set_xticks(top_pos)
+    #     ax_top.set_xticklabels(top_labels, rotation=45, ha="left")
+    #     ax_top.tick_params(axis="x", labelsize=8, length=0, pad=1)
+    #     ax_top.spines["left"].set_visible(False)
+    #     ax_top.spines["right"].set_visible(False)
+    #     ax_top.spines["bottom"].set_visible(False)
 
     # Label stack transition points (where bar color changes).
     transition_points = [
@@ -747,14 +752,14 @@ def plot_bug_detection_bars(data, output_path):
         1,
         facecolor="none",
         hatch="////",
-        edgecolor="0.35",
+        edgecolor=color_red,
         linewidth=0.0,
     )
     ax.legend(
         by_label.values(),
         by_label.keys(),
         fontsize=8,
-        loc="lower left",
+        loc="upper left",
         ncol=1,
         frameon=True,
     )
@@ -855,7 +860,7 @@ def _get_variant_detection_counts(data):
 
 
 def plot_runtime(data, output_path):
-    plt.figure(figsize=(figsize[0], 3.8))
+    plt.figure(figsize=(9, 3))
     data = data.copy()
     data["depth_bfs"] = data.apply(
         lambda row: deepest_bug_depth(
@@ -898,15 +903,22 @@ def plot_runtime(data, output_path):
             symexec_timeout = float(round(long_exec.median() / 10.0) * 10.0)
 
     tol = 0.25  # seconds tolerance for numeric jitter
+    timeout_line_color = "#C62828"
     for sym_t, sol_t, bar_sym, bar_solver in zip(symexec_times, solver_times, bars_sym, bars_solver):
         sym_timed_out = symexec_timeout is not None and sym_t >= (symexec_timeout - tol)
         solver_timed_out = solver_timeout is not None and sol_t >= (solver_timeout - tol)
         if sym_timed_out:
-            bar_sym.set_hatch("/")
+            x0 = bar_sym.get_x()
+            x1 = x0 + bar_sym.get_width()
+            y = bar_sym.get_height()
+            plt.hlines(y, x0, x1, colors=timeout_line_color, linewidth=1.8, zorder=5)
         if solver_timed_out:
-            bar_solver.set_hatch("/")
+            x0 = bar_solver.get_x()
+            x1 = x0 + bar_solver.get_width()
+            y = bar_solver.get_height()
+            plt.hlines(y, x0, x1, colors=timeout_line_color, linewidth=1.8, zorder=5)
     plt.margins(x=0.02)  # keep a slight gap at plot borders
-    plt.margins(y=0.08)  # keep a slight gap at top for bar labels
+    plt.margins(y=0.10)  # keep a slight gap at top for bar labels
 
     plt.xticks(x, benchmarks, rotation=45, ha="right", rotation_mode="anchor", fontsize=7)
     plt.ylabel("Time (s)")
@@ -916,7 +928,22 @@ def plot_runtime(data, output_path):
         y = top_h * 1.06 if top_h > 0 else 1e-3
         plt.text(xi, y, f"{int(depth)}", ha='center', va='bottom', fontsize=7)
 
-    plt.legend(fontsize=8, loc="lower right", frameon=True)
+    handles, labels = plt.gca().get_legend_handles_labels()
+    handles.append(Line2D([], [], color=timeout_line_color, linewidth=1.8, label="Timeout"))
+    labels.append("Timeout")
+    handles.append(
+        Line2D(
+            [],
+            [],
+            linestyle="none",
+            marker="$\\mathit{n}$",
+            markersize=7,
+            color="0.35",
+            label="Bug depth",
+        )
+    )
+    labels.append("Bug depth")
+    plt.legend(handles, labels, fontsize=8, loc="lower right", frameon=True)
     plt.subplots_adjust(bottom=0.30)
     plt.tight_layout()
     plt.savefig(output_path, format="pdf")
