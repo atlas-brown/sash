@@ -1,6 +1,7 @@
 import pandas as pd
 import sys
 import re
+import argparse
 import subprocess
 from pathlib import Path
 from collections import Counter
@@ -10,7 +11,21 @@ from benchmark_metadata import BENCHMARK_NAMES, benchmark_key, short_name
 EPSILON = 1e-3
 ROOT_DIR = Path(__file__).resolve().parents[1]
 
-results_path = "results/results.csv"
+parser = argparse.ArgumentParser()
+parser.add_argument(
+    "--appendix",
+    action="store_true",
+    help="Output full table with all benchmark rows (no omitted-lines summary).",
+)
+parser.add_argument(
+    "--results_csv",
+    type=str,
+    default="results/results.csv",
+    help="Path to results CSV (default: results/results.csv).",
+)
+args = parser.parse_args()
+
+results_path = args.results_csv
 results = pd.read_csv(results_path)
 buggy_results = results[results["kind"] == "buggy"].copy()
 fixed_results = results[results["kind"] == "fixed"].copy()
@@ -273,15 +288,21 @@ for _, row in buggy_results.iterrows():
     fixed_actual = fixed_actual_by_bm.get(bm_name, set())
     fixed_clears_bug_by_bm[bm_name] = len(buggy_expected & fixed_actual) == 0
 
-def create_table_line(result):
+def create_table_line(result, allow_fallback=False):
     path, time = result["benchmark"], result["time"]
     # Grab just the folder and benchmark subfolder
     bm_name = get_bm_name(path)
     bm_short_id = short_name(path, default=bm_name)
     name = names.get(bm_name, None)
     description = descriptions.get(bm_name, None)
-    if name is None or description is None:
-        return
+    if name is None:
+        if not allow_fallback:
+            return
+        name = bm_name.replace("_", r"\_")
+    if description is None:
+        if not allow_fallback:
+            return
+        description = ""
     time = f"{time:.2f}s" if time > EPSILON else "<1ms"
     loc = get_loc(path)
     source = sources.get(bm_name, "")
@@ -309,45 +330,46 @@ print(r"""
 )
 
 for result in buggy_results.to_dict(orient="records"):
-    line = create_table_line(result)
+    line = create_table_line(result, allow_fallback=args.appendix)
     if line:
         print(line)
     else:
         rest_of_benchmarks.append(result)
 
-# find time range for rest_of_benchmarks
-min_time = min(r["time"] for r in rest_of_benchmarks)
-max_time = max(r["time"] for r in rest_of_benchmarks)
-time_range = f"{min_time:.2f}--{max_time:.2f}s"
+if not args.appendix and rest_of_benchmarks:
+    # find time range for rest_of_benchmarks
+    min_time = min(r["time"] for r in rest_of_benchmarks)
+    max_time = max(r["time"] for r in rest_of_benchmarks)
+    time_range = f"{min_time:.2f}--{max_time:.2f}s"
 
-locs = [get_loc(r["benchmark"]) for r in rest_of_benchmarks]
-min_loc = min(locs)
-max_loc = max(locs)
-loc_range = f"{min_loc}--{max_loc}"
+    locs = [get_loc(r["benchmark"]) for r in rest_of_benchmarks]
+    min_loc = min(locs)
+    max_loc = max(locs)
+    loc_range = f"{min_loc}--{max_loc}"
 
-total_bugs_rest = sum(len(parse_issue_list(r["expected_results"])) for r in rest_of_benchmarks)
-detected_bugs_rest = sum(
-    count_matches(parse_issue_list(r["expected_results"]), parse_issue_list(r["actual_results"]))
-    for r in rest_of_benchmarks
-)
-depth_values_rest = [
-    deepest_bug_depth(r["benchmark"], parse_issue_list(r["expected_results"]))
-    for r in rest_of_benchmarks
-]
-min_depth_rest = min(depth_values_rest)
-max_depth_rest = max(depth_values_rest)
-depth_range_rest_cell = f"{min_depth_rest}--{max_depth_rest}"
-total = len(rest_of_benchmarks)
-fixed_clear_count = sum(1 for r in rest_of_benchmarks if fixed_clears_bug_by_bm.get(get_bm_name(r["benchmark"]), False))
-fixed_clear_rate = f"{fixed_clear_count}/{total}"
+    total_bugs_rest = sum(len(parse_issue_list(r["expected_results"])) for r in rest_of_benchmarks)
+    detected_bugs_rest = sum(
+        count_matches(parse_issue_list(r["expected_results"]), parse_issue_list(r["actual_results"]))
+        for r in rest_of_benchmarks
+    )
+    depth_values_rest = [
+        deepest_bug_depth(r["benchmark"], parse_issue_list(r["expected_results"]))
+        for r in rest_of_benchmarks
+    ]
+    min_depth_rest = min(depth_values_rest)
+    max_depth_rest = max(depth_values_rest)
+    depth_range_rest_cell = f"{min_depth_rest}--{max_depth_rest}"
+    total = len(rest_of_benchmarks)
+    fixed_clear_count = sum(1 for r in rest_of_benchmarks if fixed_clears_bug_by_bm.get(get_bm_name(r["benchmark"]), False))
+    fixed_clear_rate = f"{fixed_clear_count}/{total}"
 
-we_count = sum(1 for r in rest_of_benchmarks if "WE" in features.get(get_bm_name(r["benchmark"]), []))
-cs_count = sum(1 for r in rest_of_benchmarks if "CS" in features.get(get_bm_name(r["benchmark"]), []))
-fs_count = sum(1 for r in rest_of_benchmarks if "FS" in features.get(get_bm_name(r["benchmark"]), []))
-feature_count_marks = f"{we_count} \\WE/{cs_count} \\SP/{fs_count} \\FS"
+    we_count = sum(1 for r in rest_of_benchmarks if "WE" in features.get(get_bm_name(r["benchmark"]), []))
+    cs_count = sum(1 for r in rest_of_benchmarks if "CS" in features.get(get_bm_name(r["benchmark"]), []))
+    fs_count = sum(1 for r in rest_of_benchmarks if "FS" in features.get(get_bm_name(r["benchmark"]), []))
+    feature_count_marks = f"{we_count} \\WE/{cs_count} \\SP/{fs_count} \\FS"
 
-print(rf""" & \emph{{More buggy scripts}} & {loc_range} &  & {detected_bugs_rest}/{total_bugs_rest} & {depth_range_rest_cell} & {fixed_clear_rate} & {time_range} & {feature_count_marks} & \cf{{sec:full-ds}} \\""")
-print(r"\hspace{.5em}\dots & & & & & & & & & \\")
+    print(rf""" & \emph{{More buggy scripts}} & {loc_range} &  & {detected_bugs_rest}/{total_bugs_rest} & {depth_range_rest_cell} & {fixed_clear_rate} & {time_range} & {feature_count_marks} & \cf{{sec:full-ds}} \\""")
+    print(r"\hspace{.5em}\dots & & & & & & & & & \\")
 
 # Print summary line across all benchmarks
 locs = [get_loc(r["benchmark"]) for r in buggy_results.to_dict(orient="records")]
