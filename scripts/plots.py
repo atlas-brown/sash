@@ -936,8 +936,8 @@ def plot_runtime(data, output_path):
             [],
             [],
             linestyle="none",
-            marker="$\\mathit{n}$",
-            markersize=7,
+            marker="$n$",
+            markersize=5,
             color="0.35",
             label="Bug depth",
         )
