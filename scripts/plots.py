@@ -952,10 +952,10 @@ def plot_runtime(data, output_path):
 
 def plot_timeout_sweep_bug_catch(timeout_sweep_dir, output_path):
     series_specs = [
-        ("dfs_on", "Full SaSh", color_scheme[0], re.compile(r"results_t([0-9]+(?:\.[0-9]+)?)_dfs_on\.csv$")),
-        ("dfs_no_targeted", "No targeted DFS", color_scheme[1], re.compile(r"results_t([0-9]+(?:\.[0-9]+)?)_dfs_no_targeted\.csv$")),
-        ("dfs_no_unbound_empty", "No unbound-empty DFS", color_scheme[3], re.compile(r"results_t([0-9]+(?:\.[0-9]+)?)_dfs_no_unbound_empty\.csv$")),
-        ("dfs_off", "No DFS", color_scheme[2], re.compile(r"results_t([0-9]+(?:\.[0-9]+)?)_dfs_off\.csv$")),
+        ("dfs_on", f"Full {sysname}", color_scheme[0], re.compile(r"results_t([0-9]+(?:\.[0-9]+)?)_dfs_on\.csv$")),
+        ("dfs_no_targeted", "No targeted exploration", color_scheme[1], re.compile(r"results_t([0-9]+(?:\.[0-9]+)?)_dfs_no_targeted\.csv$")),
+        ("dfs_no_unbound_empty", "No corner environment instantiation", color_scheme[3], re.compile(r"results_t([0-9]+(?:\.[0-9]+)?)_dfs_no_unbound_empty\.csv$")),
+        ("dfs_off", "Base exploration", color_scheme[2], re.compile(r"results_t([0-9]+(?:\.[0-9]+)?)_dfs_off\.csv$")),
     ]
     series_paths = {
         key: glob.glob(os.path.join(timeout_sweep_dir, f"results_t*_{key}.csv"))
@@ -966,7 +966,7 @@ def plot_timeout_sweep_bug_catch(timeout_sweep_dir, output_path):
         # Backward-compatible fallback: legacy single-series files.
         series_paths["dfs_on"] = glob.glob(os.path.join(timeout_sweep_dir, "results_t*.csv"))
         series_specs = [
-            ("dfs_on", "Full SaSh", color_scheme[0], re.compile(r"results_t([0-9]+(?:\.[0-9]+)?)\.csv$")),
+            ("dfs_on", f"Full {sysname}", color_scheme[0], re.compile(r"results_t([0-9]+(?:\.[0-9]+)?)\.csv$")),
         ]
 
     if not any(series_paths.values()):
@@ -999,7 +999,7 @@ def plot_timeout_sweep_bug_catch(timeout_sweep_dir, output_path):
         t = np.array(timeout_points)[order]
         return x, y, bug_totals, t
 
-    plt.figure(figsize=(figsize_small[0], 2.6))
+    plt.figure(figsize=(5, 2.15))
     all_x_arrays = []
     all_y_arrays = []
     all_totals = []
@@ -1043,7 +1043,7 @@ def plot_timeout_sweep_bug_catch(timeout_sweep_dir, output_path):
         ax.set_ylim(y_lower, float(total) + 1.0)
 
     plt.xlabel("Timeout (s)")
-    plt.ylabel("Bugs Caught")
+    plt.ylabel("Bugs caught")
     if all_x_arrays:
         timeout_ticks = sorted({int(round(v)) for v in all_timeout_values})
         rightmost_tick = round(float(np.max(np.concatenate(all_x_arrays))), 2)
@@ -1090,7 +1090,11 @@ def main():
     plot_bug_detection_euler(buggy_results, os.path.join(args.output_dir, "bug-detection-euler.pdf"))
     plot_bug_detection_bars(all_results, os.path.join(args.output_dir, "bug-detection-bars.pdf"))
     plot_runtime(buggy_results, os.path.join(args.output_dir, "runtime.pdf"))
-    timeout_sweep_dir = os.path.join(args.output_dir, "timeout-sweep")
+    # Sweep inputs live next to the main results CSV, not in the figure output dir.
+    timeout_sweep_dir = os.path.join(
+        os.path.dirname(os.path.abspath(args.results_csv)),
+        "timeout-sweep",
+    )
     plot_timeout_sweep_bug_catch(
         timeout_sweep_dir,
         os.path.join(args.output_dir, "timeout-sweep-bugs-caught.pdf"),
