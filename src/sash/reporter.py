@@ -195,6 +195,9 @@ class Report(NamedTuple):
     time: float
     solver_time: float
     timed_out: bool
+    ast_nodes_total: int
+    ast_nodes_interpreted: int
+    ast_coverage_pct: float
 
     def to_dict(self) -> dict:
         return {
@@ -203,6 +206,9 @@ class Report(NamedTuple):
             "time": self.time,
             "solver_time": self.solver_time,
             "timed_out": self.timed_out,
+            "ast_nodes_total": self.ast_nodes_total,
+            "ast_nodes_interpreted": self.ast_nodes_interpreted,
+            "ast_coverage_pct": self.ast_coverage_pct,
         }
 
 
@@ -212,6 +218,8 @@ class Reporter:
     _exec_time: float = math.nan
     _solver_time: float = math.nan
     _timed_out: bool
+    _ast_nodes_total: int = 0
+    _interpreted_ast_node_ids: set[int]
     _initialized: bool = False
 
     @classmethod
@@ -225,6 +233,8 @@ class Reporter:
         cls._exec_time = math.nan
         cls._solver_time = math.nan
         cls._timed_out = False
+        cls._ast_nodes_total = 0
+        cls._interpreted_ast_node_ids = set()
         cls._initialized = True
 
     @classmethod
@@ -261,6 +271,14 @@ class Reporter:
         cls._timed_out = True
 
     @classmethod
+    def set_ast_nodes_total(cls, total: int):
+        cls._ast_nodes_total = max(int(total), 0)
+
+    @classmethod
+    def mark_interpreted_ast_node(cls, node: object):
+        cls._interpreted_ast_node_ids.add(id(node))
+
+    @classmethod
     def clear_timed_out(cls):
         cls._timed_out = False
 
@@ -275,6 +293,8 @@ class Reporter:
         cls._exec_time = math.nan
         cls._solver_time = math.nan
         cls._timed_out = False
+        cls._ast_nodes_total = 0
+        cls._interpreted_ast_node_ids = set()
 
     @classmethod
     def drop_issues(cls, codes: set[Code]):
@@ -290,6 +310,16 @@ class Reporter:
             logging.debug("Solver time not set; defaulting to 0.0")
             cls._solver_time = 0.0
 
+        interpreted_ast_nodes = min(
+            len(cls._interpreted_ast_node_ids),
+            cls._ast_nodes_total,
+        )
+        ast_coverage_pct = (
+            (100.0 * interpreted_ast_nodes / cls._ast_nodes_total)
+            if cls._ast_nodes_total > 0
+            else 0.0
+        )
+
         return Report(
             filename=cls._filename,
             # We only add the condition to the issue here to enable easy deduplication while accumulating issues
@@ -297,4 +327,7 @@ class Reporter:
             time=cls._exec_time,
             solver_time=cls._solver_time,
             timed_out=cls._timed_out,
+            ast_nodes_total=cls._ast_nodes_total,
+            ast_nodes_interpreted=interpreted_ast_nodes,
+            ast_coverage_pct=ast_coverage_pct,
         )

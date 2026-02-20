@@ -1434,6 +1434,41 @@ def drop_terminated_traces(traces: Traces) -> tuple[Traces, Traces]:
         logging.debug("Dropping %d terminated traces", len(inactive_traces))
     return active_traces, inactive_traces
 
+
+def _collect_non_arg_ast_nodes(value: object,
+                               seen_ids: set[int],
+                               non_arg_ids: set[int]) -> None:
+    if isinstance(value, AST.AstNode):
+        node_id = id(value)
+        if node_id in seen_ids:
+            return
+        seen_ids.add(node_id)
+
+        if not isinstance(value, AST.ArgChar):
+            non_arg_ids.add(node_id)
+
+        for child in value.__dict__.values():
+            _collect_non_arg_ast_nodes(child, seen_ids, non_arg_ids)
+        return
+
+    if isinstance(value, dict):
+        for child in value.values():
+            _collect_non_arg_ast_nodes(child, seen_ids, non_arg_ids)
+        return
+
+    if isinstance(value, (list, tuple, set, frozenset)):
+        for child in value:
+            _collect_non_arg_ast_nodes(child, seen_ids, non_arg_ids)
+
+
+def count_non_arg_ast_nodes(nodes: list[parser.WrappedAst]) -> int:
+    seen_ids: set[int] = set()
+    non_arg_ids: set[int] = set()
+    for wrapped in nodes:
+        _collect_non_arg_ast_nodes(wrapped.ast_node, seen_ids, non_arg_ids)
+    return len(non_arg_ids)
+
+
 def guarded_interp_node(traces: Traces,
                         node: AST.AstNode,
                         config: InterpConfig) -> Traces:
@@ -1447,6 +1482,7 @@ def guarded_interp_node(traces: Traces,
 
     prev_context_line = context_line
     context_line = getattr(node, "line_number", context_line)
+    Reporter.mark_interpreted_ast_node(node)
 
     traces, inactive1 = drop_terminated_traces(traces)
     traces, inactive2 = config.trace_collapser(traces)
@@ -1841,6 +1877,7 @@ def symbexec_file(input_file: str,
             return ([], t_else) if t_else else (t_then, [])
 
         nodes = parser.parse_shell_script(input_file)
+        Reporter.set_ast_nodes_total(count_non_arg_ast_nodes(nodes))
         func_defs = find_func_defs([Trace((starting_state(),))], nodes, config)
 
         def func_calls_dangerous(func_name: str, danger_cache: dict[str, bool]) -> bool:
