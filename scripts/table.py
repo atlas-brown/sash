@@ -188,21 +188,21 @@ sources = {
 
 
 descriptions = {
-    "high_profile/c00-steam": r"Deletes \sh{/*} after path traversal",
+    "high_profile/c00-steam": r"Path traversal to \sh{/*} loss",
     "high_profile/c01-bumblebee": r"Deletes \sh{/usr}",
     "high_profile/w00-itunes": r"Deletes drive",
     "high_profile/w01-squid": r"Unknown \sh{rm} target",
-    "high_profile/c02-n": r"Loop deletes \sh{/usr/local/*}",
+    "high_profile/c02-n": r"Deletes \sh{/usr/local/*}",
     "high_profile/c03-backup_manager": r"Bad \sh{$?} check to data loss",
 
     "milestone_1/const_loop": r"Constant \sh{while} condition",
     "milestone_1/loop_once-useless_test": r"Run-once \sh{for} loop",
-    "milestone_1/unset_var_1": r"Unset variable used in \sh{echo}",
+    "milestone_1/unset_var_1": r"Unset variable in \sh{echo}",
     "milestone_2/rm_root": r"Typo causes DB loss",
     "web_forums/rm_root_2": r"Failed \sh{mktemp} to data loss",
-    "commits/debootstrap": r"Empty \sh{$2} causes \sh{cwd} deletion",
+    "commits/debootstrap": r"Empty \sh{$2} to \sh{cwd} loss",
 
-    "simple_fs/overwrite_file": r"Data loss from \sh{mv} inside \sh{xargs}",
+    "simple_fs/overwrite_file": r"Data loss from \sh{xargs mv}",
 
     "milestone_1/redir_to_func-redir_to_func": r"Redirect to function",
     "web_forums/unset_var-cmd_always_fails": r"Always empty \sh{mkdir} arg",
@@ -442,7 +442,7 @@ if not args.appendix and rest_of_benchmarks:
     fs_count = sum(1 for r in rest_of_benchmarks if "FS" in features.get(get_bm_name(r["benchmark"]), []))
     feature_count_marks = f"{we_count} \\WE/{cs_count} \\SP/{fs_count} \\FS"
 
-    print(rf""" & \emph{{More buggy scripts}} & {loc_avg_cell} &  & {detected_bugs_rest}/{total_bugs_rest} & {depth_avg_rest_cell} & {fixed_clear_rate} & {time_avg_cell} & {feature_count_marks} & \cf{{sec:full-ds}} \\""")
+    print(rf""" & \emph{{More buggy scripts}} & {loc_avg_cell} &  & {detected_bugs_rest}/{total_bugs_rest} & {depth_avg_rest_cell} & {fixed_clear_rate} & {time_avg_cell} & {feature_count_marks} & \cref{{sec:full-ds}} \\""")
     print(r"\hspace{.5em}\dots & & & & & & & & & \\")
 
 # Print summary line across all benchmarks
