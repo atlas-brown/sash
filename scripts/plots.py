@@ -17,6 +17,8 @@ from bug_depth_stats import compute_script_metrics
 import matplotlib.pyplot as plt
 from matplotlib_set_diagrams import EulerDiagram
 from matplotlib.lines import Line2D
+from matplotlib.colors import to_rgba
+from matplotlib.patches import Rectangle
 
 
 def extract_issue_code(issue):
@@ -376,6 +378,10 @@ figsize_small = (6.0, 1.15)
 color_scheme = plt.get_cmap("Pastel1").colors
 color_red = color_scheme[0]
 color_green = color_scheme[2]
+# Optional manual prefix order for heatmap columns.
+# Fill with short benchmark IDs (e.g., "njv") and/or benchmark keys
+# (e.g., "high_profile/c02-n"). Remaining benchmarks keep auto-sort order.
+HEATMAP_MANUAL_BENCHMARK_ORDER = [ ]
 
 def _get_bug_sets_for_kind(data, kind):
     sash_detected = set()
@@ -808,6 +814,309 @@ def _get_fixed_fp_counts(data):
     return _get_kind_fp_counts(data, lambda k: str(k) == "fixed")
 
 
+def _benchmark_kind_rows(data, kind):
+    data_view = data
+    if "kind" in data_view.columns:
+        data_view = data_view[data_view["kind"] == kind]
+    elif "benchmark" in data_view.columns:
+        benchmarks = data_view["benchmark"].astype(str)
+        if kind == "buggy":
+            data_view = data_view[
+                ~benchmarks.str.endswith("/fixed.sh")
+                & ~benchmarks.str.contains("/variants/")
+            ]
+        elif kind == "fixed":
+            data_view = data_view[benchmarks.str.endswith("/fixed.sh")]
+        else:
+            data_view = data_view.iloc[0:0]
+    else:
+        data_view = data_view.iloc[0:0]
+    return data_view
+
+
+def _collect_benchmark_success(data, kind):
+    """
+    Aggregate benchmark-family success counts for one kind.
+    For kind='buggy', success means bug detected.
+    For kind='fixed', success means no false positive on the corresponding bug.
+    """
+    rows = _benchmark_kind_rows(data, kind)
+    by_family = {}
+    order = []
+
+    for _, row in rows.iterrows():
+        family = benchmark_group_key(row["benchmark"])
+        if family not in by_family:
+            by_family[family] = {
+                "label": short_name(row["benchmark"]),
+                "total": 0,
+                "sash_good": 0,
+                "shell_good": 0,
+            }
+            order.append(family)
+
+        expected_counter = Counter(parse_issue_list(row["expected_results"]))
+        actual_counter = Counter(parse_issue_list(row["actual_results"]))
+        expected_shell_counter = get_info_shellcheck_expected_counter(
+            row["benchmark"], kind, fallback_to_bug_default=(kind in {"buggy", "fixed"})
+        )
+
+        total = sum(expected_counter.values())
+        sash_match = sum(
+            min(expected_count, actual_counter[issue])
+            for issue, expected_count in expected_counter.items()
+        )
+        shell_match = sum(
+            min(expected_count, expected_shell_counter[issue])
+            for issue, expected_count in expected_counter.items()
+        )
+
+        by_family[family]["total"] += total
+        if kind == "buggy":
+            by_family[family]["sash_good"] += sash_match
+            by_family[family]["shell_good"] += shell_match
+        else:
+            by_family[family]["sash_good"] += max(total - sash_match, 0)
+            by_family[family]["shell_good"] += max(total - shell_match, 0)
+
+    return by_family, order
+
+
+def _get_variant_misses_by_family(data):
+    """
+    Per benchmark-family misses on buggy variants for SaSh and ShellCheck.
+    """
+    data_view = data
+    if "kind" in data_view.columns:
+        data_view = data_view[data_view["kind"] == "buggy_variant"]
+    elif "benchmark" in data_view.columns:
+        data_view = data_view[data_view["benchmark"].astype(str).str.contains("/variants/bug-")]
+    else:
+        data_view = data_view.iloc[0:0]
+
+    by_family = defaultdict(lambda: {"sash_missed": 0, "shell_missed": 0})
+
+    for _, row in data_view.iterrows():
+        family = benchmark_group_key(row["benchmark"])
+        expected_counter = Counter(parse_issue_list(row["expected_results"]))
+        actual_counter = Counter(parse_issue_list(row["actual_results"]))
+        expected_shell_counter = get_info_shellcheck_expected_counter(
+            row["benchmark"],
+            row.get("kind", "buggy_variant"),
+            fallback_to_bug_default=False,
+        )
+
+        for issue, expected_count in expected_counter.items():
+            sash_hits = min(expected_count, actual_counter[issue])
+            shell_hits = min(expected_count, expected_shell_counter[issue])
+            by_family[family]["sash_missed"] += max(expected_count - sash_hits, 0)
+            by_family[family]["shell_missed"] += max(expected_count - shell_hits, 0)
+
+    return by_family
+
+
+def plot_bug_detection_heatmap(data, output_path):
+    buggy_stats, buggy_order = _collect_benchmark_success(data, "buggy")
+    fixed_stats, fixed_order = _collect_benchmark_success(data, "fixed")
+    variant_misses = _get_variant_misses_by_family(data)
+
+    # Preserve buggy benchmark order for columns; append fixed-only families, if any.
+    families = list(buggy_order)
+    for family in fixed_order:
+        if family not in families:
+            families.append(family)
+
+    if not families:
+        return
+
+    # Group benchmarks where ShellCheck fails on buggy benchmarks together.
+    original_pos = {family: idx for idx, family in enumerate(families)}
+
+    def shellcheck_failure_key(family):
+        buggy = buggy_stats.get(family, {"total": 0, "shell_good": 0})
+        buggy_miss = max(buggy["total"] - buggy["shell_good"], 0)
+        any_failure = buggy_miss > 0
+        # Buggy-failing families first; then by buggy failure magnitude;
+        # keep prior order as tiebreaker.
+        return (0 if any_failure else 1, -buggy_miss, original_pos[family])
+
+    families = sorted(families, key=shellcheck_failure_key)
+
+    def family_key(family):
+        p = Path(str(family))
+        parts = p.parts
+        if "benchmarks" in parts:
+            idx = parts.index("benchmarks")
+            return "/".join(parts[idx + 1 :])
+        return str(family)
+
+    if HEATMAP_MANUAL_BENCHMARK_ORDER:
+        family_keys = {family: family_key(family) for family in families}
+        family_labels = {
+            family: (
+                buggy_stats.get(family, fixed_stats.get(family, {"label": "?"}))["label"]
+            )
+            for family in families
+        }
+
+        manual_families = []
+        used = set()
+        for token in HEATMAP_MANUAL_BENCHMARK_ORDER:
+            tok = str(token).strip().lower()
+            if not tok:
+                continue
+            for family in families:
+                if family in used:
+                    continue
+                if (
+                    family_keys[family].lower() == tok
+                    or family_labels[family].lower() == tok
+                ):
+                    manual_families.append(family)
+                    used.add(family)
+                    break
+
+        families = manual_families + [family for family in families if family not in used]
+
+    labels = []
+    for family in families:
+        if family in buggy_stats:
+            labels.append(buggy_stats[family]["label"])
+        elif family in fixed_stats:
+            labels.append(fixed_stats[family]["label"])
+        else:
+            labels.append("?")
+
+    values = np.full((4, len(families)), np.nan)
+    totals = np.zeros((4, len(families)), dtype=float)
+
+    for j, family in enumerate(families):
+        buggy = buggy_stats.get(family, {"total": 0, "sash_good": 0, "shell_good": 0})
+        fixed = fixed_stats.get(family, {"total": 0, "sash_good": 0, "shell_good": 0})
+
+        if buggy["total"] > 0:
+            values[0, j] = buggy["sash_good"] / buggy["total"]
+            values[1, j] = buggy["shell_good"] / buggy["total"]
+            totals[0, j] = buggy["total"]
+            totals[1, j] = buggy["total"]
+
+        if fixed["total"] > 0:
+            values[2, j] = fixed["sash_good"] / fixed["total"]
+            values[3, j] = fixed["shell_good"] / fixed["total"]
+            totals[2, j] = fixed["total"]
+            totals[3, j] = fixed["total"]
+
+    # Compact layout: narrow cells and low plot height.
+    fig_w = max(9.0, 0.22 * len(families) + 1.6)
+    fig, ax = plt.subplots(figsize=(fig_w, 1.5))
+
+    max_total = float(np.nanmax(totals)) if np.any(totals > 0) else 1.0
+    rgba = np.ones((4, len(families), 4), dtype=float)
+    rgba[:, :, :] = to_rgba("#efefef")
+    good_rgb = np.array(to_rgba(color_green))
+    bad_rgb = np.array(to_rgba(color_red))
+
+    for i in range(values.shape[0]):
+        for j in range(values.shape[1]):
+            total = totals[i, j]
+            if total <= 0:
+                continue
+            success_ratio = values[i, j]
+            base = good_rgb if success_ratio >= 0.999 else bad_rgb
+            intensity = 0.25 + 0.75 * (total / max_total)
+            rgba[i, j, :3] = base[:3]
+            rgba[i, j, 3] = intensity
+
+    ax.imshow(rgba, aspect="auto", interpolation="nearest")
+    ax.hlines(
+        1.5,
+        -0.5,
+        len(families) - 0.5,
+        colors="black",
+        linewidth=1.2,
+        zorder=6,
+    )
+
+    # Texture buggy rows only for variant regressions:
+    # highlight when original had no misses but variants do.
+    for j, family in enumerate(families):
+        miss = variant_misses.get(family, {"sash_missed": 0, "shell_missed": 0})
+        buggy = buggy_stats.get(family, {"total": 0, "sash_good": 0, "shell_good": 0})
+        orig_sash_missed = max(buggy["total"] - buggy["sash_good"], 0)
+        orig_shell_missed = max(buggy["total"] - buggy["shell_good"], 0)
+
+        if miss["sash_missed"] > 0 and orig_sash_missed == 0:
+            ax.add_patch(
+                Rectangle(
+                    (j - 0.5, -0.5),
+                    1.0,
+                    1.0,
+                    facecolor="none",
+                    hatch="////",
+                    edgecolor=color_red,
+                    linewidth=0.0,
+                )
+            )
+        if miss["shell_missed"] > 0 and orig_shell_missed == 0:
+            ax.add_patch(
+                Rectangle(
+                    (j - 0.5, 0.5),
+                    1.0,
+                    1.0,
+                    facecolor="none",
+                    hatch="////",
+                    edgecolor=color_red,
+                    linewidth=0.0,
+                )
+            )
+
+    ax.set_xticks(np.arange(len(families)))
+    ax.set_xticklabels(labels, rotation=45, ha="center", fontsize=8)
+    ax.set_yticks([0, 1, 2, 3])
+    ax.set_yticklabels(["", "", "", ""], fontsize=7)
+    ax.set_xlabel("Benchmark", fontsize=8)
+    ax.tick_params(axis="x", length=0, pad=1)
+    ax.tick_params(axis="y", length=0, pad=2)
+
+    # Left group labels (centered on top/bottom row pairs), right row labels.
+    y_axis_transform = ax.get_yaxis_transform()
+    ax.text(
+        -0.015, 0.5, "Buggy", transform=y_axis_transform,
+        ha="right", va="center", fontsize=8, clip_on=False
+    )
+    ax.text(
+        -0.015, 2.5, "Fixed", transform=y_axis_transform,
+        ha="right", va="center", fontsize=8, clip_on=False
+    )
+    ax.text(
+        1.01, 0, sysname, transform=y_axis_transform,
+        ha="left", va="center", fontsize=7, clip_on=False
+    )
+    ax.text(
+        1.01, 1, "ShellCheck", transform=y_axis_transform,
+        ha="left", va="center", fontsize=7, clip_on=False
+    )
+    ax.text(
+        1.01, 2, sysname, transform=y_axis_transform,
+        ha="left", va="center", fontsize=7, clip_on=False
+    )
+    ax.text(
+        1.01, 3, "ShellCheck", transform=y_axis_transform,
+        ha="left", va="center", fontsize=7, clip_on=False
+    )
+
+    legend_handles = [
+        Line2D([], [], marker="s", linestyle="none", markersize=7, markerfacecolor=color_green, markeredgecolor=color_green, label="Good"),
+        Line2D([], [], marker="s", linestyle="none", markersize=7, markerfacecolor=color_red, markeredgecolor=color_red, label="Bad"),
+        Rectangle((0, 0), 1, 1, facecolor="none", hatch="////", edgecolor=color_red, linewidth=0.0, label="Missed on variant"),
+    ]
+    ax.legend(handles=legend_handles, fontsize=7, loc="lower left", frameon=True, ncol=3)
+
+    plt.tight_layout()
+    plt.savefig(output_path, format="pdf")
+    plt.close()
+
+
 def _get_variant_detection_counts(data):
     data_view = data
     if "kind" in data_view.columns:
@@ -1087,6 +1396,7 @@ def main():
     buggy_results["loc"] = buggy_results["benchmark"].apply(get_loc)
     plot_bug_detection_euler(buggy_results, os.path.join(args.output_dir, "bug-detection-euler.pdf"))
     plot_bug_detection_bars(all_results, os.path.join(args.output_dir, "bug-detection-bars.pdf"))
+    plot_bug_detection_heatmap(all_results, os.path.join(args.output_dir, "bug-detection-heatmap.pdf"))
     plot_runtime(buggy_results, os.path.join(args.output_dir, "runtime.pdf"))
     # Sweep inputs live next to the main results CSV, not in the figure output dir.
     timeout_sweep_dir = os.path.join(
