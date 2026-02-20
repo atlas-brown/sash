@@ -1,6 +1,106 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+usage() {
+  cat <<'EOF'
+Run SaSh on Koala benchmarks with a timeout sweep (full SaSh only).
+
+Usage:
+  scripts/on_koala [options]
+
+Options:
+  --timeouts LIST    Comma-separated timeout values in seconds.
+                     Default: 1,5,10,20,30,60
+  --output-dir DIR   Sweep output directory (repo-relative or absolute).
+                     Default: results/koala-timeout-sweep
+  --dry-run          Print commands without executing.
+  -h, --help         Show this help and exit.
+EOF
+}
+
+TIMEOUTS_CSV="1,5,10,20,30,60"
+OUTPUT_DIR="results/koala-timeout-sweep"
+DRY_RUN=0
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --timeouts)
+      TIMEOUTS_CSV="${2:-}"
+      shift 2
+      ;;
+    --output-dir)
+      OUTPUT_DIR="${2:-}"
+      shift 2
+      ;;
+    --dry-run)
+      DRY_RUN=1
+      shift
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "Unknown argument: $1" >&2
+      usage >&2
+      exit 2
+      ;;
+  esac
+done
+
+IFS=',' read -r -a TIMEOUTS <<< "${TIMEOUTS_CSV}"
+if [[ ${#TIMEOUTS[@]} -eq 0 ]]; then
+  echo "No timeouts specified" >&2
+  exit 2
+fi
+
 top=$(git rev-parse --show-toplevel)
 cd "$top" || exit 1
-uv run "${top}/scripts/run_on_dir.py" "${top}/benchmarks/_not_integrated/koala" -D -t 30 -T 30 -c "${top}/results/koala_results.csv"
+
+koala_dir="${top}/benchmarks/_not_integrated/koala"
+if [[ ! -d "${koala_dir}" ]]; then
+  echo "Koala directory not found: ${koala_dir}" >&2
+  exit 1
+fi
+
+out_dir="${OUTPUT_DIR}"
+if [[ "${out_dir}" != /* ]]; then
+  out_dir="${top}/${out_dir}"
+fi
+mkdir -p "${out_dir}"
+
+echo "Repository: ${top}"
+echo "Koala dir:  ${koala_dir}"
+echo "Output dir: ${out_dir}"
+echo "Timeouts:   ${TIMEOUTS_CSV}"
+
+for raw_t in "${TIMEOUTS[@]}"; do
+  t="$(echo "${raw_t}" | xargs)"
+  if [[ -z "${t}" ]]; then
+    continue
+  fi
+  if ! [[ "${t}" =~ ^[0-9]+([.][0-9]+)?$ ]]; then
+    echo "Invalid timeout value: '${t}'" >&2
+    exit 2
+  fi
+
+  csv_path="${out_dir}/results_t${t}_dfs_on.csv"
+  cmd=(
+    uv run "${top}/scripts/run_on_dir.py" "${koala_dir}"
+    -D
+    -t "${t}"
+    -T "${t}"
+    -c "${csv_path}"
+  )
+
+  echo
+  echo "=== Koala timeout ${t}s (full SaSh) ==="
+  echo "${cmd[*]}"
+  if [[ ${DRY_RUN} -eq 0 ]]; then
+    "${cmd[@]}"
+    cp -f "${csv_path}" "${out_dir}/results_t${t}.csv"
+  fi
+done
+
+echo
+echo "Done. CSV files are in: ${out_dir}"
