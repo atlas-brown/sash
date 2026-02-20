@@ -1,8 +1,0 @@
-// [DONE] exec=0.007911249995231628s solver=0.002341874991543591s
-{
-  "filename": "/Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/covid/scripts/3.sh",
-  "issues": [],
-  "time": 0.007911249995231628,
-  "solver_time": 0.002341874991543591,
-  "timed_out": false
-}

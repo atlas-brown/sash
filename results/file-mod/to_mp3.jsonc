@@ -1,8 +1,0 @@
-// [DONE] exec=0.01603174998308532s solver=0.03742774997954257s
-{
-  "filename": "/Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/file-mod/scripts/to_mp3.sh",
-  "issues": [],
-  "time": 0.01603174998308532,
-  "solver_time": 0.03742774997954257,
-  "timed_out": false
-}

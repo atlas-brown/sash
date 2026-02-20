@@ -1,8 +1,0 @@
-// [DONE] exec=0.0166693750070408s solver=0.024359500006539747s
-{
-  "filename": "/Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/file-mod/scripts/img_convert.sh",
-  "issues": [],
-  "time": 0.0166693750070408,
-  "solver_time": 0.024359500006539747,
-  "timed_out": false
-}

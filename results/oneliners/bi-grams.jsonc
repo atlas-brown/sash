@@ -1,8 +1,0 @@
-// [DONE] exec=0.01112562499474734s solver=0.030524500005412847s
-{
-  "filename": "/Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/oneliners/scripts/bi-grams.sh",
-  "issues": [],
-  "time": 0.01112562499474734,
-  "solver_time": 0.030524500005412847,
-  "timed_out": false
-}

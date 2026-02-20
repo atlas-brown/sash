@@ -1,8 +1,0 @@
-// [DONE] exec=0.01007495800149627s solver=6.9500005338341e-05s
-{
-  "filename": "/Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/.tools/standards/time-in-shell-subprocess/scripts/sub.sh",
-  "issues": [],
-  "time": 0.01007495800149627,
-  "solver_time": 6.9500005338341e-05,
-  "timed_out": false
-}

@@ -1,8 +1,0 @@
-// [DONE] exec=0.12104195798747241s solver=0.3997771659924183s
-{
-  "filename": "/Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/inference/scripts/playlist-creation.sh",
-  "issues": [],
-  "time": 0.12104195798747241,
-  "solver_time": 0.3997771659924183,
-  "timed_out": false
-}

@@ -1,8 +1,0 @@
-// [DONE] exec=0.001857916999142617s solver=5.224999040365219e-05s
-{
-  "filename": "/Users/george/Work/repo_resash/benchmarks/_not_integrated/koala/oneliners/scripts/comm.sh",
-  "issues": [],
-  "time": 0.001857916999142617,
-  "solver_time": 5.224999040365219e-05,
-  "timed_out": false
-}
