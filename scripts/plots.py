@@ -1367,6 +1367,89 @@ def plot_timeout_sweep_bug_catch(timeout_sweep_dir, output_path):
     plt.savefig(output_path, format="pdf")
     plt.close()
 
+
+def _as_bool(value):
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return False
+    s = str(value).strip().lower()
+    return s in {"1", "true", "t", "yes", "y"}
+
+
+def plot_koala_timeout_cdf(koala_sweep_dir, output_path):
+    paths = glob.glob(os.path.join(koala_sweep_dir, "results_t*_dfs_on.csv"))
+    timeout_re = re.compile(r"results_t([0-9]+(?:\.[0-9]+)?)_dfs_on\.csv$")
+
+    if not paths:
+        print(
+            f"% No Koala timeout-sweep CSV files found in {koala_sweep_dir}; skipping koala CDF plot",
+            file=sys.stderr,
+        )
+        return
+
+    timeout_vals = []
+    complete_counts = []
+    total_counts = []
+
+    for path in paths:
+        match = timeout_re.search(os.path.basename(path))
+        if not match:
+            continue
+
+        timeout_value = float(match.group(1))
+        data = load_csv(path)
+
+        # Koala sweep files should contain full SaSh results only, but filter defensively.
+        if "tool" in data.columns:
+            data = data[data["tool"].astype(str).str.lower() == "sash"]
+
+        if data.empty:
+            continue
+
+        timed_out = data["timed_out"].map(_as_bool) if "timed_out" in data.columns else pd.Series([False] * len(data))
+        crashed = data["crashed"].map(_as_bool) if "crashed" in data.columns else pd.Series([False] * len(data))
+        complete = (~timed_out) & (~crashed)
+
+        timeout_vals.append(timeout_value)
+        complete_counts.append(int(complete.sum()))
+        total_counts.append(int(len(data)))
+
+    if not timeout_vals:
+        print(
+            f"% Koala timeout-sweep files in {koala_sweep_dir} did not match expected naming; skipping koala CDF plot",
+            file=sys.stderr,
+        )
+        return
+
+    order = np.argsort(timeout_vals)
+    x = np.array(timeout_vals)[order]
+    y = np.array(complete_counts)[order]
+    totals_sorted = np.array(total_counts)[order]
+
+    plt.figure(figsize=(5.2, 2.4))
+    plt.step(x, y, where="post", color=color_scheme[0], linewidth=1.8, label=f"Full {sysname}")
+    plt.plot(x, y, "o", color=color_scheme[0], markersize=4)
+
+    if len(totals_sorted) > 0:
+        total_scripts = int(np.median(totals_sorted))
+        plt.axhline(y=total_scripts, linestyle="--", linewidth=1.0, color="gray", label="_nolegend_")
+        ax = plt.gca()
+        y_ticks = set(ax.get_yticks().tolist())
+        y_ticks.add(float(total_scripts))
+        ax.set_yticks(sorted(y_ticks))
+        ax.set_ylim(bottom=max(0.0, float(np.min(y)) - 1.0), top=float(total_scripts) + 1.0)
+
+    plt.xlabel("Timeout (s)")
+    plt.ylabel("Scripts completely analyzed")
+    timeout_ticks = sorted({int(round(v)) for v in x})
+    plt.xticks(timeout_ticks, [str(t) for t in timeout_ticks])
+    plt.grid(axis="y", alpha=0.25, linestyle=":")
+    plt.legend(fontsize=8, loc="lower right", frameon=True)
+    plt.tight_layout()
+    plt.savefig(output_path, format="pdf")
+    plt.close()
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -1406,6 +1489,14 @@ def main():
     plot_timeout_sweep_bug_catch(
         timeout_sweep_dir,
         os.path.join(args.output_dir, "timeout-sweep-bugs-caught.pdf"),
+    )
+    koala_timeout_sweep_dir = os.path.join(
+        os.path.dirname(os.path.abspath(args.results_csv)),
+        "koala-timeout-sweep",
+    )
+    plot_koala_timeout_cdf(
+        koala_timeout_sweep_dir,
+        os.path.join(args.output_dir, "koala-timeout-sweep-cdf.pdf"),
     )
 
     # Print bug stats
