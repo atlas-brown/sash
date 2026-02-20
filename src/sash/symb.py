@@ -269,13 +269,21 @@ def handle_rm(expanded_args: tuple[Field, ...], trace: Trace, node: AST.CommandN
     non_flag_args = [arg for arg in expanded_args[1:] if not util.is_flag(arg)]
 
     pwdval = trace.latest_state.lookup("PWD")
-    assert pwdval is not None, "PWD should always be defined"
+    homeval = trace.latest_state.lookup("HOME")
     if non_flag_args:
-        trace = trace.extend(lambda s: s.add_assertion(SimpleConstraint(And.from_field_iter(non_flag_args,
-                                                                                            lambda arg_field: Not(StringEq(arg_field, pwdval.value))),
-                                                                        lambda line: reporter.DeleteSystemFile("PWD", line)),
-                                                       node.pretty(),
-                                                       context_line, priority=10, include_fs=False))
+        if pwdval is not None: # Can be empty if the script unsets it
+            trace = trace.extend(lambda s: s.add_assertion(SimpleConstraint(And.from_field_iter(non_flag_args,
+                                                                                                lambda arg_field: Not(StringEq(arg_field, pwdval.value))),
+                                                                            lambda line: reporter.DeleteSystemFile("PWD", line)),
+                                                        node.pretty(),
+                                                        context_line, priority=10, include_fs=False))
+        if homeval is not None: # Can be empty if the script unsets it
+            trace = trace.extend(lambda s: s.add_assertion(SimpleConstraint(And.from_field_iter(non_flag_args,
+                                                                                                lambda arg_field: Not(StringEq(arg_field, homeval.value))),
+                                                                            lambda line: reporter.DeleteSystemFile("HOME", line)),
+                                                        node.pretty(),
+                                                        context_line, priority=10, include_fs=False))
+
 
     for path in Config.get("PROTECTED_PATHS"):
         trace = trace.extend(
