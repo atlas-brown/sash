@@ -4,8 +4,8 @@ sources:
 bugs:
   bug00:
     description: A nonexistent file is copied to itself
-    code:
-    shellcheck: cmd_expected_path_state
+    code: cmd_expected_path_state
+    shellcheck: null
 
 ground_truths:
   # Base versions
