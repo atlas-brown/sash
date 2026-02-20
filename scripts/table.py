@@ -124,7 +124,9 @@ def feature_marks(feature_names):
         marks.append(r"\SP")
     if "FS" in feature_names:
         marks.append(r"\FS")
-    return " ".join(marks)
+    if "SE" in feature_names:
+        marks.append(r"\SE")
+    return " ".join(marks) if marks else "-"
 
 def parse_issue_lines(issues):
     lines = []
@@ -133,6 +135,10 @@ def parse_issue_lines(issues):
         if match:
             lines.append(int(match.group(1)))
     return lines
+
+
+def approx(value, fmt=".1f"):
+    return rf"$\sim${value:{fmt}}"
 
 names = BENCHMARK_NAMES
 
@@ -152,6 +158,32 @@ sources = {
     "commits/debootstrap": r"\cite{debian:debootstrap:bug}",
 
     "simple_fs/overwrite_file": r"\cite{stackoverflow:mvbug}",
+
+    # Rest of citations
+    "commits/const_cond": r"\cite{benchmark:commits:const-cond}",
+    "commits/debootstrap_2": r"\cite{benchmark:commits:debootstrap-2}",
+    "commits/ignored_command_v": r"\cite{benchmark:commits:ignored-command-v}",
+    "commits/makefile": r"\cite{benchmark:commits:makefile}",
+    "commits/unset_func": r"\cite{benchmark:commits:unset-func}",
+    "commits/unset_var_2": r"\cite{benchmark:commits:unset-var-2}",
+    "commits/unset_var_3": r"\cite{benchmark:commits:unset-var-3}",
+    "commits/unset_var_5": r"\cite{benchmark:commits:unset-var-5}",
+    "commits/unset_var_set_u_1": r"\cite{benchmark:commits:unset-var-set-u-1}",
+    "commits/unset_var_set_u_2": r"\cite{benchmark:commits:unset-var-set-u-2}",
+    "milestone_1/redir_to_func-redir_to_func": r"\cite{benchmark:milestone-1:redir-to-func-redir-to-func}",
+    "milestone_2/loop_once": r"\cite{benchmark:milestone-2:loop-once}",
+    "milestone_2/loop_once-loop_once": r"\cite{benchmark:milestone-2:loop-once-loop-once}",
+    "milestone_2/unset_var-const_if-dead_code": r"\cite{benchmark:milestone-2:unset-var-const-if-dead-code}",
+    "simple_fs/access_after_mv": r"\cite{benchmark:simple-fs:access-after-mv}",
+    "simple_fs/access_del_resource": r"\cite{benchmark:simple-fs:access-del-resource}",
+    "simple_fs/cd_into_file": r"\cite{benchmark:simple-fs:cd-into-file}",
+    "simple_fs/overwrite_file_2": r"\cite{benchmark:simple-fs:overwrite-file-2}",
+    "simple_fs/overwrite_file_3": r"\cite{benchmark:simple-fs:overwrite-file-3}",
+    "simple_fs/overwrite_file_4": r"\cite{benchmark:simple-fs:overwrite-file-4}",
+    "web_forums/capturing_empty_output": r"\cite{benchmark:web-forums:capturing-empty-output}",
+    "web_forums/unexpected_stdin": r"\cite{benchmark:web-forums:unexpected-stdin}",
+    "web_forums/unset_var": r"\cite{benchmark:web-forums:unset-var}",
+    "web_forums/unset_var-cmd_always_fails": r"\cite{benchmark:web-forums:unset-var-cmd-always-fails}",
 }
 
 
@@ -163,14 +195,39 @@ descriptions = {
     "high_profile/c02-n": r"Loop deletes \sh{/usr/local/*}",
     "high_profile/c03-backup_manager": r"Bad \sh{$?} check to data loss",
 
-    "milestone_1/const_loop": r"Constant \sh{while} loop condition",
+    "milestone_1/const_loop": r"Constant \sh{while} condition",
     "milestone_1/loop_once-useless_test": r"Run-once \sh{for} loop",
     "milestone_1/unset_var_1": r"Unset variable used in \sh{echo}",
     "milestone_2/rm_root": r"Typo causes DB loss",
-    "web_forums/rm_root_2": r"Failed \sh{mktemp} causes data loss",
+    "web_forums/rm_root_2": r"Failed \sh{mktemp} to data loss",
     "commits/debootstrap": r"Empty \sh{$2} causes \sh{cwd} deletion",
 
     "simple_fs/overwrite_file": r"Data loss from \sh{mv} inside \sh{xargs}",
+
+    "milestone_1/redir_to_func-redir_to_func": r"Redirect to function",
+    "web_forums/unset_var-cmd_always_fails": r"Always empty \sh{mkdir} arg",
+    "web_forums/capturing_empty_output": r"Captures \sh{mkdir} output",
+    "web_forums/unexpected_stdin": r"Empty \sh{$1} to stuck program",
+    "web_forums/unset_var": r"Unset \sh{$bar} used",
+    "simple_fs/access_after_mv": r"Uses dir after moving it",
+    "simple_fs/cd_into_file": r"May \sh{cd} into regular file",
+    "simple_fs/access_del_resource": r"Move from deleted dir",
+    "simple_fs/overwrite_file_4": r"Generated file overwrite",
+    "simple_fs/overwrite_file_3": r"File overwrite",
+    "simple_fs/overwrite_file_2": r"Renames to same file",
+    "milestone_2/unset_var-const_if-dead_code": r"Constant \sh{if}",
+    "milestone_2/loop_once": r"Comma not in \sh{IFS}",
+    "milestone_2/loop_once-loop_once": r"Disabled glob",
+    "commits/ignored_command_v": r"Use missing shell",
+    "commits/unset_func": r"Undefined function",
+    "commits/const_cond": r"Unreachable \sh{$?} branch",
+    "commits/makefile": r"Unset path to \sh{rm -rf /}",
+    "commits/unset_var_3": r"Unset var used in test",
+    "commits/unset_var_2": r"Unset \sh{$file} used in file check",
+    "commits/unset_var_5": r"Unset var used for download",
+    "commits/debootstrap_2": r"Deletes user-supplied dir",
+    "commits/unset_var_set_u_1": r"Abort check from \sh{set -u}",
+    "commits/unset_var_set_u_2": r"Var self-append break",
 }
 
 # WE: word expansion
@@ -222,8 +279,24 @@ features = {
     "web_forums/unset_var-cmd_always_fails": ["WE", "CS"], # WE to reason about unbound variable, CS to reason about test command and mkdir command
 }
 
-
 get_bm_name = benchmark_key
+
+# Default (non-appendix) table keeps the original curated subset.
+DEFAULT_TABLE_SUBSET = {
+    "high_profile/c00-steam",
+    "high_profile/c01-bumblebee",
+    "high_profile/w00-itunes",
+    "high_profile/w01-squid",
+    "high_profile/c02-n",
+    "high_profile/c03-backup_manager",
+    "milestone_1/const_loop",
+    "milestone_1/loop_once-useless_test",
+    "milestone_1/unset_var_1",
+    "milestone_2/rm_root",
+    "web_forums/rm_root_2",
+    "commits/debootstrap",
+    "simple_fs/overwrite_file",
+}
 
 def get_loc(path):
     for key in benchmark_lookup_keys(path):
@@ -330,6 +403,11 @@ print(r"""
 )
 
 for result in buggy_results.to_dict(orient="records"):
+    bm_name = get_bm_name(result["benchmark"])
+    if not args.appendix and bm_name not in DEFAULT_TABLE_SUBSET:
+        rest_of_benchmarks.append(result)
+        continue
+
     line = create_table_line(result, allow_fallback=args.appendix)
     if line:
         print(line)
@@ -337,15 +415,12 @@ for result in buggy_results.to_dict(orient="records"):
         rest_of_benchmarks.append(result)
 
 if not args.appendix and rest_of_benchmarks:
-    # find time range for rest_of_benchmarks
-    min_time = min(r["time"] for r in rest_of_benchmarks)
-    max_time = max(r["time"] for r in rest_of_benchmarks)
-    time_range = f"{min_time:.2f}--{max_time:.2f}s"
+    avg_time_rest = sum(r["time"] for r in rest_of_benchmarks) / len(rest_of_benchmarks)
+    time_avg_cell = f"{approx(avg_time_rest, '.2f')}s"
 
     locs = [get_loc(r["benchmark"]) for r in rest_of_benchmarks]
-    min_loc = min(locs)
-    max_loc = max(locs)
-    loc_range = f"{min_loc}--{max_loc}"
+    avg_loc_rest = sum(locs) / len(locs)
+    loc_avg_cell = approx(avg_loc_rest, ".1f")
 
     total_bugs_rest = sum(len(parse_issue_list(r["expected_results"])) for r in rest_of_benchmarks)
     detected_bugs_rest = sum(
@@ -356,9 +431,8 @@ if not args.appendix and rest_of_benchmarks:
         deepest_bug_depth(r["benchmark"], parse_issue_list(r["expected_results"]))
         for r in rest_of_benchmarks
     ]
-    min_depth_rest = min(depth_values_rest)
-    max_depth_rest = max(depth_values_rest)
-    depth_range_rest_cell = f"{min_depth_rest}--{max_depth_rest}"
+    avg_depth_rest = sum(depth_values_rest) / len(depth_values_rest)
+    depth_avg_rest_cell = approx(avg_depth_rest, ".1f")
     total = len(rest_of_benchmarks)
     fixed_clear_count = sum(1 for r in rest_of_benchmarks if fixed_clears_bug_by_bm.get(get_bm_name(r["benchmark"]), False))
     fixed_clear_rate = f"{fixed_clear_count}/{total}"
@@ -368,14 +442,13 @@ if not args.appendix and rest_of_benchmarks:
     fs_count = sum(1 for r in rest_of_benchmarks if "FS" in features.get(get_bm_name(r["benchmark"]), []))
     feature_count_marks = f"{we_count} \\WE/{cs_count} \\SP/{fs_count} \\FS"
 
-    print(rf""" & \emph{{More buggy scripts}} & {loc_range} &  & {detected_bugs_rest}/{total_bugs_rest} & {depth_range_rest_cell} & {fixed_clear_rate} & {time_range} & {feature_count_marks} & \cf{{sec:full-ds}} \\""")
+    print(rf""" & \emph{{More buggy scripts}} & {loc_avg_cell} &  & {detected_bugs_rest}/{total_bugs_rest} & {depth_avg_rest_cell} & {fixed_clear_rate} & {time_avg_cell} & {feature_count_marks} & \cf{{sec:full-ds}} \\""")
     print(r"\hspace{.5em}\dots & & & & & & & & & \\")
 
 # Print summary line across all benchmarks
 locs = [get_loc(r["benchmark"]) for r in buggy_results.to_dict(orient="records")]
-min_loc = min(locs)
-max_loc = max(locs)
-loc_range = f"{min_loc}--{max_loc}"
+avg_loc_total = sum(locs) / len(locs)
+loc_avg_total_cell = approx(avg_loc_total, ".1f")
 
 total = len(buggy_results)
 total_bugs = sum(len(parse_issue_list(r["expected_results"])) for r in buggy_results.to_dict(orient="records"))
@@ -387,15 +460,13 @@ depth_values_total = [
     deepest_bug_depth(r["benchmark"], parse_issue_list(r["expected_results"]))
     for r in buggy_results.to_dict(orient="records")
 ]
-min_depth_total = min(depth_values_total)
-max_depth_total = max(depth_values_total)
-depth_range_total_cell = f"{min_depth_total}--{max_depth_total}"
+avg_depth_total = sum(depth_values_total) / len(depth_values_total)
+depth_avg_total_cell = approx(avg_depth_total, ".1f")
 fixed_clear_count = sum(1 for r in buggy_results.to_dict(orient="records") if fixed_clears_bug_by_bm.get(get_bm_name(r["benchmark"]), False))
 fixed_clear_rate = f"{fixed_clear_count}/{total}"
 times = [r["time"] for r in buggy_results.to_dict(orient="records")]
-min_time = min(times)
-max_time = max(times)
-time_range = f"{min_time:.2f}--{max_time:.2f}s"
+avg_time_total = sum(times) / len(times)
+time_avg_total_cell = f"{approx(avg_time_total, '.2f')}s"
 
 we_count = sum(1 for r in buggy_results.to_dict(orient="records") if "WE" in features.get(get_bm_name(r["benchmark"]), []))
 cs_count = sum(1 for r in buggy_results.to_dict(orient="records") if "CS" in features.get(get_bm_name(r["benchmark"]), []))
@@ -404,7 +475,7 @@ feature_count_marks = f"{we_count} \\WE/{cs_count} \\SP/{fs_count} \\FS"
 
 print(rf"""
 \midrule
- & \textbf{{Total}} & {loc_range} &  & {detected_bugs}/{total_bugs} & {depth_range_total_cell} & {fixed_clear_rate} & {time_range} & {feature_count_marks} &  \\ """)
+ & \textbf{{Total}} & {loc_avg_total_cell} &  & {detected_bugs}/{total_bugs} & {depth_avg_total_cell} & {fixed_clear_rate} & {time_avg_total_cell} & {feature_count_marks} &  \\ """)
 
 print(r"""
 \bottomrule
@@ -431,12 +502,11 @@ n_bugs = (
     .str.split(";")
     .map(len)
 )
-bugs_min = n_bugs.min()
-bugs_max = n_bugs.max()
+bugs_avg = n_bugs.mean()
 
 print(f"% Total benchmarks: {total_benchmarks}", file=sys.stderr)
 print(f"% Total bugs: {total_bugs}", file=sys.stderr)
-print(f"% Bugs per benchmark: {bugs_min}--{bugs_max}", file=sys.stderr)
+print(f"% Bugs per benchmark: ~{bugs_avg:.2f}", file=sys.stderr)
 
 # Averages
 avg_loc = sum(get_loc(r["benchmark"]) for r in buggy_results.to_dict(orient="records")) / total_benchmarks

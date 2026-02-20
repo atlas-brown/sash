@@ -27,12 +27,12 @@ BENCHMARK_NAMES = {
     "commits/unset_var_3": "Vim config backup script",
     "commits/unset_var_5": "NVM install downloader",
     "commits/unset_var_set_u_1": "OpenStack log collector",
-    "commits/unset_var_set_u_2": "Audio watermark build script",
+    "commits/unset_var_set_u_2": "Audio watermark build",
     "milestone_1/redir_to_func-redir_to_func": "Log redirection helper",
     "milestone_2/loop_once": "Two-file cleanup",
     "milestone_2/loop_once-loop_once": "Directory chmod loop",
-    "milestone_2/unset_var-const_if-dead_code": "Rsync directory copy script",
-    "simple_fs/access_after_mv": "ActualBudget update helper",
+    "milestone_2/unset_var-const_if-dead_code": "Backup rsync script",
+    "simple_fs/access_after_mv": "ActualBudget updater",
     "simple_fs/access_del_resource": "TV transcode move loop",
     "simple_fs/cd_into_file": "Repo archiver",
     "simple_fs/overwrite_file_2": "Contest winner mover",
@@ -41,7 +41,7 @@ BENCHMARK_NAMES = {
     "web_forums/capturing_empty_output": "Domain folder creator",
     "web_forums/unexpected_stdin": "System restoration script",
     "web_forums/unset_var":  "File check",
-    "web_forums/unset_var-cmd_always_fails": "Filesystem preparation helper",
+    "web_forums/unset_var-cmd_always_fails": "Filesystem preparation",
 }
 
 _WORD_RE = re.compile(r"[a-z0-9]+")

@@ -953,8 +953,6 @@ def plot_runtime(data, output_path):
 def plot_timeout_sweep_bug_catch(timeout_sweep_dir, output_path):
     series_specs = [
         ("dfs_on", f"Full {sysname}", color_scheme[0], re.compile(r"results_t([0-9]+(?:\.[0-9]+)?)_dfs_on\.csv$")),
-        ("dfs_no_targeted", "No targeted exploration", color_scheme[1], re.compile(r"results_t([0-9]+(?:\.[0-9]+)?)_dfs_no_targeted\.csv$")),
-        ("dfs_no_unbound_empty", "No corner environment instantiation", color_scheme[3], re.compile(r"results_t([0-9]+(?:\.[0-9]+)?)_dfs_no_unbound_empty\.csv$")),
         ("dfs_off", "Base exploration", color_scheme[2], re.compile(r"results_t([0-9]+(?:\.[0-9]+)?)_dfs_off\.csv$")),
     ]
     series_paths = {
