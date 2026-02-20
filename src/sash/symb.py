@@ -941,7 +941,7 @@ def expand_simple(stuff: list[AST.ArgChar],
                     if not self.quoted and getattr(t, "string", None) in (None, "None"):
                         home_var = self.state.lookup("HOME")
                         if home_var is not None:
-                            self.add_a_field(home_var.value)
+                            self.add_a_field(home_var.value.quote())
                         else:
                             self.add_a_field(arbitrary_field(t, ArbitraryType.ENVIRONMENT, self.state))
                     else:
