@@ -83,6 +83,10 @@ def main():
     parser.add_argument("-D", "--enable-dfs", action="store_true",
                         help="Enable DFS for SaSh")
     parser.add_argument(
+        "--fork-everywhere", action="store_true",
+        help="Force symbolic execution to fork outside checked positions and disable trace collapsing."
+    )
+    parser.add_argument(
         "--shellcheck", action="store_true",
         help="Run ShellCheck instead of SaSh"
     )
@@ -146,6 +150,7 @@ def main():
                     log_file=args.error_log,
                     log_level="error",
                     enable_dfs=args.enable_dfs,
+                    fork_everywhere=args.fork_everywhere,
                 )
             except SystemExit as e:
                 crashed += 1

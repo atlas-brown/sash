@@ -22,6 +22,7 @@ def symbexec_main(file: str,
                   enable_dfs: bool = False,
                   enable_targeted_dfs: bool = True,
                   enable_unbound_empty_dfs: bool = True,
+                  fork_everywhere: bool = False,
                   debug_instrumentation: bool = False) -> sash.symb.SymbexecResult:
     global timers
     timers = []
@@ -30,9 +31,13 @@ def symbexec_main(file: str,
         logging.info(f"Debug instrumentation enabled: detailed json execution logging to {DebugLogger.default_log_file}")
         DebugLogger.initialize(file)
 
-    config = InterpConfig(trace_collapser = sash.symb.collapse_traces_if_too_many,
-                          debug_instrumentation = debug_instrumentation,
-                          DFS_first = enable_dfs)
+    config = InterpConfig(
+        trace_collapser=sash.symb.collapse_traces_if_too_many,
+        disable_trace_collapsing=fork_everywhere,
+        force_fork_all=fork_everywhere,
+        debug_instrumentation=debug_instrumentation,
+        DFS_first=enable_dfs,
+    )
 
     Reporter.initialize(file)
     start_time = time.perf_counter()
@@ -86,6 +91,7 @@ def main(file: str,
          enable_dfs: bool = False,
          enable_targeted_dfs: bool = True,
          enable_unbound_empty_dfs: bool = True,
+         fork_everywhere: bool = False,
          debug_instrumentation: bool = False) -> Report:
 
     logging.basicConfig(
@@ -107,6 +113,7 @@ def main(file: str,
         enable_dfs,
         enable_targeted_dfs,
         enable_unbound_empty_dfs,
+        fork_everywhere,
         debug_instrumentation,
     )
     return Reporter.get_report()
@@ -127,6 +134,7 @@ def cli_main():
         enable_dfs=args.enable_dfs,
         enable_targeted_dfs=not args.disable_targeted_dfs,
         enable_unbound_empty_dfs=not args.disable_unbound_empty_dfs,
+        fork_everywhere=args.fork_everywhere,
         debug_instrumentation=args.enable_debug_instrumentation,
     )
 
@@ -178,6 +186,12 @@ def parse_cli():
         "--disable-unbound-empty-dfs",
         action="store_true",
         help="Disable DFS passes that treat unbound variables as empty strings (only applies with --enable-dfs).",
+    )
+
+    parser.add_argument(
+        "--fork-everywhere",
+        action="store_true",
+        help="Force symbolic execution to fork even outside checked positions and disable trace collapsing.",
     )
 
     parser.add_argument(

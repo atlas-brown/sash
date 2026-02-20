@@ -28,7 +28,9 @@ class InterpConfig:
     node_cbs: list[NodeCB] = field(default_factory=list)
     expanded_command_cbs: list[ExpandedCmdCB] = field(default_factory=list)
     trace_collapser: TraceCollapser = lambda ts: (ts, [])
+    disable_trace_collapsing: bool = False
     in_checked_position: bool = False
+    force_fork_all: bool = False
     max_loop_unroll: int = 2
     unbound_policy: UnboundVariablePolicy = UnboundVariablePolicy.SYMBOLIC
     DFS_first: bool = True

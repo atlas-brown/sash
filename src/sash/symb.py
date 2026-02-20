@@ -64,8 +64,8 @@ def handle_commandnode(traces: Traces,
                     for trace in traces:
                         ts, tf = handle_rm(arg_fields, trace, node, config)
                         cmd_traces.append(ts)
-                        if config.in_checked_position:
-                            logging.debug("rm is in a checked position? Adding failure traces")
+                        if config.in_checked_position or config.force_fork_all:
+                            logging.debug("Adding failure traces for rm")
                             cmd_traces.append(tf)
                 t1 = cmd_traces
             case "set":
@@ -169,7 +169,7 @@ def handle_commandnode(traces: Traces,
                                                                      Confidence.DEFINITE if s.opts.is_set(SetOptions.NOFAIL) and not config.in_checked_position else Confidence.SPECULATIVE,
                                                                      spec.failure_postcond))
                 t_failure = []
-                if config.in_checked_position:
+                if config.in_checked_position or config.force_fork_all:
                     t_failure_precond = [t for t in t_precond if not pathcond_contradicts(t.latest_state, spec.failure_postcond)]
                     t_failure = trace_map(t_failure_precond,
                                           lambda s: s.update_fs(spec.failure_postcond)\
@@ -379,7 +379,7 @@ def handle_unknown_command(name: str,
     #t = trace_map(traces, lambda s: s.update_fs(And.from_field_iter(arg_fields, lambda f: IsFile(f) >> IsRead(f))))
     #return t
     # this makes execution significantly slower, so for now leave it commented out
-    if config.in_checked_position:
+    if config.in_checked_position or config.force_fork_all:
         t_success = trace_map(traces, lambda s: s.set_last_exit_code(SymStr(("0",)), Confidence.SPECULATIVE))
         t_failure = trace_map(traces, lambda s: s.set_last_exit_code(SymStr(("1",)), Confidence.SPECULATIVE))
         return t_success + t_failure
@@ -1493,7 +1493,10 @@ def guarded_interp_node(traces: Traces,
     Reporter.mark_interpreted_ast_node(node)
 
     traces, inactive1 = drop_terminated_traces(traces)
-    traces, inactive2 = config.trace_collapser(traces)
+    if config.disable_trace_collapsing:
+        inactive2 = []
+    else:
+        traces, inactive2 = config.trace_collapser(traces)
     inactive_trace_stash.extend(inactive1 + inactive2)
     traces = config.apply_node_cbs(traces, node)
 
