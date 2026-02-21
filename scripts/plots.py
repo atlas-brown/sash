@@ -467,6 +467,22 @@ color_green = color_scheme[2]
 HEATMAP_MANUAL_BENCHMARK_ORDER = []
 
 
+def _format_coverage_tick(t: float) -> str:
+    if np.isclose(t, 0.0):
+        return "0"
+    if np.isclose(t, 1.0):
+        return "1"
+    if np.isclose(t, round(t, 1)):
+        s = f"{t:.1f}"
+    else:
+        s = f"{t:.2f}"
+    if s.startswith("0."):
+        return s[1:]
+    if s.startswith("-0."):
+        return "-" + s[2:]
+    return s
+
+
 def _get_bug_sets_for_kind(data, kind):
     sash_detected = set()
     shellcheck_detected = set()
@@ -1583,7 +1599,7 @@ def plot_runtime(data, output_path):
 
 
 def plot_coverage(data, output_path):
-    plt.figure(figsize=(9, 2.2))
+    plt.figure(figsize=(3.2, 2.2))
     data = data.copy()
     data["depth_bfs"] = data.apply(
         lambda row: deepest_bug_depth(
@@ -1624,12 +1640,23 @@ def plot_coverage(data, output_path):
     )
     plt.margins(x=0.02)
     plt.ylim(0, 1.14)
-    plt.yticks([0.0, 0.5, 1.0])
+    y_ticks = {0.0, 0.5, 1.0}
+    if len(keep_idx) > 0:
+        rest_cov_values = np.concatenate(
+            [series_y[key][keep_idx] for key, _, _, _ in chosen_specs]
+        )
+        if len(rest_cov_values) > 0:
+            avg_rest_cov = float(np.mean(rest_cov_values))
+            y_ticks.add(round(avg_rest_cov, 2))
+    y_ticks = sorted(y_ticks)
+    y_tick_labels = [_format_coverage_tick(t) for t in y_ticks]
+    plt.yticks(y_ticks, y_tick_labels)
 
     plt.xticks(
-        x, benchmarks, rotation=45, ha="right", rotation_mode="anchor", fontsize=7
+        x, benchmarks, rotation=45, ha="right", rotation_mode="anchor", fontsize=8
     )
     plt.ylabel("Coverage")
+    plt.grid(axis="y", linestyle=":", linewidth=0.6, alpha=0.25)
 
     for xi, depth, bar in zip(x, depth_labels, bars):
         y = min(1.08, bar.get_height() + 0.03)
@@ -1648,6 +1675,8 @@ def plot_coverage(data, output_path):
         )
     )
     labels.append("Bug depth")
+    handles = handles[::-1]
+    labels = labels[::-1]
     plt.legend(
         handles,
         labels,
@@ -1782,19 +1811,42 @@ def plot_coverage_by_config(timeout_sweep_dir, base_buggy_data, output_path):
     group_width = 0.84
     bar_width = group_width / n_series
 
-    plt.figure(figsize=(9, 2.2))
-    all_y = []
-    for i, (key, label, color, _) in enumerate(chosen_specs):
+    plt.figure(figsize=(7.2, 2.2))
+    series_y = {}
+    for key, _, _, _ in chosen_specs:
         series_df = load_csv(chosen_paths[key])
         cov_map = _coverage_map_from_results(series_df)
         y_vals = np.array([cov_map.get(k, np.nan) for k in bench_keys], dtype=float)
         y_vals = np.nan_to_num(y_vals, nan=0.0)
         y_vals = np.clip(y_vals / 100.0, 0.0, 1.0)
-        all_y.append(y_vals)
+        series_y[key] = y_vals
+
+    bundle_mask = np.ones(len(bench_keys), dtype=bool)
+    for y_vals in series_y.values():
+        bundle_mask &= np.isclose(y_vals, 1.0, atol=1e-9)
+    keep_idx = np.where(~bundle_mask)[0]
+    bundle_idx = np.where(bundle_mask)[0]
+
+    plot_labels = [bench_labels[i] for i in keep_idx]
+    depth_texts = [f"{int(depth_labels[i])}" for i in keep_idx]
+    if len(bundle_idx) > 0:
+        plot_labels.insert(0, f"full cvg. ({len(bundle_idx)})")
+        avg_bundle_depth = float(np.mean([depth_labels[i] for i in bundle_idx]))
+        depth_texts.insert(0, f"~{avg_bundle_depth:.1f}")
+
+    x = np.arange(len(plot_labels))
+    all_y = []
+    for i, (key, label, color, _) in enumerate(chosen_specs):
+        y_vals = series_y[key]
+        if len(bundle_idx) > 0:
+            y_plot = np.concatenate([[float(np.mean(y_vals[bundle_idx]))], y_vals[keep_idx]])
+        else:
+            y_plot = y_vals[keep_idx]
+        all_y.append(y_plot)
         offset = (i - (n_series - 1) / 2.0) * bar_width
         plt.bar(
             x + offset,
-            y_vals,
+            y_plot,
             width=bar_width * 0.95,
             color=color,
             label=label,
@@ -1802,17 +1854,27 @@ def plot_coverage_by_config(timeout_sweep_dir, base_buggy_data, output_path):
 
     plt.margins(x=0.02)
     plt.ylim(0, 1.14)
-    plt.yticks([0.0, 0.5, 1.0])
+    y_ticks = {0.0, 0.5, 1.0}
+    if len(keep_idx) > 0:
+        rest_cov_values = np.concatenate(
+            [series_y[key][keep_idx] for key, _, _, _ in chosen_specs]
+        )
+        if len(rest_cov_values) > 0:
+            y_ticks.add(round(float(np.mean(rest_cov_values)), 2))
+    y_ticks = sorted(y_ticks)
+    y_tick_labels = [_format_coverage_tick(t) for t in y_ticks]
+    plt.yticks(y_ticks, y_tick_labels)
     plt.xticks(
-        x, bench_labels, rotation=45, ha="right", rotation_mode="anchor", fontsize=7
+        x, plot_labels, rotation=45, ha="right", rotation_mode="anchor", fontsize=7
     )
     plt.ylabel("Coverage")
+    plt.grid(axis="y", linestyle=":", linewidth=0.6, alpha=0.25)
 
     if all_y:
         group_tops = np.max(np.vstack(all_y), axis=0)
-        for xi, depth, top in zip(x, depth_labels, group_tops):
+        for xi, depth_text, top in zip(x, depth_texts, group_tops):
             y = min(1.08, top + 0.03)
-            plt.text(xi, y, f"{int(depth)}", ha="center", va="bottom", fontsize=7)
+            plt.text(xi, y, depth_text, ha="center", va="bottom", fontsize=7)
 
     handles, labels = plt.gca().get_legend_handles_labels()
     handles.append(
@@ -1827,8 +1889,6 @@ def plot_coverage_by_config(timeout_sweep_dir, base_buggy_data, output_path):
         )
     )
     labels.append("Bug depth")
-    handles = handles[::-1]
-    labels = labels[::-1]
     plt.legend(
         handles,
         labels,
