@@ -10,8 +10,8 @@ Usage:
 
 Options:
   --timeouts LIST      Comma-separated timeout values in seconds.
-                       Example: --timeouts 1,5,10,20,30,60
-                       Default: 1,5,10,20,30,60
+                       Example: --timeouts 1,5,10,15,20,25,30,60
+                       Default: 1,5,10,15,20,25,30,60
   --mock               Generate synthetic (plausible) CSVs instead of running evaluation.
   --base-csv PATH      Template CSV used by --mock mode.
                        Default: results/results.csv
@@ -48,7 +48,7 @@ EOF
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
 
-TIMEOUTS_CSV="1,5,10,20,30,60"
+TIMEOUTS_CSV="1,5,10,15,20,25,30,60"
 OUTPUT_DIR="results"
 SWEEP_SUBDIR="timeout-sweep"
 ONLY_REGEX=".*"
@@ -143,14 +143,14 @@ for raw_t in "${TIMEOUTS[@]}"; do
         *) seed_offset=0 ;;
       esac
       cmd=(
-        python scripts/generate_mock_eval_csv.py
+        uv run scripts/generate_mock_eval_csv.py
         --base-csv "${BASE_CSV}"
         --output-csv "${csv_path}"
         --timeout "${t}"
         --seed "$((MOCK_SEED + seed_offset))"
       )
     else
-      cmd=(python scripts/evaluation.py -f -v --only "${ONLY_REGEX}" -t "${t}" -T "${t}" -c "${csv_path}")
+      cmd=(uv run scripts/evaluation.py -f -v --only "${ONLY_REGEX}" -t "${t}" -T "${t}" -c "${csv_path}")
       if [[ -n "${JOBS}" ]]; then
         cmd+=(-j "${JOBS}")
       fi

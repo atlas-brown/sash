@@ -832,7 +832,15 @@ def _plot_system_good_bad_panel(
     for value in good_counts:
         if 0 < value < max_total:
             interest_ticks.append(value)
-    ax.set_xticks(sorted(set(interest_ticks)))
+    ticks_sorted = sorted(set(interest_ticks))
+    filtered_ticks = []
+    for tick in ticks_sorted:
+        if not filtered_ticks or (tick - filtered_ticks[-1]) >= 2:
+            filtered_ticks.append(tick)
+        elif tick == ticks_sorted[-1]:
+            # Keep the right-most endpoint tick even if it is close to the previous one.
+            filtered_ticks[-1] = tick
+    ax.set_xticks(filtered_ticks)
     ax.tick_params(axis="x", labelsize=8)
     ax.grid(axis="x", linestyle=":", linewidth=0.6, alpha=0.5)
     ax.set_axisbelow(True)
@@ -888,7 +896,7 @@ def plot_bug_detection_bars_split_versions(data, output_path):
     fig, axes = plt.subplots(1, 3, figsize=(10.5, 1.8), sharey=True)
     _plot_system_good_bad_panel(
         axes[0],
-        "Original Buggy",
+        "Buggy",
         buggy_good,
         buggy_bad,
         max_total,
