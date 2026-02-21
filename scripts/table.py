@@ -390,14 +390,14 @@ def create_table_line(result, allow_fallback=False):
     feature_mark = feature_marks(features.get(bm_name, []))
 
     bugs_detected_cell = f"{detected}/{n_bugs}"
-    return f"{bm_short_id} & {name} & {loc}  & {description} & {bugs_detected_cell} & {depth_cell} & {fixed_mark} & {time} & {feature_mark} & {source}  \\\\"
+    return f"{bm_short_id} & {name} & {description} & {bugs_detected_cell} & {fixed_mark} & {time} & {feature_mark} & {loc} & {depth_cell} & {source}  \\\\"
 
 rest_of_benchmarks = []
 
 print(r"""
-    \begin{tabular}{llrlrrcrcl}
+    \begin{tabular}{lllrcrcrrl}
     \toprule
-    \textbf{ID} & \textbf{Name} & \textbf{LoC} & \textbf{Description} & \textbf{D?/\#B} & \textbf{D\textdownarrow} & \textbf{F?} & \textbf{$t$} & \textbf{$\mathcal{F}$} & \textbf{Source} \\
+    \textbf{ID} & \textbf{Name} & \textbf{Description} & \textbf{D?/\#B} & \textbf{F?} & \textbf{$t$} & \textbf{F} & \textbf{LoC} & \textbf{$\downarrow$} & \textbf{Source} \\
     \midrule
 """
 )
@@ -442,7 +442,7 @@ if not args.appendix and rest_of_benchmarks:
     fs_count = sum(1 for r in rest_of_benchmarks if "FS" in features.get(get_bm_name(r["benchmark"]), []))
     feature_count_marks = f"{we_count} \\WE/{cs_count} \\SP/{fs_count} \\FS"
 
-    print(rf""" & \emph{{More buggy scripts}} & {loc_avg_cell} &  & {detected_bugs_rest}/{total_bugs_rest} & {depth_avg_rest_cell} & {fixed_clear_rate} & {time_avg_cell} & {feature_count_marks} & \cref{{sec:full-ds}} \\""")
+    print(rf""" & \emph{{More buggy scripts}} &  & {detected_bugs_rest}/{total_bugs_rest} & {fixed_clear_rate} & {time_avg_cell} & {feature_count_marks} & {loc_avg_cell} & {depth_avg_rest_cell} & \cref{{sec:full-ds}} \\""")
     print(r"\hspace{.5em}\dots & & & & & & & & & \\")
 
 # Print summary line across all benchmarks
@@ -475,7 +475,7 @@ feature_count_marks = f"{we_count} \\WE/{cs_count} \\SP/{fs_count} \\FS"
 
 print(rf"""
 \midrule
- & \textbf{{Total}} & {loc_avg_total_cell} &  & {detected_bugs}/{total_bugs} & {depth_avg_total_cell} & {fixed_clear_rate} & {time_avg_total_cell} & {feature_count_marks} &  \\ """)
+ & \textbf{{Total}} &  & {detected_bugs}/{total_bugs} & {fixed_clear_rate} & {time_avg_total_cell} & {feature_count_marks} & {loc_avg_total_cell} & {depth_avg_total_cell} &  \\ """)
 
 print(r"""
 \bottomrule

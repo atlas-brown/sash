@@ -369,6 +369,75 @@ def load_csv(file_path):
         exit(1)
 
 
+def has_coverage_values(data):
+    if "ast_coverage_pct" in data.columns:
+        cov = pd.to_numeric(data["ast_coverage_pct"], errors="coerce")
+        if cov.notna().any():
+            return True
+    if {"ast_nodes_total", "ast_nodes_interpreted"}.issubset(set(data.columns)):
+        total = pd.to_numeric(data["ast_nodes_total"], errors="coerce")
+        interp = pd.to_numeric(data["ast_nodes_interpreted"], errors="coerce")
+        if (total > 0).any() and interp.notna().any():
+            return True
+    return False
+
+
+def inject_coverage_from_timeout_sweep(buggy_data, timeout_sweep_dir):
+    """Fill missing coverage columns from the latest full-SaSh timeout-sweep CSV."""
+    paths_dfs_on = glob.glob(os.path.join(timeout_sweep_dir, "results_t*_dfs_on.csv"))
+    if paths_dfs_on:
+        timeout_re = re.compile(r"results_t([0-9]+(?:\.[0-9]+)?)_dfs_on\.csv$")
+        candidate_paths = paths_dfs_on
+    else:
+        timeout_re = re.compile(r"results_t([0-9]+(?:\.[0-9]+)?)\.csv$")
+        candidate_paths = glob.glob(os.path.join(timeout_sweep_dir, "results_t*.csv"))
+
+    if not candidate_paths:
+        return buggy_data
+
+    best_path = None
+    best_timeout = -1.0
+    for path in candidate_paths:
+        m = timeout_re.search(os.path.basename(path))
+        if not m:
+            continue
+        t = float(m.group(1))
+        if t > best_timeout:
+            best_timeout = t
+            best_path = path
+    if best_path is None:
+        return buggy_data
+
+    sweep = load_csv(best_path)
+    if "kind" in sweep.columns:
+        sweep = sweep[sweep["kind"] == "buggy"].copy()
+    cov_cols = ["ast_coverage_pct", "ast_nodes_total", "ast_nodes_interpreted"]
+    if "benchmark" not in sweep.columns or not any(c in sweep.columns for c in cov_cols):
+        return buggy_data
+
+    enriched = buggy_data.copy()
+    if "benchmark" not in enriched.columns:
+        return enriched
+
+    enriched["_bench_key"] = enriched["benchmark"].astype(str).apply(benchmark_key)
+    sweep["_bench_key"] = sweep["benchmark"].astype(str).apply(benchmark_key)
+    keep_cols = ["_bench_key"] + [c for c in cov_cols if c in sweep.columns]
+    sweep_cov = sweep[keep_cols].drop_duplicates(subset=["_bench_key"], keep="last")
+
+    merged = enriched.merge(sweep_cov, on="_bench_key", how="left", suffixes=("", "_sw"))
+    for col in cov_cols:
+        sw_col = f"{col}_sw"
+        if sw_col not in merged.columns:
+            continue
+        if col not in merged.columns:
+            merged[col] = merged[sw_col]
+        else:
+            merged[col] = merged[col].where(merged[col].notna(), merged[sw_col])
+        merged = merged.drop(columns=[sw_col])
+    merged = merged.drop(columns=["_bench_key"])
+    return merged
+
+
 def get_loc(path):
     resolved = resolve_benchmark_path(path)
     proc = os.popen(f"cloc --json {shlex.quote(str(resolved))}")
@@ -1506,6 +1575,79 @@ def plot_runtime(data, output_path):
     plt.close()
 
 
+def plot_coverage(data, output_path):
+    plt.figure(figsize=(9, 3))
+    data = data.copy()
+    data["depth_bfs"] = data.apply(
+        lambda row: deepest_bug_depth(
+            row["benchmark"], parse_issue_list(row["expected_results"])
+        ),
+        axis=1,
+    )
+    data = data.sort_values(by=["depth_bfs", "time"], ascending=[True, True])
+
+    if "ast_coverage_pct" in data.columns:
+        coverage = pd.to_numeric(data["ast_coverage_pct"], errors="coerce")
+    else:
+        coverage = pd.Series(np.nan, index=data.index, dtype=float)
+    if coverage.isna().all():
+        if "ast_nodes_interpreted" in data.columns:
+            interp = pd.to_numeric(data["ast_nodes_interpreted"], errors="coerce")
+        else:
+            interp = pd.Series(np.nan, index=data.index, dtype=float)
+        if "ast_nodes_total" in data.columns:
+            total = pd.to_numeric(data["ast_nodes_total"], errors="coerce")
+        else:
+            total = pd.Series(np.nan, index=data.index, dtype=float)
+        coverage = pd.Series(
+            np.where(total > 0, (100.0 * interp / total), np.nan), index=data.index
+        )
+    coverage = coverage.fillna(0.0).clip(lower=0, upper=100)
+
+    benchmarks = data["benchmark"].apply(get_runtime_label)
+    depth_labels = data["depth_bfs"]
+    x = np.arange(len(data))
+
+    bars = plt.bar(
+        x,
+        coverage.to_numpy(),
+        color=color_scheme[0],
+        width=0.65,
+        label="AST coverage",
+    )
+    plt.margins(x=0.02)
+    plt.ylim(0, 104)
+    plt.yticks([0, 20, 40, 60, 80, 100])
+
+    plt.xticks(
+        x, benchmarks, rotation=45, ha="right", rotation_mode="anchor", fontsize=7
+    )
+    plt.ylabel("Coverage (%)")
+
+    for xi, depth, bar in zip(x, depth_labels, bars):
+        y = min(102.0, bar.get_height() + 1.0)
+        plt.text(xi, y, f"{int(depth)}", ha="center", va="bottom", fontsize=7)
+
+    handles, labels = plt.gca().get_legend_handles_labels()
+    handles.append(
+        Line2D(
+            [],
+            [],
+            linestyle="none",
+            marker="$n$",
+            markersize=5,
+            color="0.35",
+            label="Bug depth",
+        )
+    )
+    labels.append("Bug depth")
+    plt.legend(handles, labels, fontsize=8, loc="lower right", frameon=True)
+    plt.subplots_adjust(bottom=0.30)
+    plt.tight_layout()
+    plt.savefig(output_path, format="pdf")
+    plt.close()
+
+
 def estimate_runtime_timeouts(data):
     timeout_rows = (
         data[data["timed_out"] == True]
@@ -1529,16 +1671,28 @@ def estimate_runtime_timeouts(data):
 def plot_timeout_sweep_bug_catch(timeout_sweep_dir, output_path):
     series_specs = [
         (
+            "no_opts",
+            "No opts",
+            color_scheme[4],
+            re.compile(r"results_t([0-9]+(?:\.[0-9]+)?)_no_opts\.csv$"),
+        ),
+        (
+            "smart_forking",
+            "Smart forking",
+            color_scheme[3],
+            re.compile(r"results_t([0-9]+(?:\.[0-9]+)?)_smart_forking\.csv$"),
+        ),
+        (
+            "solver_opts",
+            "Solver opts",
+            color_scheme[2],
+            re.compile(r"results_t([0-9]+(?:\.[0-9]+)?)_solver_opts\.csv$"),
+        ),
+        (
             "dfs_on",
             f"Full {sysname}",
             color_scheme[0],
             re.compile(r"results_t([0-9]+(?:\.[0-9]+)?)_dfs_on\.csv$"),
-        ),
-        (
-            "dfs_off",
-            "Base exploration",
-            color_scheme[2],
-            re.compile(r"results_t([0-9]+(?:\.[0-9]+)?)_dfs_off\.csv$"),
         ),
     ]
     series_paths = {
@@ -1629,15 +1783,26 @@ def plot_timeout_sweep_bug_catch(timeout_sweep_dir, output_path):
             label="_nolegend_",
         )
         ax = plt.gca()
-        y_ticks = set(ax.get_yticks().tolist())
-        y_ticks.add(float(total))
-        ax.set_yticks(sorted(y_ticks))
         if all_y_arrays:
             min_seen = float(np.min(np.concatenate(all_y_arrays)))
             y_lower = max(0.0, min_seen - 2.0)
         else:
             y_lower = 0.0
-        ax.set_ylim(y_lower, float(total) + 1.0)
+        y_lower_int = int(np.floor(y_lower))
+        span = total - y_lower_int
+        if span <= 4:
+            y_ticks = np.arange(y_lower_int, total + 1, 1, dtype=int)
+        else:
+            y_ticks = sorted(
+                {
+                    y_lower_int,
+                    *[int(round(v)) for v in np.linspace(y_lower_int, total, 5)],
+                    total,
+                }
+            )
+        ax.set_yticks(y_ticks)
+        ax.set_ylim(float(y_lower_int), float(total))
+        # Keep the truncated y-axis via limits/ticks only.
 
     plt.xlabel("Timeout (s)")
     plt.ylabel("Bugs caught")
@@ -1667,26 +1832,48 @@ def _as_bool(value):
 
 
 def plot_koala_timeout_cdf(koala_sweep_dir, output_path):
-    paths = glob.glob(os.path.join(koala_sweep_dir, "results_t*_dfs_on.csv"))
-    timeout_re = re.compile(r"results_t([0-9]+(?:\.[0-9]+)?)_dfs_on\.csv$")
+    all_paths = glob.glob(os.path.join(koala_sweep_dir, "results_t*.csv"))
+    timeout_re_dfs_on = re.compile(r"results_t([0-9]+(?:\.[0-9]+)?)_dfs_on\.csv$")
+    timeout_re_plain = re.compile(r"results_t([0-9]+(?:\.[0-9]+)?)\.csv$")
 
-    if not paths:
+    if not all_paths:
         print(
             f"% No Koala timeout-sweep CSV files found in {koala_sweep_dir}; skipping koala CDF plot",
             file=sys.stderr,
         )
         return
 
+    # Prefer explicit full-SaSh files (_dfs_on) when both naming styles exist.
+    selected_by_timeout = {}
+    for path in all_paths:
+        base = os.path.basename(path)
+        m_dfs = timeout_re_dfs_on.search(base)
+        if m_dfs:
+            timeout_value = float(m_dfs.group(1))
+            selected_by_timeout[timeout_value] = path
+            continue
+        m_plain = timeout_re_plain.search(base)
+        if not m_plain:
+            continue
+        timeout_value = float(m_plain.group(1))
+        selected_by_timeout.setdefault(timeout_value, path)
+
+    paths = list(selected_by_timeout.values())
+
     timeout_vals = []
     complete_counts = []
     total_counts = []
 
     for path in paths:
-        match = timeout_re.search(os.path.basename(path))
-        if not match:
+        base = os.path.basename(path)
+        m_dfs = timeout_re_dfs_on.search(base)
+        m_plain = timeout_re_plain.search(base)
+        if m_dfs:
+            timeout_value = float(m_dfs.group(1))
+        elif m_plain:
+            timeout_value = float(m_plain.group(1))
+        else:
             continue
-
-        timeout_value = float(match.group(1))
         data = load_csv(path)
 
         # Koala sweep files should contain full SaSh results only, but filter defensively.
@@ -1809,6 +1996,12 @@ def main():
         os.path.dirname(os.path.abspath(args.results_csv)),
         "timeout-sweep",
     )
+    coverage_results = buggy_results
+    if not has_coverage_values(coverage_results):
+        coverage_results = inject_coverage_from_timeout_sweep(
+            coverage_results, timeout_sweep_dir
+        )
+    plot_coverage(coverage_results, os.path.join(args.output_dir, "coverage.pdf"))
     plot_timeout_sweep_bug_catch(
         timeout_sweep_dir,
         os.path.join(args.output_dir, "timeout-sweep-bugs-caught.pdf"),
