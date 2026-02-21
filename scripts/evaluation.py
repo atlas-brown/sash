@@ -674,6 +674,9 @@ def job_to_run_result(job: FinishedJob) -> report.RunResult:
             actual_results=None,
             shellcheck_codes=None,
             line_numbers=None,
+            ast_nodes_total=None,
+            ast_nodes_interpreted=None,
+            ast_coverage_pct=None,
         )
 
     assert job.additional_info is not None
@@ -703,6 +706,9 @@ def job_to_run_result(job: FinishedJob) -> report.RunResult:
         actual_results=actual_results,
         shellcheck_codes=shellcheck_codes,
         line_numbers=line_numbers,
+        ast_nodes_total=job.report.ast_nodes_total,
+        ast_nodes_interpreted=job.report.ast_nodes_interpreted,
+        ast_coverage_pct=job.report.ast_coverage_pct,
     )
 
 
@@ -727,7 +733,10 @@ def export_as_csv(
                 f"{';'.join([e if e is not None else '' for e in r.expected_results]) if r.expected_results else ''},"
                 f"{';'.join([a if a is not None else '' for a in r.actual_results]) if r.actual_results else ''},"
                 f"{';'.join([c if c is not None else '' for c in r.shellcheck_codes]) if r.shellcheck_codes else ''},"
-                f"{';'.join(str(line) if line is not None else '' for line in r.line_numbers) if r.line_numbers else ''}"
+                f"{';'.join(str(line) if line is not None else '' for line in r.line_numbers) if r.line_numbers else ''},"
+                f"{r.ast_nodes_total if r.ast_nodes_total is not None else ''},"
+                f"{r.ast_nodes_interpreted if r.ast_nodes_interpreted is not None else ''},"
+                f"{r.ast_coverage_pct if r.ast_coverage_pct is not None else ''}"
                 "\n"
             )
 

@@ -21,6 +21,9 @@ class RunResult(NamedTuple):
     actual_results: list[str] | None
     shellcheck_codes: list[str] | None
     line_numbers: list[int | None] | None
+    ast_nodes_total: int | None
+    ast_nodes_interpreted: int | None
+    ast_coverage_pct: float | None
 
 
 def generate_html_report(html_file: Path, run_results: list[RunResult], ran: int, skipped: int, failed: int, unknown: int, timed_out: int,
@@ -396,6 +399,9 @@ def load_results_from_csv(csv_file: Path) -> tuple[list[RunResult], int, int, in
                 actual_results=row['actual_results'].split(';') if row['actual_results'] else None,
                 shellcheck_codes=row['shellcheck_codes'].split(';') if row['shellcheck_codes'] else None,
                 line_numbers=[int(x) if x else None for x in row['line_numbers'].split(';')] if row['line_numbers'] else None,
+                ast_nodes_total=int(row['ast_nodes_total']) if row.get('ast_nodes_total') else None,
+                ast_nodes_interpreted=int(row['ast_nodes_interpreted']) if row.get('ast_nodes_interpreted') else None,
+                ast_coverage_pct=float(row['ast_coverage_pct']) if row.get('ast_coverage_pct') else None,
             )
             run_results.append(result)
 
