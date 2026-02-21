@@ -441,6 +441,20 @@ echo "not dead code!"
     report = reset_and_run_main(script, solver=True)
     assert_expected_report(report, []) # Notice: no DeadCode error
 
+def test_cmdsubst_condition_no_dead_code_false_positive(tmp_path):
+    # Non-constant command substitutions used as conditions should not
+    # cause dead-code reports on sibling branches.
+    script = write_script(tmp_path, """
+INDEX=$(git status --porcelain 2> /dev/null)
+if $(echo "$INDEX" | grep '^A  ' >/dev/null 1>&2); then
+    STATUS="a"
+elif $(echo "$INDEX" | grep '^M  ' >/dev/null 1>&2); then
+    STATUS="b"
+fi
+""")
+    report = reset_and_run_main(script)
+    assert_expected_report(report, [])
+
 def test_non_command(tmp_path):
     # Invoking a non-command should produce a NotACommand error
     script = write_script(tmp_path, """

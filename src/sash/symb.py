@@ -185,6 +185,12 @@ def handle_commandnode(traces: Traces,
                 t1 = handle_function_call_or_unknown(some_name, expanded_args[1:], t1, config)
             case _:
                 logging.debug("Non-constant command invocation %s, optimistically treating as no-op", expanded_args)
+                # In checked positions (if/while conditions), non-constant commands may either
+                # succeed or fail. Keep both outcomes to avoid incorrectly pruning branches.
+                if config.in_checked_position or config.force_fork_all:
+                    t_success = trace_map(t1, lambda s: s.set_last_exit_code(SymStr(("0",)), Confidence.SPECULATIVE))
+                    t_failure = trace_map(t1, lambda s: s.set_last_exit_code(SymStr(("1",)), Confidence.SPECULATIVE))
+                    t1 = t_success + t_failure
 
     for redir in node.redir_list:
         t1 = guarded_interp_node(t1, redir, config)
@@ -1532,9 +1538,24 @@ def interp_node(traces: Traces,
                 return t
 
             # command (e.g. echo hello)
-            # note: local assignments (e.g. LC_ALL=C sort file.txt) are ignored for now
+            # note: local assignments (e.g. LC_ALL=C sort file.txt) are still ignored
+            # semantically for command execution, but we do evaluate their RHS
+            # expansions (e.g., command substitutions) for issue reporting/coverage.
+            t = traces
+            for assign in node.assignments:
+                assert isinstance(assign, AST.AssignNode)
+                Reporter.mark_interpreted_ast_node(assign)
+                val = (
+                    assign.val[0].arg
+                    if len(assign.val) == 1 and isinstance(assign.val[0], AST.QArgChar)
+                    else assign.val
+                )
+                # We intentionally do not persist assignment effects here.
+                # Only evaluate expansions to reflect interpretation of RHS nodes.
+                trace_expansion_pairs = expand(t, val, config)
+                t = [trace for (trace, _) in trace_expansion_pairs]
 
-            return handle_commandnode(traces, node, config)
+            return handle_commandnode(t, node, config)
 
         case AST.IfNode():
             return handle_if(traces, node, config)
