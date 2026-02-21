@@ -57,7 +57,9 @@ def get_depth_metrics(path):
 
     if script_key not in _depth_metrics_cache:
         try:
-            lines = script_path.read_text(encoding="utf-8", errors="surrogateescape").splitlines()
+            lines = script_path.read_text(
+                encoding="utf-8", errors="surrogateescape"
+            ).splitlines()
             _depth_metrics_cache[script_key] = compute_script_metrics(lines, script_key)
         except Exception:
             _depth_metrics_cache[script_key] = {
@@ -87,6 +89,7 @@ def deepest_bug_depth(path, expected_issues):
     )
     return max_bfs_nodes
 
+
 def git_toplevel():
     return Path(
         subprocess.check_output(
@@ -94,8 +97,11 @@ def git_toplevel():
         ).strip()
     )
 
+
 ROOT_DIR = git_toplevel()
-with (ROOT_DIR / "benchmarks" / "codes_out_of_scope.yaml").open("r", encoding="utf-8") as f:
+with (ROOT_DIR / "benchmarks" / "codes_out_of_scope.yaml").open(
+    "r", encoding="utf-8"
+) as f:
     OOS_CODES = set(yaml.safe_load(f) or [])
 
 _benchmark_dir_cache = {}
@@ -118,7 +124,7 @@ def resolve_benchmark_path(path):
 
     # Repo-relative path.
     if not p.is_absolute():
-        local = (ROOT_DIR / p)
+        local = ROOT_DIR / p
         if local.exists():
             return local.resolve()
 
@@ -132,6 +138,7 @@ def resolve_benchmark_path(path):
 
     # Best-effort fallback.
     return (ROOT_DIR / p).resolve() if not p.is_absolute() else p
+
 
 def find_benchmark_dir(benchmark_path):
     if benchmark_path in _benchmark_dir_cache:
@@ -148,6 +155,7 @@ def find_benchmark_dir(benchmark_path):
 
     _benchmark_dir_cache[benchmark_path] = None
     return None
+
 
 def get_shellcheck_map_for_benchmark(benchmark_path):
     benchmark_dir = find_benchmark_dir(benchmark_path)
@@ -187,7 +195,9 @@ def get_benchmark_info(benchmark_path):
     return info
 
 
-def get_info_shellcheck_expected_counter(benchmark_path, kind, fallback_to_bug_default=True):
+def get_info_shellcheck_expected_counter(
+    benchmark_path, kind, fallback_to_bug_default=True
+):
     info = get_benchmark_info(benchmark_path)
     if not info:
         return Counter()
@@ -203,7 +213,7 @@ def get_info_shellcheck_expected_counter(benchmark_path, kind, fallback_to_bug_d
         rel_path = script_path.name
 
     gt = None
-    for gt_entry in (info.get("ground_truths") or []):
+    for gt_entry in info.get("ground_truths") or []:
         if gt_entry.get("kind") == kind and gt_entry.get("path") == rel_path:
             gt = gt_entry
             break
@@ -265,7 +275,7 @@ def get_info_shellcheck_no_variant_counter(benchmark_path, kind):
         rel_path = script_path.name
 
     gt = None
-    for gt_entry in (info.get("ground_truths") or []):
+    for gt_entry in info.get("ground_truths") or []:
         if gt_entry.get("kind") == kind and gt_entry.get("path") == rel_path:
             gt = gt_entry
             break
@@ -274,7 +284,7 @@ def get_info_shellcheck_no_variant_counter(benchmark_path, kind):
         return Counter()
 
     variant_bug_ids = set()
-    for gt_entry in (info.get("ground_truths") or []):
+    for gt_entry in info.get("ground_truths") or []:
         if gt_entry.get("kind") == "buggy_variant":
             variant_bug_ids.update((gt_entry.get("bugs") or {}).keys())
 
@@ -349,6 +359,7 @@ def get_benchmark_segments(data, kind):
         if by_family[f]["count"] > 0
     ]
 
+
 def load_csv(file_path):
     try:
         data = pd.read_csv(file_path)
@@ -356,6 +367,7 @@ def load_csv(file_path):
     except Exception as e:
         print(f"Error loading CSV file: {e}")
         exit(1)
+
 
 def get_loc(path):
     resolved = resolve_benchmark_path(path)
@@ -368,9 +380,11 @@ def get_loc(path):
     # assert loc > 0, f"Failed to get LoC for path: {path}"
     return loc
 
+
 def get_runtime_label(path):
     key = benchmark_key(path)
     return benchmark_display_name(path, default=key)
+
 
 sysname = "SaSh"
 figsize = (9, 3)
@@ -381,7 +395,8 @@ color_green = color_scheme[2]
 # Optional manual prefix order for heatmap columns.
 # Fill with short benchmark IDs (e.g., "njv") and/or benchmark keys
 # (e.g., "high_profile/c02-n"). Remaining benchmarks keep auto-sort order.
-HEATMAP_MANUAL_BENCHMARK_ORDER = [ ]
+HEATMAP_MANUAL_BENCHMARK_ORDER = []
+
 
 def _get_bug_sets_for_kind(data, kind):
     sash_detected = set()
@@ -561,18 +576,21 @@ def plot_bug_detection_euler(data, output_path):
     # neither = len(all_bugs_expected - (sash_detected | shellcheck_detected))
 
     combination_counts = {
-        (1, 0): only_sash,          # Only SaSh
-        (1, 1): both,               # Both
-        (0, 1): only_shell,         # Only ShellCheck
+        (1, 0): only_sash,  # Only SaSh
+        (1, 1): both,  # Both
+        (0, 1): only_shell,  # Only ShellCheck
         # (0, 0): neither             # Neither
     }
 
     plt.figure(figsize=figsize_small)
-    dgm = EulerDiagram(combination_counts, set_labels=[sysname, "ShellCheck"], set_colors=color_scheme)
+    dgm = EulerDiagram(
+        combination_counts, set_labels=[sysname, "ShellCheck"], set_colors=color_scheme
+    )
     plt.title(None)
     plt.tight_layout()
     plt.savefig(output_path, format="pdf")
     plt.close()
+
 
 def plot_bug_detection_bars(data, output_path):
     sash_detected, shellcheck_detected, all_bugs_expected = _get_bug_sets(data)
@@ -584,7 +602,9 @@ def plot_bug_detection_bars(data, output_path):
     fixed_total, sash_success, shell_success = _get_fixed_fp_counts(data)
     sash_fp = fixed_total - sash_success
     shell_fp = fixed_total - shell_success
-    variant_detected_to_missed, variant_missed_to_detected = _get_variant_overlay_deltas(data)
+    variant_detected_to_missed, variant_missed_to_detected = (
+        _get_variant_overlay_deltas(data)
+    )
 
     # Single axis: two benchmark-kind groups; each group has SaSh/ShellCheck rows.
     fig, ax = plt.subplots(1, 1, figsize=(9, 2))
@@ -657,7 +677,9 @@ def plot_bug_detection_bars(data, output_path):
             )
 
     # Fixed bars
-    ax.barh(fixed_rows, fixed_no_fp, height=bar_height, color=good_color, label="_nolegend_")
+    ax.barh(
+        fixed_rows, fixed_no_fp, height=bar_height, color=good_color, label="_nolegend_"
+    )
     ax.barh(
         fixed_rows,
         fixed_fp,
@@ -677,7 +699,10 @@ def plot_bug_detection_bars(data, output_path):
 
     # Annotate row identity on the right side as axis tick labels.
     row_ticks = [
-        buggy_rows[0], buggy_rows[1], fixed_rows[0], fixed_rows[1],
+        buggy_rows[0],
+        buggy_rows[1],
+        fixed_rows[0],
+        fixed_rows[1],
     ]
     row_labels = [sysname, "ShellCheck", sysname, "ShellCheck"]
     ax_right = ax.twinx()
@@ -771,6 +796,149 @@ def plot_bug_detection_bars(data, output_path):
     )
 
     plt.tight_layout(rect=[0.0, 0.08, 1.0, 0.92])
+    plt.savefig(output_path, format="pdf")
+    plt.close()
+
+
+def _plot_system_good_bad_panel(
+    ax, title, good_counts, bad_counts, max_total, show_yticklabels=False
+):
+    row_positions = [0.54, 0.46]
+    bar_height = 0.07
+    good_color = color_green
+    bad_color = color_red
+
+    ax.barh(
+        row_positions,
+        good_counts,
+        height=bar_height,
+        color=good_color,
+    )
+    ax.barh(
+        row_positions,
+        bad_counts,
+        height=bar_height,
+        left=good_counts,
+        color=bad_color,
+    )
+
+    ax.set_title(title, fontsize=10)
+    ax.set_xlim(0, max(max_total, 1))
+    bar_half = bar_height / 2.0
+    y_min = min(row_positions) - bar_half - 0.01
+    y_max = max(row_positions) + bar_half + 0.01
+    ax.set_ylim(y_min, y_max)
+    interest_ticks = [0, max(max_total, 1)]
+    for value in good_counts:
+        if 0 < value < max_total:
+            interest_ticks.append(value)
+    ax.set_xticks(sorted(set(interest_ticks)))
+    ax.tick_params(axis="x", labelsize=8)
+    ax.grid(axis="x", linestyle=":", linewidth=0.6, alpha=0.5)
+    ax.set_axisbelow(True)
+
+    if show_yticklabels:
+        ax.set_yticks(row_positions)
+        ax.set_yticklabels([sysname, "ShellCheck"], fontsize=8)
+    else:
+        ax.set_yticks(row_positions)
+        ax.set_yticklabels([])
+
+    if sum(good_counts) + sum(bad_counts) == 0:
+        ax.text(
+            0.5,
+            0.5,
+            "No data",
+            transform=ax.transAxes,
+            ha="center",
+            va="center",
+            fontsize=8,
+        )
+
+
+def plot_bug_detection_bars_split_versions(data, output_path):
+    buggy_sash, buggy_shell, buggy_expected = _get_bug_sets_for_kind(data, "buggy")
+    variants_sash, variants_shell, variants_expected = _get_bug_sets_for_kind(
+        data, "buggy_variant"
+    )
+    fixed_total, fixed_sash_no_fp, fixed_shell_no_fp = _get_fixed_fp_counts(data)
+
+    buggy_total = len(buggy_expected)
+    variants_total = len(variants_expected)
+
+    buggy_good = [len(buggy_sash), len(buggy_shell)]
+    buggy_bad = [buggy_total - buggy_good[0], buggy_total - buggy_good[1]]
+
+    variants_good = [len(variants_sash), len(variants_shell)]
+    variants_bad = [
+        variants_total - variants_good[0],
+        variants_total - variants_good[1],
+    ]
+
+    fixed_good = [fixed_sash_no_fp, fixed_shell_no_fp]
+    fixed_bad = [fixed_total - fixed_sash_no_fp, fixed_total - fixed_shell_no_fp]
+
+    max_total = max(
+        buggy_total,
+        variants_total,
+        fixed_total,
+        1,
+    )
+
+    fig, axes = plt.subplots(1, 3, figsize=(10.5, 1.8), sharey=True)
+    _plot_system_good_bad_panel(
+        axes[0],
+        "Original Buggy",
+        buggy_good,
+        buggy_bad,
+        max_total,
+        show_yticklabels=True,
+    )
+    _plot_system_good_bad_panel(
+        axes[1],
+        "Variants",
+        variants_good,
+        variants_bad,
+        max_total,
+    )
+    _plot_system_good_bad_panel(
+        axes[2],
+        "Fixed",
+        fixed_good,
+        fixed_bad,
+        max_total,
+    )
+
+    fig.supxlabel("Bug Instances", fontsize=9, y=0.24)
+    legend_handles = [
+        Rectangle(
+            (0, 0),
+            1,
+            1,
+            facecolor=color_green,
+            edgecolor=color_green,
+            label="Good (Detected/No FP)",
+        ),
+        Rectangle(
+            (0, 0),
+            1,
+            1,
+            facecolor=color_red,
+            edgecolor=color_red,
+            label="Bad (Missed/FP)",
+        ),
+        Line2D([], [], linestyle="none", label="SaSh (Top)"),
+        Line2D([], [], linestyle="none", label="ShellCheck (Bottom)"),
+    ]
+    fig.legend(
+        handles=legend_handles,
+        loc="lower center",
+        bbox_to_anchor=(0.5, 0.02),
+        ncol=4,
+        frameon=False,
+        fontsize=8,
+    )
+    plt.tight_layout(rect=[0.0, 0.15, 1.0, 1.0])
     plt.savefig(output_path, format="pdf")
     plt.close()
 
@@ -890,7 +1058,9 @@ def _get_variant_misses_by_family(data):
     if "kind" in data_view.columns:
         data_view = data_view[data_view["kind"] == "buggy_variant"]
     elif "benchmark" in data_view.columns:
-        data_view = data_view[data_view["benchmark"].astype(str).str.contains("/variants/bug-")]
+        data_view = data_view[
+            data_view["benchmark"].astype(str).str.contains("/variants/bug-")
+        ]
     else:
         data_view = data_view.iloc[0:0]
 
@@ -954,7 +1124,9 @@ def plot_bug_detection_heatmap(data, output_path):
         family_keys = {family: family_key(family) for family in families}
         family_labels = {
             family: (
-                buggy_stats.get(family, fixed_stats.get(family, {"label": "?"}))["label"]
+                buggy_stats.get(family, fixed_stats.get(family, {"label": "?"}))[
+                    "label"
+                ]
             )
             for family in families
         }
@@ -976,7 +1148,9 @@ def plot_bug_detection_heatmap(data, output_path):
                     used.add(family)
                     break
 
-        families = manual_families + [family for family in families if family not in used]
+        families = manual_families + [
+            family for family in families if family not in used
+        ]
 
     labels = []
     for family in families:
@@ -1081,36 +1255,101 @@ def plot_bug_detection_heatmap(data, output_path):
     # Left group labels (centered on top/bottom row pairs), right row labels.
     y_axis_transform = ax.get_yaxis_transform()
     ax.text(
-        -0.015, 0.5, "Buggy", transform=y_axis_transform,
-        ha="right", va="center", fontsize=8, clip_on=False
+        -0.015,
+        0.5,
+        "Buggy",
+        transform=y_axis_transform,
+        ha="right",
+        va="center",
+        fontsize=8,
+        clip_on=False,
     )
     ax.text(
-        -0.015, 2.5, "Fixed", transform=y_axis_transform,
-        ha="right", va="center", fontsize=8, clip_on=False
+        -0.015,
+        2.5,
+        "Fixed",
+        transform=y_axis_transform,
+        ha="right",
+        va="center",
+        fontsize=8,
+        clip_on=False,
     )
     ax.text(
-        1.01, 0, sysname, transform=y_axis_transform,
-        ha="left", va="center", fontsize=7, clip_on=False
+        1.01,
+        0,
+        sysname,
+        transform=y_axis_transform,
+        ha="left",
+        va="center",
+        fontsize=7,
+        clip_on=False,
     )
     ax.text(
-        1.01, 1, "ShellCheck", transform=y_axis_transform,
-        ha="left", va="center", fontsize=7, clip_on=False
+        1.01,
+        1,
+        "ShellCheck",
+        transform=y_axis_transform,
+        ha="left",
+        va="center",
+        fontsize=7,
+        clip_on=False,
     )
     ax.text(
-        1.01, 2, sysname, transform=y_axis_transform,
-        ha="left", va="center", fontsize=7, clip_on=False
+        1.01,
+        2,
+        sysname,
+        transform=y_axis_transform,
+        ha="left",
+        va="center",
+        fontsize=7,
+        clip_on=False,
     )
     ax.text(
-        1.01, 3, "ShellCheck", transform=y_axis_transform,
-        ha="left", va="center", fontsize=7, clip_on=False
+        1.01,
+        3,
+        "ShellCheck",
+        transform=y_axis_transform,
+        ha="left",
+        va="center",
+        fontsize=7,
+        clip_on=False,
     )
 
     legend_handles = [
-        Line2D([], [], marker="s", linestyle="none", markersize=7, markerfacecolor=color_green, markeredgecolor=color_green, label="Good"),
-        Line2D([], [], marker="s", linestyle="none", markersize=7, markerfacecolor=color_red, markeredgecolor=color_red, label="Bad"),
-        Rectangle((0, 0), 1, 1, facecolor="none", hatch="////", edgecolor=color_red, linewidth=0.0, label="Missed on variant"),
+        Line2D(
+            [],
+            [],
+            marker="s",
+            linestyle="none",
+            markersize=7,
+            markerfacecolor=color_green,
+            markeredgecolor=color_green,
+            label="Good",
+        ),
+        Line2D(
+            [],
+            [],
+            marker="s",
+            linestyle="none",
+            markersize=7,
+            markerfacecolor=color_red,
+            markeredgecolor=color_red,
+            label="Bad",
+        ),
+        Rectangle(
+            (0, 0),
+            1,
+            1,
+            facecolor="none",
+            hatch="////",
+            edgecolor=color_red,
+            linewidth=0.0,
+            label="Missed on variant",
+        ),
     ]
-    ax.legend(handles=legend_handles, fontsize=7, loc="lower left", frameon=True, ncol=3)
+    ax.legend(
+        handles=legend_handles, fontsize=7, loc="lower left", frameon=True, ncol=3
+    )
 
     plt.tight_layout()
     plt.savefig(output_path, format="pdf")
@@ -1122,7 +1361,9 @@ def _get_variant_detection_counts(data):
     if "kind" in data_view.columns:
         data_view = data_view[data_view["kind"] == "buggy_variant"]
     elif "benchmark" in data_view.columns:
-        data_view = data_view[data_view["benchmark"].astype(str).str.contains("/variants/bug-")]
+        data_view = data_view[
+            data_view["benchmark"].astype(str).str.contains("/variants/bug-")
+        ]
     else:
         data_view = data_view.iloc[0:0]
 
@@ -1199,23 +1440,17 @@ def plot_runtime(data, output_path):
         width=width,
         label="Solver",
     )
-    timeout_rows = data[data["timed_out"] == True] if "timed_out" in data.columns else data.iloc[0:0]
-    if timeout_rows.empty:
-        symexec_timeout = None
-        solver_timeout = None
-    else:
-        solver_timeout = float(round(timeout_rows["solver_time"].median()))
-        long_exec = timeout_rows[timeout_rows["exec_time"] > (solver_timeout * 1.5)]["exec_time"]
-        if long_exec.empty:
-            symexec_timeout = float(round(timeout_rows["exec_time"].median()))
-        else:
-            symexec_timeout = float(round(long_exec.median() / 10.0) * 10.0)
+    symexec_timeout, solver_timeout = estimate_runtime_timeouts(data)
 
     tol = 0.25  # seconds tolerance for numeric jitter
     timeout_line_color = "#C62828"
-    for sym_t, sol_t, bar_sym, bar_solver in zip(symexec_times, solver_times, bars_sym, bars_solver):
+    for sym_t, sol_t, bar_sym, bar_solver in zip(
+        symexec_times, solver_times, bars_sym, bars_solver
+    ):
         sym_timed_out = symexec_timeout is not None and sym_t >= (symexec_timeout - tol)
-        solver_timed_out = solver_timeout is not None and sol_t >= (solver_timeout - tol)
+        solver_timed_out = solver_timeout is not None and sol_t >= (
+            solver_timeout - tol
+        )
         if sym_timed_out:
             x0 = bar_sym.get_x()
             x1 = x0 + bar_sym.get_width()
@@ -1229,16 +1464,20 @@ def plot_runtime(data, output_path):
     plt.margins(x=0.02)  # keep a slight gap at plot borders
     plt.margins(y=0.10)  # keep a slight gap at top for bar labels
 
-    plt.xticks(x, benchmarks, rotation=45, ha="right", rotation_mode="anchor", fontsize=7)
+    plt.xticks(
+        x, benchmarks, rotation=45, ha="right", rotation_mode="anchor", fontsize=7
+    )
     plt.ylabel("Time (s)")
     plt.yscale("log")
     for xi, depth, sym_t, sol_t in zip(x, depth_labels, symexec_times, solver_times):
         top_h = max(sym_t, sol_t)
         y = top_h * 1.06 if top_h > 0 else 1e-3
-        plt.text(xi, y, f"{int(depth)}", ha='center', va='bottom', fontsize=7)
+        plt.text(xi, y, f"{int(depth)}", ha="center", va="bottom", fontsize=7)
 
     handles, labels = plt.gca().get_legend_handles_labels()
-    handles.append(Line2D([], [], color=timeout_line_color, linewidth=1.8, label="Timeout"))
+    handles.append(
+        Line2D([], [], color=timeout_line_color, linewidth=1.8, label="Timeout")
+    )
     labels.append("Timeout")
     handles.append(
         Line2D(
@@ -1259,10 +1498,40 @@ def plot_runtime(data, output_path):
     plt.close()
 
 
+def estimate_runtime_timeouts(data):
+    timeout_rows = (
+        data[data["timed_out"] == True]
+        if "timed_out" in data.columns
+        else data.iloc[0:0]
+    )
+    if timeout_rows.empty:
+        return None, None
+
+    solver_timeout = float(round(timeout_rows["solver_time"].median()))
+    long_exec = timeout_rows[timeout_rows["exec_time"] > (solver_timeout * 1.5)][
+        "exec_time"
+    ]
+    if long_exec.empty:
+        symexec_timeout = float(round(timeout_rows["exec_time"].median()))
+    else:
+        symexec_timeout = float(round(long_exec.median() / 10.0) * 10.0)
+    return symexec_timeout, solver_timeout
+
+
 def plot_timeout_sweep_bug_catch(timeout_sweep_dir, output_path):
     series_specs = [
-        ("dfs_on", f"Full {sysname}", color_scheme[0], re.compile(r"results_t([0-9]+(?:\.[0-9]+)?)_dfs_on\.csv$")),
-        ("dfs_off", "Base exploration", color_scheme[2], re.compile(r"results_t([0-9]+(?:\.[0-9]+)?)_dfs_off\.csv$")),
+        (
+            "dfs_on",
+            f"Full {sysname}",
+            color_scheme[0],
+            re.compile(r"results_t([0-9]+(?:\.[0-9]+)?)_dfs_on\.csv$"),
+        ),
+        (
+            "dfs_off",
+            "Base exploration",
+            color_scheme[2],
+            re.compile(r"results_t([0-9]+(?:\.[0-9]+)?)_dfs_off\.csv$"),
+        ),
     ]
     series_paths = {
         key: glob.glob(os.path.join(timeout_sweep_dir, f"results_t*_{key}.csv"))
@@ -1271,9 +1540,16 @@ def plot_timeout_sweep_bug_catch(timeout_sweep_dir, output_path):
 
     if not any(series_paths.values()):
         # Backward-compatible fallback: legacy single-series files.
-        series_paths["dfs_on"] = glob.glob(os.path.join(timeout_sweep_dir, "results_t*.csv"))
+        series_paths["dfs_on"] = glob.glob(
+            os.path.join(timeout_sweep_dir, "results_t*.csv")
+        )
         series_specs = [
-            ("dfs_on", f"Full {sysname}", color_scheme[0], re.compile(r"results_t([0-9]+(?:\.[0-9]+)?)\.csv$")),
+            (
+                "dfs_on",
+                f"Full {sysname}",
+                color_scheme[0],
+                re.compile(r"results_t([0-9]+(?:\.[0-9]+)?)\.csv$"),
+            ),
         ]
 
     if not any(series_paths.values()):
@@ -1293,7 +1569,9 @@ def plot_timeout_sweep_bug_catch(timeout_sweep_dir, output_path):
                 continue
             timeout_value = 2.0 * float(match.group(1))
             data = load_csv(path)
-            buggy_data = data[data["kind"] == "buggy"].copy() if "kind" in data.columns else data
+            buggy_data = (
+                data[data["kind"] == "buggy"].copy() if "kind" in data.columns else data
+            )
             sash_detected, _, all_expected = _get_bug_sets(buggy_data)
             timeout_points.append(timeout_value)
             bugs_caught.append(len(sash_detected))
@@ -1312,9 +1590,13 @@ def plot_timeout_sweep_bug_catch(timeout_sweep_dir, output_path):
     all_totals = []
     all_timeout_values = []
     for key, label, color, regex in series_specs:
-        x_vals, y_vals, totals, timeout_vals = collect_series(series_paths.get(key, []), regex)
+        x_vals, y_vals, totals, timeout_vals = collect_series(
+            series_paths.get(key, []), regex
+        )
         all_totals.extend(totals)
-        all_timeout_values.extend(timeout_vals.tolist() if len(timeout_vals) > 0 else [])
+        all_timeout_values.extend(
+            timeout_vals.tolist() if len(timeout_vals) > 0 else []
+        )
         if len(x_vals) == 0:
             continue
         all_x_arrays.append(x_vals)
@@ -1357,8 +1639,7 @@ def plot_timeout_sweep_bug_catch(timeout_sweep_dir, output_path):
         x_ticks = sorted(set(timeout_ticks + [rightmost_tick]))
         timeout_tick_set = set(timeout_ticks)
         x_tick_labels = [
-            str(int(x)) if x in timeout_tick_set else f"{x:.2f}"
-            for x in x_ticks
+            str(int(x)) if x in timeout_tick_set else f"{x:.2f}" for x in x_ticks
         ]
         plt.xticks(x_ticks, x_tick_labels)
     plt.grid(axis="y", alpha=0.25, linestyle=":")
@@ -1407,8 +1688,16 @@ def plot_koala_timeout_cdf(koala_sweep_dir, output_path):
         if data.empty:
             continue
 
-        timed_out = data["timed_out"].map(_as_bool) if "timed_out" in data.columns else pd.Series([False] * len(data))
-        crashed = data["crashed"].map(_as_bool) if "crashed" in data.columns else pd.Series([False] * len(data))
+        timed_out = (
+            data["timed_out"].map(_as_bool)
+            if "timed_out" in data.columns
+            else pd.Series([False] * len(data))
+        )
+        crashed = (
+            data["crashed"].map(_as_bool)
+            if "crashed" in data.columns
+            else pd.Series([False] * len(data))
+        )
         complete = (~timed_out) & (~crashed)
 
         timeout_vals.append(timeout_value)
@@ -1428,17 +1717,32 @@ def plot_koala_timeout_cdf(koala_sweep_dir, output_path):
     totals_sorted = np.array(total_counts)[order]
 
     plt.figure(figsize=(5.2, 2.4))
-    plt.step(x, y, where="post", color=color_scheme[0], linewidth=1.8, label=f"Full {sysname}")
+    plt.step(
+        x,
+        y,
+        where="post",
+        color=color_scheme[0],
+        linewidth=1.8,
+        label=f"Full {sysname}",
+    )
     plt.plot(x, y, "o", color=color_scheme[0], markersize=4)
 
     if len(totals_sorted) > 0:
         total_scripts = int(np.median(totals_sorted))
-        plt.axhline(y=total_scripts, linestyle="--", linewidth=1.0, color="gray", label="_nolegend_")
+        plt.axhline(
+            y=total_scripts,
+            linestyle="--",
+            linewidth=1.0,
+            color="gray",
+            label="_nolegend_",
+        )
         ax = plt.gca()
         y_ticks = set(ax.get_yticks().tolist())
         y_ticks.add(float(total_scripts))
         ax.set_yticks(sorted(y_ticks))
-        ax.set_ylim(bottom=max(0.0, float(np.min(y)) - 1.0), top=float(total_scripts) + 1.0)
+        ax.set_ylim(
+            bottom=max(0.0, float(np.min(y)) - 1.0), top=float(total_scripts) + 1.0
+        )
 
     plt.xlabel("Timeout (s)")
     plt.ylabel("Scripts completely analyzed")
@@ -1450,36 +1754,47 @@ def plot_koala_timeout_cdf(koala_sweep_dir, output_path):
     plt.savefig(output_path, format="pdf")
     plt.close()
 
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "results_csv",
-        type=str,
-        help="Path to the input CSV file (e.g., results.csv)."
+        "results_csv", type=str, help="Path to the input CSV file (e.g., results.csv)."
     )
     parser.add_argument(
         "--output_dir",
         type=str,
         default=".",
-        help="Path to the output directory (default: current directory)."
+        help="Path to the output directory (default: current directory).",
     )
     args = parser.parse_args()
     # Ensure the output directory exists
     os.makedirs(args.output_dir, exist_ok=True)
 
-    plt.rcParams.update({
-        #"text.usetex": True, # doesnt work in container
-        "font.family": "serif",
-        #"font.serif": ["Times New Roman"], # doesnt work in container
-        "font.size": 12,
-    })
+    plt.rcParams.update(
+        {
+            # "text.usetex": True, # doesnt work in container
+            "font.family": "serif",
+            # "font.serif": ["Times New Roman"], # doesnt work in container
+            "font.size": 12,
+        }
+    )
 
     all_results = load_csv(args.results_csv)
     buggy_results = all_results[all_results["kind"] == "buggy"].copy()
     buggy_results["loc"] = buggy_results["benchmark"].apply(get_loc)
-    plot_bug_detection_euler(buggy_results, os.path.join(args.output_dir, "bug-detection-euler.pdf"))
-    plot_bug_detection_bars(all_results, os.path.join(args.output_dir, "bug-detection-bars.pdf"))
-    plot_bug_detection_heatmap(all_results, os.path.join(args.output_dir, "bug-detection-heatmap.pdf"))
+    plot_bug_detection_euler(
+        buggy_results, os.path.join(args.output_dir, "bug-detection-euler.pdf")
+    )
+    plot_bug_detection_bars(
+        all_results, os.path.join(args.output_dir, "bug-detection-bars.pdf")
+    )
+    plot_bug_detection_bars_split_versions(
+        all_results,
+        os.path.join(args.output_dir, "bug-detection-bars-split-versions.pdf"),
+    )
+    plot_bug_detection_heatmap(
+        all_results, os.path.join(args.output_dir, "bug-detection-heatmap.pdf")
+    )
     plot_runtime(buggy_results, os.path.join(args.output_dir, "runtime.pdf"))
     # Sweep inputs live next to the main results CSV, not in the figure output dir.
     timeout_sweep_dir = os.path.join(
@@ -1507,18 +1822,38 @@ def main():
     print(f"% Total bugs: {total_bugs}", file=sys.stderr)
     print(f"% {sysname} detected bugs: {len(sash_detected)}", file=sys.stderr)
     print(f"% ShellCheck detected bugs: {len(shellcheck_detected)}", file=sys.stderr)
-    print(f"% Both detected bugs: {len(sash_detected & shellcheck_detected)}", file=sys.stderr)
-    print(f"% Missed bugs: {len(all_bugs_expected - (sash_detected | shellcheck_detected))}", file=sys.stderr)
+    print(
+        f"% Both detected bugs: {len(sash_detected & shellcheck_detected)}",
+        file=sys.stderr,
+    )
+    print(
+        f"% Missed bugs: {len(all_bugs_expected - (sash_detected | shellcheck_detected))}",
+        file=sys.stderr,
+    )
     fixed_total, sash_success, shell_success = _get_fixed_fp_counts(all_results)
     print(f"% Fixed bug instances: {fixed_total}", file=sys.stderr)
     print(f"% {sysname} fixed no-FP (bug-level): {sash_success}", file=sys.stderr)
     print(f"% ShellCheck fixed no-FP (bug-level): {shell_success}", file=sys.stderr)
-    variant_total, variant_sash_detected, variant_shell_detected = _get_variant_detection_counts(all_results)
+    variant_total, variant_sash_detected, variant_shell_detected = (
+        _get_variant_detection_counts(all_results)
+    )
     print(f"% Variant bug instances: {variant_total}", file=sys.stderr)
-    print(f"% {sysname} variants detected bugs: {variant_sash_detected}", file=sys.stderr)
-    print(f"% ShellCheck variants detected bugs: {variant_shell_detected}", file=sys.stderr)
-    print(f"% {sysname} variants missed bugs: {variant_total - variant_sash_detected}", file=sys.stderr)
-    print(f"% ShellCheck variants missed bugs: {variant_total - variant_shell_detected}", file=sys.stderr)
+    print(
+        f"% {sysname} variants detected bugs: {variant_sash_detected}", file=sys.stderr
+    )
+    print(
+        f"% ShellCheck variants detected bugs: {variant_shell_detected}",
+        file=sys.stderr,
+    )
+    print(
+        f"% {sysname} variants missed bugs: {variant_total - variant_sash_detected}",
+        file=sys.stderr,
+    )
+    print(
+        f"% ShellCheck variants missed bugs: {variant_total - variant_shell_detected}",
+        file=sys.stderr,
+    )
+
 
 if __name__ == "__main__":
     main()
