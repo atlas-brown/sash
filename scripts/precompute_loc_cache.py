@@ -8,6 +8,33 @@ from pathlib import Path
 import pandas as pd
 
 
+ROOT_DIR = Path(__file__).resolve().parents[1]
+
+
+def resolve_benchmark_path(path: str) -> Path:
+    p = Path(str(path))
+
+    # Direct hit.
+    if p.exists():
+        return p
+
+    # Repo-relative path.
+    if not p.is_absolute():
+        candidate = ROOT_DIR / p
+        if candidate.exists():
+            return candidate
+
+    # Foreign absolute path: keep only benchmarks/... suffix.
+    if "benchmarks" in p.parts:
+        idx = p.parts.index("benchmarks")
+        candidate = ROOT_DIR / Path(*p.parts[idx:])
+        if candidate.exists():
+            return candidate
+
+    # Best effort fallback.
+    return p if p.is_absolute() else ROOT_DIR / p
+
+
 def get_loc(path: str) -> int:
     output = subprocess.check_output(["cloc", "--json", path], encoding="utf-8")
     data = json.loads(output)
@@ -44,10 +71,14 @@ def main() -> None:
     benchmarks = sorted({str(p) for p in data["benchmark"].dropna().tolist()})
     rows = []
     for benchmark in benchmarks:
+        resolved = resolve_benchmark_path(benchmark)
         try:
-            loc = get_loc(benchmark)
+            loc = get_loc(str(resolved))
         except Exception as exc:
-            print(f"[WARN] Failed cloc for {benchmark}: {exc}", file=sys.stderr)
+            print(
+                f"[WARN] Failed cloc for {benchmark} (resolved: {resolved}): {exc}",
+                file=sys.stderr,
+            )
             continue
         rows.append({"benchmark": benchmark, "loc": loc})
 
