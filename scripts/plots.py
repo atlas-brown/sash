@@ -1568,7 +1568,14 @@ def plot_runtime(data, output_path):
         )
     )
     labels.append("Bug depth")
-    plt.legend(handles, labels, fontsize=8, loc="lower right", frameon=True)
+    plt.legend(
+        handles,
+        labels,
+        fontsize=8,
+        loc="lower left",
+        frameon=True,
+        ncol=1,
+    )
     plt.subplots_adjust(bottom=0.30)
     plt.tight_layout()
     plt.savefig(output_path, format="pdf")
@@ -1576,7 +1583,7 @@ def plot_runtime(data, output_path):
 
 
 def plot_coverage(data, output_path):
-    plt.figure(figsize=(9, 3))
+    plt.figure(figsize=(9, 2.2))
     data = data.copy()
     data["depth_bfs"] = data.apply(
         lambda row: deepest_bug_depth(
@@ -1602,9 +1609,9 @@ def plot_coverage(data, output_path):
         coverage = pd.Series(
             np.where(total > 0, (100.0 * interp / total), np.nan), index=data.index
         )
-    coverage = coverage.fillna(0.0).clip(lower=0, upper=100)
+    coverage = (coverage.fillna(0.0).clip(lower=0, upper=100)) / 100.0
 
-    benchmarks = data["benchmark"].apply(get_runtime_label)
+    benchmarks = data["benchmark"].apply(short_name)
     depth_labels = data["depth_bfs"]
     x = np.arange(len(data))
 
@@ -1616,16 +1623,16 @@ def plot_coverage(data, output_path):
         label="AST coverage",
     )
     plt.margins(x=0.02)
-    plt.ylim(0, 104)
-    plt.yticks([0, 20, 40, 60, 80, 100])
+    plt.ylim(0, 1.14)
+    plt.yticks([0.0, 0.5, 1.0])
 
     plt.xticks(
         x, benchmarks, rotation=45, ha="right", rotation_mode="anchor", fontsize=7
     )
-    plt.ylabel("Coverage (%)")
+    plt.ylabel("Coverage")
 
     for xi, depth, bar in zip(x, depth_labels, bars):
-        y = min(102.0, bar.get_height() + 1.0)
+        y = min(1.08, bar.get_height() + 0.03)
         plt.text(xi, y, f"{int(depth)}", ha="center", va="bottom", fontsize=7)
 
     handles, labels = plt.gca().get_legend_handles_labels()
@@ -1641,11 +1648,200 @@ def plot_coverage(data, output_path):
         )
     )
     labels.append("Bug depth")
-    plt.legend(handles, labels, fontsize=8, loc="lower right", frameon=True)
-    plt.subplots_adjust(bottom=0.30)
+    plt.legend(
+        handles,
+        labels,
+        fontsize=8,
+        loc="lower left",
+        frameon=True,
+        ncol=1,
+    )
+    plt.subplots_adjust(bottom=0.23)
     plt.tight_layout()
     plt.savefig(output_path, format="pdf")
     plt.close()
+
+
+def _coverage_map_from_results(data):
+    data_view = data.copy()
+    if "kind" in data_view.columns:
+        data_view = data_view[data_view["kind"] == "buggy"].copy()
+
+    if "benchmark" not in data_view.columns:
+        return {}
+
+    if "ast_coverage_pct" in data_view.columns:
+        coverage = pd.to_numeric(data_view["ast_coverage_pct"], errors="coerce")
+    else:
+        coverage = pd.Series(np.nan, index=data_view.index, dtype=float)
+
+    if coverage.isna().all():
+        if "ast_nodes_interpreted" in data_view.columns:
+            interp = pd.to_numeric(data_view["ast_nodes_interpreted"], errors="coerce")
+        else:
+            interp = pd.Series(np.nan, index=data_view.index, dtype=float)
+        if "ast_nodes_total" in data_view.columns:
+            total = pd.to_numeric(data_view["ast_nodes_total"], errors="coerce")
+        else:
+            total = pd.Series(np.nan, index=data_view.index, dtype=float)
+        coverage = pd.Series(
+            np.where(total > 0, (100.0 * interp / total), np.nan), index=data_view.index
+        )
+
+    coverage = coverage.clip(lower=0, upper=100)
+    keys = data_view["benchmark"].astype(str).apply(benchmark_key)
+    out = {}
+    for k, v in zip(keys, coverage):
+        if pd.notna(v):
+            out[k] = float(v)
+    return out
+
+
+def plot_coverage_by_config(timeout_sweep_dir, base_buggy_data, output_path):
+    series_specs = [
+        (
+            "no_opts",
+            "No opts",
+            color_scheme[4],
+            re.compile(r"results_t([0-9]+(?:\.[0-9]+)?)_no_opts\.csv$"),
+        ),
+        (
+            "smart_forking",
+            "Smart forking",
+            color_scheme[3],
+            re.compile(r"results_t([0-9]+(?:\.[0-9]+)?)_smart_forking\.csv$"),
+        ),
+        (
+            "solver_opts",
+            "Solver opts",
+            color_scheme[2],
+            re.compile(r"results_t([0-9]+(?:\.[0-9]+)?)_solver_opts\.csv$"),
+        ),
+        (
+            "dfs_on",
+            f"Full {sysname}",
+            color_scheme[0],
+            re.compile(r"results_t([0-9]+(?:\.[0-9]+)?)_dfs_on\.csv$"),
+        ),
+    ]
+
+    timeout_maps = {}
+    for key, _, _, regex in series_specs:
+        matches = {}
+        for path in glob.glob(os.path.join(timeout_sweep_dir, f"results_t*_{key}.csv")):
+            m = regex.search(os.path.basename(path))
+            if not m:
+                continue
+            matches[float(m.group(1))] = path
+        if key == "dfs_on" and not matches:
+            legacy_re = re.compile(r"results_t([0-9]+(?:\.[0-9]+)?)\.csv$")
+            for path in glob.glob(os.path.join(timeout_sweep_dir, "results_t*.csv")):
+                m = legacy_re.search(os.path.basename(path))
+                if not m:
+                    continue
+                matches[float(m.group(1))] = path
+        timeout_maps[key] = matches
+
+    available_specs = [spec for spec in series_specs if timeout_maps.get(spec[0])]
+    if not available_specs:
+        return False
+
+    timeout_sets = [set(timeout_maps[key].keys()) for key, _, _, _ in available_specs]
+    common_timeouts = set.intersection(*timeout_sets) if timeout_sets else set()
+    if common_timeouts:
+        chosen_timeout = max(common_timeouts)
+        chosen_specs = [
+            spec
+            for spec in available_specs
+            if chosen_timeout in timeout_maps.get(spec[0], {})
+        ]
+        chosen_paths = {
+            key: timeout_maps[key][chosen_timeout] for key, _, _, _ in chosen_specs
+        }
+    else:
+        chosen_specs = available_specs
+        chosen_paths = {
+            key: timeout_maps[key][max(timeout_maps[key].keys())]
+            for key, _, _, _ in chosen_specs
+        }
+
+    data = base_buggy_data.copy()
+    data["depth_bfs"] = data.apply(
+        lambda row: deepest_bug_depth(
+            row["benchmark"], parse_issue_list(row["expected_results"])
+        ),
+        axis=1,
+    )
+    data = data.sort_values(by=["depth_bfs", "time"], ascending=[True, True])
+    bench_keys = data["benchmark"].astype(str).apply(benchmark_key).tolist()
+    bench_labels = data["benchmark"].apply(short_name).tolist()
+    depth_labels = data["depth_bfs"].tolist()
+
+    x = np.arange(len(data))
+    n_series = max(1, len(chosen_specs))
+    group_width = 0.84
+    bar_width = group_width / n_series
+
+    plt.figure(figsize=(9, 2.2))
+    all_y = []
+    for i, (key, label, color, _) in enumerate(chosen_specs):
+        series_df = load_csv(chosen_paths[key])
+        cov_map = _coverage_map_from_results(series_df)
+        y_vals = np.array([cov_map.get(k, np.nan) for k in bench_keys], dtype=float)
+        y_vals = np.nan_to_num(y_vals, nan=0.0)
+        y_vals = np.clip(y_vals / 100.0, 0.0, 1.0)
+        all_y.append(y_vals)
+        offset = (i - (n_series - 1) / 2.0) * bar_width
+        plt.bar(
+            x + offset,
+            y_vals,
+            width=bar_width * 0.95,
+            color=color,
+            label=label,
+        )
+
+    plt.margins(x=0.02)
+    plt.ylim(0, 1.14)
+    plt.yticks([0.0, 0.5, 1.0])
+    plt.xticks(
+        x, bench_labels, rotation=45, ha="right", rotation_mode="anchor", fontsize=7
+    )
+    plt.ylabel("Coverage")
+
+    if all_y:
+        group_tops = np.max(np.vstack(all_y), axis=0)
+        for xi, depth, top in zip(x, depth_labels, group_tops):
+            y = min(1.08, top + 0.03)
+            plt.text(xi, y, f"{int(depth)}", ha="center", va="bottom", fontsize=7)
+
+    handles, labels = plt.gca().get_legend_handles_labels()
+    handles.append(
+        Line2D(
+            [],
+            [],
+            linestyle="none",
+            marker="$n$",
+            markersize=5,
+            color="0.35",
+            label="Bug depth",
+        )
+    )
+    labels.append("Bug depth")
+    handles = handles[::-1]
+    labels = labels[::-1]
+    plt.legend(
+        handles,
+        labels,
+        fontsize=8,
+        loc="lower left",
+        frameon=True,
+        ncol=1,
+    )
+    plt.subplots_adjust(bottom=0.23)
+    plt.tight_layout()
+    plt.savefig(output_path, format="pdf")
+    plt.close()
+    return True
 
 
 def estimate_runtime_timeouts(data):
@@ -1996,12 +2192,17 @@ def main():
         os.path.dirname(os.path.abspath(args.results_csv)),
         "timeout-sweep",
     )
-    coverage_results = buggy_results
-    if not has_coverage_values(coverage_results):
-        coverage_results = inject_coverage_from_timeout_sweep(
-            coverage_results, timeout_sweep_dir
-        )
-    plot_coverage(coverage_results, os.path.join(args.output_dir, "coverage.pdf"))
+    coverage_output = os.path.join(args.output_dir, "coverage.pdf")
+    plotted_multi_config_coverage = plot_coverage_by_config(
+        timeout_sweep_dir, buggy_results, coverage_output
+    )
+    if not plotted_multi_config_coverage:
+        coverage_results = buggy_results
+        if not has_coverage_values(coverage_results):
+            coverage_results = inject_coverage_from_timeout_sweep(
+                coverage_results, timeout_sweep_dir
+            )
+        plot_coverage(coverage_results, coverage_output)
     plot_timeout_sweep_bug_catch(
         timeout_sweep_dir,
         os.path.join(args.output_dir, "timeout-sweep-bugs-caught.pdf"),
