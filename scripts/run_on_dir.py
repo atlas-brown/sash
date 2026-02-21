@@ -87,6 +87,10 @@ def main():
         help="Force symbolic execution to fork outside checked positions and disable trace collapsing."
     )
     parser.add_argument(
+        "--disable-solver-optimizations", action="store_true",
+        help="Disable solver optimizations."
+    )
+    parser.add_argument(
         "--shellcheck", action="store_true",
         help="Run ShellCheck instead of SaSh"
     )
@@ -151,6 +155,7 @@ def main():
                     log_level="error",
                     enable_dfs=args.enable_dfs,
                     fork_everywhere=args.fork_everywhere,
+                    disable_solver_optimizations=args.disable_solver_optimizations,
                 )
             except SystemExit as e:
                 crashed += 1

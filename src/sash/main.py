@@ -23,6 +23,7 @@ def symbexec_main(file: str,
                   enable_targeted_dfs: bool = True,
                   enable_unbound_empty_dfs: bool = True,
                   fork_everywhere: bool = False,
+                  disable_solver_optimizations: bool = False,
                   debug_instrumentation: bool = False) -> sash.symb.SymbexecResult:
     global timers
     timers = []
@@ -36,6 +37,7 @@ def symbexec_main(file: str,
         disable_trace_collapsing=fork_everywhere,
         force_fork_all=fork_everywhere,
         debug_instrumentation=debug_instrumentation,
+        disable_solver_optimizations=disable_solver_optimizations,
         DFS_first=enable_dfs,
     )
 
@@ -92,6 +94,7 @@ def main(file: str,
          enable_targeted_dfs: bool = True,
          enable_unbound_empty_dfs: bool = True,
          fork_everywhere: bool = False,
+         disable_solver_optimizations: bool = False,
          debug_instrumentation: bool = False) -> Report:
 
     logging.basicConfig(
@@ -114,6 +117,7 @@ def main(file: str,
         enable_targeted_dfs,
         enable_unbound_empty_dfs,
         fork_everywhere,
+        disable_solver_optimizations,
         debug_instrumentation,
     )
     return Reporter.get_report()
@@ -135,6 +139,7 @@ def cli_main():
         enable_targeted_dfs=not args.disable_targeted_dfs,
         enable_unbound_empty_dfs=not args.disable_unbound_empty_dfs,
         fork_everywhere=args.fork_everywhere,
+        disable_solver_optimizations=args.disable_solver_optimizations,
         debug_instrumentation=args.enable_debug_instrumentation,
     )
 
@@ -192,6 +197,12 @@ def parse_cli():
         "--fork-everywhere",
         action="store_true",
         help="Force symbolic execution to fork even outside checked positions and disable trace collapsing.",
+    )
+
+    parser.add_argument(
+        "--disable-solver-optimizations",
+        action="store_true",
+        help="Disable solver optimizations: assertion prioritization, FS omission, and obvious-assertion skipping.",
     )
 
     parser.add_argument(

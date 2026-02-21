@@ -41,6 +41,7 @@ class InterpConfig:
     current_pass: str = "default"
     current_pass_condition: Constraint = Empty()
     debug_instrumentation: bool = False
+    disable_solver_optimizations: bool = False
 
     def add_node_callback(self, cb: NodeCB) -> 'InterpConfig':
         return replace(self, node_cbs=(self.node_cbs + [cb]))

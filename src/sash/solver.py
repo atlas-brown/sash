@@ -114,10 +114,11 @@ def state_to_z3(s: State, include_fs: bool = True) -> z3.ExprRef:
 
     return z3.And(fs_state_formula, pathcond_formula, env_formula)
 
-def assertion_to_z3(assertion: Assertion) -> tuple[z3.BoolRef, # assertion var
-                                                   z3.ExprRef, # state formula
-                                                   z3.ExprRef,
-                                                   list[tuple[z3.ExprRef, Issue]]]: # assertion constraint formula
+def assertion_to_z3(assertion: Assertion,
+                    include_fs_override: bool | None = None) -> tuple[z3.BoolRef, # assertion var
+                                                                       z3.ExprRef, # state formula
+                                                                       z3.ExprRef,
+                                                                       list[tuple[z3.ExprRef, Issue]]]: # assertion constraint formula
     """
     Convert an assertion to a tracked Z3 formula.
     Returns a tuple of (assertion tracking var, state formula, assertion constraint formula).
@@ -127,7 +128,8 @@ def assertion_to_z3(assertion: Assertion) -> tuple[z3.BoolRef, # assertion var
     rc = assertion.constraint
     constraint_formula = constraint_to_z3(rc.full, assertion.producing_state)
     refinement_formulas = [(constraint_to_z3(c, assertion.producing_state), im(assertion.source_line)) for (c, im) in rc.refinements]
-    state_formula = state_to_z3(assertion.producing_state, include_fs=assertion.include_fs)
+    include_fs = include_fs_override if include_fs_override is not None else assertion.include_fs
+    state_formula = state_to_z3(assertion.producing_state, include_fs=include_fs)
 
     return assertion_var, state_formula, constraint_formula, refinement_formulas
 
@@ -236,7 +238,8 @@ def run_solver(traces: list[Trace], config: InterpConfig, stop: threading.Event 
 
         assertions = trace.latest_state.assertions
         assertions = assertions + assume_unknowns_are_files(assertions)
-        assertions = sorted(assertions, key=lambda a: a.priority, reverse=True)
+        if not config.disable_solver_optimizations:
+            assertions = sorted(assertions, key=lambda a: a.priority, reverse=True)
         logging.debug("Trace %d/%d: checking %d assertions", i + 1, len(traces), len(assertions))
         for assertion in assertions:
             if logging.getLogger().isEnabledFor(logging.DEBUG):
@@ -253,10 +256,14 @@ def run_solver(traces: list[Trace], config: InterpConfig, stop: threading.Event 
             solver = z3.Solver()
             solver.set('timeout', 5000)
             solver.set(unsat_core=True)
-            assertion_var, state_formula, assertion_formula, refinements = assertion_to_z3(assertion)
+            include_fs_override = True if config.disable_solver_optimizations else None
+            assertion_var, state_formula, assertion_formula, refinements = assertion_to_z3(
+                assertion,
+                include_fs_override=include_fs_override,
+            )
             solver.add(state_formula)
 
-            if solver.check() == z3.unsat:
+            if not config.disable_solver_optimizations and solver.check() == z3.unsat:
                 logging.debug("Path condition is unsat, skipping assertion check")
                 if config.debug_instrumentation:
                     log_assertion_result(
@@ -308,4 +315,3 @@ def run_solver(traces: list[Trace], config: InterpConfig, stop: threading.Event 
                     )
 
     logging.info("Solving produced %d new reports", len(Reporter._issues) - total_issues_before_solver)
-

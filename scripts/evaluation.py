@@ -28,6 +28,7 @@ def parse_args():
     parser.add_argument('--disable-targeted-dfs', action='store_true', help='Disable only the targeted DFS pass while keeping the other DFS passes (default: false)')
     parser.add_argument('--disable-unbound-empty-dfs', action='store_true', help='Disable only DFS passes that treat unbound variables as empty strings (default: false)')
     parser.add_argument('--fork-everywhere', action='store_true', help='Force symbolic execution to fork outside checked positions and disable trace collapsing (default: false)')
+    parser.add_argument('--disable-solver-optimizations', action='store_true', help='Disable solver optimizations (default: false)')
     parser.add_argument('-l', '--log-level', type=str, default='disabled', choices=['disabled', 'error', 'warning', 'info', 'debug'], help='Logging level for SaSh; recommended to only use along with -L (default: disabled)')
     parser.add_argument('-L', '--error-log', type=Path, default=Path('/dev/null'), help='File to write error logs to (default: /dev/null)')
     parser.add_argument('-S', '--skip-buggy', action='store_true', help='Don\'t run the evaluation on the buggy versions of the benchmarks (default: false)')
@@ -55,6 +56,7 @@ def main(
     enable_targeted_dfs: bool,
     enable_unbound_empty_dfs: bool,
     fork_everywhere: bool,
+    disable_solver_optimizations: bool,
     log_level: str,
     log_file: Path,
     run_buggy: bool,
@@ -126,6 +128,7 @@ def main(
                     enable_targeted_dfs,
                     enable_unbound_empty_dfs,
                     fork_everywhere,
+                    disable_solver_optimizations,
                     log_level,
                     log_file,
                     verbose,
@@ -425,6 +428,7 @@ def run_job(
     enable_targeted_dfs: bool,
     enable_unbound_empty_dfs: bool,
     fork_everywhere: bool,
+    disable_solver_optimizations: bool,
     log_level: str,
     log_file: Path | None,
     verbose: bool,
@@ -448,6 +452,7 @@ def run_job(
             enable_targeted_dfs=enable_targeted_dfs,
             enable_unbound_empty_dfs=enable_unbound_empty_dfs,
             fork_everywhere=fork_everywhere,
+            disable_solver_optimizations=disable_solver_optimizations,
             debug_instrumentation=False,
         )
 
@@ -887,6 +892,7 @@ if __name__ == "__main__":
         enable_targeted_dfs=not args.disable_targeted_dfs,
         enable_unbound_empty_dfs=not args.disable_unbound_empty_dfs,
         fork_everywhere=args.fork_everywhere,
+        disable_solver_optimizations=args.disable_solver_optimizations,
         log_level=args.log_level,
         log_file=args.error_log,
         run_buggy=not args.skip_buggy or args.all,
