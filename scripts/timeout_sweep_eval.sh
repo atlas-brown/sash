@@ -22,21 +22,24 @@ Options:
                        Default: .*
   --jobs N             Number of evaluation workers (-j).
                        Default: 8
-  --disable-dfs        Run only the DFS-disabled sweep mode (backward compatible behavior).
   --dry-run            Print commands without executing.
   -h, --help           Show this help and exit.
 
 Behavior:
   For each timeout T, runs:
-    1) DFS enabled (full)
-    2) DFS enabled without targeted DFS
-    3) DFS enabled without unbound-empty DFS
-    4) DFS disabled (-D)
+    1) All optimizations disabled + no DFS
+       (-D --fork-everywhere --disable-solver-optimizations)
+    2) Smart forking enabled + solver optimizations disabled + no DFS
+       (-D --disable-solver-optimizations)
+    3) Solver optimizations enabled + no DFS
+       (-D)
+    4) Full SaSh (all DFS passes enabled; default config)
+       [compatibility key: dfs_on]
   and writes:
+    <output-dir>/timeout-sweep/results_t<T>_no_opts.csv
+    <output-dir>/timeout-sweep/results_t<T>_smart_forking.csv
+    <output-dir>/timeout-sweep/results_t<T>_solver_opts.csv
     <output-dir>/timeout-sweep/results_t<T>_dfs_on.csv
-    <output-dir>/timeout-sweep/results_t<T>_dfs_no_targeted.csv
-    <output-dir>/timeout-sweep/results_t<T>_dfs_no_unbound_empty.csv
-    <output-dir>/timeout-sweep/results_t<T>_dfs_off.csv
   Plus compatibility copy for DFS-on:
     <output-dir>/timeout-sweep/results_t<T>.csv
 EOF
@@ -50,7 +53,6 @@ OUTPUT_DIR="results"
 SWEEP_SUBDIR="timeout-sweep"
 ONLY_REGEX=".*"
 JOBS="8"
-DISABLE_DFS=0
 DRY_RUN=0
 MOCK=0
 BASE_CSV="results/results.csv"
@@ -81,10 +83,6 @@ while [[ $# -gt 0 ]]; do
     --jobs)
       JOBS="${2:-}"
       shift 2
-      ;;
-    --disable-dfs)
-      DISABLE_DFS=1
-      shift
       ;;
     --dry-run)
       DRY_RUN=1
@@ -118,11 +116,7 @@ if [[ ${MOCK} -eq 1 ]]; then
   echo "Mode:       mock"
   echo "Base CSV:   ${BASE_CSV}"
 fi
-if [[ ${DISABLE_DFS} -eq 1 ]]; then
-  echo "DFS modes:  disabled only"
-else
-  echo "DFS modes:  full + no_targeted + no_unbound_empty + disabled"
-fi
+echo "Sweep:      no_opts -> smart_forking -> solver_opts -> dfs_on"
 
 for raw_t in "${TIMEOUTS[@]}"; do
   t="$(echo "${raw_t}" | xargs)"
@@ -134,11 +128,7 @@ for raw_t in "${TIMEOUTS[@]}"; do
     exit 2
   fi
 
-  if [[ ${DISABLE_DFS} -eq 1 ]]; then
-    DFS_MODES=("dfs_off")
-  else
-    DFS_MODES=("dfs_on" "dfs_no_targeted" "dfs_no_unbound_empty" "dfs_off")
-  fi
+  DFS_MODES=("no_opts" "smart_forking" "solver_opts" "dfs_on")
 
   for dfs_mode in "${DFS_MODES[@]}"; do
     csv_path="${TARGET_DIR}/results_t${t}_${dfs_mode}.csv"
@@ -146,10 +136,10 @@ for raw_t in "${TIMEOUTS[@]}"; do
     if [[ ${MOCK} -eq 1 ]]; then
       seed_offset=0
       case "${dfs_mode}" in
-        dfs_on) seed_offset=0 ;;
-        dfs_no_targeted) seed_offset=2741 ;;
-        dfs_no_unbound_empty) seed_offset=5471 ;;
-        dfs_off) seed_offset=7919 ;;
+        no_opts) seed_offset=0 ;;
+        smart_forking) seed_offset=2741 ;;
+        solver_opts) seed_offset=5471 ;;
+        dfs_on) seed_offset=7919 ;;
         *) seed_offset=0 ;;
       esac
       cmd=(
@@ -165,14 +155,14 @@ for raw_t in "${TIMEOUTS[@]}"; do
         cmd+=(-j "${JOBS}")
       fi
       case "${dfs_mode}" in
-        dfs_off)
+        no_opts)
+          cmd+=(-D --fork-everywhere --disable-solver-optimizations)
+          ;;
+        smart_forking)
+          cmd+=(-D --disable-solver-optimizations)
+          ;;
+        solver_opts)
           cmd+=(-D)
-          ;;
-        dfs_no_targeted)
-          cmd+=(--disable-targeted-dfs)
-          ;;
-        dfs_no_unbound_empty)
-          cmd+=(--disable-unbound-empty-dfs)
           ;;
       esac
     fi
