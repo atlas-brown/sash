@@ -225,7 +225,7 @@ descriptions = {
     "commits/makefile": r"Unset path to \sh{rm -rf /}",
     "commits/cp_nonexistent": r"Copies missing file to itself",
     "commits/unset_var_3": r"Unset var used in test",
-    "commits/unset_var_2": r"Unset \sh{$file} used in file check",
+    "commits/unset_var_2": r"File check on unset var",
     "commits/unset_var_5": r"Unset var used for download",
     "commits/debootstrap_2": r"Deletes user-supplied dir",
     "commits/unset_var_set_u_1": r"Abort check from \sh{set -u}",

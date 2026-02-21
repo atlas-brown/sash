@@ -978,60 +978,94 @@ def plot_bug_detection_bars_split_versions(data, output_path):
         1,
     )
 
-    fig, axes = plt.subplots(1, 3, figsize=(10.5, 1.8), sharey=True)
-    _plot_system_good_bad_panel(
-        axes[0],
-        "Buggy",
-        buggy_good,
-        buggy_bad,
-        max_total,
-        show_yticklabels=True,
+    # Single-column vertical layout on one shared axis.
+    fig, ax = plt.subplots(figsize=(3.7, 2.8))
+    categories = ["Buggy", "Variants", "Fixed"]
+    # Keep sets compact and reduce the gap before "Fixed".
+    x = np.array([0.0, 0.82, 1.45])
+    width = 0.09
+
+    sash_good = np.array([buggy_good[0], variants_good[0], fixed_good[0]], dtype=float)
+    sash_bad = np.array([buggy_bad[0], variants_bad[0], fixed_bad[0]], dtype=float)
+    shell_good = np.array([buggy_good[1], variants_good[1], fixed_good[1]], dtype=float)
+    shell_bad = np.array([buggy_bad[1], variants_bad[1], fixed_bad[1]], dtype=float)
+
+    ax.bar(x - width / 2, sash_good, width=width, color=color_green)
+    ax.bar(
+        x - width / 2,
+        sash_bad,
+        width=width,
+        bottom=sash_good,
+        color=color_red,
     )
-    _plot_system_good_bad_panel(
-        axes[1],
-        "Variants",
-        variants_good,
-        variants_bad,
-        max_total,
-    )
-    _plot_system_good_bad_panel(
-        axes[2],
-        "Fixed",
-        fixed_good,
-        fixed_bad,
-        max_total,
+    ax.bar(x + width / 2, shell_good, width=width, color=color_green)
+    ax.bar(
+        x + width / 2,
+        shell_bad,
+        width=width,
+        bottom=shell_good,
+        color=color_red,
     )
 
-    fig.supxlabel("Bug Instances", fontsize=9, y=0.24)
-    legend_handles = [
-        Rectangle(
-            (0, 0),
-            1,
-            1,
-            facecolor=color_green,
-            edgecolor=color_green,
-            label="Good (Detected/No FP)",
-        ),
-        Rectangle(
-            (0, 0),
-            1,
-            1,
-            facecolor=color_red,
-            edgecolor=color_red,
-            label="Bad (Missed/FP)",
-        ),
-        Line2D([], [], linestyle="none", label="SaSh (Top)"),
-        Line2D([], [], linestyle="none", label="ShellCheck (Bottom)"),
+    ax.set_xticks(x)
+    ax.set_xticklabels(categories, fontsize=14)
+    ax.set_ylabel("Bug Instances", fontsize=14)
+    top_pad = max(2, int(np.ceil(max_total * 0.06)))
+    y_max = max_total + top_pad
+    ax.set_ylim(0, y_max)
+    y_ticks = list(range(0, max_total + 1, 10))
+    if max_total not in y_ticks:
+        y_ticks.append(max_total)
+    ax.set_yticks(sorted(set(y_ticks)))
+    ax.tick_params(axis="y", labelsize=14)
+    ax.grid(axis="y", linestyle=":", linewidth=0.6, alpha=0.35)
+    ax.set_axisbelow(True)
+    good_handle = Rectangle(
+        (0, 0),
+        1,
+        1,
+        facecolor=color_green,
+        edgecolor=color_green,
+        label="Good",
+    )
+    bad_handle = Rectangle(
+        (0, 0),
+        1,
+        1,
+        facecolor=color_red,
+        edgecolor=color_red,
+        label="Bad",
+    )
+    legend_top = fig.legend(
+        handles=[good_handle, bad_handle],
+        loc="lower center",
+        bbox_to_anchor=(0.5, 0.14),
+        ncol=2,
+        frameon=False,
+        fontsize=14,
+        borderaxespad=0.0,
+        columnspacing=2.0,
+    )
+    fig.add_artist(legend_top)
+
+    # Keep this row aligned to marker columns from the top legend.
+    side_handles = [
+        Line2D([], [], linestyle="none", label="SaSh (Left)"),
+        Line2D([], [], linestyle="none", label="ShellCheck (Right)"),
     ]
     fig.legend(
-        handles=legend_handles,
+        handles=side_handles,
         loc="lower center",
-        bbox_to_anchor=(0.5, 0.02),
-        ncol=4,
+        bbox_to_anchor=(0.5, 0.05),
+        ncol=2,
         frameon=False,
-        fontsize=8,
+        fontsize=14,
+        handlelength=0.0,
+        handletextpad=0.0,
+        borderaxespad=0.0,
+        columnspacing=2.0,
     )
-    plt.tight_layout(rect=[0.0, 0.15, 1.0, 1.0])
+    fig.subplots_adjust(left=0.17, right=0.98, bottom=0.44, top=0.92)
     plt.savefig(output_path, format="pdf")
     plt.close()
 
