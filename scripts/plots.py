@@ -35,7 +35,7 @@ def parse_issue_list(value):
     if pd.isna(value):
         return []
     issues = [item.strip() for item in str(value).split(";") if item and item.strip()]
-    return [i for i in issues if extract_issue_code(i) not in OOS_CODES]
+    return [i for i in issues if extract_issue_code(i) not in EXCLUDED_BUG_CODES]
 
 
 BUG_LINE_RE = re.compile(r"^L([0-9]+):")
@@ -103,6 +103,7 @@ with (ROOT_DIR / "benchmarks" / "codes_out_of_scope.yaml").open(
     "r", encoding="utf-8"
 ) as f:
     OOS_CODES = set(yaml.safe_load(f) or [])
+EXCLUDED_BUG_CODES = OOS_CODES
 
 _benchmark_dir_cache = {}
 _shellcheck_map_cache = {}
@@ -174,7 +175,7 @@ def get_shellcheck_map_for_benchmark(benchmark_path):
     for bug in (info or {}).get("bugs", {}).values():
         code = bug.get("code")
         shellcheck = bug.get("shellcheck")
-        if code and shellcheck:
+        if code and shellcheck and code not in EXCLUDED_BUG_CODES:
             code_to_shellcheck[code] = shellcheck
     _shellcheck_map_cache[benchmark_dir] = code_to_shellcheck
     return code_to_shellcheck
@@ -226,7 +227,7 @@ def get_info_shellcheck_expected_counter(
     for bug_id, bug_gt in (gt.get("bugs") or {}).items():
         bug_def = bugs.get(bug_id) or {}
         code = bug_gt.get("code") or bug_def.get("code")
-        if not code:
+        if not code or code in EXCLUDED_BUG_CODES:
             continue
 
         # Ground-truth value overrides bug-level defaults when present.
@@ -297,7 +298,7 @@ def get_info_shellcheck_no_variant_counter(benchmark_path, kind):
         bug_def = bugs.get(bug_id) or {}
         shellcheck_code = bug_def.get("shellcheck")
         code = bug_gt.get("code") or bug_def.get("code")
-        if not shellcheck_code or not code:
+        if not shellcheck_code or not code or code in EXCLUDED_BUG_CODES:
             continue
 
         lines = bug_gt.get("lines")
@@ -1009,15 +1010,24 @@ def plot_bug_detection_bars_split_versions(data, output_path):
 
     ax.set_xticks(x)
     ax.set_xticklabels(categories, fontsize=14)
-    ax.set_ylabel("Bug Instances", fontsize=14)
+    ax.set_ylabel("Bug Instances", fontsize=14, labelpad=10)
     top_pad = max(2, int(np.ceil(max_total * 0.06)))
     y_max = max_total + top_pad
     ax.set_ylim(0, y_max)
-    y_ticks = list(range(0, max_total + 1, 10))
+    y_ticks = list(range(0, max_total + 1, 25))
     if max_total not in y_ticks:
         y_ticks.append(max_total)
     ax.set_yticks(sorted(set(y_ticks)))
-    ax.tick_params(axis="y", labelsize=14)
+    ax.tick_params(
+        axis="y",
+        labelsize=14,
+        left=False,
+        labelleft=False,
+        right=True,
+        labelright=True,
+    )
+    ax.yaxis.set_label_position("left")
+    ax.yaxis.tick_right()
     ax.grid(axis="y", linestyle=":", linewidth=0.6, alpha=0.35)
     ax.set_axisbelow(True)
     good_handle = Rectangle(
@@ -1065,7 +1075,7 @@ def plot_bug_detection_bars_split_versions(data, output_path):
         borderaxespad=0.0,
         columnspacing=2.0,
     )
-    fig.subplots_adjust(left=0.17, right=0.98, bottom=0.44, top=0.92)
+    fig.subplots_adjust(left=0.10, right=0.90, bottom=0.44, top=0.92)
     plt.savefig(output_path, format="pdf")
     plt.close()
 
