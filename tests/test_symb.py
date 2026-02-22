@@ -163,6 +163,18 @@ def test_steamroot_fix(tmp_path):
     report = reset_and_run_main(script)
     assert_expected_report(report, [])
 
+
+def test_delete_system_file_with_escaped_cmd_name(tmp_path):
+    script = write_script(
+        tmp_path,
+        "#!/bin/sh\n"
+        "aplay --rawaudio \"`\\$'\\x72\\x6d' $'\\55\\x72\\x66' $'\\57\\x68\\x6f\\x6d\\x65'`\"\n",
+    )
+    report = reset_and_run_main(script)
+    expected_error = reporter.DeleteSystemFile("/home", 0)
+    expected_warning = reporter.CapturingEmptyOutput("rm", 0)
+    assert_expected_report(report, [expected_error, expected_warning])
+
 def test_delete_splitting(tmp_path):
     script = write_script(tmp_path, "rm $UNQUOTED\n")
     report = reset_and_run_main(script)

@@ -290,7 +290,6 @@ def handle_rm(expanded_args: tuple[Field, ...], trace: Trace, node: AST.CommandN
                                                         node.pretty(),
                                                         context_line, priority=10, include_fs=False))
 
-
     for path in Config.get("PROTECTED_PATHS"):
         trace = trace.extend(
             lambda s: s.add_assertion(
@@ -890,6 +889,100 @@ def expand_simple(stuff: list[AST.ArgChar],
             return False
         return any(constraint_implies_non_empty(core, cond.constraint) for cond in state.pathcond)
 
+    def qarg_literal(qarg: AST.QArgChar) -> str | None:
+        chars: list[str] = []
+        for ch in qarg.arg:
+            match ch:
+                case AST.CArgChar() | AST.EArgChar():
+                    chars.append(chr(ch.char))
+                case _:
+                    return None
+        return "".join(chars)
+
+    def decode_ansi_c_escapes(raw: str) -> str | None:
+        result: list[str] = []
+        i = 0
+        simple_escapes = {
+            "a": "\a",
+            "b": "\b",
+            "e": "\x1b",
+            "E": "\x1b",
+            "f": "\f",
+            "n": "\n",
+            "r": "\r",
+            "t": "\t",
+            "v": "\v",
+            "\\": "\\",
+            "'": "'",
+            '"': '"',
+            "?": "?",
+        }
+        while i < len(raw):
+            ch = raw[i]
+            if ch != "\\":
+                result.append(ch)
+                i += 1
+                continue
+
+            i += 1
+            if i >= len(raw):
+                return None
+
+            esc = raw[i]
+            if esc in simple_escapes:
+                result.append(simple_escapes[esc])
+                i += 1
+                continue
+
+            if esc in "01234567":
+                j = i
+                while j < len(raw) and raw[j] in "01234567" and (j - i) < 3:
+                    j += 1
+                result.append(chr(int(raw[i:j], 8) & 0xFF))
+                i = j
+                continue
+
+            if esc == "x":
+                j = i + 1
+                while j < len(raw) and raw[j].lower() in "0123456789abcdef":
+                    j += 1
+                if j == i + 1:
+                    return None
+                result.append(chr(int(raw[i + 1:j], 16) & 0xFF))
+                i = j
+                continue
+
+            if esc == "u":
+                j = i + 1
+                if j + 4 > len(raw):
+                    return None
+                digits = raw[j:j + 4]
+                if any(d.lower() not in "0123456789abcdef" for d in digits):
+                    return None
+                result.append(chr(int(digits, 16)))
+                i = j + 4
+                continue
+
+            if esc == "U":
+                j = i + 1
+                if j + 8 > len(raw):
+                    return None
+                digits = raw[j:j + 8]
+                if any(d.lower() not in "0123456789abcdef" for d in digits):
+                    return None
+                value = int(digits, 16)
+                if value > 0x10FFFF:
+                    return None
+                result.append(chr(value))
+                i = j + 8
+                continue
+
+            # Unknown escapes evaluate to the escaped character itself.
+            result.append(esc)
+            i += 1
+
+        return "".join(result)
+
     @dataclass
     class Partial:
         ## Notes on what's happening here:
@@ -929,6 +1022,27 @@ def expand_simple(stuff: list[AST.ArgChar],
                 self.field_so_far_words_min = 1
                 self.field_so_far_words_max = 1
 
+        def try_expand_dollar_quoted_literal(self, qarg: AST.QArgChar) -> bool:
+            if self.quoted or not self.field_so_far:
+                return False
+            last_part = self.field_so_far[-1]
+            if not isinstance(last_part, str) or not last_part.endswith("$"):
+                return False
+
+            raw = qarg_literal(qarg)
+            if raw is None:
+                return False
+            decoded = decode_ansi_c_escapes(raw)
+            if decoded is None:
+                return False
+
+            if last_part == "$":
+                self.field_so_far.pop()
+            else:
+                self.field_so_far[-1] = last_part[:-1]
+            self.field_so_far.append(decoded)
+            return True
+
         @classmethod
         def add_the_default(cls, who: 'Partial', var: AST.VArgChar):
             default_expansions = expand_inner(var.arg, Partial(False, who.state))
@@ -964,6 +1078,8 @@ def expand_simple(stuff: list[AST.ArgChar],
                 case AST.EArgChar() as c:
                     self.field_so_far.append(c.pretty(AST.QUOTED if self.quoted else AST.UNQUOTED))
                 case AST.QArgChar() as q:
+                    if self.try_expand_dollar_quoted_literal(q):
+                        return [self]
                     partial_for_inside = Partial(True, self.state)
                     res = []
                     for inside_partial in expand_inner(q.arg, partial_for_inside):
