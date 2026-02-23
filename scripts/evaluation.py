@@ -846,12 +846,12 @@ INFO_SCHEMA = {
                                 "properties": {
                                     "lines": {
                                         "type": "array",
-                                        "items": {"type": "integer", "minimum": 1},
+                                        "items": {"type": "integer", "minimum": 0},
                                         "minItems": 1,
                                     },
                                     "regression_lines": {
                                         "type": "array",
-                                        "items": {"type": "integer", "minimum": 1},
+                                        "items": {"type": "integer", "minimum": 0},
                                         "minItems": 1,
                                     },
                                     "shellcheck": {
