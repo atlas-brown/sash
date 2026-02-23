@@ -1987,8 +1987,9 @@ def interp_node(traces: Traces,
                 )
                 # We intentionally do not persist assignment effects here.
                 # Only evaluate expansions to reflect interpretation of RHS nodes.
-                trace_expansion_pairs = expand(t, val, config)
-                t = [trace for (trace, _) in trace_expansion_pairs]
+                # In particular, do not leak expansion-side ghost env bindings
+                # (e.g. from unbound variables) into subsequent command state.
+                expand(t, val, config)
 
             return handle_commandnode(t, node, config)
 

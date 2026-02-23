@@ -54,6 +54,22 @@ def test_unbound_variable_cmdsubst(tmp_path):
     expected_error = reporter.UnboundID(foo_var.pretty(), 0)
     assert_expected_report(report, [expected_error])
 
+def test_unbound_from_local_assignment_does_not_bind_later_use(tmp_path):
+    script = write_script(
+        tmp_path,
+        "COMMENT=\"//\"\n"
+        "DATE=`date +%Y` \"$COMMENT\"\n"
+        "TAR_BAK=\"bak_$DATE.tar.gz\" \"$COMMENT\"\n"
+        "echo \"$DATE\"\n",
+    )
+    report = reset_and_run_main(script)
+    date_unbound_lines = sorted(
+        issue.source_line
+        for issue in report.issues
+        if issue.code == reporter.Code.UNBOUND_ID and "${DATE}" in issue.message
+    )
+    assert 4 in date_unbound_lines
+
 def test_unbound_variable_setu(tmp_path):
     # Using an unset variable with 'set -u' should produce an unbound error
     script = write_script(tmp_path, "set -u\n echo $FOO\n")
