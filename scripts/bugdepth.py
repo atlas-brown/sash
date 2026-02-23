@@ -126,7 +126,8 @@ def interp_node(node: AST.AstNode,
 
 
 def count_conds(program: list[AST.AstNode],
-                line: int) -> int:
+                line: int,
+                verbose: bool = False) -> int:
     global is_target, fns, stack
     is_target = lambda n: getattr(n, "line_number", -1) == line
     fns = {}
@@ -136,21 +137,22 @@ def count_conds(program: list[AST.AstNode],
     try:
         for node in program:
             node = node.ast_node
-            print(f"Conds {conds_so_far} at node {node.pretty()}")
+            if verbose:
+                print(f"Conds {conds_so_far} at node {node.pretty()}")
             conds_so_far = interp_node(node, conds_so_far)
     except Found as f:
         return f.conds_before
     assert False, f"Program does not have line {line}"
     return 0
 
-def count_conds_file(path, line) -> int:
+def count_conds_file(path, line, verbose: bool = False) -> int:
     nodes = parser.parse_shell_script(path)
-    return count_conds(nodes, line)
+    return count_conds(nodes, line, verbose=verbose)
 
 if __name__ == '__main__':
     # get first arg as path, second arg as line number
     import sys
     path = sys.argv[1]
     line = int(sys.argv[2])
-    cs = count_conds_file(path, line)
+    cs = count_conds_file(path, line, verbose=True)
     print(f"\n\nNumber of conditions before line {line}: {cs}\n")

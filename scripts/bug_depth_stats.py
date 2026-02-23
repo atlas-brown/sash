@@ -13,6 +13,7 @@ from pathlib import Path
 import yaml
 import sash.parser
 import shasta.ast_node as AST
+import bugdepth
 
 
 def git_toplevel() -> Path:
@@ -636,15 +637,29 @@ def analyze_single_script(args: argparse.Namespace) -> None:
         range(1, total_lines + 1)
     )
 
+    try:
+        lukas_program = bugdepth.parser.parse_shell_script(str(script_path))
+    except Exception:
+        lukas_program = None
+
     rows = []
     for line_number in report_lines:
         if line_number < 1 or line_number > total_lines:
             continue
+        lukas_depth = 0
+        if lukas_program is not None:
+            try:
+                lukas_depth = bugdepth.count_conds(
+                    lukas_program, line_number, verbose=False
+                )
+            except Exception:
+                lukas_depth = 0
         rows.append(
             {
                 "script_path": str(script_path),
                 "line": line_number,
                 "line_text": lines[line_number - 1],
+                "lukas-depth": lukas_depth,
                 "fork_count": metrics["fork_count_at_line"][line_number],
                 "fork_path_factor": metrics["fork_path_factor_at_line"][line_number],
                 "fork_count_prefix": metrics["fork_count_prefix_at_line"][line_number],
@@ -675,6 +690,7 @@ def analyze_single_script(args: argparse.Namespace) -> None:
         "script_path",
         "line",
         "line_text",
+        "lukas-depth",
         "fork_count",
         "fork_path_factor",
         "fork_count_prefix",
@@ -702,6 +718,8 @@ def main() -> None:
 
     rows: list[dict] = []
     script_cache: dict[Path, dict] = {}
+    lukas_program_cache: dict[Path, list] = {}
+    lukas_line_cache: dict[tuple[Path, int], int] = {}
     warnings = 0
 
     benchmark_dirs = iter_benchmark_dirs(args.benchmarks, args.include_not_integrated)
@@ -742,6 +760,12 @@ def main() -> None:
                     warnings += 1
                     continue
                 script_cache[script_path] = compute_script_metrics(lines, str(script_path))
+                try:
+                    lukas_program_cache[script_path] = bugdepth.parser.parse_shell_script(
+                        str(script_path)
+                    )
+                except Exception:
+                    lukas_program_cache[script_path] = []
 
             metrics = script_cache[script_path]
             total_lines = metrics["total_lines"]
@@ -760,6 +784,26 @@ def main() -> None:
                 bug_meta = bugs_meta.get(bug_id, {})
                 bug_code = bug_meta.get("code", "")
                 bug_desc = bug_meta.get("description", "")
+                lukas_depth_values: list[int] = []
+
+                for bug_line in line_numbers:
+                    if not isinstance(bug_line, int) or bug_line < 1:
+                        continue
+                    cache_key = (script_path, bug_line)
+                    if cache_key not in lukas_line_cache:
+                        lukas_depth_value = 0
+                        try:
+                            program = lukas_program_cache.get(script_path, [])
+                            if program:
+                                lukas_depth_value = bugdepth.count_conds(
+                                    program, bug_line, verbose=False
+                                )
+                        except Exception:
+                            lukas_depth_value = 0
+                        lukas_line_cache[cache_key] = lukas_depth_value
+                    lukas_depth_values.append(lukas_line_cache[cache_key])
+
+                lukas_depth_max = max(lukas_depth_values) if lukas_depth_values else 0
 
                 for bug_line in line_numbers:
                     if not isinstance(bug_line, int) or bug_line < 1:
@@ -803,6 +847,7 @@ def main() -> None:
                             "line_text": line_text,
                             "nesting_depth": nesting_depth,
                             "statements_before": statements_before,
+                            "lukas-depth": lukas_depth_max,
                             "fork_count": fork_count,
                             "fork_path_factor": fork_path_factor,
                             "fork_count_prefix": fork_count_prefix,
@@ -824,6 +869,7 @@ def main() -> None:
         "line_text",
         "nesting_depth",
         "statements_before",
+        "lukas-depth",
         "fork_count",
         "fork_path_factor",
         "fork_count_prefix",
@@ -838,6 +884,7 @@ def main() -> None:
 
     nesting_values = [float(r["nesting_depth"]) for r in rows]
     statement_values = [float(r["statements_before"]) for r in rows]
+    lukas_depth_values = [float(r["lukas-depth"]) for r in rows]
     fork_count_values = [float(r["fork_count"]) for r in rows]
     fork_factor_values = [float(r["fork_path_factor"]) for r in rows]
     fork_count_prefix_values = [float(r["fork_count_prefix"]) for r in rows]
@@ -849,6 +896,10 @@ def main() -> None:
     print(f"% Nesting depth stats: {fmt_stats(summarize(nesting_values))}", file=sys.stderr)
     print(
         f"% Statements-before stats: {fmt_stats(summarize(statement_values))}",
+        file=sys.stderr,
+    )
+    print(
+        f"% Lukas-depth stats: {fmt_stats(summarize(lukas_depth_values))}",
         file=sys.stderr,
     )
     print(
@@ -873,6 +924,7 @@ def main() -> None:
         kind_rows = [r for r in rows if r["ground_truth_kind"] == kind]
         k_nesting = [float(r["nesting_depth"]) for r in kind_rows]
         k_statements = [float(r["statements_before"]) for r in kind_rows]
+        k_lukas_depths = [float(r["lukas-depth"]) for r in kind_rows]
         k_fork_counts = [float(r["fork_count"]) for r in kind_rows]
         k_fork_factors = [float(r["fork_path_factor"]) for r in kind_rows]
         k_fork_counts_prefix = [float(r["fork_count_prefix"]) for r in kind_rows]
@@ -880,6 +932,7 @@ def main() -> None:
         print(f"% Kind={kind} rows: {len(kind_rows)}", file=sys.stderr)
         print(f"%   Nesting: {fmt_stats(summarize(k_nesting))}", file=sys.stderr)
         print(f"%   Statements-before: {fmt_stats(summarize(k_statements))}", file=sys.stderr)
+        print(f"%   Lukas-depth: {fmt_stats(summarize(k_lukas_depths))}", file=sys.stderr)
         print(
             f"%   Fork-count: {fmt_stats(summarize(k_fork_counts))}",
             file=sys.stderr,

@@ -13,6 +13,7 @@ from collections import Counter, defaultdict
 import yaml
 from benchmark_metadata import benchmark_key, benchmark_display_name, short_name
 from bug_depth_stats import compute_script_metrics
+import bugdepth
 
 import matplotlib.pyplot as plt
 from matplotlib_set_diagrams import EulerDiagram
@@ -40,6 +41,8 @@ def parse_issue_list(value):
 
 BUG_LINE_RE = re.compile(r"^L([0-9]+):")
 _depth_metrics_cache = {}
+_lukas_program_cache = {}
+_lukas_line_depth_cache = {}
 
 
 def parse_issue_lines(issues):
@@ -88,6 +91,41 @@ def deepest_bug_depth(path, expected_issues):
         for line in bug_lines
     )
     return max_bfs_nodes
+
+
+def get_lukas_program(path):
+    script_path = resolve_benchmark_path(path)
+    script_key = str(script_path)
+    if script_key not in _lukas_program_cache:
+        try:
+            _lukas_program_cache[script_key] = bugdepth.parser.parse_shell_script(
+                script_key
+            )
+        except Exception:
+            _lukas_program_cache[script_key] = []
+    return _lukas_program_cache[script_key]
+
+
+def lukas_depth_at_line(path, line_number):
+    script_path = resolve_benchmark_path(path)
+    cache_key = (str(script_path), int(line_number))
+    if cache_key not in _lukas_line_depth_cache:
+        depth_value = 0
+        try:
+            program = get_lukas_program(path)
+            if program:
+                depth_value = bugdepth.count_conds(program, int(line_number), verbose=False)
+        except Exception:
+            depth_value = 0
+        _lukas_line_depth_cache[cache_key] = depth_value
+    return _lukas_line_depth_cache[cache_key]
+
+
+def deepest_bug_lukas_depth(path, expected_issues):
+    bug_lines = parse_issue_lines(expected_issues)
+    if not bug_lines:
+        return 0
+    return max((lukas_depth_at_line(path, line) for line in bug_lines), default=0)
 
 
 def git_toplevel():
@@ -1701,13 +1739,13 @@ def plot_runtime(data, output_path):
 def plot_coverage(data, output_path):
     plt.figure(figsize=(3.2, 2.2))
     data = data.copy()
-    data["depth_bfs"] = data.apply(
-        lambda row: deepest_bug_depth(
+    data["depth_lukas"] = data.apply(
+        lambda row: deepest_bug_lukas_depth(
             row["benchmark"], parse_issue_list(row["expected_results"])
         ),
         axis=1,
     )
-    data = data.sort_values(by=["depth_bfs", "time"], ascending=[True, True])
+    data = data.sort_values(by=["depth_lukas", "time"], ascending=[True, True])
 
     if "ast_coverage_pct" in data.columns:
         coverage = pd.to_numeric(data["ast_coverage_pct"], errors="coerce")
@@ -1728,7 +1766,7 @@ def plot_coverage(data, output_path):
     coverage = (coverage.fillna(0.0).clip(lower=0, upper=100)) / 100.0
 
     benchmarks = data["benchmark"].apply(short_name)
-    depth_labels = data["depth_bfs"]
+    depth_labels = data["depth_lukas"]
     x = np.arange(len(data))
 
     bars = plt.bar(
@@ -1882,16 +1920,16 @@ def plot_coverage_by_config(timeout_sweep_dir, base_buggy_data, output_path):
         }
 
     data = base_buggy_data.copy()
-    data["depth_bfs"] = data.apply(
-        lambda row: deepest_bug_depth(
+    data["depth_lukas"] = data.apply(
+        lambda row: deepest_bug_lukas_depth(
             row["benchmark"], parse_issue_list(row["expected_results"])
         ),
         axis=1,
     )
-    data = data.sort_values(by=["depth_bfs", "time"], ascending=[True, True])
+    data = data.sort_values(by=["depth_lukas", "time"], ascending=[True, True])
     bench_keys = data["benchmark"].astype(str).apply(benchmark_key).to_numpy()
     bench_labels = data["benchmark"].apply(short_name).to_numpy()
-    depth_labels = data["depth_bfs"].to_numpy()
+    depth_labels = data["depth_lukas"].to_numpy()
 
     x = np.arange(len(data))
     n_series = max(1, len(chosen_specs))
