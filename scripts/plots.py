@@ -469,19 +469,10 @@ HEATMAP_MANUAL_BENCHMARK_ORDER = []
 
 
 def _format_coverage_tick(t: float) -> str:
-    if np.isclose(t, 0.0):
-        return "0"
-    if np.isclose(t, 1.0):
-        return "1"
-    if np.isclose(t, round(t, 1)):
-        s = f"{t:.1f}"
-    else:
-        s = f"{t:.2f}"
-    if s.startswith("0."):
-        return s[1:]
-    if s.startswith("-0."):
-        return "-" + s[2:]
-    return s
+    pct = 100.0 * float(t)
+    if np.isclose(pct, round(pct)):
+        return f"{int(round(pct))}%"
+    return f"{pct:.1f}%"
 
 
 def _get_bug_sets_for_kind(data, kind):
@@ -984,39 +975,50 @@ def plot_bug_detection_bars_split_versions(data, output_path):
     categories = ["Buggy", "Variants", "Fixed"]
     # Keep sets compact and reduce the gap before "Fixed".
     x = np.array([0.0, 0.82, 1.45])
-    width = 0.09
+    width = 0.07
+    bar_offset = 0.055
 
     sash_good = np.array([buggy_good[0], variants_good[0], fixed_good[0]], dtype=float)
-    sash_bad = np.array([buggy_bad[0], variants_bad[0], fixed_bad[0]], dtype=float)
     shell_good = np.array([buggy_good[1], variants_good[1], fixed_good[1]], dtype=float)
-    shell_bad = np.array([buggy_bad[1], variants_bad[1], fixed_bad[1]], dtype=float)
 
-    ax.bar(x - width / 2, sash_good, width=width, color=color_green)
+    # Use neutral pastel system colors (avoid good/bad red/green semantics).
+    sash_color = color_scheme[1]
+    shellcheck_color = color_scheme[3]
+
     ax.bar(
-        x - width / 2,
-        sash_bad,
+        x - bar_offset,
+        sash_good,
         width=width,
-        bottom=sash_good,
-        color=color_red,
+        color=sash_color,
+        edgecolor=sash_color,
     )
-    ax.bar(x + width / 2, shell_good, width=width, color=color_green)
     ax.bar(
-        x + width / 2,
-        shell_bad,
+        x + bar_offset,
+        shell_good,
         width=width,
-        bottom=shell_good,
-        color=color_red,
+        color=shellcheck_color,
+        edgecolor=shellcheck_color,
+    )
+    # Visual reference: carry buggy ShellCheck catches over to the variants slot.
+    ax.hlines(
+        y=shell_good[0] + 0.5,
+        xmin=x[0] + bar_offset - width / 2,
+        xmax=x[1] - 0.02,
+        colors="black",
+        linestyles=":",
+        linewidth=0.7,
+        alpha=0.3,
     )
 
     ax.set_xticks(x)
     ax.set_xticklabels(categories, fontsize=14)
     ax.set_ylabel("Bug Instances", fontsize=14, labelpad=10)
-    top_pad = max(2, int(np.ceil(max_total * 0.06)))
-    y_max = max_total + top_pad
+    max_good = max(float(np.max(sash_good)), float(np.max(shell_good)), 1.0)
+    top_pad = max(3, int(np.ceil(max_good * 0.10)))
+    y_max = max(max_good + top_pad, 125 + top_pad)
     ax.set_ylim(0, y_max)
-    y_ticks = list(range(0, max_total + 1, 25))
-    if max_total not in y_ticks:
-        y_ticks.append(max_total)
+    y_ticks = list(range(0, int(max_good) + 1, 25))
+    y_ticks.append(125)
     ax.set_yticks(sorted(set(y_ticks)))
     ax.tick_params(
         axis="y",
@@ -1031,52 +1033,51 @@ def plot_bug_detection_bars_split_versions(data, output_path):
     ax.yaxis.tick_right()
     ax.grid(axis="y", linestyle=":", linewidth=0.6, alpha=0.35)
     ax.set_axisbelow(True)
-    good_handle = Rectangle(
-        (0, 0),
-        1,
-        1,
-        facecolor=color_green,
-        edgecolor=color_green,
-        label="Good",
-    )
-    bad_handle = Rectangle(
-        (0, 0),
-        1,
-        1,
-        facecolor=color_red,
-        edgecolor=color_red,
-        label="Bad",
-    )
-    legend_top = fig.legend(
-        handles=[good_handle, bad_handle],
-        loc="lower center",
-        bbox_to_anchor=(0.5, 0.14),
-        ncol=2,
-        frameon=False,
-        fontsize=14,
-        borderaxespad=0.0,
-        columnspacing=2.0,
-    )
-    fig.add_artist(legend_top)
 
-    # Keep this row aligned to marker columns from the top legend.
+    label_offset = max(0.4, y_max * 0.012)
+    for xi, total in zip(x - bar_offset, sash_good):
+        ax.text(
+            xi,
+            total + label_offset,
+            f"{int(total)}",
+            ha="center",
+            va="bottom",
+            fontsize=7,
+        )
+    for xi, total in zip(x + bar_offset, shell_good):
+        ax.text(
+            xi,
+            total + label_offset,
+            f"{int(total)}",
+            ha="center",
+            va="bottom",
+            fontsize=7,
+        )
+    # Bars encode good-instance counts for each system.
     side_handles = [
-        Line2D([], [], linestyle="none", label="SaSh (Left)"),
-        Line2D([], [], linestyle="none", label="ShellCheck (Right)"),
+        Rectangle((0, 0), 1, 1, facecolor=sash_color, edgecolor=sash_color, label="SaSh"),
+        Rectangle(
+            (0, 0),
+            1,
+            1,
+            facecolor=shellcheck_color,
+            edgecolor=shellcheck_color,
+            label="ShellCheck",
+        ),
     ]
     fig.legend(
         handles=side_handles,
         loc="lower center",
-        bbox_to_anchor=(0.5, 0.05),
+        bbox_to_anchor=(0.5, 0.08),
         ncol=2,
         frameon=False,
         fontsize=14,
-        handlelength=0.0,
-        handletextpad=0.0,
+        handlelength=1.2,
+        handletextpad=0.6,
         borderaxespad=0.0,
         columnspacing=2.0,
     )
-    fig.subplots_adjust(left=0.10, right=0.86, bottom=0.44, top=0.92)
+    fig.subplots_adjust(left=0.10, right=0.86, bottom=0.36, top=0.92)
     plt.savefig(output_path, format="pdf")
     plt.close()
 
@@ -1684,22 +1685,15 @@ def plot_coverage(data, output_path):
         label="AST coverage",
     )
     plt.margins(x=0.02)
-    plt.ylim(0, 1.14)
-    y_ticks = {0.0, 0.5, 1.0}
-    if len(keep_idx) > 0:
-        rest_cov_values = np.concatenate(
-            [series_y[key][keep_idx] for key, _, _, _ in chosen_specs]
-        )
-        if len(rest_cov_values) > 0:
-            avg_rest_cov = float(np.mean(rest_cov_values))
-            y_ticks.add(round(avg_rest_cov, 2))
-    y_ticks = sorted(y_ticks)
+    plt.ylim(0, 1.40)
+    y_ticks = [0.0, 0.25, 0.5, 0.75, 1.0]
     y_tick_labels = [_format_coverage_tick(t) for t in y_ticks]
-    plt.yticks(y_ticks, y_tick_labels)
+    plt.yticks(y_ticks, y_tick_labels, fontsize=8)
 
     plt.xticks(
         x, benchmarks, rotation=45, ha="right", rotation_mode="anchor", fontsize=8
     )
+    plt.xlabel("Benchmarks")
     plt.ylabel("Coverage")
     plt.grid(axis="y", linestyle=":", linewidth=0.6, alpha=0.25)
 
@@ -1786,12 +1780,6 @@ def plot_coverage_by_config(timeout_sweep_dir, base_buggy_data, output_path):
             re.compile(r"results_t([0-9]+(?:\.[0-9]+)?)_smart_forking\.csv$"),
         ),
         (
-            "solver_opts",
-            "Solver opts",
-            color_scheme[2],
-            re.compile(r"results_t([0-9]+(?:\.[0-9]+)?)_solver_opts\.csv$"),
-        ),
-        (
             "dfs_on",
             f"Full {sysname}",
             color_scheme[0],
@@ -1847,24 +1835,38 @@ def plot_coverage_by_config(timeout_sweep_dir, base_buggy_data, output_path):
         axis=1,
     )
     data = data.sort_values(by=["depth_bfs", "time"], ascending=[True, True])
-    bench_keys = data["benchmark"].astype(str).apply(benchmark_key).tolist()
-    bench_labels = data["benchmark"].apply(short_name).tolist()
-    depth_labels = data["depth_bfs"].tolist()
+    bench_keys = data["benchmark"].astype(str).apply(benchmark_key).to_numpy()
+    bench_labels = data["benchmark"].apply(short_name).to_numpy()
+    depth_labels = data["depth_bfs"].to_numpy()
 
     x = np.arange(len(data))
     n_series = max(1, len(chosen_specs))
     group_width = 0.84
     bar_width = group_width / n_series
 
-    plt.figure(figsize=(7.2, 2.2))
+    plt.figure(figsize=(7.2, 2.5))
     series_y = {}
+    series_present = {}
     for key, _, _, _ in chosen_specs:
         series_df = load_csv(chosen_paths[key])
         cov_map = _coverage_map_from_results(series_df)
-        y_vals = np.array([cov_map.get(k, np.nan) for k in bench_keys], dtype=float)
-        y_vals = np.nan_to_num(y_vals, nan=0.0)
-        y_vals = np.clip(y_vals / 100.0, 0.0, 1.0)
+        y_raw = np.array([cov_map.get(k, np.nan) for k in bench_keys], dtype=float)
+        series_present[key] = ~np.isnan(y_raw)
+        y_vals = np.clip(y_raw / 100.0, 0.0, 1.0)
         series_y[key] = y_vals
+
+    # Keep only benchmarks available in all selected timeout-sweep configurations.
+    present_all = np.ones(len(bench_keys), dtype=bool)
+    for mask in series_present.values():
+        present_all &= mask
+    if not present_all.any():
+        return False
+
+    bench_keys = bench_keys[present_all]
+    bench_labels = bench_labels[present_all]
+    depth_labels = depth_labels[present_all]
+    for key in list(series_y.keys()):
+        series_y[key] = series_y[key][present_all]
 
     bundle_mask = np.ones(len(bench_keys), dtype=bool)
     for y_vals in series_y.values():
@@ -1899,26 +1901,20 @@ def plot_coverage_by_config(timeout_sweep_dir, base_buggy_data, output_path):
 
     plt.margins(x=0.02)
     plt.ylim(0, 1.14)
-    y_ticks = {0.0, 0.5, 1.0}
-    if len(keep_idx) > 0:
-        rest_cov_values = np.concatenate(
-            [series_y[key][keep_idx] for key, _, _, _ in chosen_specs]
-        )
-        if len(rest_cov_values) > 0:
-            y_ticks.add(round(float(np.mean(rest_cov_values)), 2))
-    y_ticks = sorted(y_ticks)
+    y_ticks = [0.0, 0.25, 0.5, 0.75, 1.0]
     y_tick_labels = [_format_coverage_tick(t) for t in y_ticks]
-    plt.yticks(y_ticks, y_tick_labels)
+    plt.yticks(y_ticks, y_tick_labels, fontsize=7)
     plt.xticks(
         x, plot_labels, rotation=45, ha="right", rotation_mode="anchor", fontsize=7
     )
+    plt.xlabel("Benchmarks")
     plt.ylabel("Coverage")
     plt.grid(axis="y", linestyle=":", linewidth=0.6, alpha=0.25)
 
     if all_y:
         group_tops = np.max(np.vstack(all_y), axis=0)
         for xi, depth_text, top in zip(x, depth_texts, group_tops):
-            y = min(1.08, top + 0.03)
+            y = min(1.24, top + 0.04)
             plt.text(xi, y, depth_text, ha="center", va="bottom", fontsize=7)
 
     handles, labels = plt.gca().get_legend_handles_labels()
@@ -1934,6 +1930,12 @@ def plot_coverage_by_config(timeout_sweep_dir, base_buggy_data, output_path):
         )
     )
     labels.append("Bug depth")
+    # Reverse config order in legend so "Full SaSh" appears first.
+    cfg_pairs = [(h, l) for h, l in zip(handles, labels) if l != "Bug depth"]
+    depth_pairs = [(h, l) for h, l in zip(handles, labels) if l == "Bug depth"]
+    cfg_pairs = list(reversed(cfg_pairs))
+    handles = [h for h, _ in cfg_pairs] + [h for h, _ in depth_pairs]
+    labels = [l for _, l in cfg_pairs] + [l for _, l in depth_pairs]
     plt.legend(
         handles,
         labels,
@@ -1982,12 +1984,6 @@ def plot_timeout_sweep_bug_catch(timeout_sweep_dir, output_path):
             "Smart forking",
             color_scheme[3],
             re.compile(r"results_t([0-9]+(?:\.[0-9]+)?)_smart_forking\.csv$"),
-        ),
-        (
-            "solver_opts",
-            "Solver opts",
-            color_scheme[2],
-            re.compile(r"results_t([0-9]+(?:\.[0-9]+)?)_solver_opts\.csv$"),
         ),
         (
             "dfs_on",
@@ -2076,13 +2072,6 @@ def plot_timeout_sweep_bug_catch(timeout_sweep_dir, output_path):
 
     if all_totals:
         total = int(round(float(np.median(all_totals))))
-        plt.axhline(
-            y=total,
-            linestyle="--",
-            linewidth=1.0,
-            color="gray",
-            label="_nolegend_",
-        )
         ax = plt.gca()
         if all_y_arrays:
             min_seen = float(np.min(np.concatenate(all_y_arrays)))
@@ -2090,20 +2079,54 @@ def plot_timeout_sweep_bug_catch(timeout_sweep_dir, output_path):
         else:
             y_lower = 0.0
         y_lower_int = int(np.floor(y_lower))
-        span = total - y_lower_int
-        if span <= 4:
-            y_ticks = np.arange(y_lower_int, total + 1, 1, dtype=int)
-        else:
-            y_ticks = sorted(
-                {
-                    y_lower_int,
-                    *[int(round(v)) for v in np.linspace(y_lower_int, total, 5)],
-                    total,
-                }
-            )
+        # Use a fixed truncated baseline for readability.
+        y_bottom = 30.0 if float(total) > 30.0 else 0.0
+        y_top = max(float(total), 70.0)
+        ax.set_ylim(y_bottom, y_top)
+        y_tick_start = int(np.floor(y_bottom / 10.0) * 10 + 10)
+        y_ticks = [t for t in range(y_tick_start, int(y_top) + 1, 10)]
+        if 70 not in y_ticks:
+            y_ticks.append(70)
+            y_ticks = sorted(set(y_ticks))
+        if not y_ticks:
+            y_ticks = [int(total)]
         ax.set_yticks(y_ticks)
-        ax.set_ylim(float(y_lower_int), float(total))
-        # Keep the truncated y-axis via limits/ticks only.
+        # Standard broken-axis directive: // marker on the left y-axis,
+        # positioned between the axis bottom and the first visible tick.
+        y0, _ = ax.get_ylim()
+        y_break = max(y0 + 0.75, 35.0)
+        x_center = 0.0  # left axis spine in y-axis transform coordinates
+        dx = 0.010      # x in axes fraction
+        dy = 0.07       # y in data units
+        gap = 0.70      # spacing between the two slashes (data units)
+        break_kwargs = dict(
+            transform=ax.get_yaxis_transform(),
+            color="black",
+            clip_on=False,
+            linewidth=0.6,
+            zorder=6,
+        )
+        ax.plot(
+            (x_center - dx, x_center + dx),
+            (y_break - dy, y_break + dy),
+            **break_kwargs,
+        )
+        ax.plot(
+            (x_center - dx, x_center + dx),
+            (y_break + gap - dy, y_break + gap + dy),
+            **break_kwargs,
+        )
+        # Mask the axis segment between slashes to emphasize the break.
+        ax.plot(
+            (x_center, x_center),
+            (y_break + dy + 0.03, y_break + gap - dy - 0.03),
+            transform=ax.get_yaxis_transform(),
+            color="white",
+            linewidth=2.2,
+            solid_capstyle="butt",
+            clip_on=False,
+            zorder=5,
+        )
 
     plt.xlabel("Timeout (s)")
     plt.ylabel("Bugs caught")
@@ -2115,9 +2138,13 @@ def plot_timeout_sweep_bug_catch(timeout_sweep_dir, output_path):
         x_tick_labels = [
             str(int(x)) if x in timeout_tick_set else f"{x:.2f}" for x in x_ticks
         ]
-        plt.xticks(x_ticks, x_tick_labels)
+        plt.xticks(x_ticks, x_tick_labels, fontsize=7)
+    plt.yticks(fontsize=7)
     plt.grid(axis="y", alpha=0.25, linestyle=":")
-    plt.legend(fontsize=8, loc="lower right", frameon=True)
+    handles, labels = plt.gca().get_legend_handles_labels()
+    handles = handles[::-1]
+    labels = labels[::-1]
+    plt.legend(handles, labels, fontsize=8, loc="lower right", frameon=True)
     plt.tight_layout()
     plt.savefig(output_path, format="pdf")
     plt.close()
