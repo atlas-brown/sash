@@ -1025,6 +1025,7 @@ def plot_bug_detection_bars_split_versions(data, output_path):
         labelleft=False,
         right=True,
         labelright=True,
+        pad=1,
     )
     ax.yaxis.set_label_position("left")
     ax.yaxis.tick_right()
@@ -1075,7 +1076,7 @@ def plot_bug_detection_bars_split_versions(data, output_path):
         borderaxespad=0.0,
         columnspacing=2.0,
     )
-    fig.subplots_adjust(left=0.10, right=0.90, bottom=0.44, top=0.92)
+    fig.subplots_adjust(left=0.10, right=0.86, bottom=0.44, top=0.92)
     plt.savefig(output_path, format="pdf")
     plt.close()
 
