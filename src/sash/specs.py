@@ -382,6 +382,62 @@ def grep_spec(cmd: CmdInvocation) -> CmdSpec:
     return CmdSpec(check, success_postcond, failure_postcond, io)
 
 
+def xargs_spec(cmd: CmdInvocation) -> CmdSpec:
+    # https://pubs.opengroup.org/onlinepubs/9799919799/utilities/xargs.html
+    (name, flags, options, operands) = (cmd.cmd_name, cmd.flags, cmd.options, cmd.operands)
+
+    assert name == SymStr(("xargs",)), f"Expected xargs command, got: {name}"
+
+    # xargs fundamentally consumes stdin to build command arguments.
+    io = IOType.STDIN
+
+    subcmd_operands: list[Field] = []
+    if "-I" in options:
+        # parse_command already strips "-I repl" from operands and stores repl in options.
+        # Remaining operands are the command template.
+        subcmd_operands = operands
+    else:
+        # For unknown/unsupported xargs flags, parse_command leaves them in operands.
+        # Use a minimal scan to skip leading flags/options and find the command.
+        i = 0
+        while i < len(operands):
+            tok = operands[i].try_to_str()
+            if tok is None:
+                break
+            if tok == "--":
+                i += 1
+                break
+            if tok in {"-I", "-n", "-L", "-E", "-s", "-P"}:
+                i += 2
+                continue
+            if tok.startswith("-"):
+                i += 1
+                continue
+            break
+        subcmd_operands = operands[i:]
+
+    if not subcmd_operands:
+        # POSIX default utility is echo, which writes to stdout.
+        return CmdSpec(None, Empty(), Empty(), IOType.BOTH)
+
+    subcmd_name_raw = subcmd_operands[0].try_to_str()
+    if subcmd_name_raw is None:
+        return CmdSpec(None, Empty(), Empty(), IOType.UNKNOWN)
+
+    subcmd_name = subcmd_name_raw.rsplit("/", 1)[-1] if "/" in subcmd_name_raw else subcmd_name_raw
+    subcmd_inv = (Field(SymStr((subcmd_name,)), WordCount(1, 1)),) + tuple(subcmd_operands[1:])
+    sub_spec = get_spec(subcmd_name, subcmd_inv)
+    if sub_spec is None:
+        return CmdSpec(None, Empty(), Empty(), IOType.UNKNOWN)
+
+    if sub_spec.io in {IOType.STDOUT, IOType.BOTH}:
+        io = IOType.add_stdout(io)
+    elif sub_spec.io == IOType.UNKNOWN:
+        io = IOType.UNKNOWN
+
+    return CmdSpec(None, Empty(), Empty(), io)
+
+
 def mkdir_spec(cmd: CmdInvocation) -> CmdSpec:
     # https://pubs.opengroup.org/onlinepubs/9799919799/utilities/mkdir.html
     (name, flags, options, operands) = (cmd.cmd_name, cmd.flags, cmd.options, cmd.operands)
