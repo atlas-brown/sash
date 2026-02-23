@@ -196,3 +196,14 @@ def is_protected(path):
 def is_flag(field: Field) -> bool:
     field_str = field.try_to_str()
     return field_str is not None and field_str.startswith("-")
+
+
+def is_user_directory(path: str) -> bool:
+    """Return True for user home directories like /home/alice, /home/alice/, /home/alice/*."""
+    normalized = path.strip()
+    if normalized.endswith("/*"):
+        normalized = normalized[:-2]
+    if normalized.endswith("/"):
+        normalized = normalized[:-1]
+    parts = normalized.split("/")
+    return len(parts) == 3 and parts[0] == "" and parts[1] == "home" and parts[2] not in {"", "*", ".", ".."}

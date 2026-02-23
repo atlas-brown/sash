@@ -36,6 +36,7 @@ class Code(Enum):
     CAPTURING_EMPTY_OUTPUT = "capturing_empty_output"
     CMD_ASSERTION_PATH_STATE = "cmd_expected_path_state"
     DATA_LOSS = "data_loss"
+    DELETE_USER_DIRECTORY = "del_user_dir"
 
 
 @dataclass(frozen=True)
@@ -188,6 +189,11 @@ class ExpectedPathState(Issue):
 class DataLoss(Issue):
     def __init__(self, command: str, paths, line):
         super().__init__(Code.DATA_LOSS, f"command '{command}' deletes {paths}, one of which has not been read, potentially causing loss of data", Severity.ERROR, line)
+
+
+class DeleteUserDirectory(Issue):
+    def __init__(self, directory: str, line):
+        super().__init__(Code.DELETE_USER_DIRECTORY, f"deletes user directory '{directory}'", Severity.WARNING, line)
 
 class Report(NamedTuple):
     filename: str

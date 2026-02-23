@@ -2,7 +2,7 @@ import threading
 from sash.constraints import *
 from sash.reporter import *
 from sash.interpreter_config import InterpConfig
-from sash.symbolic.state import State, Assertion, Trace, RefineableConstraint
+from sash.symbolic.state import State, Assertion, Trace, RefineableConstraint, SimpleConstraint
 from dataclasses import replace
 import logging
 from sash.symbolic.strings import CompletelyArbitrary, Field, SymStr
@@ -211,6 +211,27 @@ def assume_unknowns_are_files(assertions: list[Assertion]) -> tuple[Assertion, .
         new_assertions.append(new_assertion)
     return tuple(new_assertions)
 
+
+def home_not_deleted_assertion(trace: Trace) -> Assertion | None:
+    init_home = trace.states[0].lookup("HOME")
+    if init_home is None:
+        return None
+    home_label = init_home.value.try_to_str() or "HOME"
+    constraint = SimpleConstraint(
+        Not(IsDeleted(init_home.value)),
+        lambda line: DeleteUserDirectory(home_label, line),
+    )
+    if constraint is None:
+        return None
+    return Assertion(
+        producing_state=trace.latest_state,
+        constraint=constraint,
+        source_str="global invariant: HOME is not deleted",
+        source_line=0,
+        priority=1000,
+        include_fs=True,
+    )
+
 # <assertion_constraint>: if true, then things are OK, if false then there's a bug
 
 # assert not(<assertion_constraint>)
@@ -237,6 +258,9 @@ def run_solver(traces: list[Trace], config: InterpConfig, stop: threading.Event 
             break
 
         assertions = trace.latest_state.assertions
+        home_assertion = home_not_deleted_assertion(trace)
+        if home_assertion is not None:
+            assertions = assertions + (home_assertion,)
         assertions = assertions + assume_unknowns_are_files(assertions)
         if not config.disable_solver_optimizations:
             assertions = sorted(assertions, key=lambda a: a.priority, reverse=True)

@@ -73,6 +73,19 @@ def test_unbound_variable_setu_with_plus_colon(tmp_path):
     report = reset_and_run_main(script)
     assert_expected_report(report, [])
 
+
+def test_empty_path_command_not_found(tmp_path):
+    script = write_script(tmp_path, "unset PATH\ngrep foo /etc/profile\n")
+    report = reset_and_run_main(script)
+    expected_error = reporter.NotACommand("grep", 0)
+    assert_expected_report(report, [expected_error])
+
+
+def test_empty_path_explicit_command_path(tmp_path):
+    script = write_script(tmp_path, "unset PATH\n/bin/echo ok\n")
+    report = reset_and_run_main(script)
+    assert_expected_report(report, [])
+
 def test_delete_system_file(tmp_path):
     # Deleting a system file should produce a DeleteSystemFile error
     script = write_script(tmp_path, "rm /usr\n")
@@ -100,11 +113,50 @@ def test_delete_system_file(tmp_path):
     expected_error = reporter.DeleteSystemFile("/*", 0)
     assert_expected_report(report, [expected_error])
 
+    script = write_script(tmp_path, "rm *\n")
+    report = reset_and_run_main(script)
+    expected_error = reporter.DeleteSystemFile("PWD", 0)
+    assert_expected_report(report, [expected_error])
+
+    script = write_script(tmp_path, "rm -rf *\n")
+    report = reset_and_run_main(script)
+    expected_error = reporter.DeleteSystemFile("PWD", 0)
+    assert_expected_report(report, [expected_error])
+
+    script = write_script(tmp_path, "cd dir\nrm *\n")
+    report = reset_and_run_main(script)
+    assert_expected_report(report, [])
+
+    script = write_script(tmp_path, "#!/bin/sh\ncd ~\nrm -rf *\n")
+    report = reset_and_run_main(script)
+    expected_error = reporter.DeleteSystemFile("PWD", 0)
+    assert_expected_report(report, [expected_error])
+
     script = write_script(tmp_path, "rm -rf \"$FOO\"/\n")
     report = reset_and_run_main(script)
     expected_error1 = reporter.UnboundID(foo_var.pretty(), 0)
     expected_error2 = reporter.WordSplitCouldDeleteSystemFile("$FOO", 0)
     assert_expected_report(report, [expected_error1, expected_error2])
+
+    script = write_script(tmp_path, "rm -r /home/user\n")
+    report = reset_and_run_main(script)
+    expected_warning = reporter.DeleteUserDirectory("/home/user", 0)
+    assert_expected_report(report, [expected_warning])
+
+    script = write_script(tmp_path, "sudo rm -r /home/user\n")
+    report = reset_and_run_main(script)
+    expected_warning = reporter.DeleteUserDirectory("/home/user", 0)
+    assert_expected_report(report, [expected_warning])
+
+    script = write_script(tmp_path, "find / -mtime +1 -exec rm {} \\;\n")
+    report = reset_and_run_main(script)
+    expected_error1 = reporter.DeleteSystemFile("/", 0)
+    expected_error2 = reporter.WordSplitCouldDeleteSystemFile("/", 0)
+    assert_expected_report(report, [expected_error1, expected_error2])
+
+    script = write_script(tmp_path, "find /tmp -mtime +1 -exec rm {} \\;\n")
+    report = reset_and_run_main(script)
+    assert_expected_report(report, [])
 
     script = write_script(tmp_path, """
 if [ "$FOO" = "yes" ]; then
@@ -162,6 +214,16 @@ def test_steamroot_fix(tmp_path):
     """)
     report = reset_and_run_main(script)
     assert_expected_report(report, [])
+
+
+def test_home_not_deleted_global_invariant(tmp_path):
+    script = write_script(tmp_path, "mv \"$HOME\" /tmp/newhome\n")
+    report = reset_and_run_main(script)
+    assert_expected_report(report, [])
+
+    report = reset_and_run_main(script, solver=True)
+    expected_warning = reporter.DeleteUserDirectory("HOME", 0)
+    assert_expected_report(report, [expected_warning])
 
 
 def test_delete_system_file_with_escaped_cmd_name(tmp_path):
@@ -839,6 +901,23 @@ xargs -I thing rm somefile.txt thing
     expected_warning = reporter.ExpectedPathState('rm', 'existant', ('somefile.txt',), 0)
     expected_warning2 = reporter.DangerousWordSplit(None, 0)
     assert_expected_report(report, [expected_warning, expected_warning2])
+
+
+def test_xargs_pipeline_consumes_empty_stdout(tmp_path):
+    script = write_script(tmp_path, """
+echo hi | xargs /bin/rm -f | xargs -I list echo list
+""")
+    report = reset_and_run_main(script)
+    expected_error = reporter.UnexpectedStdin("xargs", 0)
+    assert_expected_report(report, [expected_error])
+
+
+def test_eval_constant_string_interpreted(tmp_path):
+    script = write_script(tmp_path, 'eval "rm /usr"\n')
+    report = reset_and_run_main(script)
+    expected_error = reporter.DeleteSystemFile("/usr", 0)
+    assert_expected_report(report, [expected_error])
+
 
 def test_grep_no_pattern(tmp_path):
     """Test that `grep` with no pattern is reported as an unexpected stdin issue."""

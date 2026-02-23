@@ -1,7 +1,9 @@
 import logging
+import os
 import threading
 import traceback
 import time
+import tempfile
 from collections import defaultdict
 from copy import copy
 from dataclasses import dataclass, field, replace
@@ -30,6 +32,83 @@ from sash.symbolic.state import *
 from sash.debugtools.logger import DebugLogger
 
 
+def _set_env_like(state: State, name: str, value: Field) -> State:
+    existing = state.lookup(name)
+    if existing is None:
+        return state.set_env(name, ShellVar(value))
+    return state.set_env(
+        name,
+        ShellVar(
+            value,
+            readonly=existing.readonly,
+            export=existing.export,
+            ghost=existing.ghost,
+        ),
+    )
+
+
+def _pathcond_contradicts(state: State, new_cond: Constraint) -> bool:
+    if new_cond == Empty():
+        return False
+    norm_new = new_cond.normalized().constraint
+    for cond in state.pathcond:
+        norm_existing = cond.constraint.normalized().constraint
+        if isinstance(norm_existing, Not) and norm_existing.constraint == norm_new:
+            return True
+        if isinstance(norm_new, Not) and norm_new.constraint == norm_existing:
+            return True
+    return False
+
+
+def _path_lookup_disabled_for_command(name: str, traces: Traces) -> bool:
+    # Commands invoked with a slash do not use PATH lookup.
+    if "/" in name:
+        return False
+
+    # Known shell builtins should still resolve even with PATH unset/empty.
+    if name in {"set", "unset", "exit", "read", "cd", "command", "test", "[", "true", "false", ":"}:
+        return False
+
+    # Function calls are independent of PATH lookup as well.
+    if traces and all(t.latest_state.lookup_fundef(name) is not None for t in traces):
+        return False
+
+    for trace in traces:
+        path_var = trace.latest_state.lookup("PATH")
+        if path_var is None:
+            return True
+        path_str = path_var.value.try_to_str()
+        if path_str == "":
+            return True
+    return False
+
+
+def _update_pwd_for_cd(state: State, expanded_args: tuple[Field, ...]) -> State:
+    pwd = state.lookup("PWD")
+    if pwd is None:
+        return state
+
+    target: Field | None = None
+    if len(expanded_args) <= 1:
+        home = state.lookup("HOME")
+        if home is not None:
+            target = home.value
+    else:
+        operand = expanded_args[1]
+        if operand.try_to_str() == "-":
+            oldpwd = state.lookup("OLDPWD")
+            if oldpwd is not None:
+                target = oldpwd.value
+        else:
+            target = operand
+
+    if target is None:
+        return state
+
+    state = _set_env_like(state, "OLDPWD", pwd.value)
+    state = _set_env_like(state, "PWD", target)
+    return state
+
 def handle_commandnode(traces: Traces,
                        node: AST.CommandNode,
                        config: InterpConfig) -> Traces:
@@ -52,6 +131,8 @@ def handle_commandnode(traces: Traces,
             # `grep` will expect input from stdin instead of treating the second argument as a file.
             if expanded_args[1].count.min == 0 and not util.is_definitely_non_empty(expanded_args[1], t1_active[0]):
                 Reporter.add_issue(reporter.UnexpectedStdin(cmd_name, context_line), config)
+        if isinstance(cmd_name, str) and _path_lookup_disabled_for_command(cmd_name, t1_active):
+            Reporter.add_issue(reporter.NotACommand(cmd_name, context_line), config)
 
     if expanded_args:
         match expanded_args[0].try_to_str():
@@ -68,8 +149,27 @@ def handle_commandnode(traces: Traces,
                             logging.debug("Adding failure traces for rm")
                             cmd_traces.append(tf)
                 t1 = cmd_traces
+            case "sudo" if len(expanded_args) >= 2 and expanded_args[1].try_to_str() == "rm":
+                logging.debug("Exploring all possible expansions of sudo rm args")
+                expansions = expand_args(t1, node.arguments, config)
+                simplified_expansions = collapse_equiv_trace_expansions(expansions)
+                cmd_traces = []
+                for arg_fields, traces in simplified_expansions.items():
+                    if len(arg_fields) < 2 or arg_fields[1].try_to_str() != "rm":
+                        continue
+                    rm_arg_fields = tuple(arg_fields[1:])
+                    for trace in traces:
+                        ts, tf = handle_rm(rm_arg_fields, trace, node, config)
+                        cmd_traces.append(ts)
+                        if config.in_checked_position or config.force_fork_all:
+                            logging.debug("Adding failure traces for sudo rm")
+                            cmd_traces.append(tf)
+                if cmd_traces:
+                    t1 = cmd_traces
             case "set":
                 t1 = handle_set(expanded_args, t1)
+            case "unset":
+                t1 = handle_unset(expanded_args, t1)
             case "exit":
                 t1 = handle_exit(t1)
             # case "return":
@@ -78,6 +178,10 @@ def handle_commandnode(traces: Traces,
                 t1 = handle_read(expanded_args, t1, node)
             case "xargs":
                 t1 = handle_xargs(t1, node, expanded_args, config)
+            case "eval":
+                t1 = handle_eval(t1, node, expanded_args, config)
+            case "find":
+                t1 = handle_find(t1, node, expanded_args, config)
             # TODO: Unify rm with other commands
             case cmd_name if spec := get_spec(cmd_name, tuple(expanded_args)):
                 logging.debug("Adding %s precondition: %s", cmd_name, spec.check)
@@ -146,20 +250,8 @@ def handle_commandnode(traces: Traces,
                 else:
                     t_precond = t1
 
-                def pathcond_contradicts(state: State, new_cond: Constraint) -> bool:
-                    if new_cond == Empty():
-                        return False
-                    norm_new = new_cond.normalized().constraint
-                    for cond in state.pathcond:
-                        norm_existing = cond.constraint.normalized().constraint
-                        if isinstance(norm_existing, Not) and norm_existing.constraint == norm_new:
-                            return True
-                        if isinstance(norm_new, Not) and norm_new.constraint == norm_existing:
-                            return True
-                    return False
-
                 knowledge_before_exec, knowledge_after_exec = spec.success_postcond if isinstance(spec.success_postcond, tuple) else (Empty(), spec.success_postcond)
-                t_success_precond = [t for t in t_precond if not pathcond_contradicts(t.latest_state, knowledge_after_exec)]
+                t_success_precond = [t for t in t_precond if not _pathcond_contradicts(t.latest_state, knowledge_after_exec)]
                 t_success = trace_map(t_success_precond,
                                       lambda s: s.add_pathcond(knowledge_before_exec)\
                                                  .update_fs(knowledge_after_exec)\
@@ -168,9 +260,11 @@ def handle_commandnode(traces: Traces,
                                                  .set_last_exit_code(SymStr(("0",)),
                                                                      Confidence.DEFINITE if s.opts.is_set(SetOptions.NOFAIL) and not config.in_checked_position else Confidence.SPECULATIVE,
                                                                      spec.failure_postcond))
+                if cmd_name == "cd": # TODO: Put this somewhere better
+                    t_success = trace_map(t_success, lambda s: _update_pwd_for_cd(s, tuple(expanded_args)))
                 t_failure = []
                 if config.in_checked_position or config.force_fork_all:
-                    t_failure_precond = [t for t in t_precond if not pathcond_contradicts(t.latest_state, spec.failure_postcond)]
+                    t_failure_precond = [t for t in t_precond if not _pathcond_contradicts(t.latest_state, spec.failure_postcond)]
                     t_failure = trace_map(t_failure_precond,
                                           lambda s: s.update_fs(spec.failure_postcond)\
                                                      .add_pathcond(spec.failure_postcond)\
@@ -214,6 +308,72 @@ def extract_literal_strings_from_arg(arg: list[AST.ArgChar]) -> str:
             case AST.VArgChar() | AST.BArgChar() | AST.AArgChar() | AST.TArgChar():
                 pass
     return "".join(result)
+
+
+def _arg_is_fully_literal(arg: list[AST.ArgChar]) -> bool:
+    for char in arg:
+        match char:
+            case AST.CArgChar() | AST.EArgChar():
+                continue
+            case AST.QArgChar() as q:
+                if not _arg_is_fully_literal(q.arg):
+                    return False
+            case _:
+                return False
+    return True
+
+
+def _commandnode_literal_tokens(node: AST.CommandNode) -> list[str] | None:
+    tokens: list[str] = []
+    for arg in node.arguments:
+        if not _arg_is_fully_literal(arg):
+            return None
+        tokens.append(extract_literal_strings_from_arg(arg))
+    return tokens
+
+
+def _normalized_cmd_name(name: str) -> str:
+    return name.rsplit("/", 1)[-1] if "/" in name else name
+
+
+def _spec_io_for_literal_tokens(tokens: list[str]) -> IOType | None:
+    if not tokens:
+        return None
+    normalized_name = _normalized_cmd_name(tokens[0])
+    cmd_inv: tuple[Field, ...] = tuple(
+        [Field(SymStr((normalized_name,)), WordCount(1, 1))]
+        + [Field(SymStr((tok,)), WordCount(1, 1)) for tok in tokens[1:]]
+    )
+    spec = get_spec(normalized_name, cmd_inv)
+    if spec is None:
+        return None
+    return spec.io
+
+
+def _node_invocation_has_no_stdout(node: AST.CommandNode) -> bool:
+    tokens = _commandnode_literal_tokens(node)
+    if not tokens:
+        return False
+
+    io = _spec_io_for_literal_tokens(tokens)
+
+    return io in {IOType.NONE, IOType.STDIN}
+
+
+def _node_invocation_expects_stdin(node: AST.CommandNode) -> bool:
+    tokens = _commandnode_literal_tokens(node)
+    if not tokens:
+        return False
+
+    io = _spec_io_for_literal_tokens(tokens)
+    return io in {IOType.STDIN, IOType.BOTH}
+
+
+def _node_invocation_name(node: AST.CommandNode) -> str:
+    tokens = _commandnode_literal_tokens(node)
+    if not tokens:
+        return node.pretty()
+    return _normalized_cmd_name(tokens[0])
 
 # Case where the output string can be determined
 def word_count_from_output(output: str) -> WordCount:
@@ -261,7 +421,7 @@ def command_substitution_output(cmd_name: str,
         case _:
             return None, state
 
-def handle_rm(expanded_args: tuple[Field, ...], trace: Trace, node: AST.CommandNode, config: Config) -> tuple[Trace, Trace]:
+def handle_rm(expanded_args: tuple[Field, ...], trace: Trace, node: AST.CommandNode, config: InterpConfig) -> tuple[Trace, Trace]:
     logging.debug("Checking rm command with expansion possibility: %s", expanded_args)
     spec = get_spec("rm", expanded_args)
 
@@ -275,18 +435,32 @@ def handle_rm(expanded_args: tuple[Field, ...], trace: Trace, node: AST.CommandN
     non_flag_args = [arg for arg in expanded_args[1:] if not util.is_flag(arg)]
 
     pwdval = trace.latest_state.lookup("PWD")
+    start_pwdval = trace.latest_state.lookup(config.pwd_init_var)
     homeval = trace.latest_state.lookup("HOME")
+
+    def same_location(lhs: Field, rhs: Field) -> bool:
+        lhs_str = lhs.try_to_str()
+        rhs_str = rhs.try_to_str()
+        if lhs_str is not None and rhs_str is not None:
+            return lhs.try_without_trailing_slash() == rhs.try_without_trailing_slash()
+        lhs_core = util.field_core_key(lhs)
+        rhs_core = util.field_core_key(rhs)
+        return lhs_core is not None and lhs_core == rhs_core
+
+    at_pwd_init = pwdval is not None and start_pwdval is not None and same_location(pwdval.value, start_pwdval.value)
+    at_home = pwdval is not None and homeval is not None and same_location(pwdval.value, homeval.value)
+    # TODO: Replace this heuristic with a proper "current working directory" abstraction independent of env-field shape.
+    if (
+        (at_pwd_init or at_home)
+        and any(arg.try_to_str() == "*" for arg in non_flag_args)
+    ):
+        Reporter.add_issue(reporter.DeleteSystemFile(pwdval.value.try_to_str() or "PWD", context_line), config)
+
     if non_flag_args:
         if pwdval is not None: # Can be empty if the script unsets it
             trace = trace.extend(lambda s: s.add_assertion(SimpleConstraint(And.from_field_iter(non_flag_args,
                                                                                                 lambda arg_field: Not(StringEq(arg_field, pwdval.value))),
                                                                             lambda line: reporter.DeleteSystemFile("PWD", line)),
-                                                        node.pretty(),
-                                                        context_line, priority=10, include_fs=False))
-        if homeval is not None: # Can be empty if the script unsets it
-            trace = trace.extend(lambda s: s.add_assertion(SimpleConstraint(And.from_field_iter(non_flag_args,
-                                                                                                lambda arg_field: Not(StringEq(arg_field, homeval.value))),
-                                                                            lambda line: reporter.DeleteSystemFile("HOME", line)),
                                                         node.pretty(),
                                                         context_line, priority=10, include_fs=False))
 
@@ -313,8 +487,11 @@ def handle_rm(expanded_args: tuple[Field, ...], trace: Trace, node: AST.CommandN
             continue
         definitely_non_empty = util.is_definitely_non_empty(arg_field, trace)
         logging.debug("arg %d: %s, definitely_non_empty=%s", arg_idx, arg_field, definitely_non_empty)
-        if (path := arg_field.try_to_str()) and util.is_protected(path):
-            Reporter.add_issue(reporter.DeleteSystemFile(path, context_line), config)
+        if path := arg_field.try_to_str():
+            if util.is_protected(path):
+                Reporter.add_issue(reporter.DeleteSystemFile(path, context_line), config)
+            if util.is_user_directory(path):
+                Reporter.add_issue(reporter.DeleteUserDirectory(path, context_line), config)
 
         def maybe_report_protected_split(content: CompletelyArbitrary, max_words: int | float) -> None:
             if content.maybe_empty and content.quoted and not definitely_non_empty:
@@ -349,6 +526,85 @@ def handle_rm(expanded_args: tuple[Field, ...], trace: Trace, node: AST.CommandN
     )
 
 
+def handle_find(traces: Traces,
+                node: AST.CommandNode,
+                expanded_args: list[Field],
+                config: InterpConfig) -> Traces:
+    arg_strs = [f.try_to_str() for f in expanded_args]
+    if any(arg is None for arg in arg_strs):
+        return handle_unknown_command("find", expanded_args[1:], traces, config)
+
+    args = [arg for arg in arg_strs if isinstance(arg, str)]
+
+    # Parse starting points: positional args before the first expression term.
+    search_roots: list[str] = []
+    for tok in args[1:]:
+        if tok.startswith("-") or tok in {"!", "(", ")"}:
+            break
+        search_roots.append(tok)
+    if not search_roots:
+        search_roots = ["."]
+
+    def literal_argchars(s: str) -> list[AST.ArgChar]:
+        return [AST.CArgChar(ord(ch)) for ch in s]
+
+    def symbolic_suffix_argchars(prefix: str) -> list[AST.ArgChar]:
+        # quoted command substitution -> one symbolic path segment
+        return literal_argchars(prefix) + [AST.QArgChar([AST.BArgChar(AST.CommandNode(node.line_number, [], [], []))])]
+
+    def path_variants(root: str) -> list[list[AST.ArgChar]]:
+        root_with_slash = root if root.endswith("/") else f"{root}/"
+        variants = [
+            literal_argchars(root),
+            symbolic_suffix_argchars(root),
+            symbolic_suffix_argchars(root_with_slash),
+        ]
+        deduped: list[list[AST.ArgChar]] = []
+        seen = set()
+        for argchars in variants:
+            key = tuple(ch.pretty() for ch in argchars)
+            if key not in seen:
+                seen.add(key)
+                deduped.append(argchars)
+        return deduped
+
+    generated_cmd_traces: Traces = []
+
+    # Approximate `find ... -exec cmd ... {} ... \;` by unrolling into synthetic command nodes.
+    # TODO: model find's expression language and -exec argument expansion soundly.
+    i = 1
+    while i < len(args):
+        if args[i] == "-exec" and i + 1 < len(args):
+            j = i + 1
+            exec_args: list[str] = []
+            has_placeholder = False
+            while j < len(args) and args[j] not in {";", "\\;", "+"}:
+                if args[j] == "{}":
+                    has_placeholder = True
+                j += 1
+                exec_args.append(args[j - 1])
+
+            if j < len(args) and has_placeholder and exec_args:
+                for root in search_roots:
+                    for placeholder_arg in path_variants(root):
+                        mangled_cmdnode = deepcopy(node)
+                        mangled_cmdnode.arguments = []
+                        mangled_cmdnode.assignments = []
+                        mangled_cmdnode.redir_list = []
+                        for tok in exec_args:
+                            if tok == "{}":
+                                mangled_cmdnode.arguments.append(deepcopy(placeholder_arg))
+                            else:
+                                mangled_cmdnode.arguments.append(literal_argchars(tok))
+                        generated_cmd_traces.extend(handle_commandnode(traces, mangled_cmdnode, config))
+                i = j
+        i += 1
+
+    if generated_cmd_traces:
+        return generated_cmd_traces
+    return handle_unknown_command("find", expanded_args[1:], traces, config)
+
+
 def handle_function_call_or_unknown(func_name: str,
                                     arg_fields: list[Field],
                                     traces: Traces,
@@ -376,7 +632,8 @@ def handle_unknown_command(name: str,
     if name in func_map.funcs.keys():
         Reporter.add_issue(reporter.UndefinedFunction(name, context_line), config)
 
-    if name.endswith("/") or any(name in t.latest_state.known_nonexistent_commands for t in traces):
+    if name.endswith("/") \
+       or any(name in t.latest_state.known_nonexistent_commands for t in traces):
         Reporter.add_issue(reporter.NotACommand(name, context_line), config)
 
     logging.debug("Unknown command %s, optimistically treating as no-op", name) # that reads its operands", name)
@@ -599,6 +856,25 @@ def handle_set(expanded_args: list[Field], traces: Traces) -> Traces:
                 raise NotImplementedError(f"set with non-constant args: {expanded_args}")
     return trace_map(traces, lambda s: s.set_options(to_set))
 
+def handle_unset(expanded_args: list[Field], traces: Traces) -> Traces:
+    vars_to_unset: list[str] = []
+    for arg in expanded_args[1:]:
+        var_name = arg.try_to_str()
+        if not var_name:
+            raise NotImplementedError(f"unset with non-constant args: {expanded_args}")
+        vars_to_unset.append(var_name)
+
+    empty = Field(SymStr(("",)), WordCount(0, 0))
+
+    def apply_unset(state: State) -> State:
+        updated = state
+        for var_name in vars_to_unset:
+            # Model unset as a ghost empty variable so expansions treat it as unset-like.
+            updated = updated.set_env(var_name, ShellVar(empty, ghost=True))
+        return updated
+
+    return trace_map(traces, apply_unset)
+
 def handle_if(traces: Traces, node: AST.IfNode, config: InterpConfig) -> Traces:
     test_line_number = context_line
     test_cmds = []
@@ -734,6 +1010,49 @@ def handle_xargs(traces: Traces, node: AST.CommandNode, expanded_args: list[Fiel
         case _:
             logging.warning("Ignoring unsupported xargs invocation: %s", node.pretty())
             return traces
+
+
+def handle_eval(traces: Traces,
+                node: AST.CommandNode,
+                expanded_args: list[Field],
+                config: InterpConfig) -> Traces:
+    if len(expanded_args) <= 1:
+        return trace_map(traces, lambda s: s.set_last_exit_code(SymStr(("0",)), Confidence.DEFINITE))
+
+    eval_parts: list[str] = []
+    for field in expanded_args[1:]:
+        part = field.try_to_str()
+        if part is None:
+            return handle_unknown_command("eval", expanded_args[1:], traces, config)
+        eval_parts.append(part)
+
+    eval_script = " ".join(eval_parts)
+    if eval_script.strip() == "":
+        return trace_map(traces, lambda s: s.set_last_exit_code(SymStr(("0",)), Confidence.DEFINITE))
+
+    temp_path = None
+    try:
+        with tempfile.NamedTemporaryFile("w", suffix=".sh", delete=False) as temp_file:
+            temp_path = temp_file.name
+            temp_file.write(eval_script)
+            if not eval_script.endswith("\n"):
+                temp_file.write("\n")
+        parsed_nodes = parser.parse_shell_script(temp_path)
+    except Exception:
+        logging.debug("Failed to parse constant eval payload; falling back to unknown eval handling", exc_info=True)
+        return handle_unknown_command("eval", expanded_args[1:], traces, config)
+    finally:
+        if temp_path is not None:
+            try:
+                os.unlink(temp_path)
+            except OSError:
+                pass
+
+    t = traces
+    for wrapped_node in parsed_nodes:
+        if isinstance(wrapped_node.ast_node, AST.Command):
+            t = guarded_interp_node(t, wrapped_node.ast_node, config)
+    return t
 
 # ============================================================
 #                  Symbolic Expander
@@ -1879,7 +2198,16 @@ def interp_node(traces: Traces,
             saved_envs = [(t.latest_state.env, t.latest_state.localenv) for t in traces]
             t = traces
             # Sequentially interpret each command in the pipeline, and return the aggregated traces.
-            for cmd in node.items:
+            for i, cmd in enumerate(node.items):
+                if (
+                    i > 0
+                    and isinstance(cmd, AST.CommandNode)
+                    and isinstance(node.items[i - 1], AST.CommandNode)
+                ):
+                    lhs = node.items[i - 1]
+                    rhs = cmd
+                    if _node_invocation_has_no_stdout(lhs) and _node_invocation_expects_stdin(rhs):
+                        Reporter.add_issue(reporter.UnexpectedStdin(_node_invocation_name(rhs), context_line), config)
                 t = guarded_interp_node(t, cmd, config)
             # Since traces can fork and merge, we need to match traces back to their original saved environments.
             # Thus, restore the environment of each trace to the environment of the first trace that matches its current state.
@@ -1896,7 +2224,7 @@ def interp_node(traces: Traces,
             logging.debug("Unhandled node type '%s'; treating as no-op", node.NodeName)
             return traces
 
-def starting_state(fs_model: FSModel | None = None) -> State:
+def starting_state(fs_model: FSModel | None = None, config: InterpConfig | None = None) -> State:
     # env["IFS"] = ShellVar(" \t\n")
     # for defaultvar in ["HOME", "PWD", "OLDPWD", "PATH"]:
     #     env[defaultvar] = ShellVar(SymStr(util.create_fresh_varname(f"default_{defaultvar}"))
@@ -1908,6 +2236,8 @@ def starting_state(fs_model: FSModel | None = None) -> State:
         "OLDPWD": ShellVar(arbitrary_field(make_ast("OLDPWD"), ArbitraryType.ENVIRONMENT, root, min_words=1)),
         "PATH": ShellVar(arbitrary_field(make_ast("PATH"), ArbitraryType.ENVIRONMENT, root, min_words=1))
     }
+    pwd_init_var = config.pwd_init_var if config is not None else InterpConfig().pwd_init_var
+    starter_env[pwd_init_var] = ShellVar(starter_env["PWD"].value, readonly=True, ghost=True)
     return root.extend_env(starter_env)
 
 def trim_string_for_logging(s: str, max_len: int = 300) -> str:
@@ -1960,7 +2290,7 @@ def symb_engine(nodes: list[parser.WrappedAst], config: InterpConfig) -> Traces:
 
     logging.info("Running symb engine with %d raw nodes", len(nodes))
     inactive_trace_stash = []
-    traces = [Trace((starting_state(),))]
+    traces = [Trace((starting_state(config=config),))]
 
     func_map = replace(func_map, funcs=find_func_defs(traces, nodes, config), called=set())
 
@@ -1980,7 +2310,7 @@ def symb_engine(nodes: list[parser.WrappedAst], config: InterpConfig) -> Traces:
         if stop_event and stop_event.is_set():
             break
         logging.info("Interpreting uncalled function '%s'", name)
-        func_traces[name] = guarded_interp_node([Trace((starting_state(),))], node, config)
+        func_traces[name] = guarded_interp_node([Trace((starting_state(config=config),))], node, config)
 
 
     return traces + [t for ts in func_traces.values() for t in ts] + inactive_trace_stash
@@ -2026,7 +2356,7 @@ def symbexec_file(input_file: str,
 
         nodes = parser.parse_shell_script(input_file)
         Reporter.set_ast_nodes_total(count_non_arg_ast_nodes(nodes))
-        func_defs = find_func_defs([Trace((starting_state(),))], nodes, config)
+        func_defs = find_func_defs([Trace((starting_state(config=config),))], nodes, config)
 
         def func_calls_dangerous(func_name: str, danger_cache: dict[str, bool]) -> bool:
             if func_name in danger_cache:
