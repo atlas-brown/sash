@@ -952,91 +952,127 @@ def plot_bug_detection_bars_split_versions(data, output_path):
     variants_total = len(variants_expected)
 
     buggy_good = [len(buggy_sash), len(buggy_shell)]
-    buggy_bad = [buggy_total - buggy_good[0], buggy_total - buggy_good[1]]
-
     variants_good = [len(variants_sash), len(variants_shell)]
-    variants_bad = [
-        variants_total - variants_good[0],
-        variants_total - variants_good[1],
-    ]
 
     fixed_good = [fixed_sash_no_fp, fixed_shell_no_fp]
-    fixed_bad = [fixed_total - fixed_sash_no_fp, fixed_total - fixed_shell_no_fp]
 
-    max_total = max(
-        buggy_total,
-        variants_total,
-        fixed_total,
+    # Two-panel layout: Buggy/Variants (left) and Fixed (right).
+    fig, (ax_left, ax_right) = plt.subplots(
         1,
+        2,
+        figsize=(4.6, 2.8),
+        sharey=True,
+        gridspec_kw={"width_ratios": [2.0, 1.0]},
     )
-
-    # Single-column vertical layout on one shared axis.
-    fig, ax = plt.subplots(figsize=(3.7, 2.8))
-    categories = ["Buggy", "Variants", "Fixed"]
-    # Keep sets compact and reduce the gap before "Fixed".
-    x = np.array([0.0, 0.82, 1.45])
-    width = 0.07
-    bar_offset = 0.055
-
-    sash_good = np.array([buggy_good[0], variants_good[0], fixed_good[0]], dtype=float)
-    shell_good = np.array([buggy_good[1], variants_good[1], fixed_good[1]], dtype=float)
+    width = 0.16
+    bar_offset = width / 2.0
 
     # Use neutral pastel system colors (avoid good/bad red/green semantics).
     sash_color = color_scheme[1]
     shellcheck_color = color_scheme[3]
 
-    ax.bar(
-        x - bar_offset,
-        sash_good,
+    left_categories = ["Buggy", "Variants"]
+    # Keep buggy/variant groups visually close.
+    left_x = np.array([0.0, 0.62], dtype=float)
+    left_sash = np.array([buggy_good[0], variants_good[0]], dtype=float)
+    left_shell = np.array([buggy_good[1], variants_good[1]], dtype=float)
+
+    ax_left.bar(
+        left_x - bar_offset,
+        left_sash,
         width=width,
         color=sash_color,
         edgecolor=sash_color,
     )
-    ax.bar(
-        x + bar_offset,
-        shell_good,
+    ax_left.bar(
+        left_x + bar_offset,
+        left_shell,
         width=width,
         color=shellcheck_color,
         edgecolor=shellcheck_color,
     )
+
     # Visual reference: carry buggy ShellCheck catches over to the variants slot.
-    ax.hlines(
-        y=shell_good[0] + 0.5,
-        xmin=x[0] + bar_offset - width / 2,
-        xmax=x[1] - 0.02,
+    ax_left.hlines(
+        y=left_shell[0] + 0.5,
+        xmin=left_x[0] + bar_offset - width / 2,
+        xmax=left_x[1] + bar_offset - width / 2,
         colors="black",
-        linestyles=":",
+        linestyles="-",
         linewidth=0.7,
-        alpha=0.3,
+        alpha=0.9,
     )
 
-    ax.set_xticks(x)
-    ax.set_xticklabels(categories, fontsize=14)
-    ax.set_ylabel("Bug Instances", fontsize=14, labelpad=10)
-    max_good = max(float(np.max(sash_good)), float(np.max(shell_good)), 1.0)
+    right_categories = ["Fixed"]
+    right_x = np.array([0.0], dtype=float)
+    right_sash = np.array([fixed_good[0]], dtype=float)
+    right_shell = np.array([fixed_good[1]], dtype=float)
+
+    ax_right.bar(
+        right_x - bar_offset,
+        right_sash,
+        width=width,
+        color=sash_color,
+        edgecolor=sash_color,
+    )
+    ax_right.bar(
+        right_x + bar_offset,
+        right_shell,
+        width=width,
+        color=shellcheck_color,
+        edgecolor=shellcheck_color,
+    )
+
+    max_good = max(
+        float(np.max(left_sash)),
+        float(np.max(left_shell)),
+        float(np.max(right_sash)),
+        float(np.max(right_shell)),
+        1.0,
+    )
     top_pad = max(3, int(np.ceil(max_good * 0.10)))
     y_max = max(max_good + top_pad, 125 + top_pad)
-    ax.set_ylim(0, y_max)
-    y_ticks = list(range(0, int(max_good) + 1, 25))
-    y_ticks.append(125)
-    ax.set_yticks(sorted(set(y_ticks)))
-    ax.tick_params(
+    y_ticks = list(range(0, int(y_max) + 1, 25))
+    for ax in (ax_left, ax_right):
+        ax.set_ylim(0, y_max)
+        ax.set_yticks(y_ticks)
+        ax.grid(axis="y", linestyle=":", linewidth=0.6, alpha=0.35)
+        ax.set_axisbelow(True)
+        ax.tick_params(axis="x", labelsize=14)
+
+    ax_left.set_xticks(left_x)
+    ax_left.set_xticklabels(left_categories, fontsize=14)
+    ax_right.set_xticks(right_x)
+    ax_right.set_xticklabels(right_categories, fontsize=14)
+    # Match visual bar thickness across panels by keeping data-unit scales proportional
+    # to the subplot width ratio (left:right = 2:1).
+    ax_left.set_xlim(-0.35, 1.05)
+    ax_right.set_xlim(-0.35, 0.35)
+
+    ax_left.set_ylabel("Bug Instances", fontsize=14, labelpad=8)
+    ax_left.tick_params(
         axis="y",
         labelsize=14,
+        left=True,
+        labelleft=True,
+        right=False,
+        labelright=False,
+        pad=1,
+    )
+    ax_right.tick_params(
+        axis="y",
         left=False,
         labelleft=False,
         right=True,
         labelright=True,
+        labelsize=14,
         pad=1,
     )
-    ax.yaxis.set_label_position("left")
-    ax.yaxis.tick_right()
-    ax.grid(axis="y", linestyle=":", linewidth=0.6, alpha=0.35)
-    ax.set_axisbelow(True)
+    ax_right.yaxis.tick_right()
 
     label_offset = max(0.4, y_max * 0.012)
-    for xi, total in zip(x - bar_offset, sash_good):
-        ax.text(
+    for xi, total in zip(left_x - bar_offset, left_sash):
+        ax_left.text(
             xi,
             total + label_offset,
             f"{int(total)}",
@@ -1044,8 +1080,26 @@ def plot_bug_detection_bars_split_versions(data, output_path):
             va="bottom",
             fontsize=7,
         )
-    for xi, total in zip(x + bar_offset, shell_good):
-        ax.text(
+    for xi, total in zip(left_x + bar_offset, left_shell):
+        ax_left.text(
+            xi,
+            total + label_offset,
+            f"{int(total)}",
+            ha="center",
+            va="bottom",
+            fontsize=7,
+        )
+    for xi, total in zip(right_x - bar_offset, right_sash):
+        ax_right.text(
+            xi,
+            total + label_offset,
+            f"{int(total)}",
+            ha="center",
+            va="bottom",
+            fontsize=7,
+        )
+    for xi, total in zip(right_x + bar_offset, right_shell):
+        ax_right.text(
             xi,
             total + label_offset,
             f"{int(total)}",
@@ -1077,7 +1131,7 @@ def plot_bug_detection_bars_split_versions(data, output_path):
         borderaxespad=0.0,
         columnspacing=2.0,
     )
-    fig.subplots_adjust(left=0.10, right=0.86, bottom=0.36, top=0.92)
+    fig.subplots_adjust(left=0.20, right=0.88, bottom=0.36, top=0.92, wspace=0.08)
     plt.savefig(output_path, format="pdf")
     plt.close()
 

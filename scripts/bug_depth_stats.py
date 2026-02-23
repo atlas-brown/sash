@@ -41,6 +41,14 @@ CONTROL_NODE_TYPES = (
     AST.SubshellNode,
     AST.DefunNode,
 )
+FORK_NODE_TYPES = (
+    AST.IfNode,
+    AST.CaseNode,
+    AST.AndNode,
+    AST.OrNode,
+    AST.ForNode,
+    AST.WhileNode,
+)
 
 
 def parse_args() -> argparse.Namespace:
@@ -49,6 +57,24 @@ def parse_args() -> argparse.Namespace:
             "Compute bug-line depth stats from benchmark ground truths. "
             "Outputs per-bug-line CSV and aggregate summary."
         )
+    )
+    parser.add_argument(
+        "--script",
+        type=Path,
+        help=(
+            "Analyze a single shell script directly (no benchmark metadata required). "
+            "Use with --bug-line to query specific lines."
+        ),
+    )
+    parser.add_argument(
+        "--bug-line",
+        type=int,
+        action="append",
+        default=[],
+        help=(
+            "Bug line to report in --script mode. Can be provided multiple times. "
+            "If omitted in --script mode, all lines are emitted."
+        ),
     )
     parser.add_argument(
         "--benchmarks",
@@ -268,6 +294,24 @@ def _iter_ast_children(node: AST.AstNode) -> list[AST.AstNode]:
             return []
 
 
+def _first_line_in_subtree(
+    node: AST.AstNode, fallback_line: int | None = None
+) -> int | None:
+    line_number = _node_line_number(node, fallback_line)
+    if line_number is not None and line_number > 0:
+        return line_number
+
+    queue: deque[AST.AstNode] = deque(_iter_ast_children(node))
+    while queue:
+        current = queue.popleft()
+        ln = _node_line_number(current, None)
+        if ln is not None and ln > 0:
+            return ln
+        for child in _iter_ast_children(current):
+            queue.append(child)
+    return None
+
+
 def compute_parser_bfs_nodes(lines: list[str], script_path: str) -> tuple[list[int], int]:
     bfs_nodes_before_line = [0] * (len(lines) + 1)
     try:
@@ -298,12 +342,115 @@ def compute_parser_bfs_nodes(lines: list[str], script_path: str) -> tuple[list[i
     return bfs_nodes_before_line, nodes_seen
 
 
+def _collect_fork_counts_from_ast(
+    node: AST.AstNode,
+    current_fork_count: int,
+    forks_by_line: dict[int, int],
+    fallback_line: int | None = None,
+) -> int:
+    is_fork_node = isinstance(node, FORK_NODE_TYPES)
+    node_fork_count = current_fork_count + 1 if is_fork_node else current_fork_count
+
+    line_number = _node_line_number(node, fallback_line)
+    if line_number is not None and line_number > 0:
+        forks_by_line[line_number] = max(
+            forks_by_line.get(line_number, 0), node_fork_count
+        )
+
+    max_seen = node_fork_count
+    for child in _iter_ast_children(node):
+        max_seen = max(
+            max_seen,
+            _collect_fork_counts_from_ast(child, node_fork_count, forks_by_line, None),
+        )
+    return max_seen
+
+
+def compute_parser_fork_counts(lines: list[str], script_path: str) -> tuple[list[int], int]:
+    fork_count_at_line = [0] * (len(lines) + 1)
+    try:
+        wrapped_nodes = sash.parser.parse_shell_script(script_path)
+    except Exception:
+        return fork_count_at_line, 0
+
+    forks_by_line: dict[int, int] = {}
+    max_fork_count = 0
+    for wrapped in wrapped_nodes:
+        max_fork_count = max(
+            max_fork_count,
+            _collect_fork_counts_from_ast(
+                wrapped.ast_node,
+                current_fork_count=0,
+                forks_by_line=forks_by_line,
+                fallback_line=wrapped.get_line_number(),
+            ),
+        )
+
+    for line_number, fork_count in forks_by_line.items():
+        if 1 <= line_number <= len(lines):
+            fork_count_at_line[line_number] = max(
+                fork_count_at_line[line_number], fork_count
+            )
+
+    return fork_count_at_line, max_fork_count
+
+
+def _collect_fork_line_numbers(
+    node: AST.AstNode,
+    fork_counts_by_line: list[int],
+    fallback_line: int | None = None,
+) -> None:
+    line_number = _node_line_number(node, fallback_line)
+    if (line_number is None or line_number <= 0) and isinstance(node, FORK_NODE_TYPES):
+        line_number = _first_line_in_subtree(node, fallback_line)
+    if (
+        isinstance(node, FORK_NODE_TYPES)
+        and line_number is not None
+        and 1 <= line_number < len(fork_counts_by_line)
+    ):
+        fork_counts_by_line[line_number] += 1
+
+    for child in _iter_ast_children(node):
+        _collect_fork_line_numbers(child, fork_counts_by_line, None)
+
+
+def compute_parser_prefix_fork_counts(
+    lines: list[str], script_path: str
+) -> tuple[list[int], int]:
+    """
+    Symbolic-exec style fork count proxy:
+    cumulative number of fork constructs seen in source order up to each line.
+    """
+    prefix_fork_count_at_line = [0] * (len(lines) + 1)
+    try:
+        wrapped_nodes = sash.parser.parse_shell_script(script_path)
+    except Exception:
+        return prefix_fork_count_at_line, 0
+
+    fork_counts_by_line = [0] * (len(lines) + 1)
+    for wrapped in wrapped_nodes:
+        _collect_fork_line_numbers(
+            wrapped.ast_node, fork_counts_by_line, wrapped.get_line_number()
+        )
+
+    running = 0
+    for line_number in range(1, len(lines) + 1):
+        running += fork_counts_by_line[line_number]
+        prefix_fork_count_at_line[line_number] = running
+
+    return prefix_fork_count_at_line, running
+
+
 def compute_script_metrics(lines: list[str], script_path: str | None = None) -> dict:
     total_lines = len(lines)
     loc = sum(1 for line in lines if strip_comments_and_strings(line).strip())
 
     depth_at_line: list[int] = [0] * (total_lines + 1)  # 1-based
     statements_before_line: list[int] = [0] * (total_lines + 1)  # 1-based
+    fork_count_at_line: list[int] = [0] * (total_lines + 1)  # 1-based
+    fork_path_factor_at_line: list[int] = [0] * (total_lines + 1)  # 1-based
+    fork_count_prefix_at_line: list[int] = [0] * (total_lines + 1)  # 1-based
+    fork_path_factor_prefix_at_line: list[int] = [0] * (total_lines + 1)  # 1-based
 
     depth = 0
     statements_seen = 0
@@ -374,9 +521,25 @@ def compute_script_metrics(lines: list[str], script_path: str | None = None) -> 
         bfs_nodes_before_line, final_bfs_nodes_seen = compute_parser_bfs_nodes(
             lines, script_path
         )
+        fork_count_at_line, final_fork_count = compute_parser_fork_counts(
+            lines, script_path
+        )
+        fork_count_prefix_at_line, final_fork_count_prefix = (
+            compute_parser_prefix_fork_counts(lines, script_path)
+        )
     else:
         bfs_nodes_before_line = [0] * (total_lines + 1)
         final_bfs_nodes_seen = 0
+        final_fork_count = 0
+        final_fork_count_prefix = 0
+
+    for line_number in range(1, total_lines + 1):
+        fork_path_factor_at_line[line_number] = 2 ** fork_count_at_line[line_number]
+        fork_path_factor_prefix_at_line[line_number] = 2 ** fork_count_prefix_at_line[
+            line_number
+        ]
+    final_fork_path_factor = 2 ** final_fork_count
+    final_fork_path_factor_prefix = 2 ** final_fork_count_prefix
 
     return {
         "lines": lines,
@@ -385,9 +548,17 @@ def compute_script_metrics(lines: list[str], script_path: str | None = None) -> 
         "depth_at_line": depth_at_line,
         "bfs_nodes_before_line": bfs_nodes_before_line,
         "statements_before_line": statements_before_line,
+        "fork_count_at_line": fork_count_at_line,
+        "fork_path_factor_at_line": fork_path_factor_at_line,
+        "fork_count_prefix_at_line": fork_count_prefix_at_line,
+        "fork_path_factor_prefix_at_line": fork_path_factor_prefix_at_line,
         "final_depth": depth,
         "final_bfs_nodes_seen": final_bfs_nodes_seen,
         "final_statements_seen": statements_seen,
+        "final_fork_count": final_fork_count,
+        "final_fork_path_factor": final_fork_path_factor,
+        "final_fork_count_prefix": final_fork_count_prefix,
+        "final_fork_path_factor_prefix": final_fork_path_factor_prefix,
     }
 
 
@@ -443,8 +614,86 @@ def fmt_stats(stats: dict[str, float]) -> str:
     )
 
 
+def analyze_single_script(args: argparse.Namespace) -> None:
+    script_path = args.script
+    assert script_path is not None
+
+    if not script_path.exists():
+        print(f"Script does not exist: {script_path}", file=sys.stderr)
+        sys.exit(1)
+
+    try:
+        lines = script_path.read_text(
+            encoding="utf-8", errors="surrogateescape"
+        ).splitlines()
+    except Exception as exc:
+        print(f"Failed to read script {script_path}: {exc}", file=sys.stderr)
+        sys.exit(1)
+
+    metrics = compute_script_metrics(lines, str(script_path))
+    total_lines = metrics["total_lines"]
+    report_lines = sorted(set(args.bug_line)) if args.bug_line else list(
+        range(1, total_lines + 1)
+    )
+
+    rows = []
+    for line_number in report_lines:
+        if line_number < 1 or line_number > total_lines:
+            continue
+        rows.append(
+            {
+                "script_path": str(script_path),
+                "line": line_number,
+                "line_text": lines[line_number - 1],
+                "fork_count": metrics["fork_count_at_line"][line_number],
+                "fork_path_factor": metrics["fork_path_factor_at_line"][line_number],
+                "fork_count_prefix": metrics["fork_count_prefix_at_line"][line_number],
+                "fork_path_factor_prefix": metrics["fork_path_factor_prefix_at_line"][
+                    line_number
+                ],
+                "nesting_depth": metrics["depth_at_line"][line_number],
+                "bfs_nodes_before": metrics["bfs_nodes_before_line"][line_number],
+                "statements_before": metrics["statements_before_line"][line_number],
+            }
+        )
+
+    print(f"% Script: {script_path}", file=sys.stderr)
+    print(f"% Total lines: {total_lines}", file=sys.stderr)
+    print(f"% LoC: {metrics['loc']}", file=sys.stderr)
+    print(
+        f"% Max fork count: {metrics['final_fork_count']} "
+        f"(2^k={metrics['final_fork_path_factor']})",
+        file=sys.stderr,
+    )
+    print(
+        f"% Max prefix fork count: {metrics['final_fork_count_prefix']} "
+        f"(2^k={metrics['final_fork_path_factor_prefix']})",
+        file=sys.stderr,
+    )
+
+    fieldnames = [
+        "script_path",
+        "line",
+        "line_text",
+        "fork_count",
+        "fork_path_factor",
+        "fork_count_prefix",
+        "fork_path_factor_prefix",
+        "nesting_depth",
+        "bfs_nodes_before",
+        "statements_before",
+    ]
+    writer = csv.DictWriter(sys.stdout, fieldnames=fieldnames)
+    writer.writeheader()
+    writer.writerows(rows)
+
+
 def main() -> None:
     args = parse_args()
+    if args.script is not None:
+        analyze_single_script(args)
+        return
+
     bench_filter = re.compile(args.only)
 
     if not args.benchmarks.exists():
@@ -500,6 +749,10 @@ def main() -> None:
             statements_before_line = metrics["statements_before_line"]
             final_depth = metrics["final_depth"]
             final_statements_seen = metrics["final_statements_seen"]
+            final_fork_count = metrics["final_fork_count"]
+            final_fork_path_factor = metrics["final_fork_path_factor"]
+            final_fork_count_prefix = metrics["final_fork_count_prefix"]
+            final_fork_path_factor_prefix = metrics["final_fork_path_factor_prefix"]
             script_lines = metrics["lines"]
 
             for bug_id, bug_info in gt_bugs.items():
@@ -516,10 +769,20 @@ def main() -> None:
                         line_text = script_lines[bug_line - 1]
                         nesting_depth = depth_at_line[bug_line]
                         statements_before = statements_before_line[bug_line]
+                        fork_count = metrics["fork_count_at_line"][bug_line]
+                        fork_path_factor = metrics["fork_path_factor_at_line"][bug_line]
+                        fork_count_prefix = metrics["fork_count_prefix_at_line"][bug_line]
+                        fork_path_factor_prefix = metrics[
+                            "fork_path_factor_prefix_at_line"
+                        ][bug_line]
                     else:
                         line_text = ""
                         nesting_depth = final_depth
                         statements_before = final_statements_seen
+                        fork_count = final_fork_count
+                        fork_path_factor = final_fork_path_factor
+                        fork_count_prefix = final_fork_count_prefix
+                        fork_path_factor_prefix = final_fork_path_factor_prefix
                         print(
                             f"[WARN] Bug line {bug_line} out of range for {script_path}",
                             file=sys.stderr,
@@ -540,6 +803,10 @@ def main() -> None:
                             "line_text": line_text,
                             "nesting_depth": nesting_depth,
                             "statements_before": statements_before,
+                            "fork_count": fork_count,
+                            "fork_path_factor": fork_path_factor,
+                            "fork_count_prefix": fork_count_prefix,
+                            "fork_path_factor_prefix": fork_path_factor_prefix,
                             "loc": metrics["loc"],
                             "line_percentile": round(line_percentile, 6),
                         }
@@ -557,6 +824,10 @@ def main() -> None:
         "line_text",
         "nesting_depth",
         "statements_before",
+        "fork_count",
+        "fork_path_factor",
+        "fork_count_prefix",
+        "fork_path_factor_prefix",
         "loc",
         "line_percentile",
     ]
@@ -567,6 +838,10 @@ def main() -> None:
 
     nesting_values = [float(r["nesting_depth"]) for r in rows]
     statement_values = [float(r["statements_before"]) for r in rows]
+    fork_count_values = [float(r["fork_count"]) for r in rows]
+    fork_factor_values = [float(r["fork_path_factor"]) for r in rows]
+    fork_count_prefix_values = [float(r["fork_count_prefix"]) for r in rows]
+    fork_factor_prefix_values = [float(r["fork_path_factor_prefix"]) for r in rows]
 
     print(f"% Scripts analyzed: {len(script_cache)}", file=sys.stderr)
     print(f"% Bug-line rows: {len(rows)}", file=sys.stderr)
@@ -576,15 +851,51 @@ def main() -> None:
         f"% Statements-before stats: {fmt_stats(summarize(statement_values))}",
         file=sys.stderr,
     )
+    print(
+        f"% Fork-count stats: {fmt_stats(summarize(fork_count_values))}",
+        file=sys.stderr,
+    )
+    print(
+        f"% Fork-factor (2^k) stats: {fmt_stats(summarize(fork_factor_values))}",
+        file=sys.stderr,
+    )
+    print(
+        f"% Prefix fork-count stats: {fmt_stats(summarize(fork_count_prefix_values))}",
+        file=sys.stderr,
+    )
+    print(
+        f"% Prefix fork-factor (2^k) stats: {fmt_stats(summarize(fork_factor_prefix_values))}",
+        file=sys.stderr,
+    )
 
     kinds = sorted({r["ground_truth_kind"] for r in rows if r["ground_truth_kind"] is not None})
     for kind in kinds:
         kind_rows = [r for r in rows if r["ground_truth_kind"] == kind]
         k_nesting = [float(r["nesting_depth"]) for r in kind_rows]
         k_statements = [float(r["statements_before"]) for r in kind_rows]
+        k_fork_counts = [float(r["fork_count"]) for r in kind_rows]
+        k_fork_factors = [float(r["fork_path_factor"]) for r in kind_rows]
+        k_fork_counts_prefix = [float(r["fork_count_prefix"]) for r in kind_rows]
+        k_fork_factors_prefix = [float(r["fork_path_factor_prefix"]) for r in kind_rows]
         print(f"% Kind={kind} rows: {len(kind_rows)}", file=sys.stderr)
         print(f"%   Nesting: {fmt_stats(summarize(k_nesting))}", file=sys.stderr)
         print(f"%   Statements-before: {fmt_stats(summarize(k_statements))}", file=sys.stderr)
+        print(
+            f"%   Fork-count: {fmt_stats(summarize(k_fork_counts))}",
+            file=sys.stderr,
+        )
+        print(
+            f"%   Fork-factor (2^k): {fmt_stats(summarize(k_fork_factors))}",
+            file=sys.stderr,
+        )
+        print(
+            f"%   Prefix fork-count: {fmt_stats(summarize(k_fork_counts_prefix))}",
+            file=sys.stderr,
+        )
+        print(
+            f"%   Prefix fork-factor (2^k): {fmt_stats(summarize(k_fork_factors_prefix))}",
+            file=sys.stderr,
+        )
 
     print(f"% CSV written: {args.output_csv}", file=sys.stderr)
 
