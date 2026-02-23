@@ -227,6 +227,7 @@ def home_not_deleted_assertion(trace: Trace) -> Assertion | None:
         producing_state=trace.latest_state,
         constraint=constraint,
         source_str="global invariant: HOME is not deleted",
+        # TODO: report the concrete source line that causes HOME deletion instead of using sentinel line 0.
         source_line=0,
         priority=1000,
         include_fs=True,
