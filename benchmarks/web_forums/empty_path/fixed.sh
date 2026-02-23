@@ -2,7 +2,7 @@
 
 # https://segmentfault.com/q/1010000000158149
 
-# FIXED: unset PATH
+
 
 # -bash: grep: command not found
 # -bash: grep: command not found
@@ -18,15 +18,15 @@
 # -bash: grep: command not found
 # -bash: grep: command not found
 
-# FIXED: grep "PATH" /etc/profile
-# FIXED: grep "PATH" /etc/profile.d/*.sh
-# FIXED: bash -c "echo \$PATH"
-# FIXED: bash -c "env | grep PATH"
-# FIXED: bash -c "env | grep PATH"
-# FIXED: bash -c "env | grep PATH"
-# FIXED: grep "PATH" /etc/profile
-# FIXED: cat /etc/profile
-# FIXED: grep "PATH" /etc/profile.d/*.sh
-# FIXED: grep "PATH" /etc/profile.d/*.sh
-# FIXED: grep "PATH" /etc/profile.d/*.sh
-# FIXED: grep "PATH" /etc/profile.d/*.sh
+grep "PATH" /etc/profile
+grep "PATH" /etc/profile.d/*.sh
+bash -c "echo \$PATH"
+bash -c "env | grep PATH"
+bash -c "env | grep PATH"
+bash -c "env | grep PATH"
+grep "PATH" /etc/profile
+cat /etc/profile
+grep "PATH" /etc/profile.d/*.sh
+grep "PATH" /etc/profile.d/*.sh
+grep "PATH" /etc/profile.d/*.sh
+grep "PATH" /etc/profile.d/*.sh

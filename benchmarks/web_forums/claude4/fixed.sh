@@ -1,5 +1,5 @@
 # https://github.com/anthropics/claude-code/issues/17925
 
 
-# FIXED: echo "some output" > nul
-# FIXED: echo "some other output" > nul
+echo "some output" > /dev/null
+echo "some other output" > /dev/null
