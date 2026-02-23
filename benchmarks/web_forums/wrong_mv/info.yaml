@@ -1,0 +1,24 @@
+sources:
+  - https://www.linuxquestions.org/questions/linux-general-1/mv-is-not-working-right-782971/
+
+bugs:
+  bug00:
+    description: Detected issue code 'cmd_expected_path_state' in benchmark script
+    code: cmd_expected_path_state
+    shellcheck: null
+
+ground_truths:
+  - path: original.sh
+    kind: original
+    bugs:
+      bug00: { lines: [3] }
+
+  - path: posix.sh
+    kind: buggy
+    bugs:
+      bug00: { lines: [3] }
+
+  - path: fixed.sh
+    kind: fixed
+    bugs:
+      bug00: { regression_lines: [3], shellcheck: null }

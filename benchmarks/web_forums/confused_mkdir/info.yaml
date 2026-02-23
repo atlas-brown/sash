@@ -1,0 +1,24 @@
+sources:
+  - https://serverfault.com/questions/702207/why-doesnt-mkdir-p-tmp-one-two-tree-print-anything-when-directories-exist
+
+bugs:
+  bug00:
+    description: Detected issue code 'cmd_expected_path_state' in benchmark script
+    code: cmd_expected_path_state
+    shellcheck: null
+
+ground_truths:
+  - path: original.sh
+    kind: original
+    bugs:
+      bug00: { lines: [2, 4] }
+
+  - path: posix.sh
+    kind: buggy
+    bugs:
+      bug00: { lines: [2, 4] }
+
+  - path: fixed.sh
+    kind: fixed
+    bugs:
+      bug00: { regression_lines: [2, 4], shellcheck: null }

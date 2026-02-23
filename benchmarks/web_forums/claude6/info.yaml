@@ -1,14 +1,13 @@
 sources:
-  - https://www.reddit.com/r/ClaudeAI/comments/1pgxckk/claude_cli_deleted_my_entire_home_directory_wiped/
+  - https://github.com/anthropics/claude-code/issues/24319
 
 bugs:
   bug00:
-    description: Agent-generated code deletes the user's home directory
+    description: Detected issue code 'del_user_dir' in benchmark script
     code: del_user_dir
     shellcheck: null
 
 ground_truths:
-  # Base versions
   - path: original.sh
     kind: original
     bugs:

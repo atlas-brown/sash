@@ -1,0 +1,24 @@
+sources:
+  - https://www.pixelbeat.org/docs/unix_file_replacement.html
+
+bugs:
+  bug00:
+    description: Detected issue code 'data_loss' in benchmark script
+    code: data_loss
+    shellcheck: null
+
+ground_truths:
+  - path: original.sh
+    kind: original
+    bugs:
+      bug00: { lines: [5] }
+
+  - path: posix.sh
+    kind: buggy
+    bugs:
+      bug00: { lines: [5] }
+
+  - path: fixed.sh
+    kind: fixed
+    bugs:
+      bug00: { regression_lines: [5], shellcheck: null }

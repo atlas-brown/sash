@@ -1,0 +1,31 @@
+sources:
+  - https://www.reddit.com/r/linuxquestions/comments/161v8aj/i_fell_for_a_troll_and_deleted_my_home_directory/
+
+bugs:
+  bug00:
+    description: Detected issue code 'capturing_empty_output' in benchmark script
+    code: capturing_empty_output
+    shellcheck: null
+  bug01:
+    description: Detected issue code 'del_sys_file' in benchmark script
+    code: del_sys_file
+    shellcheck: null
+
+ground_truths:
+  - path: original.sh
+    kind: original
+    bugs:
+      bug00: { lines: [3] }
+      bug01: { lines: [1] }
+
+  - path: posix.sh
+    kind: buggy
+    bugs:
+      bug00: { lines: [3] }
+      bug01: { lines: [1] }
+
+  - path: fixed.sh
+    kind: fixed
+    bugs:
+      bug00: { regression_lines: [3], shellcheck: null }
+      bug01: { regression_lines: [1], shellcheck: null }
