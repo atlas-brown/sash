@@ -1,5 +1,5 @@
 #!/bin/sh
-# https://github.com/anthropics/claude-code/issues/12637
-mkdir ~
-cd ~/project
+
+mkdir -p ~/project/files
+cd ~/project/files || exit 1
 rm -rf *
