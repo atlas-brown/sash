@@ -447,11 +447,44 @@ def handle_rm(expanded_args: tuple[Field, ...], trace: Trace, node: AST.CommandN
         rhs_core = util.field_core_key(rhs)
         return lhs_core is not None and lhs_core == rhs_core
 
+    def path_depth_from_base(base_path: str, target_path: str) -> int | None:
+        # Return how many segments `target_path` is below `base_path`.
+        # 0 means equal, 1 means immediate child, 2+ means deeper.
+        base_parts = [p for p in base_path.strip("/").split("/") if p]
+        target_parts = [p for p in target_path.strip("/").split("/") if p]
+        if target_parts[:len(base_parts)] != base_parts:
+            return None
+        return len(target_parts) - len(base_parts)
+
+    def home_depth(pwd: Field, home: Field) -> int | None:
+        pwd_str = pwd.try_to_str()
+        home_str = home.try_to_str()
+        if pwd_str is not None and home_str is not None:
+            return path_depth_from_base(home_str, pwd_str)
+
+        pwd_core = util.field_core_key(pwd)
+        home_core = util.field_core_key(home)
+        if pwd_core is None or home_core is None or pwd_core != home_core:
+            return None
+
+        pwd_suffix = ""
+        if isinstance(pwd.content, CompletelyArbitrary) and pwd.content.suffix is not None:
+            pwd_suffix = pwd.content.suffix.try_to_str()
+            if pwd_suffix is None:
+                return 0  # conservative fallback
+        home_suffix = ""
+        if isinstance(home.content, CompletelyArbitrary) and home.content.suffix is not None:
+            home_suffix = home.content.suffix.try_to_str()
+            if home_suffix is None:
+                return 0  # conservative fallback
+        return path_depth_from_base(home_suffix, pwd_suffix)
+
     at_pwd_init = pwdval is not None and start_pwdval is not None and same_location(pwdval.value, start_pwdval.value)
-    at_home = pwdval is not None and homeval is not None and same_location(pwdval.value, homeval.value)
+    home_level = home_depth(pwdval.value, homeval.value) if (pwdval is not None and homeval is not None) else None
+    at_home_top_level = home_level is not None and home_level <= 1
     # TODO: Replace this heuristic with a proper "current working directory" abstraction independent of env-field shape.
     if (
-        (at_pwd_init or at_home)
+        (at_pwd_init or at_home_top_level)
         and any(arg.try_to_str() == "*" for arg in non_flag_args)
     ):
         Reporter.add_issue(reporter.DeleteSystemFile(pwdval.value.try_to_str() or "PWD", context_line), config)

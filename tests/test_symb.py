@@ -148,6 +148,10 @@ def test_delete_system_file(tmp_path):
     expected_error = reporter.DeleteSystemFile("PWD", 0)
     assert_expected_report(report, [expected_error])
 
+    script = write_script(tmp_path, "#!/bin/sh\ncd ~/project/files\nrm -rf *\n")
+    report = reset_and_run_main(script)
+    assert_expected_report(report, [])
+
     script = write_script(tmp_path, "rm -rf \"$FOO\"/\n")
     report = reset_and_run_main(script)
     expected_error1 = reporter.UnboundID(foo_var.pretty(), 0)
