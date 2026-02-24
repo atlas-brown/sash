@@ -1861,7 +1861,7 @@ def plot_coverage_by_config(timeout_sweep_dir, base_buggy_data, output_path):
     series_specs = [
         (
             "no_opts",
-            "No opts",
+            "Core engine",
             color_scheme[4],
             re.compile(r"results_t([0-9]+(?:\.[0-9]+)?)_no_opts\.csv$"),
         ),
@@ -2067,7 +2067,7 @@ def plot_timeout_sweep_bug_catch(timeout_sweep_dir, output_path):
     series_specs = [
         (
             "no_opts",
-            "No opts",
+            "Core engine",
             color_scheme[4],
             re.compile(r"results_t([0-9]+(?:\.[0-9]+)?)_no_opts\.csv$"),
         ),
@@ -2172,21 +2172,17 @@ def plot_timeout_sweep_bug_catch(timeout_sweep_dir, output_path):
             y_lower = 0.0
         y_lower_int = int(np.floor(y_lower))
         # Use a fixed truncated baseline for readability.
-        y_bottom = 30.0 if float(total) > 30.0 else 0.0
-        y_top = max(float(total), 70.0)
+        y_bottom = 70.0
+        y_top = max(float(total), 76.0)
         ax.set_ylim(y_bottom, y_top)
         y_tick_start = int(np.floor(y_bottom / 10.0) * 10 + 10)
         y_ticks = [t for t in range(y_tick_start, int(y_top) + 1, 10)]
-        if 70 not in y_ticks:
-            y_ticks.append(70)
-            y_ticks = sorted(set(y_ticks))
         if not y_ticks:
             y_ticks = [int(total)]
         ax.set_yticks(y_ticks)
         # Standard broken-axis directive: // marker on the left y-axis,
         # positioned between the axis bottom and the first visible tick.
-        y0, _ = ax.get_ylim()
-        y_break = max(y0 + 0.75, 35.0)
+        y_break = 75.0
         x_center = 0.0  # left axis spine in y-axis transform coordinates
         dx = 0.010      # x in axes fraction
         dy = 0.07       # y in data units
