@@ -2193,6 +2193,32 @@ def interp_node(traces: Traces,
                                                                 s.last_exit_code[1]))
             return t2
 
+        case AST.SubshellNode():
+            # A subshell executes its body but does not persist shell-local state
+            # changes (variables, function definitions, options, etc.) back to the
+            # parent shell. Keep side effects like fs/assertions/path conditions.
+            res: Traces = []
+            for parent_trace in traces:
+                parent_state = parent_trace.latest_state
+                sub_traces = guarded_interp_node([parent_trace], node.body, config)
+                for sub_trace in sub_traces:
+                    res.append(
+                        sub_trace.extend(
+                            lambda s, p=parent_state: replace(
+                                s,
+                                env=p.env,
+                                localenv=p.localenv,
+                                call_stack=p.call_stack,
+                                fundefs=p.fundefs,
+                                opts=p.opts,
+                                known_nonexistent_commands=p.known_nonexistent_commands,
+                                known_existing_commands=p.known_existing_commands,
+                                terminated=p.terminated,
+                            )
+                        )
+                    )
+            return res
+
         case AST.PipeNode():
             # Since variable assignments from parameter expansion, such as `${var:=default}`, in pipeline commands
             # should not persist beyond the pipeline, save the environment before the pipeline and restore it after.
