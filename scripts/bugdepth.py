@@ -34,6 +34,14 @@ stack = []
 
 def interp_node(node: AST.AstNode,
                 conds_so_far: int) -> int:
+    if node is None:
+        return conds_so_far
+    if isinstance(node, list):
+        res = conds_so_far
+        for item in node:
+            res = interp_node(item, res)
+        return res
+
     if is_target(node):
         raise Found(conds_so_far)
 
@@ -49,7 +57,7 @@ def interp_node(node: AST.AstNode,
             res = []
             for acase in node.cases:
                 res.append(interp_node(acase["cbody"], conds_so_far + 1))
-            return min(*res)
+            return min(res) if res else conds_so_far
 
         case AST.WhileNode():
             conds_so_far = interp_node(node.test, conds_so_far)
@@ -108,6 +116,10 @@ def interp_node(node: AST.AstNode,
         case AST.DefunNode():
             # Note: the type annotation in the Shasta source code is *wrong* for node.name -- it's a string
             fns[str(node.name)] = node.body
+            # Static line lookup: allow finding targets inside function bodies
+            # even when the function is not invoked along this top-level walk.
+            # Ignore the returned count so surrounding flow is unchanged.
+            interp_node(node.body, conds_so_far)
             return conds_so_far
 
         case AST.NotNode():
