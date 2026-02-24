@@ -5,7 +5,7 @@ import argparse
 import subprocess
 from pathlib import Path
 from collections import Counter
-from bug_depth_stats import compute_script_metrics
+import bugdepth
 from benchmark_metadata import BENCHMARK_NAMES, benchmark_key, short_name
 
 EPSILON = 1e-3
@@ -314,41 +314,40 @@ def get_loc(path):
         return 0
     return loc_by_benchmark[key]
 
-depth_metrics_cache = {}
-def get_depth_metrics(path):
+lukas_program_cache = {}
+lukas_line_cache = {}
+
+
+def lukas_depth_at_line(path, line_number):
     resolved = str(resolve_benchmark_path(path))
-    if resolved not in depth_metrics_cache:
+    cache_key = (resolved, int(line_number))
+    if cache_key in lukas_line_cache:
+        return lukas_line_cache[cache_key]
+
+    if resolved not in lukas_program_cache:
         try:
-            lines = Path(resolved).read_text(encoding="utf-8", errors="surrogateescape").splitlines()
-            depth_metrics_cache[resolved] = compute_script_metrics(lines, resolved)
+            lukas_program_cache[resolved] = bugdepth.parser.parse_shell_script(resolved)
         except Exception as e:
-            print(f"Failed to compute depth metrics for {resolved}: {e}", file=sys.stderr)
-            depth_metrics_cache[resolved] = {
-                "total_lines": 0,
-                "depth_at_line": [0],
-                "bfs_nodes_before_line": [0],
-                "statements_before_line": [0],
-                "final_depth": 0,
-                "final_bfs_nodes_seen": 0,
-                "final_statements_seen": 0,
-            }
-    return depth_metrics_cache[resolved]
+            print(f"Failed to parse for Lukas depth {resolved}: {e}", file=sys.stderr)
+            lukas_program_cache[resolved] = []
+
+    depth_value = 0
+    try:
+        program = lukas_program_cache[resolved]
+        if program:
+            depth_value = bugdepth.count_conds(program, int(line_number), verbose=False)
+    except Exception:
+        depth_value = 0
+
+    lukas_line_cache[cache_key] = depth_value
+    return depth_value
 
 def deepest_bug_depth(path, expected_issues):
     bug_lines = parse_issue_lines(expected_issues)
     if not bug_lines:
         return 0
 
-    metrics = get_depth_metrics(path)
-    total_lines = metrics["total_lines"]
-    bfs_nodes_before_line = metrics.get("bfs_nodes_before_line", [0])
-    fallback_bfs = metrics.get("final_bfs_nodes_seen", 0)
-
-    max_bfs_nodes = max(
-        bfs_nodes_before_line[line] if 1 <= line <= total_lines else fallback_bfs
-        for line in bug_lines
-    )
-    return max_bfs_nodes
+    return max(lukas_depth_at_line(path, line) for line in bug_lines)
 
 fixed_actual_by_bm = {}
 for _, row in fixed_results.iterrows():
@@ -399,7 +398,7 @@ rest_of_benchmarks = []
 print(r"""
     \begin{tabular}{lllrcrcrrl}
     \toprule
-    \textbf{ID} & \textbf{Name} & \textbf{Description} & \textbf{D?/\#B} & \textbf{F?} & \textbf{$t$} & \textbf{F} & \textbf{LoC} & \textbf{$\downarrow$} & \textbf{Source} \\
+    \textbf{ID} & \textbf{Name} & \textbf{Description} & \textbf{D?/\#B} & \textbf{F?} & \textbf{$t$} & $\mathcal{F}$ & \textbf{LoC} & \textbf{$\downarrow$} & \textbf{Source} \\
     \midrule
 """
 )
