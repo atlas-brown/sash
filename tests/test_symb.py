@@ -621,6 +621,82 @@ def test_fundef_before_call__infunc_def_infunc_call_no_error(tmp_path):
     assert_expected_report(report, [])
 
 
+def test_return_skips_rest_of_function_body(tmp_path):
+    """Return inside a function should skip subsequent commands in that function."""
+    script = write_script(tmp_path, """
+f() {
+    return
+    rm -rf /usr
+}
+f
+""")
+    report = reset_and_run_main(script)
+    expected_error = reporter.DeadCode("rm -rf /usr", 0)
+    assert_expected_report(report, [expected_error])
+
+def test_return_does_not_exit_caller(tmp_path):
+    """Return should not terminate the caller or the rest of the script."""
+    script = write_script(tmp_path, """
+f() {
+    return
+}
+f
+rm -rf /usr
+""")
+    report = reset_and_run_main(script)
+    expected_error = reporter.DeleteSystemFile("/usr", 0)
+    assert_expected_report(report, [expected_error])
+
+def test_return_in_nested_function_does_not_exit_outer(tmp_path):
+    """Return in an inner function should not exit the outer function."""
+    script = write_script(tmp_path, """
+g() {
+    return
+}
+f() {
+    g
+    rm -rf /usr
+}
+f
+""")
+    report = reset_and_run_main(script)
+    expected_error = reporter.DeleteSystemFile("/usr", 0)
+    assert_expected_report(report, [expected_error])
+
+def test_conditional_return_allows_non_return_trace(tmp_path):
+    """If a return is conditional, non-returning traces should keep executing."""
+    script = write_script(tmp_path, """
+f() {
+    if [ "$1" = "yes" ]; then
+        return
+    fi
+    rm -rf /usr
+}
+f "$1"
+""")
+    report = reset_and_run_main(script)
+    expected_error = reporter.DeleteSystemFile("/usr", 0)
+    assert_expected_report(report, [expected_error])
+
+def test_conditional_return_in_nested_function(tmp_path):
+    """Conditional return in inner function should not stop outer function."""
+    script = write_script(tmp_path, """
+g() {
+    if [ "$1" = "yes" ]; then
+        return
+    fi
+}
+f() {
+    g "$1"
+    rm -rf /usr
+}
+f "$1"
+""")
+    report = reset_and_run_main(script)
+    expected_error = reporter.DeleteSystemFile("/usr", 0)
+    assert_expected_report(report, [expected_error])
+
+
 def test_const_cond_triggered_by_exit_code_top_level(tmp_path):
     """
     Test that a constant condition in an if-statement,

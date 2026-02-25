@@ -110,6 +110,7 @@ class State:
     terminated:                  bool                        = False # by `exit` or similar
     assertions:                  tuple[Assertion, ...]       = field(default_factory=tuple)
     fs_model:                    FSModel                     = field(default_factory=FSModel)
+    is_returning:                bool                        = False # whether we're in the process of returning from a function (i.e. have executed a `return` but not yet popped the call stack)
 
     external_data: Any = None # ASSUMPTION: must be hashable
 
@@ -234,8 +235,14 @@ class State:
     def enter_function(self, name: str) -> 'State':
         return replace(self, call_stack=self.call_stack + (name,))
 
+    def is_in_function(self) -> bool:
+        return len(self.call_stack) > 0
+
+    def set_returning(self, is_returning: bool) -> 'State':
+        return replace(self, is_returning=is_returning)
+
     def exit_function(self) -> 'State':
-        assert self.call_stack, "Tried to exit function when not in function"
+        assert len(self.call_stack) > 0, "Tried to exit function when not in function"
         return replace(self, call_stack=self.call_stack[:-1])
 
 def is_special_var(name: str) -> bool:

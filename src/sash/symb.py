@@ -172,8 +172,11 @@ def handle_commandnode(traces: Traces,
                 t1 = handle_unset(expanded_args, t1)
             case "exit":
                 t1 = handle_exit(t1)
-            # case "return":
-            #     t1 = handle_return(t1) # TODO: Handle return properly
+            case "return":
+                if len(expanded_args) > 2 and (retval := expanded_args[1].try_to_str()) is not None:
+                    t1 = handle_return(t1, retval)
+                else:
+                    t1 = handle_return(t1, None)
             case "read":
                 t1 = handle_read(expanded_args, t1, node)
             case "xargs":
@@ -711,7 +714,7 @@ def handle_function_call(name: str,
         t1.append(t.extend(lambda s: s.enter_function(name).extend_localenv(localenv)))
     call_result_traces = guarded_interp_node(t1, func_node.body, config)
     # TODO: should actually pop the localenv as well! need a stack of localenvs...
-    return [t.extend(lambda s: s.exit_function()) for t in call_result_traces]
+    return [t.extend(lambda s: s.set_returning(False).exit_function()) for t in call_result_traces]
 
 def record_assignment(trace: Trace, var: str, rhs: Field, definite_confidence: bool = True) -> Trace:
     conf = Confidence.DEFINITE if definite_confidence else Confidence.SPECULATIVE
@@ -972,9 +975,10 @@ def handle_exit(traces: Traces) -> Traces:
     logging.debug("Handling exit command, terminating %d traces", len(traces))
     return trace_map(traces, lambda s: s.terminate())
 
-def handle_return(traces: Traces) -> Traces:
-    logging.debug("Handling return command, terminating %d traces", len(traces))
-    return trace_map(traces, lambda s: s.terminate())
+def handle_return(traces: Traces, retval: str | None) -> Traces:
+    logging.debug("Handling return command")
+    # TODO: handle return value properly
+    return trace_map(traces, lambda s: s.set_returning(True) if s.is_in_function() else s)
 
 def handle_branch(traces: Traces, success_cb: Callable[[Traces], Traces], failure_cb: Callable[[Traces], Traces], node: AST.AstNode, config: InterpConfig) -> Traces:
     t_success = [t for t in traces if t.latest_state.last_exit_code[0] == SymStr(("0",))]
@@ -1898,6 +1902,7 @@ def collapse_equiv_trace_expansions(expansions: list[tuple[Trace, list[Field]]])
 
 context_line = None
 inactive_trace_stash: list[Trace] = []
+returning_trace_stash: list[Trace] = []
 
 trace_count = 1
 def collapse_traces_if_too_many(traces: Traces) -> tuple[Traces, Traces]:
@@ -1916,6 +1921,12 @@ def drop_terminated_traces(traces: Traces) -> tuple[Traces, Traces]:
         logging.debug("Dropping %d terminated traces", len(inactive_traces))
     return active_traces, inactive_traces
 
+
+def split_returning_traces(traces: Traces) -> tuple[Traces, Traces]:
+    returning_traces, non_returning_traces = util.partition(traces, lambda t: t.latest_state.is_returning)
+    if len(returning_traces) > 0:
+        logging.debug("Splitting off %d returning traces", len(returning_traces))
+    return non_returning_traces, returning_traces
 
 def _collect_non_arg_ast_nodes(value: object,
                                seen_ids: set[int],
@@ -1974,9 +1985,21 @@ def guarded_interp_node(traces: Traces,
     inactive_trace_stash.extend(inactive1 + inactive2)
     traces = config.apply_node_cbs(traces, node)
 
-    res = interp_node(traces, node, config)
-    context_line = prev_context_line
-    return res
+    # Stash any traces that are returning (i.e., have executed a return statement in a function
+    # and are waiting to be joined back with their caller) so that they don't interfere with
+    # interpretation of the current node; we'll join them back in at the end of the function
+    traces, returning = split_returning_traces(traces)
+    returning_trace_stash.extend(returning)
+
+    res: Traces = []
+    if len(traces) > 0:
+        res = interp_node(traces, node, config)
+        context_line = prev_context_line
+    else:
+        Reporter.add_issue(reporter.DeadCode(node, context_line), config)
+    with_returning = res + returning_trace_stash
+    returning_trace_stash.clear()
+    return with_returning
 
 def interp_node(traces: Traces,
                 node: AST.AstNode,
