@@ -129,7 +129,6 @@ for raw_t in "${TIMEOUTS[@]}"; do
   fi
 
   DFS_MODES=("no_opts" "smart_forking" "solver_opts" "dfs_on")
-
   for dfs_mode in "${DFS_MODES[@]}"; do
     csv_path="${TARGET_DIR}/results_t${t}_${dfs_mode}.csv"
 

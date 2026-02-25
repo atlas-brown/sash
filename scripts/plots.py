@@ -19,7 +19,7 @@ import matplotlib.pyplot as plt
 from matplotlib_set_diagrams import EulerDiagram
 from matplotlib.lines import Line2D
 from matplotlib.colors import to_rgba
-from matplotlib.patches import Rectangle
+from matplotlib.patches import ConnectionPatch, Polygon, Rectangle
 
 
 def extract_issue_code(issue):
@@ -497,9 +497,11 @@ def get_runtime_label(path):
 sysname = "SaSh"
 figsize = (9, 3)
 figsize_small = (6.0, 1.15)
-color_scheme = plt.get_cmap("Pastel1").colors
-color_red = color_scheme[0]
-color_green = color_scheme[2]
+# Use a high-contrast Matplotlib palette across all plots.
+color_scheme = plt.get_cmap("Set1").colors
+# Semantic colors for good/bad outcomes.
+color_green = "#2ca02c"
+color_red = "#d62728"
 # Optional manual prefix order for heatmap columns.
 # Fill with short benchmark IDs (e.g., "njv") and/or benchmark keys
 # (e.g., "high_profile/c02-n"). Remaining benchmarks keep auto-sort order.
@@ -998,12 +1000,13 @@ def plot_bug_detection_bars_split_versions(data, output_path):
     fig, (ax_left, ax_right) = plt.subplots(
         1,
         2,
-        figsize=(4.6, 2.8),
+        figsize=(5.6, 2.8),
         sharey=True,
-        gridspec_kw={"width_ratios": [2.0, 1.0]},
+        gridspec_kw={"width_ratios": [1.3, 1.0]},
     )
     width = 0.16
-    bar_offset = width / 2.0
+    # Keep a small gap between SaSh/ShellCheck bars to avoid visual overlap.
+    bar_offset = width * 0.58
 
     # Use neutral pastel system colors (avoid good/bad red/green semantics).
     sash_color = color_scheme[1]
@@ -1034,9 +1037,9 @@ def plot_bug_detection_bars_split_versions(data, output_path):
     ax_left.hlines(
         y=left_shell[0] + 0.5,
         xmin=left_x[0] + bar_offset - width / 2,
-        xmax=left_x[1] + bar_offset - width / 2,
+        xmax=left_x[1] + bar_offset - 3 * width / 5,
         colors="black",
-        linestyles="-",
+        linestyles=":",
         linewidth=0.7,
         alpha=0.9,
     )
@@ -1082,12 +1085,17 @@ def plot_bug_detection_bars_split_versions(data, output_path):
     ax_left.set_xticklabels(left_categories, fontsize=14)
     ax_right.set_xticks(right_x)
     ax_right.set_xticklabels(right_categories, fontsize=14)
-    # Match visual bar thickness across panels by keeping data-unit scales proportional
-    # to the subplot width ratio (left:right = 2:1).
-    ax_left.set_xlim(-0.35, 1.05)
-    ax_right.set_xlim(-0.35, 0.35)
+    # Match visual bar thickness across panels by keeping data-unit scales
+    # proportional to the subplot width ratio (left:right = 1.3:1.0).
+    left_xlim = (-0.35, 1.05)
+    left_span = left_xlim[1] - left_xlim[0]
+    width_ratio_left = 1.3
+    width_ratio_right = 1.0
+    right_span = left_span * (width_ratio_right / width_ratio_left)
+    ax_left.set_xlim(*left_xlim)
+    ax_right.set_xlim(-right_span / 2.0, right_span / 2.0)
 
-    ax_left.set_ylabel("Bug Instances", fontsize=14, labelpad=8)
+    ax_left.set_ylabel("Bugs identified", fontsize=14, labelpad=8)
     ax_left.tick_params(
         axis="y",
         labelsize=14,
@@ -1099,14 +1107,16 @@ def plot_bug_detection_bars_split_versions(data, output_path):
     )
     ax_right.tick_params(
         axis="y",
-        left=False,
-        labelleft=False,
-        right=True,
-        labelright=True,
+        left=True,
+        labelleft=True,
+        right=False,
+        labelright=False,
         labelsize=14,
         pad=1,
     )
-    ax_right.yaxis.tick_right()
+    # Keep same label-to-tick gap as the left subplot.
+    ax_right.set_ylabel("True negatives", fontsize=14, labelpad=8)
+    ax_right.yaxis.set_label_position("left")
 
     label_offset = max(0.4, y_max * 0.012)
     for xi, total in zip(left_x - bar_offset, left_sash):
@@ -1169,7 +1179,7 @@ def plot_bug_detection_bars_split_versions(data, output_path):
         borderaxespad=0.0,
         columnspacing=2.0,
     )
-    fig.subplots_adjust(left=0.20, right=0.88, bottom=0.36, top=0.92, wspace=0.08)
+    fig.subplots_adjust(left=0.18, right=0.90, bottom=0.36, top=0.92, wspace=0.52)
     plt.savefig(output_path, format="pdf")
     plt.close()
 
@@ -1737,7 +1747,7 @@ def plot_runtime(data, output_path):
 
 
 def plot_coverage(data, output_path):
-    plt.figure(figsize=(3.2, 2.2))
+    plt.figure(figsize=(14, 1.5))
     data = data.copy()
     data["depth_lukas"] = data.apply(
         lambda row: deepest_bug_lukas_depth(
@@ -1785,38 +1795,48 @@ def plot_coverage(data, output_path):
     plt.xticks(
         x, benchmarks, rotation=45, ha="right", rotation_mode="anchor", fontsize=8
     )
-    plt.xlabel("Benchmarks")
+    ax = plt.gca()
+    ax.set_xlabel("Benchmarks")
+    ax.xaxis.set_label_coords(0.5, -0.54)
     plt.ylabel("Coverage")
     plt.grid(axis="y", linestyle=":", linewidth=0.6, alpha=0.25)
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
 
-    for xi, depth, bar in zip(x, depth_labels, bars):
-        y = min(1.08, bar.get_height() + 0.03)
-        plt.text(xi, y, f"{int(depth)}", ha="center", va="bottom", fontsize=7)
+    for xi, depth in zip(x, depth_labels):
+        ax.text(
+            xi,
+            -0.34,
+            f"{int(depth)}",
+            transform=ax.get_xaxis_transform(),
+            ha="center",
+            va="top",
+            fontsize=7,
+            clip_on=False,
+        )
+    ax.text(
+        0.0,
+        -0.34,
+        r"Bug depth ($\downarrow$)",
+        transform=ax.transAxes,
+        ha="right",
+        va="top",
+        fontsize=8,
+        clip_on=False,
+    )
 
     handles, labels = plt.gca().get_legend_handles_labels()
-    handles.append(
-        Line2D(
-            [],
-            [],
-            linestyle="none",
-            marker="$n$",
-            markersize=5,
-            color="0.35",
-            label="Bug depth",
-        )
-    )
-    labels.append("Bug depth")
     handles = handles[::-1]
     labels = labels[::-1]
     plt.legend(
         handles,
         labels,
-        fontsize=8,
+        fontsize=7,
         loc="lower left",
         frameon=True,
         ncol=1,
     )
-    plt.subplots_adjust(bottom=0.23)
+    plt.subplots_adjust(left=0.17, bottom=0.43)
     plt.tight_layout()
     plt.savefig(output_path, format="pdf")
     plt.close()
@@ -1862,19 +1882,19 @@ def plot_coverage_by_config(timeout_sweep_dir, base_buggy_data, output_path):
         (
             "no_opts",
             "Core engine",
-            color_scheme[4],
+            color_scheme[0],
             re.compile(r"results_t([0-9]+(?:\.[0-9]+)?)_no_opts\.csv$"),
         ),
         (
             "smart_forking",
             "Smart forking",
-            color_scheme[3],
+            color_scheme[1],
             re.compile(r"results_t([0-9]+(?:\.[0-9]+)?)_smart_forking\.csv$"),
         ),
         (
             "dfs_on",
             f"Full {sysname}",
-            color_scheme[0],
+            color_scheme[2],
             re.compile(r"results_t([0-9]+(?:\.[0-9]+)?)_dfs_on\.csv$"),
         ),
     ]
@@ -1936,7 +1956,11 @@ def plot_coverage_by_config(timeout_sweep_dir, base_buggy_data, output_path):
     group_width = 0.84
     bar_width = group_width / n_series
 
-    plt.figure(figsize=(7.2, 2.5))
+    fig = plt.figure(figsize=(10, 2))
+    gs = fig.add_gridspec(nrows=2, ncols=1, height_ratios=[0.22, 2.68], hspace=0.28)
+    ax_top = fig.add_subplot(gs[0, 0])
+    ax_main = fig.add_subplot(gs[1, 0])
+    plt.sca(ax_main)
     series_y = {}
     series_present = {}
     for key, _, _, _ in chosen_specs:
@@ -1964,80 +1988,200 @@ def plot_coverage_by_config(timeout_sweep_dir, base_buggy_data, output_path):
     for y_vals in series_y.values():
         bundle_mask &= np.isclose(y_vals, 1.0, atol=1e-9)
     keep_idx = np.where(~bundle_mask)[0]
-    bundle_idx = np.where(bundle_mask)[0]
 
     plot_labels = [bench_labels[i] for i in keep_idx]
     depth_texts = [f"{int(depth_labels[i])}" for i in keep_idx]
-    if len(bundle_idx) > 0:
-        plot_labels.insert(0, f"full cvg. ({len(bundle_idx)})")
-        avg_bundle_depth = float(np.mean([depth_labels[i] for i in bundle_idx]))
-        depth_texts.insert(0, f"~{avg_bundle_depth:.1f}")
+
+    # Summary bar: fully covered in all selected configurations.
+    fully_covered_count = int(np.sum(bundle_mask))
+    comparable_total = int(len(bundle_mask))
+    top_bar_height = 0.03
+    avg_cfg_color = "#c8e6c9"  # light green fill for the covered segment
+    axis_linewidth = float(plt.rcParams.get("axes.linewidth", 1.0))
+    empty_bar_color = "#eceff1"
+    total_bar_width = max(comparable_total, 1)
+    empty_width = max(total_bar_width - fully_covered_count, 0)
+    if fully_covered_count > 0:
+        ax_top.barh(
+            [0],
+            [fully_covered_count],
+            left=[0],
+            color=avg_cfg_color,
+            height=top_bar_height,
+            edgecolor="none",
+            linewidth=0.0,
+        )
+    if empty_width > 0:
+        ax_top.barh(
+            [0],
+            [empty_width],
+            left=[fully_covered_count],
+            color=empty_bar_color,
+            height=top_bar_height,
+            edgecolor="none",
+            linewidth=0.0,
+        )
+    ax_top.add_patch(
+        Rectangle(
+            (0.0, -top_bar_height / 2.0),
+            total_bar_width,
+            top_bar_height,
+            facecolor="none",
+            edgecolor="black",
+            linewidth=axis_linewidth,
+            antialiased=False,
+            joinstyle="miter",
+            zorder=3,
+        )
+    )
+    current_top_bar_pad = max(total_bar_width * 0.06, 0.6)
+    current_span = total_bar_width + (2.0 * current_top_bar_pad)
+    # Make the bar appear at 3/4 of its previous visual width.
+    target_span = current_span / 0.75
+    top_bar_pad = (target_span - total_bar_width) / 2.0
+    ax_top.set_xlim(-top_bar_pad, total_bar_width + top_bar_pad)
+    ax_top.set_xticks([])
+    ax_top.set_yticks([])
+    for spine in ax_top.spines.values():
+        spine.set_visible(False)
+    ax_top.text(
+        0.5,
+        1.22,
+        f"100% coverage under all configurations ({fully_covered_count}/{comparable_total})",
+        transform=ax_top.transAxes,
+        ha="center",
+        va="bottom",
+        fontsize=8,
+    )
+    connector_left = ConnectionPatch(
+        xyA=(fully_covered_count, -top_bar_height / 2.0),
+        coordsA=ax_top.transData,
+        xyB=(0.0, 1.0),
+        coordsB=ax_main.transAxes,
+        axesA=ax_top,
+        axesB=ax_main,
+        color="black",
+        linewidth=axis_linewidth,
+        linestyle="--",
+    )
+    connector_right = ConnectionPatch(
+        xyA=(max(comparable_total, 1), -top_bar_height / 2.0),
+        coordsA=ax_top.transData,
+        xyB=(1.0, 1.0),
+        coordsB=ax_main.transAxes,
+        axesA=ax_top,
+        axesB=ax_main,
+        color="black",
+        linewidth=axis_linewidth,
+        linestyle="--",
+    )
 
     x = np.arange(len(plot_labels))
     all_y = []
     for i, (key, label, color, _) in enumerate(chosen_specs):
         y_vals = series_y[key]
-        if len(bundle_idx) > 0:
-            y_plot = np.concatenate([[float(np.mean(y_vals[bundle_idx]))], y_vals[keep_idx]])
-        else:
-            y_plot = y_vals[keep_idx]
+        y_plot = y_vals[keep_idx]
         all_y.append(y_plot)
         offset = (i - (n_series - 1) / 2.0) * bar_width
-        plt.bar(
-            x + offset,
-            y_plot,
-            width=bar_width * 0.95,
-            color=color,
-            label=label,
-        )
+        if len(y_plot) > 0:
+            plt.bar(
+                x + offset,
+                y_plot,
+                width=bar_width * 0.95,
+                color=color,
+                label=label,
+            )
 
     plt.margins(x=0.02)
-    plt.ylim(0, 1.14)
+    plt.ylim(0, 1.06)
     y_ticks = [0.0, 0.25, 0.5, 0.75, 1.0]
     y_tick_labels = [_format_coverage_tick(t) for t in y_ticks]
     plt.yticks(y_ticks, y_tick_labels, fontsize=7)
     plt.xticks(
         x, plot_labels, rotation=45, ha="right", rotation_mode="anchor", fontsize=7
     )
-    plt.xlabel("Benchmarks")
+    ax = plt.gca()
+    ax.set_xlabel("Benchmarks")
+    ax.xaxis.set_label_coords(0.5, -0.54)
     plt.ylabel("Coverage")
     plt.grid(axis="y", linestyle=":", linewidth=0.6, alpha=0.25)
 
-    if all_y:
-        group_tops = np.max(np.vstack(all_y), axis=0)
-        for xi, depth_text, top in zip(x, depth_texts, group_tops):
-            y = min(1.24, top + 0.04)
-            plt.text(xi, y, depth_text, ha="center", va="bottom", fontsize=7)
+    if len(plot_labels) == 0:
+        ax.text(
+            0.5,
+            0.5,
+            "All comparable benchmarks are fully explored\nin all configurations",
+            transform=ax.transAxes,
+            ha="center",
+            va="center",
+            fontsize=8,
+        )
+    else:
+        for xi, depth_text in zip(x, depth_texts):
+            ax.text(
+                xi,
+                -0.34,
+                depth_text,
+                transform=ax.get_xaxis_transform(),
+                ha="center",
+                va="top",
+                fontsize=7,
+                clip_on=False,
+            )
+        ax.text(
+            0.0,
+            -0.34,
+            r"Bug depth ($\downarrow$)",
+            transform=ax.transAxes,
+            ha="right",
+            va="top",
+            fontsize=8,
+            clip_on=False,
+        )
 
     handles, labels = plt.gca().get_legend_handles_labels()
-    handles.append(
-        Line2D(
-            [],
-            [],
-            linestyle="none",
-            marker="$n$",
-            markersize=5,
-            color="0.35",
-            label="Bug depth",
-        )
-    )
-    labels.append("Bug depth")
     # Reverse config order in legend so "Full SaSh" appears first.
-    cfg_pairs = [(h, l) for h, l in zip(handles, labels) if l != "Bug depth"]
-    depth_pairs = [(h, l) for h, l in zip(handles, labels) if l == "Bug depth"]
-    cfg_pairs = list(reversed(cfg_pairs))
-    handles = [h for h, _ in cfg_pairs] + [h for h, _ in depth_pairs]
-    labels = [l for _, l in cfg_pairs] + [l for _, l in depth_pairs]
+    cfg_pairs = list(reversed(list(zip(handles, labels))))
+    handles = [h for h, _ in cfg_pairs]
+    labels = [l for _, l in cfg_pairs]
     plt.legend(
         handles,
         labels,
-        fontsize=8,
+        fontsize=7,
         loc="lower left",
         frameon=True,
         ncol=1,
     )
-    plt.subplots_adjust(bottom=0.23)
-    plt.tight_layout()
+    fig.subplots_adjust(left=0.17, bottom=0.43, top=0.92, hspace=0.28)
+
+    # Build connector fill after final subplot layout so coordinates are exact.
+    top_left_disp = ax_top.transData.transform(
+        (fully_covered_count, -top_bar_height / 2.0)
+    )
+    top_right_disp = ax_top.transData.transform(
+        (max(comparable_total, 1), -top_bar_height / 2.0)
+    )
+    top_left_fig = fig.transFigure.inverted().transform(top_left_disp)
+    top_right_fig = fig.transFigure.inverted().transform(top_right_disp)
+    bottom_left_fig = fig.transFigure.inverted().transform(
+        ax_main.transAxes.transform((0.0, 1.0))
+    )
+    bottom_right_fig = fig.transFigure.inverted().transform(
+        ax_main.transAxes.transform((1.0, 1.0))
+    )
+    connector_fill_color = "#f5f7f9"  # keep connector patch subtle/light
+    connector_fill = Polygon(
+        [top_left_fig, top_right_fig, bottom_right_fig, bottom_left_fig],
+        closed=True,
+        transform=fig.transFigure,
+        facecolor=connector_fill_color,
+        edgecolor="none",
+        alpha=1.0,
+        zorder=0.2,
+    )
+    fig.add_artist(connector_fill)
+    fig.add_artist(connector_left)
+    fig.add_artist(connector_right)
     plt.savefig(output_path, format="pdf")
     plt.close()
     return True
@@ -2068,19 +2212,19 @@ def plot_timeout_sweep_bug_catch(timeout_sweep_dir, output_path):
         (
             "no_opts",
             "Core engine",
-            color_scheme[4],
+            color_scheme[0],
             re.compile(r"results_t([0-9]+(?:\.[0-9]+)?)_no_opts\.csv$"),
         ),
         (
             "smart_forking",
             "Smart forking",
-            color_scheme[3],
+            color_scheme[1],
             re.compile(r"results_t([0-9]+(?:\.[0-9]+)?)_smart_forking\.csv$"),
         ),
         (
             "dfs_on",
             f"Full {sysname}",
-            color_scheme[0],
+            color_scheme[2],
             re.compile(r"results_t([0-9]+(?:\.[0-9]+)?)_dfs_on\.csv$"),
         ),
     ]
@@ -2135,7 +2279,7 @@ def plot_timeout_sweep_bug_catch(timeout_sweep_dir, output_path):
         t = np.array(timeout_points)[order]
         return x, y, bug_totals, t
 
-    plt.figure(figsize=(5, 2.15))
+    plt.figure(figsize=(5.8, 1.8))
     all_x_arrays = []
     all_y_arrays = []
     all_totals = []
@@ -2218,6 +2362,8 @@ def plot_timeout_sweep_bug_catch(timeout_sweep_dir, output_path):
 
     plt.xlabel("Timeout (s)")
     plt.ylabel("Bugs caught")
+    ax = plt.gca()
+    axis_label_size = ax.xaxis.label.get_size()
     if all_x_arrays:
         timeout_ticks = sorted({int(round(v)) for v in all_timeout_values})
         rightmost_tick = round(float(np.max(np.concatenate(all_x_arrays))), 2)
@@ -2226,13 +2372,13 @@ def plot_timeout_sweep_bug_catch(timeout_sweep_dir, output_path):
         x_tick_labels = [
             str(int(x)) if x in timeout_tick_set else f"{x:.2f}" for x in x_ticks
         ]
-        plt.xticks(x_ticks, x_tick_labels, fontsize=7)
-    plt.yticks(fontsize=7)
+        plt.xticks(x_ticks, x_tick_labels, fontsize=axis_label_size)
+    plt.yticks(fontsize=axis_label_size)
     plt.grid(axis="y", alpha=0.25, linestyle=":")
-    handles, labels = plt.gca().get_legend_handles_labels()
+    handles, labels = ax.get_legend_handles_labels()
     handles = handles[::-1]
     labels = labels[::-1]
-    plt.legend(handles, labels, fontsize=8, loc="lower right", frameon=True)
+    plt.legend(handles, labels, fontsize=axis_label_size, loc="lower right", frameon=True)
     plt.tight_layout()
     plt.savefig(output_path, format="pdf")
     plt.close()
