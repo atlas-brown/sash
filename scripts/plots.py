@@ -1009,12 +1009,12 @@ def plot_bug_detection_bars_split_versions(data, output_path):
     bar_offset = width * 0.58
 
     # Use neutral pastel system colors (avoid good/bad red/green semantics).
-    sash_color = color_scheme[1]
+    sash_color = color_scheme[0]
     shellcheck_color = color_scheme[3]
 
-    left_categories = ["Buggy", "Variants"]
-    # Keep buggy/variant groups visually close.
-    left_x = np.array([0.0, 0.62], dtype=float)
+    left_categories = ["Original", "Variants"]
+    # Keep original/variant groups visually separated.
+    left_x = np.array([0.0, 0.78], dtype=float)
     left_sash = np.array([buggy_good[0], variants_good[0]], dtype=float)
     left_shell = np.array([buggy_good[1], variants_good[1]], dtype=float)
 
@@ -1786,7 +1786,7 @@ def plot_coverage(data, output_path):
         width=0.65,
         label="AST coverage",
     )
-    plt.margins(x=0.02)
+    plt.margins(x=0.005)
     plt.ylim(0, 1.40)
     y_ticks = [0.0, 0.25, 0.5, 0.75, 1.0]
     y_tick_labels = [_format_coverage_tick(t) for t in y_ticks]
@@ -1806,7 +1806,7 @@ def plot_coverage(data, output_path):
     for xi, depth in zip(x, depth_labels):
         ax.text(
             xi,
-            -0.34,
+            -0.37,
             f"{int(depth)}",
             transform=ax.get_xaxis_transform(),
             ha="center",
@@ -1816,8 +1816,8 @@ def plot_coverage(data, output_path):
         )
     ax.text(
         0.0,
-        -0.34,
-        r"Bug depth ($\downarrow$)",
+        -0.37,
+        r"Bug depth:",
         transform=ax.transAxes,
         ha="right",
         va="top",
@@ -1828,16 +1828,18 @@ def plot_coverage(data, output_path):
     handles, labels = plt.gca().get_legend_handles_labels()
     handles = handles[::-1]
     labels = labels[::-1]
-    plt.legend(
+    fig = plt.gcf()
+    fig.legend(
         handles,
         labels,
-        fontsize=7,
-        loc="lower left",
-        frameon=True,
+        fontsize=8,
+        loc="lower center",
+        bbox_to_anchor=(0.5, 0.00),
+        frameon=False,
         ncol=1,
     )
-    plt.subplots_adjust(left=0.17, bottom=0.43)
-    plt.tight_layout()
+    plt.subplots_adjust(left=0.11, right=0.98, bottom=0.43)
+    plt.tight_layout(rect=(0, 0.08, 1, 1))
     plt.savefig(output_path, format="pdf")
     plt.close()
 
@@ -1881,19 +1883,19 @@ def plot_coverage_by_config(timeout_sweep_dir, base_buggy_data, output_path):
     series_specs = [
         (
             "no_opts",
-            "Core engine",
+            f"{sysname} w/o optimizations",
             color_scheme[0],
             re.compile(r"results_t([0-9]+(?:\.[0-9]+)?)_no_opts\.csv$"),
         ),
         (
             "smart_forking",
-            "Smart forking",
+            f"{sysname} w/o DFS",
             color_scheme[1],
             re.compile(r"results_t([0-9]+(?:\.[0-9]+)?)_smart_forking\.csv$"),
         ),
         (
             "dfs_on",
-            f"Full {sysname}",
+            f"{sysname}",
             color_scheme[2],
             re.compile(r"results_t([0-9]+(?:\.[0-9]+)?)_dfs_on\.csv$"),
         ),
@@ -1957,7 +1959,7 @@ def plot_coverage_by_config(timeout_sweep_dir, base_buggy_data, output_path):
     bar_width = group_width / n_series
 
     fig = plt.figure(figsize=(10, 2))
-    gs = fig.add_gridspec(nrows=2, ncols=1, height_ratios=[0.22, 2.68], hspace=0.28)
+    gs = fig.add_gridspec(nrows=2, ncols=1, height_ratios=[0.22, 2.68], hspace=0.42)
     ax_top = fig.add_subplot(gs[0, 0])
     ax_main = fig.add_subplot(gs[1, 0])
     plt.sca(ax_main)
@@ -2092,7 +2094,7 @@ def plot_coverage_by_config(timeout_sweep_dir, base_buggy_data, output_path):
                 label=label,
             )
 
-    plt.margins(x=0.02)
+    plt.margins(x=0.005)
     plt.ylim(0, 1.06)
     y_ticks = [0.0, 0.25, 0.5, 0.75, 1.0]
     y_tick_labels = [_format_coverage_tick(t) for t in y_ticks]
@@ -2120,7 +2122,7 @@ def plot_coverage_by_config(timeout_sweep_dir, base_buggy_data, output_path):
         for xi, depth_text in zip(x, depth_texts):
             ax.text(
                 xi,
-                -0.34,
+                -0.37,
                 depth_text,
                 transform=ax.get_xaxis_transform(),
                 ha="center",
@@ -2130,8 +2132,8 @@ def plot_coverage_by_config(timeout_sweep_dir, base_buggy_data, output_path):
             )
         ax.text(
             0.0,
-            -0.34,
-            r"Bug depth ($\downarrow$)",
+            -0.37,
+            r"Bug depth:",
             transform=ax.transAxes,
             ha="right",
             va="top",
@@ -2144,15 +2146,16 @@ def plot_coverage_by_config(timeout_sweep_dir, base_buggy_data, output_path):
     cfg_pairs = list(reversed(list(zip(handles, labels))))
     handles = [h for h, _ in cfg_pairs]
     labels = [l for _, l in cfg_pairs]
-    plt.legend(
+    fig.legend(
         handles,
         labels,
-        fontsize=7,
-        loc="lower left",
-        frameon=True,
-        ncol=1,
+        fontsize=8,
+        loc="lower center",
+        bbox_to_anchor=(0.5, 0.00),
+        frameon=False,
+        ncol=max(1, min(3, len(labels))),
     )
-    fig.subplots_adjust(left=0.17, bottom=0.43, top=0.92, hspace=0.28)
+    fig.subplots_adjust(left=0.11, right=0.98, bottom=0.43, top=0.92, hspace=0.42)
 
     # Build connector fill after final subplot layout so coordinates are exact.
     top_left_disp = ax_top.transData.transform(
@@ -2211,26 +2214,29 @@ def plot_timeout_sweep_bug_catch(timeout_sweep_dir, output_path):
     series_specs = [
         (
             "no_opts",
-            "Core engine",
+            f"{sysname} w/o optimizations",
             color_scheme[0],
+            "o",
             re.compile(r"results_t([0-9]+(?:\.[0-9]+)?)_no_opts\.csv$"),
         ),
         (
             "smart_forking",
-            "Smart forking",
+            f"{sysname} w/o DFS",
             color_scheme[1],
+            "^",
             re.compile(r"results_t([0-9]+(?:\.[0-9]+)?)_smart_forking\.csv$"),
         ),
         (
             "dfs_on",
-            f"Full {sysname}",
+            f"{sysname}",
             color_scheme[2],
+            "s",
             re.compile(r"results_t([0-9]+(?:\.[0-9]+)?)_dfs_on\.csv$"),
         ),
     ]
     series_paths = {
         key: glob.glob(os.path.join(timeout_sweep_dir, f"results_t*_{key}.csv"))
-        for key, _, _, _ in series_specs
+        for key, _, _, _, _ in series_specs
     }
 
     if not any(series_paths.values()):
@@ -2243,6 +2249,7 @@ def plot_timeout_sweep_bug_catch(timeout_sweep_dir, output_path):
                 "dfs_on",
                 f"Full {sysname}",
                 color_scheme[0],
+                "o",
                 re.compile(r"results_t([0-9]+(?:\.[0-9]+)?)\.csv$"),
             ),
         ]
@@ -2262,7 +2269,7 @@ def plot_timeout_sweep_bug_catch(timeout_sweep_dir, output_path):
             match = regex.search(os.path.basename(path))
             if not match:
                 continue
-            timeout_value = 2.0 * float(match.group(1))
+            timeout_value = float(match.group(1))
             data = load_csv(path)
             buggy_data = (
                 data[data["kind"] == "buggy"].copy() if "kind" in data.columns else data
@@ -2279,12 +2286,12 @@ def plot_timeout_sweep_bug_catch(timeout_sweep_dir, output_path):
         t = np.array(timeout_points)[order]
         return x, y, bug_totals, t
 
-    plt.figure(figsize=(5.8, 1.8))
+    plt.figure(figsize=(5.8, 2.0))
     all_x_arrays = []
     all_y_arrays = []
     all_totals = []
     all_timeout_values = []
-    for key, label, color, regex in series_specs:
+    for key, label, color, marker, regex in series_specs:
         x_vals, y_vals, totals, timeout_vals = collect_series(
             series_paths.get(key, []), regex
         )
@@ -2299,10 +2306,13 @@ def plot_timeout_sweep_bug_catch(timeout_sweep_dir, output_path):
         plt.plot(
             x_vals,
             y_vals,
-            marker="o",
+            marker=marker,
             color=color,
             linewidth=1.8,
             markersize=4,
+            markerfacecolor=color,
+            markeredgecolor=color,
+            markeredgewidth=0.8,
             label=label,
         )
 
@@ -2317,7 +2327,7 @@ def plot_timeout_sweep_bug_catch(timeout_sweep_dir, output_path):
         y_lower_int = int(np.floor(y_lower))
         # Use a fixed truncated baseline for readability.
         y_bottom = 70.0
-        y_top = max(float(total), 76.0)
+        y_top = 120.0
         ax.set_ylim(y_bottom, y_top)
         y_tick_start = int(np.floor(y_bottom / 10.0) * 10 + 10)
         y_ticks = [t for t in range(y_tick_start, int(y_top) + 1, 10)]
@@ -2363,7 +2373,7 @@ def plot_timeout_sweep_bug_catch(timeout_sweep_dir, output_path):
     plt.xlabel("Timeout (s)")
     plt.ylabel("Bugs caught")
     ax = plt.gca()
-    axis_label_size = ax.xaxis.label.get_size()
+    axis_label_size = max(ax.xaxis.label.get_size(), ax.yaxis.label.get_size())
     if all_x_arrays:
         timeout_ticks = sorted({int(round(v)) for v in all_timeout_values})
         rightmost_tick = round(float(np.max(np.concatenate(all_x_arrays))), 2)
@@ -2378,8 +2388,17 @@ def plot_timeout_sweep_bug_catch(timeout_sweep_dir, output_path):
     handles, labels = ax.get_legend_handles_labels()
     handles = handles[::-1]
     labels = labels[::-1]
-    plt.legend(handles, labels, fontsize=axis_label_size, loc="lower right", frameon=True)
-    plt.tight_layout()
+    legend_size = max(8, axis_label_size - 2)
+    plt.legend(
+        handles,
+        labels,
+        fontsize=legend_size,
+        loc="upper center",
+        bbox_to_anchor=(0.5, -0.34),
+        frameon=False,
+        ncol=3,
+    )
+    plt.subplots_adjust(bottom=0.33)
     plt.savefig(output_path, format="pdf")
     plt.close()
 

@@ -48,7 +48,7 @@ EOF
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
 
-TIMEOUTS_CSV="1,5,10,15,20,25,30,35,40,45,50"
+TIMEOUTS_CSV="1,10,20,30,40,50,60"
 OUTPUT_DIR="results"
 SWEEP_SUBDIR="timeout-sweep"
 ONLY_REGEX=".*"
