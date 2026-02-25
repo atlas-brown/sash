@@ -103,16 +103,36 @@ def main(file: str,
         filename=log_file
     )
 
-    logging.info("Processing file %s with solver=%s, exec_timeout=%s, solver_timeout=%s", file, solver, timeout, solver_timeout)
+    effective_timeout = timeout
+    effective_solver_timeout = solver_timeout
+    # If only a total timeout is provided (-t) and solver is enabled, split it
+    # evenly between symbolic execution and solver.
+    if solver and timeout is not None and timeout > 0 and solver_timeout is None:
+        effective_timeout = timeout / 2.0
+        effective_solver_timeout = timeout / 2.0
+        logging.info(
+            "No solver timeout provided; splitting timeout %.3fs into exec=%.3fs and solver=%.3fs",
+            timeout,
+            effective_timeout,
+            effective_solver_timeout,
+        )
+
+    logging.info(
+        "Processing file %s with solver=%s, exec_timeout=%s, solver_timeout=%s",
+        file,
+        solver,
+        effective_timeout,
+        effective_solver_timeout,
+    )
     logging.info("Commands with specs: %s", [name for name, _ in specs.CMD_SPECS.items()])
 
     symbexec_main(
         file,
         solver,
-        timeout,
+        effective_timeout,
         dfs_timeout,
         targeted_dfs_timeout,
-        solver_timeout,
+        effective_solver_timeout,
         enable_dfs,
         enable_targeted_dfs,
         enable_unbound_empty_dfs,
@@ -210,7 +230,7 @@ def parse_cli():
         "--timeout",
         type=float,
         default=None,
-        help="Set a timeout (in seconds) for the symbolic execution (not including the solver step)",
+        help="Set a timeout budget in seconds; if --solver-timeout is omitted, this budget is split equally between symbolic execution and solver",
     )
 
     parser.add_argument(
@@ -233,7 +253,7 @@ def parse_cli():
         "--solver-timeout",
         type=float,
         default=None,
-        help="Set a timeout (in seconds) for the solver step",
+        help="Set a timeout (in seconds) for the solver step (overrides the split from --timeout)",
     )
 
     # enable debug instrumentation flag
