@@ -132,7 +132,15 @@ def handle_commandnode(traces: Traces,
             if expanded_args[1].count.min == 0 and not util.is_definitely_non_empty(expanded_args[1], t1_active[0]):
                 Reporter.add_issue(reporter.UnexpectedStdin(cmd_name, context_line), config)
         if isinstance(cmd_name, str) and _path_lookup_disabled_for_command(cmd_name, t1_active):
+            # PATH is unset and command is not guaranteed to exist
             Reporter.add_issue(reporter.NotACommand(cmd_name, context_line), config)
+        elif cmd_name == "sudo" and len(expanded_args) >= 2:
+            # PATH is not unset (otherwise sudo would not be found)
+            sudo_cmd_name = expanded_args[1].try_to_str()
+            if isinstance(sudo_cmd_name, str) and not sudo_cmd_name.startswith("-") and (sudo_cmd_name.endswith("/") \
+                or any(sudo_cmd_name in t.latest_state.known_nonexistent_commands for t in traces)):
+                # Since sudo is a metacommand we need to check if the command it tries to invoke is valid
+                Reporter.add_issue(reporter.NotACommand(sudo_cmd_name, context_line), config)
 
     if expanded_args:
         match expanded_args[0].try_to_str():
