@@ -106,14 +106,14 @@ def test_parse_shell_script_uses_shfmt_bridge_for_env_bash_2(tmp_path, monkeypat
     assert calls == {"libdash": 0, "shfmt": 1}
 
 
-def test_parse_shell_script_defaults_to_libdash_without_shebang(tmp_path, monkeypatch):
+def test_parse_shell_script_defaults_to_shfmt_without_shebang(tmp_path, monkeypatch):
     monkeypatch.delenv("SASH_PARSER_BACKEND", raising=False)
     script = _write_script(tmp_path, "script.sh", "echo ok\n")
     calls = _install_backend_spies(monkeypatch)
 
     parser.parse_shell_script(script)
 
-    assert calls == {"libdash": 1, "shfmt": 0}
+    assert calls == {"libdash": 0, "shfmt": 1}
 
 
 @pytest.mark.skip(reason="Environment variable override not implemented yet")
