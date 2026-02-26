@@ -11,7 +11,10 @@ Usage:
 Options:
   --timeouts LIST      Comma-separated timeout values in seconds.
                        Example: --timeouts 1,5,10,15,20,25,30,60
-                       Default: 1,5,10,15,20,25,30,60
+                       Default: 1,10,20,30,40,50,60
+  --configs LIST       Comma-separated sweep configurations.
+                       Allowed: no_opts,smart_forking,solver_opts,dfs_on
+                       Default: no_opts,smart_forking,dfs_on
   --mock               Generate synthetic (plausible) CSVs instead of running evaluation.
   --base-csv PATH      Template CSV used by --mock mode.
                        Default: results/results.csv
@@ -49,6 +52,7 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
 
 TIMEOUTS_CSV="1,10,20,30,40,50,60"
+CONFIGS_CSV="no_opts,smart_forking,dfs_on"
 OUTPUT_DIR="results"
 SWEEP_SUBDIR="timeout-sweep"
 ONLY_REGEX=".*"
@@ -66,6 +70,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --output-dir)
       OUTPUT_DIR="${2:-}"
+      shift 2
+      ;;
+    --configs)
+      CONFIGS_CSV="${2:-}"
       shift 2
       ;;
     --mock)
@@ -105,6 +113,21 @@ if [[ ${#TIMEOUTS[@]} -eq 0 ]]; then
   echo "No timeouts specified" >&2
   exit 2
 fi
+IFS=',' read -r -a DFS_MODES <<< "${CONFIGS_CSV}"
+if [[ ${#DFS_MODES[@]} -eq 0 ]]; then
+  echo "No sweep configurations specified" >&2
+  exit 2
+fi
+for raw_mode in "${DFS_MODES[@]}"; do
+  mode="$(echo "${raw_mode}" | xargs)"
+  case "${mode}" in
+    no_opts|smart_forking|solver_opts|dfs_on) ;;
+    *)
+      echo "Invalid sweep configuration: '${mode}'" >&2
+      exit 2
+      ;;
+  esac
+done
 
 TARGET_DIR="${OUTPUT_DIR%/}/${SWEEP_SUBDIR}"
 mkdir -p "${REPO_ROOT}/${TARGET_DIR}"
@@ -112,11 +135,12 @@ mkdir -p "${REPO_ROOT}/${TARGET_DIR}"
 echo "Repository: ${REPO_ROOT}"
 echo "Output dir: ${TARGET_DIR}"
 echo "Timeouts:   ${TIMEOUTS_CSV}"
+echo "Configs:    ${CONFIGS_CSV}"
 if [[ ${MOCK} -eq 1 ]]; then
   echo "Mode:       mock"
   echo "Base CSV:   ${BASE_CSV}"
 fi
-echo "Sweep:      no_opts -> smart_forking -> solver_opts -> dfs_on"
+echo "Sweep:      ${CONFIGS_CSV}"
 
 for raw_t in "${TIMEOUTS[@]}"; do
   t="$(echo "${raw_t}" | xargs)"
@@ -128,9 +152,8 @@ for raw_t in "${TIMEOUTS[@]}"; do
     exit 2
   fi
 
-  # DFS_MODES=("no_opts" "smart_forking" "solver_opts" "dfs_on")
-  DFS_MODES=("no_opts" "smart_forking" "dfs_on")
-  for dfs_mode in "${DFS_MODES[@]}"; do
+  for raw_mode in "${DFS_MODES[@]}"; do
+    dfs_mode="$(echo "${raw_mode}" | xargs)"
     csv_path="${TARGET_DIR}/results_t${t}_${dfs_mode}.csv"
 
     if [[ ${MOCK} -eq 1 ]]; then

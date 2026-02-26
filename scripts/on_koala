@@ -3,14 +3,17 @@ set -euo pipefail
 
 usage() {
   cat <<'EOF'
-Run SaSh on Koala benchmarks with a timeout sweep (full SaSh only).
+Run SaSh on Koala benchmarks with a timeout/configuration sweep.
 
 Usage:
   scripts/on_koala [options]
 
 Options:
   --timeouts LIST    Comma-separated timeout values in seconds.
-                     Default: 1,5,10,20,30,60
+                     Default: 1,10,20,30,40,50,60
+  --configs LIST     Comma-separated sweep configurations.
+                     Allowed: no_opts,smart_forking,solver_opts,dfs_on
+                     Default: no_opts,smart_forking,dfs_on
   --output-dir DIR   Sweep output directory (repo-relative or absolute).
                      Default: results/koala-timeout-sweep
   --dry-run          Print commands without executing.
@@ -18,7 +21,8 @@ Options:
 EOF
 }
 
-TIMEOUTS_CSV="1,5,10,20,30,60"
+TIMEOUTS_CSV="1,10,20,30,40,50,60"
+CONFIGS_CSV="no_opts,smart_forking,dfs_on"
 OUTPUT_DIR="results/koala-timeout-sweep"
 DRY_RUN=0
 
@@ -30,6 +34,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --output-dir)
       OUTPUT_DIR="${2:-}"
+      shift 2
+      ;;
+    --configs)
+      CONFIGS_CSV="${2:-}"
       shift 2
       ;;
     --dry-run)
@@ -53,6 +61,21 @@ if [[ ${#TIMEOUTS[@]} -eq 0 ]]; then
   echo "No timeouts specified" >&2
   exit 2
 fi
+IFS=',' read -r -a CONFIGS <<< "${CONFIGS_CSV}"
+if [[ ${#CONFIGS[@]} -eq 0 ]]; then
+  echo "No sweep configurations specified" >&2
+  exit 2
+fi
+for raw_mode in "${CONFIGS[@]}"; do
+  mode="$(echo "${raw_mode}" | xargs)"
+  case "${mode}" in
+    no_opts|smart_forking|solver_opts|dfs_on) ;;
+    *)
+      echo "Invalid sweep configuration: '${mode}'" >&2
+      exit 2
+      ;;
+  esac
+done
 
 top=$(git rev-parse --show-toplevel)
 cd "$top" || exit 1
@@ -73,6 +96,7 @@ echo "Repository: ${top}"
 echo "Koala dir:  ${koala_dir}"
 echo "Output dir: ${out_dir}"
 echo "Timeouts:   ${TIMEOUTS_CSV}"
+echo "Configs:    ${CONFIGS_CSV}"
 
 for raw_t in "${TIMEOUTS[@]}"; do
   t="$(echo "${raw_t}" | xargs)"
@@ -84,22 +108,39 @@ for raw_t in "${TIMEOUTS[@]}"; do
     exit 2
   fi
 
-  csv_path="${out_dir}/results_t${t}_dfs_on.csv"
-  cmd=(
-    uv run "${top}/scripts/run_on_dir.py" "${koala_dir}"
-    -D
-    -t "${t}"
-    -T "${t}"
-    -c "${csv_path}"
-  )
+  for raw_mode in "${CONFIGS[@]}"; do
+    mode="$(echo "${raw_mode}" | xargs)"
+    csv_path="${out_dir}/results_t${t}_${mode}.csv"
+    cmd=(
+      uv run "${top}/scripts/run_on_dir.py" "${koala_dir}"
+      -t "${t}"
+      -T "${t}"
+      -c "${csv_path}"
+    )
+    case "${mode}" in
+      no_opts)
+        cmd+=(--fork-everywhere --disable-solver-optimizations)
+        ;;
+      smart_forking)
+        cmd+=(--disable-solver-optimizations)
+        ;;
+      solver_opts)
+        ;;
+      dfs_on)
+        cmd+=(-D)
+        ;;
+    esac
 
-  echo
-  echo "=== Koala timeout ${t}s (full SaSh) ==="
-  echo "${cmd[*]}"
-  if [[ ${DRY_RUN} -eq 0 ]]; then
-    "${cmd[@]}"
-    cp -f "${csv_path}" "${out_dir}/results_t${t}.csv"
-  fi
+    echo
+    echo "=== Koala timeout ${t}s | ${mode} ==="
+    echo "${cmd[*]}"
+    if [[ ${DRY_RUN} -eq 0 ]]; then
+      "${cmd[@]}"
+      if [[ "${mode}" == "dfs_on" ]]; then
+        cp -f "${csv_path}" "${out_dir}/results_t${t}.csv"
+      fi
+    fi
+  done
 done
 
 echo
