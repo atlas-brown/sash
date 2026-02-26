@@ -893,9 +893,11 @@ def handle_set(expanded_args: list[Field], traces: Traces) -> Traces:
                         to_set.update(flag[1:])
                     else:
                         logging.debug("set: ignoring irrelevant option: %s", flag)
-                else:
+                elif flag.startswith("+"):
                     raise NotImplementedError(f"set: option unsetting not implemented: {expanded_args}")
-
+                else:
+                    logging.debug("set: ignoring non-option argument: %s", flag)
+                    pass # It's probably pipefail tbh
             case _:
                 raise NotImplementedError(f"set with non-constant args: {expanded_args}")
     return trace_map(traces, lambda s: s.set_options(to_set))
