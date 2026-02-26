@@ -1879,6 +1879,96 @@ def _coverage_map_from_results(data):
     return out
 
 
+def coverage_full_across_timeout_sweep(timeout_sweep_dir):
+    """
+    Return (full_count, comparable_count, csv_count) for buggy benchmarks that
+    have 100% AST coverage in every timeout/configuration CSV.
+    """
+    paths = sorted(glob.glob(os.path.join(timeout_sweep_dir, "results_t*.csv")))
+    if not paths:
+        return None
+
+    coverage_maps = []
+    for path in paths:
+        data = load_csv(path)
+        if "kind" in data.columns:
+            data = data[data["kind"] == "buggy"].copy()
+        cov_map = _coverage_map_from_results(data)
+        if cov_map:
+            coverage_maps.append(cov_map)
+
+    if not coverage_maps:
+        return None
+
+    comparable_keys = set(coverage_maps[0].keys())
+    for cov_map in coverage_maps[1:]:
+        comparable_keys &= set(cov_map.keys())
+
+    if not comparable_keys:
+        return 0, 0, len(coverage_maps)
+
+    full_count = 0
+    for bench_key in comparable_keys:
+        if all(
+            np.isclose(cov_map[bench_key], 100.0, atol=1e-9)
+            for cov_map in coverage_maps
+        ):
+            full_count += 1
+
+    return full_count, len(comparable_keys), len(coverage_maps)
+
+
+def bugs_caught_across_timeout_sweep(timeout_sweep_dir):
+    """
+    Return (caught_all_count, comparable_bug_count, csv_count) for buggy bug
+    instances that are detected in every timeout/configuration CSV.
+    """
+    paths = sorted(glob.glob(os.path.join(timeout_sweep_dir, "results_t*.csv")))
+    if not paths:
+        return None
+
+    expected_sets = []
+    detected_sets = []
+    for path in paths:
+        data = load_csv(path)
+        if "kind" in data.columns:
+            data = data[data["kind"] == "buggy"].copy()
+
+        expected_set = set()
+        detected_set = set()
+        for _, row in data.iterrows():
+            bench_key = benchmark_key(row["benchmark"])
+            expected_counter = Counter(parse_issue_list(row["expected_results"]))
+            actual_counter = Counter(parse_issue_list(row["actual_results"]))
+            for issue, count in expected_counter.items():
+                for idx in range(count):
+                    key = f"{bench_key}_{issue}_{idx}"
+                    expected_set.add(key)
+                    if idx < min(count, actual_counter[issue]):
+                        detected_set.add(key)
+
+        if expected_set:
+            expected_sets.append(expected_set)
+            detected_sets.append(detected_set)
+
+    if not expected_sets:
+        return None
+
+    comparable_expected = set(expected_sets[0])
+    for s in expected_sets[1:]:
+        comparable_expected &= s
+
+    if not comparable_expected:
+        return 0, 0, len(expected_sets)
+
+    caught_all = set(detected_sets[0])
+    for s in detected_sets[1:]:
+        caught_all &= s
+    caught_all &= comparable_expected
+
+    return len(caught_all), len(comparable_expected), len(expected_sets)
+
+
 def plot_coverage_by_config(timeout_sweep_dir, base_buggy_data, output_path):
     series_specs = [
         (
@@ -2600,6 +2690,8 @@ def main():
         koala_timeout_sweep_dir,
         os.path.join(args.output_dir, "koala-timeout-sweep-cdf.pdf"),
     )
+    full_coverage_stats = coverage_full_across_timeout_sweep(timeout_sweep_dir)
+    bug_sweep_stats = bugs_caught_across_timeout_sweep(timeout_sweep_dir)
 
     # Print bug stats
     total_benchmarks = len(buggy_results)
@@ -2640,6 +2732,30 @@ def main():
         f"% ShellCheck variants missed bugs: {variant_total - variant_shell_detected}",
         file=sys.stderr,
     )
+    if full_coverage_stats is None:
+        print(
+            "% Benchmarks with 100% coverage across all configurations/timeouts: N/A",
+            file=sys.stderr,
+        )
+    else:
+        full_count, comparable_count, csv_count = full_coverage_stats
+        print(
+            "% Benchmarks with 100% coverage across all configurations/timeouts: "
+            f"{full_count}/{comparable_count} (from {csv_count} CSVs)",
+            file=sys.stderr,
+        )
+    if bug_sweep_stats is None:
+        print(
+            "% Bug instances caught across all configurations/timeouts: N/A",
+            file=sys.stderr,
+        )
+    else:
+        caught_all_count, comparable_bug_count, csv_count = bug_sweep_stats
+        print(
+            "% Bug instances caught across all configurations/timeouts: "
+            f"{caught_all_count}/{comparable_bug_count} (from {csv_count} CSVs)",
+            file=sys.stderr,
+        )
 
 
 if __name__ == "__main__":

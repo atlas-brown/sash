@@ -508,9 +508,33 @@ bugs_avg = n_bugs.mean()
 print(f"% Total benchmarks: {total_benchmarks}", file=sys.stderr)
 print(f"% Total bugs: {total_bugs}", file=sys.stderr)
 print(f"% Bugs per benchmark: ~{bugs_avg:.2f}", file=sys.stderr)
+timed_out_count = int(buggy_results["timed_out"].fillna(False).astype(bool).sum())
+print(f"% Timed out benchmarks: {timed_out_count}", file=sys.stderr)
 
 # Averages
 avg_loc = sum(get_loc(r["benchmark"]) for r in buggy_results.to_dict(orient="records")) / total_benchmarks
 avg_time = sum(r["time"] for r in buggy_results.to_dict(orient="records")) / total_benchmarks
 print(f"% Average LoC: {avg_loc:.2f}", file=sys.stderr)
 print(f"% Average time: {avg_time:.2f}s", file=sys.stderr)
+
+non_timeout_times = pd.to_numeric(
+    buggy_results.loc[~buggy_results["timed_out"], "time"],
+    errors="coerce",
+).dropna()
+if len(non_timeout_times) > 0:
+    avg_non_timeout_time = non_timeout_times.mean()
+    min_non_timeout_time = non_timeout_times.min()
+    max_non_timeout_time = non_timeout_times.max()
+    print(
+        "The average runtime per program is "
+        f"{avg_non_timeout_time:.2f} seconds, with a minimum of "
+        f"{min_non_timeout_time:.2f} seconds and a maximum of "
+        f"{max_non_timeout_time:.2f} seconds (excluding timeouts).",
+        file=sys.stderr,
+    )
+else:
+    print(
+        "The average runtime per program is N/A seconds, with a minimum of "
+        "N/A seconds and a maximum of N/A seconds (excluding timeouts).",
+        file=sys.stderr,
+    )
