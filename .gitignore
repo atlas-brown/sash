@@ -27,3 +27,5 @@ local/
 trace_info.jsonl
 .mplconfig
 .cache/fontconfig
+
+*.pdf
