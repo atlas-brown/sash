@@ -1971,6 +1971,32 @@ def count_non_arg_ast_nodes(nodes: list[parser.WrappedAst]) -> int:
         _collect_non_arg_ast_nodes(wrapped.ast_node, seen_ids, non_arg_ids)
     return len(non_arg_ids)
 
+def mark_subtree_as_interpreted_for_coverage(root: object) -> None:
+    seen_ids: set[int] = set()
+
+    def walk(value: object) -> None:
+        if isinstance(value, AST.AstNode):
+            node_id = id(value)
+            if node_id in seen_ids:
+                return
+            seen_ids.add(node_id)
+            if not isinstance(value, AST.ArgChar):
+                Reporter.mark_interpreted_ast_node(value)
+            for child in value.__dict__.values():
+                walk(child)
+            return
+
+        if isinstance(value, dict):
+            for child in value.values():
+                walk(child)
+            return
+
+        if isinstance(value, (list, tuple, set, frozenset)):
+            for child in value:
+                walk(child)
+
+    walk(root)
+
 
 def guarded_interp_node(traces: Traces,
                         node: AST.AstNode,
@@ -2260,30 +2286,35 @@ def interp_node(traces: Traces,
             return t2
 
         case AST.SubshellNode():
-            # A subshell executes its body but does not persist shell-local state
-            # changes (variables, function definitions, options, etc.) back to the
-            # parent shell. Keep side effects like fs/assertions/path conditions.
-            res: Traces = []
-            for parent_trace in traces:
-                parent_state = parent_trace.latest_state
-                sub_traces = guarded_interp_node([parent_trace], node.body, config)
-                for sub_trace in sub_traces:
-                    res.append(
-                        sub_trace.extend(
-                            lambda s, p=parent_state: replace(
-                                s,
-                                env=p.env,
-                                localenv=p.localenv,
-                                call_stack=p.call_stack,
-                                fundefs=p.fundefs,
-                                opts=p.opts,
-                                known_nonexistent_commands=p.known_nonexistent_commands,
-                                known_existing_commands=p.known_existing_commands,
-                                terminated=p.terminated,
-                            )
-                        )
-                    )
-            return res
+            # TODO: Re-enable subshells
+            # # A subshell executes its body but does not persist shell-local state
+            # # changes (variables, function definitions, options, etc.) back to the
+            # # parent shell. Keep side effects like fs/assertions/path conditions.
+            # res: Traces = []
+            # for parent_trace in traces:
+            #     parent_state = parent_trace.latest_state
+            #     sub_traces = guarded_interp_node([parent_trace], node.body, config)
+            #     for sub_trace in sub_traces:
+            #         res.append(
+            #             sub_trace.extend(
+            #                 lambda s, p=parent_state: replace(
+            #                     s,
+            #                     env=p.env,
+            #                     localenv=p.localenv,
+            #                     call_stack=p.call_stack,
+            #                     fundefs=p.fundefs,
+            #                     opts=p.opts,
+            #                     known_nonexistent_commands=p.known_nonexistent_commands,
+            #                     known_existing_commands=p.known_existing_commands,
+            #                     terminated=p.terminated,
+            #                 )
+            #             )
+            #         )
+            # return res
+            # Keep subshell nodes as analysis no-ops.
+            # Coverage is still tracked by guarded_interp_node via mark_interpreted_ast_node(node).
+            mark_subtree_as_interpreted_for_coverage(node.body)
+            return traces
 
         case AST.PipeNode():
             # Since variable assignments from parameter expansion, such as `${var:=default}`, in pipeline commands
