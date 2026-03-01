@@ -5,8 +5,9 @@ from sash.interpreter_config import InterpConfig
 from sash.symbolic.state import State, Assertion, Trace, RefineableConstraint, SimpleConstraint
 from dataclasses import replace
 import logging
-from sash.symbolic.strings import CompletelyArbitrary, Field, SymStr
+from sash.symbolic.strings import ArbitraryType, CompletelyArbitrary, Field, SymStr
 from sash.util import shasta_pretty
+from sash.frozen import FrozenAst
 from sash.fs import FileInfo, File, Read, Unread
 from pprint import pformat
 import z3
@@ -19,6 +20,17 @@ command_exists_predicate = z3.Function('command_exists', z3.StringSort(), z3.Boo
 def reset_z3cache():
     global arbitrary_to_z3_var, tracked_assertions
     arbitrary_to_z3_var, tracked_assertions = {}, {}
+
+
+def _env_var_name_from_source(source: object) -> str | None:
+    """Extract variable name for ENVIRONMENT arbitrariness from frozen VArgChar sources."""
+    if not isinstance(source, FrozenAst):
+        return None
+    if source.kind != "VArgChar":
+        return None
+    fields = dict(source.fields)
+    var = fields.get("var")
+    return var if isinstance(var, str) else None
 
 def field_to_z3(field: Field) -> z3.ExprRef:
     return field_content_to_z3(field.content)
@@ -33,9 +45,18 @@ def field_content_to_z3(field_content: SymStr | CompletelyArbitrary) -> z3.ExprR
             arbitrary_no_pfx_sfx = replace(arbitrary, prefix=None, suffix=None,
                                            # As far as paths are concerned, whether they're quoted or not is irrelevant
                                            quoted=False, maybe_empty=False)
-            if arbitrary_no_pfx_sfx not in arbitrary_to_z3_var:
-                arbitrary_to_z3_var[arbitrary_no_pfx_sfx] = z3.FreshConst(z3.StringSort(), 'arb-' + shasta_pretty(arbitrary.source))
-            z3_var = arbitrary_to_z3_var[arbitrary_no_pfx_sfx]
+            if arbitrary_no_pfx_sfx.kind == ArbitraryType.ENVIRONMENT:
+                if env_name := _env_var_name_from_source(arbitrary_no_pfx_sfx.source):
+                    z3_var = z3.String(f"env::{env_name}")
+                else:
+                    z3_var = arbitrary_to_z3_var.get(arbitrary_no_pfx_sfx)
+                    if z3_var is None:
+                        z3_var = z3.FreshConst(z3.StringSort(), 'arb-' + shasta_pretty(arbitrary.source))
+                        arbitrary_to_z3_var[arbitrary_no_pfx_sfx] = z3_var
+            else:
+                if arbitrary_no_pfx_sfx not in arbitrary_to_z3_var:
+                    arbitrary_to_z3_var[arbitrary_no_pfx_sfx] = z3.FreshConst(z3.StringSort(), 'arb-' + shasta_pretty(arbitrary.source))
+                z3_var = arbitrary_to_z3_var[arbitrary_no_pfx_sfx]
             if arbitrary.prefix:
                 z3_var = z3.Concat(field_content_to_z3(arbitrary.prefix), z3_var)
             if arbitrary.suffix:
