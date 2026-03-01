@@ -8,7 +8,7 @@ import time
 import sash.symb
 from sash.interpreter_config import InterpConfig
 from sash.reporter import Report, Reporter
-from sash.solver import run_solver
+from sash.solver import reset_z3cache, run_solver
 import sash.specs as specs
 from sash.debugtools.logger import DebugLogger
 
@@ -27,6 +27,10 @@ def symbexec_main(file: str,
                   debug_instrumentation: bool = False) -> sash.symb.SymbexecResult:
     global timers
     timers = []
+    # Per-analysis reset: symbolic execution builds FS formulas using field_to_z3.
+    # Reset once at analysis start so symbexec+solver share one cache per run,
+    # while avoiding cross-analysis leakage.
+    reset_z3cache()
 
     if debug_instrumentation:
         logging.info(f"Debug instrumentation enabled: detailed json execution logging to {DebugLogger.default_log_file}")

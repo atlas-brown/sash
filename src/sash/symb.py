@@ -2448,7 +2448,18 @@ def symbexec_file(input_file: str,
                   enable_targeted_dfs: bool = True,
                   enable_unbound_empty_dfs: bool = True) -> SymbexecResult:
     global stop_event
+    global trace_count
+    global inactive_trace_stash
+    global returning_trace_stash
+    global context_line
+
     stop_event = stop
+    # Reset cross-run interpreter globals so consecutive analyses in the same
+    # process do not influence each other's trace-collapsing behavior.
+    trace_count = 1
+    inactive_trace_stash = []
+    returning_trace_stash = []
+    context_line = None
 
     try:
         def constant_word(arg: list[AST.ArgChar]) -> str | None:
