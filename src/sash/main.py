@@ -46,9 +46,18 @@ def symbexec_main(file: str,
     )
 
     Reporter.initialize(file)
+    total_timeout = symbexec_timeout
+    symbexec_timeout_cap = symbexec_timeout
+    if solver and symbexec_timeout is not None and symbexec_timeout > 0 and solver_timeout is None:
+        symbexec_timeout_cap = symbexec_timeout / 2.0
+        logging.info(
+            "No solver timeout provided; using timeout %.3fs as exec_cap=%.3fs and solver=remaining budget",
+            symbexec_timeout,
+            symbexec_timeout_cap,
+        )
     start_time = time.perf_counter()
     if enable_dfs and dfs_timeout is None:
-        dfs_timeout = symbexec_timeout
+        dfs_timeout = symbexec_timeout_cap
     stop = None
     result = sash.symb.symbexec_file(
         file,
@@ -56,11 +65,12 @@ def symbexec_main(file: str,
         stop=stop,
         dfs_timeout=dfs_timeout,
         targeted_dfs_timeout=targeted_dfs_timeout,
-        main_timeout=symbexec_timeout,
+        main_timeout=symbexec_timeout_cap,
         enable_targeted_dfs=enable_targeted_dfs,
         enable_unbound_empty_dfs=enable_unbound_empty_dfs,
     )
-    Reporter.set_exec_time(time.perf_counter() - start_time)
+    exec_elapsed = time.perf_counter() - start_time
+    Reporter.set_exec_time(exec_elapsed)
 
     match result.status:
         case sash.symb.SymbexecStatus.COMPLETED:
@@ -76,8 +86,22 @@ def symbexec_main(file: str,
 
     if solver:
         logging.info("Running solver")
+        effective_solver_timeout = solver_timeout
+        if solver_timeout is None and total_timeout is not None and total_timeout > 0:
+            effective_solver_timeout = max(total_timeout - exec_elapsed, 0.0)
+            logging.info(
+                "Dynamic solver timeout from total budget: total=%.3fs, exec=%.3fs, solver=%.3fs",
+                total_timeout,
+                exec_elapsed,
+                effective_solver_timeout,
+            )
         start_time = time.perf_counter()
-        run_solver(result.traces, config, stop=set_timer(solver_timeout, "solver"))
+        if effective_solver_timeout is not None and effective_solver_timeout <= 0:
+            solver_stop = threading.Event()
+            solver_stop.set()
+        else:
+            solver_stop = set_timer(effective_solver_timeout, "solver")
+        run_solver(result.traces, config, stop=solver_stop)
         Reporter.set_solver_time(time.perf_counter() - start_time)
         logging.info("Solver finished running")
     else:
@@ -107,36 +131,22 @@ def main(file: str,
         filename=log_file
     )
 
-    effective_timeout = timeout
-    effective_solver_timeout = solver_timeout
-    # If only a total timeout is provided (-t) and solver is enabled, split it
-    # evenly between symbolic execution and solver.
-    if solver and timeout is not None and timeout > 0 and solver_timeout is None:
-        effective_timeout = timeout / 2.0
-        effective_solver_timeout = timeout / 2.0
-        logging.info(
-            "No solver timeout provided; splitting timeout %.3fs into exec=%.3fs and solver=%.3fs",
-            timeout,
-            effective_timeout,
-            effective_solver_timeout,
-        )
-
     logging.info(
-        "Processing file %s with solver=%s, exec_timeout=%s, solver_timeout=%s",
+        "Processing file %s with solver=%s, timeout=%s, solver_timeout=%s",
         file,
         solver,
-        effective_timeout,
-        effective_solver_timeout,
+        timeout,
+        solver_timeout,
     )
     logging.info("Commands with specs: %s", [name for name, _ in specs.CMD_SPECS.items()])
 
     symbexec_main(
         file,
         solver,
-        effective_timeout,
+        timeout,
         dfs_timeout,
         targeted_dfs_timeout,
-        effective_solver_timeout,
+        solver_timeout,
         enable_dfs,
         enable_targeted_dfs,
         enable_unbound_empty_dfs,
@@ -158,7 +168,7 @@ def cli_main():
         timeout=args.timeout,
         dfs_timeout=args.dfs_timeout,
         targeted_dfs_timeout=args.targeted_dfs_timeout,
-        solver_timeout=args.solver_timeout,
+        solver_timeout=None,
         enable_dfs=args.enable_dfs,
         enable_targeted_dfs=not args.disable_targeted_dfs,
         enable_unbound_empty_dfs=not args.disable_unbound_empty_dfs,
@@ -234,7 +244,7 @@ def parse_cli():
         "--timeout",
         type=float,
         default=None,
-        help="Set a timeout budget in seconds; if --solver-timeout is omitted, this budget is split equally between symbolic execution and solver",
+        help="Set a timeout budget in seconds; symbolic execution gets up to half and solver gets the remaining budget",
     )
 
     parser.add_argument(
@@ -249,15 +259,6 @@ def parse_cli():
         type=float,
         default=None,
         help="Set a timeout (in seconds) for only the targeted DFS pass (defaults to the DFS timeout budget)",
-    )
-
-    # solver timeout
-    parser.add_argument(
-        "-T",
-        "--solver-timeout",
-        type=float,
-        default=None,
-        help="Set a timeout (in seconds) for the solver step (overrides the split from --timeout)",
     )
 
     # enable debug instrumentation flag
