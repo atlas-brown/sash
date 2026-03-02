@@ -995,6 +995,26 @@ def plot_bug_detection_bars_split_versions(data, output_path):
     variants_good = [len(variants_sash), len(variants_shell)]
 
     fixed_good = [fixed_sash_no_fp, fixed_shell_no_fp]
+    (
+        fixed_shell_no_fp_from_orig_caught,
+        fixed_shell_no_fp_from_orig_missed,
+    ) = _get_fixed_shell_no_fp_split_by_buggy_detection(data)
+    split_total = (
+        fixed_shell_no_fp_from_orig_caught + fixed_shell_no_fp_from_orig_missed
+    )
+    # Keep bar height exactly aligned with the fixed ShellCheck total even if
+    # metadata mismatches create tiny accounting differences.
+    if split_total < fixed_good[1]:
+        fixed_shell_no_fp_from_orig_missed += fixed_good[1] - split_total
+    elif split_total > fixed_good[1]:
+        overflow = split_total - fixed_good[1]
+        trim_missed = min(overflow, fixed_shell_no_fp_from_orig_missed)
+        fixed_shell_no_fp_from_orig_missed -= trim_missed
+        overflow -= trim_missed
+        if overflow > 0:
+            fixed_shell_no_fp_from_orig_caught = max(
+                fixed_shell_no_fp_from_orig_caught - overflow, 0
+            )
 
     # Two-panel layout: Buggy/Variants (left) and Fixed (right).
     fig, (ax_left, ax_right) = plt.subplots(
@@ -1011,10 +1031,11 @@ def plot_bug_detection_bars_split_versions(data, output_path):
     # Use neutral pastel system colors (avoid good/bad red/green semantics).
     sash_color = color_scheme[0]
     shellcheck_color = color_scheme[3]
+    shellcheck_lighter = to_rgba(shellcheck_color, alpha=0.45)
 
-    left_categories = ["Original", "Variants"]
+    left_categories = ["Real Bugs", "Variants"]
     # Keep original/variant groups visually separated.
-    left_x = np.array([0.0, 0.78], dtype=float)
+    left_x = np.array([0.0, 1.08], dtype=float)
     left_sash = np.array([buggy_good[0], variants_good[0]], dtype=float)
     left_shell = np.array([buggy_good[1], variants_good[1]], dtype=float)
 
@@ -1044,7 +1065,7 @@ def plot_bug_detection_bars_split_versions(data, output_path):
         alpha=0.9,
     )
 
-    right_categories = ["Fixed"]
+    right_categories = ["Real Fixes"]
     right_x = np.array([0.0], dtype=float)
     right_sash = np.array([fixed_good[0]], dtype=float)
     right_shell = np.array([fixed_good[1]], dtype=float)
@@ -1058,10 +1079,20 @@ def plot_bug_detection_bars_split_versions(data, output_path):
     )
     ax_right.bar(
         right_x + bar_offset,
-        right_shell,
+        np.array([fixed_shell_no_fp_from_orig_caught], dtype=float),
         width=width,
         color=shellcheck_color,
-        edgecolor=shellcheck_color,
+        edgecolor="none",
+        linewidth=0.0,
+    )
+    ax_right.bar(
+        right_x + bar_offset,
+        np.array([fixed_shell_no_fp_from_orig_missed], dtype=float),
+        width=width,
+        bottom=np.array([fixed_shell_no_fp_from_orig_caught], dtype=float),
+        color=shellcheck_lighter,
+        edgecolor="none",
+        linewidth=0.0,
     )
 
     max_good = max(
@@ -1087,7 +1118,7 @@ def plot_bug_detection_bars_split_versions(data, output_path):
     ax_right.set_xticklabels(right_categories, fontsize=14)
     # Match visual bar thickness across panels by keeping data-unit scales
     # proportional to the subplot width ratio (left:right = 1.3:1.0).
-    left_xlim = (-0.35, 1.05)
+    left_xlim = (-0.35, 1.34)
     left_span = left_xlim[1] - left_xlim[0]
     width_ratio_left = 1.3
     width_ratio_right = 1.0
@@ -1155,6 +1186,18 @@ def plot_bug_detection_bars_split_versions(data, output_path):
             va="bottom",
             fontsize=7,
         )
+    # Extra fixed ShellCheck label: true negatives on issues ShellCheck
+    # actually flags on original buggy scripts (exclude "says nothing" cases).
+    if len(right_x) == 1:
+        ax_right.text(
+            right_x[0] + bar_offset,
+            fixed_shell_no_fp_from_orig_caught + label_offset,
+            f"{int(fixed_shell_no_fp_from_orig_caught)}",
+            ha="center",
+            va="bottom",
+            fontsize=7,
+            color="black",
+        )
     # Bars encode good-instance counts for each system.
     side_handles = [
         Rectangle((0, 0), 1, 1, facecolor=sash_color, edgecolor=sash_color, label="SaSh"),
@@ -1179,7 +1222,7 @@ def plot_bug_detection_bars_split_versions(data, output_path):
         borderaxespad=0.0,
         columnspacing=2.0,
     )
-    fig.subplots_adjust(left=0.18, right=0.90, bottom=0.36, top=0.92, wspace=0.52)
+    fig.subplots_adjust(left=0.18, right=0.90, bottom=0.36, top=0.92, wspace=0.84)
     plt.savefig(output_path, format="pdf")
     plt.close()
 
@@ -1221,6 +1264,50 @@ def _get_kind_fp_counts(data, kind_selector):
 
 def _get_fixed_fp_counts(data):
     return _get_kind_fp_counts(data, lambda k: str(k) == "fixed")
+
+
+def _get_fixed_shell_no_fp_split_by_buggy_detection(data):
+    """
+    Split fixed ShellCheck true negatives into two groups:
+    1) corresponding buggy issue was detected by ShellCheck
+    2) corresponding buggy issue was not detected by ShellCheck
+    """
+    buggy_rows = _benchmark_kind_rows(data, "buggy")
+    fixed_rows = _benchmark_kind_rows(data, "fixed")
+
+    buggy_shell_detected = set()
+    for _, row in buggy_rows.iterrows():
+        family = benchmark_group_key(row["benchmark"])
+        kind = str(row.get("kind", "buggy"))
+        expected_counter = Counter(parse_issue_list(row["expected_results"]))
+        shell_counter = get_info_shellcheck_expected_counter(
+            row["benchmark"], kind, fallback_to_bug_default=True
+        )
+        for issue, expected_count in expected_counter.items():
+            matched = min(expected_count, shell_counter[issue])
+            for idx in range(matched):
+                buggy_shell_detected.add((family, issue, idx))
+
+    no_fp_from_orig_caught = 0
+    no_fp_from_orig_missed = 0
+    for _, row in fixed_rows.iterrows():
+        family = benchmark_group_key(row["benchmark"])
+        kind = str(row.get("kind", "fixed"))
+        expected_counter = Counter(parse_issue_list(row["expected_results"]))
+        shell_counter = get_info_shellcheck_expected_counter(
+            row["benchmark"], kind, fallback_to_bug_default=True
+        )
+        for issue, expected_count in expected_counter.items():
+            fp_matched = min(expected_count, shell_counter[issue])
+            for idx in range(expected_count):
+                # fixed no-FP for this issue instance
+                if idx >= fp_matched:
+                    if (family, issue, idx) in buggy_shell_detected:
+                        no_fp_from_orig_caught += 1
+                    else:
+                        no_fp_from_orig_missed += 1
+
+    return no_fp_from_orig_caught, no_fp_from_orig_missed
 
 
 def _benchmark_kind_rows(data, kind):
