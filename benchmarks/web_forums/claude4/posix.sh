@@ -1,3 +1,4 @@
+#!/bin/sh
 # https://github.com/anthropics/claude-code/issues/17925
 
 

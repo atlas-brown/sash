@@ -1,3 +1,4 @@
+#!/bin/sh
 # https://www.pixelbeat.org/docs/unix_file_replacement.html
 
 # FIXED: cp file file.tmp

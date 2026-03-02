@@ -1,3 +1,4 @@
+#!/bin/sh
 # https://www.hivelocity.net/blog/human-error-is-the-leading-cause-of-business-data-loss/
 rm -rf *
 rm *

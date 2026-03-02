@@ -1,3 +1,4 @@
+#!/bin/sh
 # https://github.com/anthropics/claude-code/issues/24787
 mkdir -p some/dir
 touch some/dir/newfile.cpp

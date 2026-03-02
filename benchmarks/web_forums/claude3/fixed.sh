@@ -1,3 +1,4 @@
+#!/bin/sh
 # https://github.com/anthropics/claude-code/issues/24787
 # FIXED: mkdir -p some/dir
 # FIXED: touch some/dir/newfile.cpp

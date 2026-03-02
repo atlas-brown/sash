@@ -11,14 +11,14 @@ ground_truths:
   - path: original.sh
     kind: original
     bugs:
-      bug00: { lines: [5] }
+      bug00: { lines: [6] }
 
   - path: posix.sh
     kind: buggy
     bugs:
-      bug00: { lines: [5] }
+      bug00: { lines: [6] }
 
   - path: fixed.sh
     kind: fixed
     bugs:
-      bug00: { regression_lines: [5], shellcheck: null }
+      bug00: { regression_lines: [6], shellcheck: null }
