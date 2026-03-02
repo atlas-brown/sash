@@ -18,7 +18,7 @@ bash scripts/timeout_sweep_eval.sh --timeouts "${TIMEOUTS_CSV}" --configs "${CON
 
 echo
 echo "==> Running Koala timeout sweep"
-bash scripts/on_koala --timeouts "${TIMEOUTS_CSV}" --configs "${CONFIGS_CSV}"
+bash scripts/on_koala --timeouts "300" --configs "dfs_on"
 
 echo
 echo "==> Running regular evaluation"
