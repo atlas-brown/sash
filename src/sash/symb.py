@@ -1915,6 +1915,17 @@ inactive_trace_stash: list[Trace] = []
 returning_trace_stash: list[Trace] = []
 
 trace_count = 1
+
+def _compact_trace_history(trace: Trace) -> Trace:
+    """
+    Keep only the initial and latest states for traces that are no longer executed.
+    This preserves solver-relevant information (initial env and latest assertions/fs)
+    while reducing memory retained in inactive trace storage.
+    """
+    if len(trace.states) <= 2:
+        return trace
+    return replace(trace, states=(trace.states[0], trace.states[-1]))
+
 def collapse_traces_if_too_many(traces: Traces) -> tuple[Traces, Traces]:
     global trace_count
     new_inactive = []
@@ -2018,7 +2029,7 @@ def guarded_interp_node(traces: Traces,
         inactive2 = []
     else:
         traces, inactive2 = config.trace_collapser(traces)
-    inactive_trace_stash.extend(inactive1 + inactive2)
+    inactive_trace_stash.extend([_compact_trace_history(t) for t in inactive1 + inactive2])
     traces = config.apply_node_cbs(traces, node)
 
     # Stash any traces that are returning (i.e., have executed a return statement in a function
