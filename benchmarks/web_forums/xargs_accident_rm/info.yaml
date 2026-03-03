@@ -16,16 +16,16 @@ ground_truths:
     kind: original
     bugs:
       bug00: { lines: [3] }
-      bug01: { lines: [2] }
+      bug01: { lines: [3] }
 
   - path: posix.sh
     kind: buggy
     bugs:
       bug00: { lines: [3] }
-      bug01: { lines: [2] }
+      bug01: { lines: [3] }
 
   - path: fixed.sh
     kind: fixed
     bugs:
       bug00: { regression_lines: [3], shellcheck: null }
-      bug01: { regression_lines: [2], shellcheck: null }
+      bug01: { regression_lines: [3], shellcheck: null }
