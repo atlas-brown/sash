@@ -811,8 +811,8 @@ class Mv(Cmd):
             #              & And.from_field_iter(glob_srcs, IsDir)
             assertion    = RefineableConstraint(IsDir(dst) \
                                                 & And.from_field_iter(other_srcs, lambda src: ~IsDeleted(src)) \
-                                                & And.from_field_iter(glob_srcs, IsDir),
-                                                ((IsDir(dst) & And.from_field_iter(glob_srcs, IsDir),
+                                                & And.from_field_iter(glob_srcs, lambda src: ~IsDeleted(src)),
+                                                ((IsDir(dst) & And.from_field_iter(glob_srcs, lambda src: ~IsDeleted(src)),
                                                   lambda line: reporter.ExpectedPathState('mv', 'directories', tuple([dst] + glob_srcs), line)),
                                                  (And.from_field_iter(other_srcs, lambda src: ~IsDeleted(src)),
                                                   lambda line: reporter.ExpectedPathState('mv', 'existant', tuple(other_srcs), line))))
