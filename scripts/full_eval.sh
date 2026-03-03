@@ -10,7 +10,7 @@ fi
 repo_root="$(git rev-parse --show-toplevel)"
 cd "${repo_root}"
 
-TIMEOUTS_CSV="1,10,20,30,40,50,60"
+TIMEOUTS_CSV="1,10,20,30,40,50,60,70,80,90,100"
 CONFIGS_CSV="no_opts,smart_forking,dfs_on"
 
 echo "==> Running benchmark timeout sweep"
