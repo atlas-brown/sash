@@ -51,8 +51,9 @@ def symbexec_main(file: str,
     if solver and symbexec_timeout is not None and symbexec_timeout > 0 and solver_timeout is None:
         symbexec_timeout_cap = symbexec_timeout / 2.0
         logging.info(
-            "No solver timeout provided; using timeout %.3fs as exec_cap=%.3fs and solver=remaining budget",
+            "No solver timeout provided; using timeout %.3fs as exec_cap=%.3fs and solver budget=max(remaining, %.3fs)",
             symbexec_timeout,
+            symbexec_timeout_cap,
             symbexec_timeout_cap,
         )
     start_time = time.perf_counter()
@@ -88,11 +89,16 @@ def symbexec_main(file: str,
         logging.info("Running solver")
         effective_solver_timeout = solver_timeout
         if solver_timeout is None and total_timeout is not None and total_timeout > 0:
-            effective_solver_timeout = max(total_timeout - exec_elapsed, 0.0)
+            min_solver_budget = total_timeout / 2.0
+            effective_solver_timeout = max(
+                min_solver_budget,
+                total_timeout - exec_elapsed,
+            )
             logging.info(
-                "Dynamic solver timeout from total budget: total=%.3fs, exec=%.3fs, solver=%.3fs",
+                "Dynamic solver timeout from total budget: total=%.3fs, exec=%.3fs, min_solver=%.3fs, solver=%.3fs",
                 total_timeout,
                 exec_elapsed,
+                min_solver_budget,
                 effective_solver_timeout,
             )
         start_time = time.perf_counter()
@@ -244,7 +250,7 @@ def parse_cli():
         "--timeout",
         type=float,
         default=None,
-        help="Set a timeout budget in seconds; symbolic execution gets up to half and solver gets the remaining budget",
+        help="Set a timeout budget in seconds; symbolic execution gets up to half and solver gets at least half",
     )
 
     parser.add_argument(
