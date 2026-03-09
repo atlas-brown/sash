@@ -16,7 +16,7 @@ A static analysis tool for the shell, based on symbolic execution.
 git clone https://github.com/atlas-brown/resash.git
 cd resash
 docker build -t resash . # This might take a while, but only ever needs to be executed once
-docker run --rm -itv $(pwd):/app resash /bin/bash
+docker run --rm -itv $(pwd):/home/sash resash /bin/bash
 # You are now inside the container!
 # All changes you make locally will be immediately reflected in the container!
 # See https://docs.docker.com/get-started/ if you've never used Docker before

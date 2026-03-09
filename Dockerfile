@@ -7,6 +7,7 @@ RUN apt-get update \
     build-essential \
     curl \
     git \
+    shfmt \
     wget \
     software-properties-common \
     sudo \ 
