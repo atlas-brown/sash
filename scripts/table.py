@@ -205,11 +205,33 @@ descriptions = {
     "simple_fs/overwrite_file": r"Data loss from \sh{xargs mv}",
 
     "milestone_1/redir_to_func-redir_to_func": r"Redirect to function",
+    "web_forums/accident": r"Wildcard \sh{rm} deletes cwd",
     "web_forums/unset_var-cmd_always_fails": r"Always empty \sh{mkdir} arg",
     "web_forums/capturing_empty_output": r"Captures \sh{mkdir} output",
+    "web_forums/claude2": r"Claude Code deletes \sh{$HOME} contents",
+    "web_forums/claude3": r"Deletes the only copy of a file",
+    "web_forums/claude4": r"Typo overwrites regular file",
+    "web_forums/claude5": r"Failed \sh{cd} to \sh{rm -rf *}",
+    "web_forums/claude6": r"Malformed command deletes project cache",
     "web_forums/claude_wipe": r"Agent wipes \sh{$HOME}",
+    "web_forums/confused_mkdir": r"Assumes \sh{mkdir} prints created path",
+    "web_forums/delete_home_user": r"Deletes \sh{/home/user}",
+    "web_forums/delete_slash": r"Deletes \sh{/} via extra \sh{rm} arg",
+    "web_forums/empty_path": r"Unset \sh{PATH} makes commands disappear",
+    "web_forums/find_rm": r"\sh{find} command deletes system files",
+    "web_forums/for_mv": r"Moves file to a missing destination",
+    "web_forums/move_home": r"Moves \sh{$HOME} onto loader path",
+    "web_forums/posix2": r"Quoted glob makes file test fail",
+    "web_forums/replacement": r"Typo in temp file path truncates file",
+    "web_forums/sc_author": r"\sh{eval} hides \sh{rm -rf /}",
+    "web_forums/silly_q": r"Passes multiple sources to \sh{mv}",
+    "web_forums/troll": r"Command substitution deletes \sh{/home}",
     "web_forums/unexpected_stdin": r"Empty \sh{$1} to stuck program",
     "web_forums/unset_var": r"Unset \sh{$bar} used",
+    "web_forums/wrong_mkdir": r"Captures empty \sh{mkdir} output as path",
+    "web_forums/wrong_mv": r"Multi-source \sh{mv} without destination",
+    "web_forums/xargs_accident_rm": r"\sh{xargs rm} consumes file list before \sh{mv}",
+    "web_forums/xargs_del_files": r"Moves files into a missing target dir",
     "simple_fs/access_after_mv": r"Uses dir after moving it",
     "simple_fs/cd_into_file": r"May \sh{cd} into regular file",
     "simple_fs/access_del_resource": r"Move from deleted dir",
@@ -274,11 +296,33 @@ features = {
     "simple_fs/overwrite_file_3": ["SE", "CS", "FS"], # SE to reason about the pipeline and the while loop, CS to reason about cp, FS to reason about overwrites
     "simple_fs/overwrite_file_4": ["WE", "SE", "FS"], # WE to reason about the expansion of the filename, SE to reason about redirection and about all expansions being the same file, FS to reason about overwrites
 
+    "web_forums/accident": ["WE", "CS"], # WE to reason about wildcard expansion, CS to reason about rm
     "web_forums/capturing_empty_output": ["CS", "SE"], # SE to reason about the subshell, CS to reason about mkdir not having output
+    "web_forums/claude2": ["WE", "CS"], # WE to reason about ~ and wildcard expansion, CS to reason about rm
+    "web_forums/claude3": ["CS", "FS"], # CS to reason about rm/rmdir, FS to reason about file loss
+    "web_forums/claude4": ["SE", "FS"], # SE to reason about redirection, FS to reason about overwrite/data loss
+    "web_forums/claude5": ["WE", "CS", "SE"], # WE for wildcard expansion, CS for rm/cd, SE for the && chain
+    "web_forums/claude6": ["WE", "CS"], # WE to reason about ~ as an rm argument, CS to reason about rm
+    "web_forums/confused_mkdir": ["CS"], # CS to reason about mkdir output/behavior
+    "web_forums/delete_home_user": ["CS"], # CS to reason about rm
+    "web_forums/delete_slash": ["CS"], # CS to reason about rm --no-preserve-root
+    "web_forums/empty_path": ["CS"], # CS to reason about command lookup after PATH is unset
+    "web_forums/find_rm": ["CS"], # CS to reason about find -exec rm
+    "web_forums/for_mv": ["WE", "CS"], # WE to reason about variable/glob expansion, CS to reason about mv
+    "web_forums/move_home": ["CS", "FS"], # CS to reason about mv, FS to reason about directory relocation
+    "web_forums/posix2": ["WE", "CS"], # WE to reason about quoted glob behavior, CS to reason about test/mv
     "web_forums/rm_root_2": ["WE", "CS"], # WE to reason about unbound variable, CS to reason about rm
+    "web_forums/replacement": ["SE", "FS"], # SE to reason about redirection ordering, FS to reason about truncation/data loss
+    "web_forums/sc_author": ["CS", "SE"], # CS to reason about rm, SE to reason about eval/command substitution
+    "web_forums/silly_q": ["CS"], # CS to reason about mv argument expectations
+    "web_forums/troll": ["CS", "SE"], # CS to reason about the hidden rm, SE to reason about command substitution
     "web_forums/unexpected_stdin": ["CS", "SE"], # CS to reason about grep, SE to compare specs across traces
     "web_forums/unset_var": ["WE"], # WE to reason about unbound variable
     "web_forums/unset_var-cmd_always_fails": ["WE", "CS"], # WE to reason about unbound variable, CS to reason about test command and mkdir command
+    "web_forums/wrong_mkdir": ["CS", "SE"], # CS to reason about mkdir output, SE to reason about command substitution
+    "web_forums/wrong_mv": ["WE", "CS"], # WE to reason about glob expansion, CS to reason about mv
+    "web_forums/xargs_accident_rm": ["CS", "SE"], # CS to reason about xargs/rm/mv, SE to reason about pipeline behavior
+    "web_forums/xargs_del_files": ["CS"], # CS to reason about xargs mv behavior
 }
 
 get_bm_name = benchmark_key
@@ -297,6 +341,7 @@ DEFAULT_TABLE_SUBSET = {
     "milestone_2/rm_root",
     "web_forums/rm_root_2",
     "commits/debootstrap",
+    "commits/debootstrap_2",
     "simple_fs/overwrite_file",
 }
 
@@ -398,7 +443,7 @@ rest_of_benchmarks = []
 print(r"""
     \begin{tabular}{lllrcrcrrl}
     \toprule
-    \textbf{ID} & \textbf{Name} & \textbf{Description} & \textbf{D?/\#B} & \textbf{F?} & \textbf{$t$} & $\mathcal{F}$ & \textbf{LoC} & \textbf{$\downarrow$} & \textbf{Source} \\
+    \textbf{ID} & \textbf{Script name} & \textbf{Bug description} & \textbf{D?/\#B} & \textbf{F?} & \textbf{$t$} & $\mathcal{F}$ & \textbf{LoC} & \textbf{$\downarrow$} & \textbf{Source} \\
     \midrule
 """
 )

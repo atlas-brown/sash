@@ -515,6 +515,21 @@ def _format_coverage_tick(t: float) -> str:
     return f"{pct:.1f}%"
 
 
+def _lighten_color(color, amount):
+    """
+    Blend a color toward white.
+    amount=0 keeps the original color, amount=1 yields white.
+    """
+    r, g, b, a = to_rgba(color)
+    amount = min(max(float(amount), 0.0), 1.0)
+    return (
+        r + (1.0 - r) * amount,
+        g + (1.0 - g) * amount,
+        b + (1.0 - b) * amount,
+        a,
+    )
+
+
 def _get_bug_sets_for_kind(data, kind):
     sash_detected = set()
     shellcheck_detected = set()
@@ -1029,7 +1044,7 @@ def plot_bug_detection_bars_split_versions(data, output_path):
     bar_offset = width * 0.58
 
     # Use neutral pastel system colors (avoid good/bad red/green semantics).
-    sash_color = color_scheme[0]
+    sash_color = color_green
     shellcheck_color = color_scheme[3]
     shellcheck_lighter = to_rgba(shellcheck_color, alpha=0.45)
 
@@ -2057,23 +2072,26 @@ def bugs_caught_across_timeout_sweep(timeout_sweep_dir):
 
 
 def plot_coverage_by_config(timeout_sweep_dir, base_buggy_data, output_path):
+    dfs_on_color = color_green
+    smart_forking_color = _lighten_color(dfs_on_color, 0.22)
+    no_opts_color = _lighten_color(dfs_on_color, 0.45)
     series_specs = [
         (
             "no_opts",
             f"{sysname} w/o optimizations",
-            color_scheme[0],
+            no_opts_color,
             re.compile(r"results_t([0-9]+(?:\.[0-9]+)?)_no_opts\.csv$"),
         ),
         (
             "smart_forking",
             f"{sysname} w/o DFS",
-            color_scheme[1],
+            smart_forking_color,
             re.compile(r"results_t([0-9]+(?:\.[0-9]+)?)_smart_forking\.csv$"),
         ),
         (
             "dfs_on",
             f"{sysname}",
-            color_scheme[2],
+            dfs_on_color,
             re.compile(r"results_t([0-9]+(?:\.[0-9]+)?)_dfs_on\.csv$"),
         ),
     ]
@@ -2319,10 +2337,6 @@ def plot_coverage_by_config(timeout_sweep_dir, base_buggy_data, output_path):
         )
 
     handles, labels = plt.gca().get_legend_handles_labels()
-    # Reverse config order in legend so "Full SaSh" appears first.
-    cfg_pairs = list(reversed(list(zip(handles, labels))))
-    handles = [h for h, _ in cfg_pairs]
-    labels = [l for _, l in cfg_pairs]
     fig.legend(
         handles,
         labels,
@@ -2388,25 +2402,28 @@ def estimate_runtime_timeouts(data):
 
 
 def plot_timeout_sweep_bug_catch(timeout_sweep_dir, output_path):
+    dfs_on_color = color_green
+    smart_forking_color = _lighten_color(dfs_on_color, 0.22)
+    no_opts_color = _lighten_color(dfs_on_color, 0.45)
     series_specs = [
         (
             "no_opts",
             f"{sysname} w/o optimizations",
-            color_scheme[0],
+            no_opts_color,
             "o",
             re.compile(r"results_t([0-9]+(?:\.[0-9]+)?)_no_opts\.csv$"),
         ),
         (
             "smart_forking",
             f"{sysname} w/o DFS",
-            color_scheme[1],
+            smart_forking_color,
             "^",
             re.compile(r"results_t([0-9]+(?:\.[0-9]+)?)_smart_forking\.csv$"),
         ),
         (
             "dfs_on",
             f"{sysname}",
-            color_scheme[2],
+            dfs_on_color,
             "s",
             re.compile(r"results_t([0-9]+(?:\.[0-9]+)?)_dfs_on\.csv$"),
         ),
@@ -2425,7 +2442,7 @@ def plot_timeout_sweep_bug_catch(timeout_sweep_dir, output_path):
             (
                 "dfs_on",
                 f"Full {sysname}",
-                color_scheme[0],
+                dfs_on_color,
                 "o",
                 re.compile(r"results_t([0-9]+(?:\.[0-9]+)?)\.csv$"),
             ),
@@ -2553,18 +2570,13 @@ def plot_timeout_sweep_bug_catch(timeout_sweep_dir, output_path):
     axis_label_size = max(ax.xaxis.label.get_size(), ax.yaxis.label.get_size())
     if all_x_arrays:
         timeout_ticks = sorted({int(round(v)) for v in all_timeout_values})
-        rightmost_tick = round(float(np.max(np.concatenate(all_x_arrays))), 2)
-        x_ticks = sorted(set(timeout_ticks + [rightmost_tick]))
-        timeout_tick_set = set(timeout_ticks)
-        x_tick_labels = [
-            str(int(x)) if x in timeout_tick_set else f"{x:.2f}" for x in x_ticks
-        ]
-        plt.xticks(x_ticks, x_tick_labels, fontsize=axis_label_size)
+        x_ticks = [t for t in timeout_ticks if t == 1 or t % 10 == 0]
+        if not x_ticks:
+            x_ticks = timeout_ticks
+        plt.xticks(x_ticks, [str(t) for t in x_ticks], fontsize=axis_label_size)
     plt.yticks(fontsize=axis_label_size)
     plt.grid(axis="y", alpha=0.25, linestyle=":")
     handles, labels = ax.get_legend_handles_labels()
-    handles = handles[::-1]
-    labels = labels[::-1]
     legend_size = max(8, axis_label_size - 2)
     plt.legend(
         handles,
