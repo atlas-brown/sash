@@ -31,7 +31,11 @@ def assert_equiv_formulas(f1, f2):
     assert res == z3.unsat, f"Formulas are not equivalent:\nf1: {f1}\nf2: {f2}\nModel: {s.model()}"
 
 def make_env_constraints_z3(s, env_constraints):
-    default_env_constraints = {name: field_content_to_z3(shellvar.value.content) for name, shellvar in s.env.items() if name in {"HOME", "PWD", "OLDPWD", "PATH"}}
+    default_env_constraints = {
+        name: field_content_to_z3(shellvar.value.content)
+        for name, shellvar in s.env.items()
+        if name in {"HOME", "PWD", "OLDPWD", "PATH", "PWD_INIT"}
+    }
     parts = [z3var(name) == z3expr for name, z3expr in (env_constraints | default_env_constraints).items()]
     return z3.And(*parts)
 
