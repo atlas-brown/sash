@@ -490,6 +490,24 @@ def handle_rm(expanded_args: tuple[Field, ...], trace: Trace, node: AST.CommandN
                 return 0  # conservative fallback
         return path_depth_from_base(home_suffix, pwd_suffix)
 
+    def could_equal_literal(field: Field, literal: str) -> bool:
+        field_str = field.try_to_str()
+        if field_str is not None:
+            return field_str == literal
+
+        if field.count.min > 1 or field.count.max < 1:
+            return False
+
+        match field.content:
+            case CompletelyArbitrary(prefix=prefix, suffix=suffix):
+                if prefix is not None and (prefix_str := prefix.try_to_str()) is not None and not literal.startswith(prefix_str):
+                    return False
+                if suffix is not None and (suffix_str := suffix.try_to_str()) is not None and not literal.endswith(suffix_str):
+                    return False
+                return True
+            case _:
+                return True
+
     at_pwd_init = pwdval is not None and start_pwdval is not None and same_location(pwdval.value, start_pwdval.value)
     home_level = home_depth(pwdval.value, homeval.value) if (pwdval is not None and homeval is not None) else None
     at_home_top_level = home_level is not None and home_level <= 1
@@ -508,22 +526,34 @@ def handle_rm(expanded_args: tuple[Field, ...], trace: Trace, node: AST.CommandN
                                                         node.pretty(),
                                                         context_line, priority=10, include_fs=False))
 
-    for path in Config.get("PROTECTED_PATHS"):
-        trace = trace.extend(
-            lambda s: s.add_assertion(
-                SimpleConstraint(
-                    And.from_field_iter(
-                        non_flag_args,
-                        lambda arg_field: Not(StringEq(arg_field, Field(SymStr((path,)), WordCount(1, 1)))),
+    protected_paths = Config.get("PROTECTED_PATHS")
+    if protected_paths:
+        protected_checks = tuple(
+            (
+                And.from_field_iter(
+                    tuple(arg_field for arg_field in non_flag_args if could_equal_literal(arg_field, path)),
+                    lambda arg_field, p=path: Not(
+                        StringEq(arg_field, Field(SymStr((p,)), WordCount(1, 1)))
                     ),
-                    lambda line: reporter.DeleteSystemFile(path, line),
                 ),
-                node.pretty(),
-                context_line,
-                priority=10,
-                include_fs=False,
+                lambda line, p=path: reporter.DeleteSystemFile(p, line),
             )
+            for path in protected_paths
+            if any(could_equal_literal(arg_field, path) for arg_field in non_flag_args)
         )
+        if protected_checks:
+            trace = trace.extend(
+                lambda s: s.add_assertion(
+                    SimpleConstraint(*protected_checks[0]) if len(protected_checks) == 1 else RefineableConstraint(
+                        And.from_iter(check for check, _ in protected_checks),
+                        protected_checks,
+                    ),
+                    node.pretty(),
+                    context_line,
+                    priority=10,
+                    include_fs=False,
+                )
+            )
 
 
     for arg_idx, arg_field in enumerate(expanded_args[1:], start=1):
@@ -832,6 +862,18 @@ def interpret_test(cmd: list[Field]) -> bool | None:
     if not len(args) in {2, 3}:
         return None
 
+    def definitely_empty(field: Field) -> bool:
+        field_str = field.try_to_str()
+        if field_str is not None:
+            return field_str == ""
+        return field.count.max == 0
+
+    def definitely_non_empty(field: Field) -> bool:
+        field_str = field.try_to_str()
+        if field_str is not None:
+            return field_str != ""
+        return False
+
     if len(args) == 2:
         if args[0].content == SymStr(("!",)):
             res = interpret_test(args[1:])
@@ -841,6 +883,18 @@ def interpret_test(cmd: list[Field]) -> bool | None:
                 return s != ""
             case (SymStr([op]), SymStr([s])) if op == "-z":
                 return s == ""
+            case (SymStr([op]), _) if op == "-n":
+                if definitely_non_empty(args[1]):
+                    return True
+                if definitely_empty(args[1]):
+                    return False
+                return None
+            case (SymStr([op]), _) if op == "-z":
+                if definitely_empty(args[1]):
+                    return True
+                if definitely_non_empty(args[1]):
+                    return False
+                return None
             case (SymStr([op]), SymStr([s1])) if op in {"-f", "-d", "-e"} and s1 == "":
                 return False
             case _:
@@ -1372,6 +1426,9 @@ def expand_simple(stuff: list[AST.ArgChar],
                     self.finish_field_so_far()
                     self.combined_fields_so_far.append(one_field)
                 case SymStr(parts):
+                    if parts == () and one_field.count == WordCount(1, 1):
+                        self.field_so_far.append("")
+                        return
                     self.field_so_far.extend(parts)
                     if one_field.count.min > 1:
                         self.field_so_far_words_min += one_field.count.min - 1
@@ -1925,6 +1982,7 @@ def _compact_trace_history(trace: Trace) -> Trace:
     if len(trace.states) <= 2:
         return trace
     return replace(trace, states=(trace.states[0], trace.states[-1]))
+
 
 def collapse_traces_if_too_many(traces: Traces) -> tuple[Traces, Traces]:
     global trace_count
@@ -2528,7 +2586,8 @@ def symbexec_file(input_file: str,
             if not func_calls_dangerous(name, {})
         )
         # opt_store = parse_shebang_args(input_file)
-        dfs_traces = []
+        dfs_solver_traces = []
+        dfs_fallback_traces = []
         if config.DFS_first:
             logging.info("Doing whole execution with a single trace first (DFS_first)")
             dfs_phase_start = time.perf_counter()
@@ -2639,10 +2698,10 @@ def symbexec_file(input_file: str,
             # logging.info("DFS run: exploring the first trace only")
             # symb_engine(nodes, replace(config, trace_collapser = lambda ts: ts[:1]))
             logging.info("DFS_first run complete, proceeding with normal symbolic execution")
-            dfs_traces = targeted_traces + \
-                            only_then_traces + only_else_traces + \
-                            only_then_unbound_empty + only_else_unbound_empty + \
-                            unbound_empty
+            dfs_solver_traces = unbound_empty
+            dfs_fallback_traces = targeted_traces + \
+                                  only_then_traces + only_else_traces + \
+                                  only_then_unbound_empty + only_else_unbound_empty
             Reporter.drop_issues({reporter.Code.DEAD_CODE}) # wholly unreliable with branch policies
             if dfs_phase_timed_out:
                 Reporter.clear_timed_out()
@@ -2671,7 +2730,12 @@ def symbexec_file(input_file: str,
             stop_event = main_stop if main_stop is not None else stop_event
 
         traces = symb_engine(nodes, replace(config, branch_policy=branch_policy_half_n_half_if_too_many))
-        traces = traces + dfs_traces
+        print(f"Symbolic execution completed with {len(traces)} and {len(dfs_solver_traces)} DFS solver traces and {len(dfs_fallback_traces)} DFS fallback traces")
+        traces = traces + dfs_solver_traces
+        if Reporter.get_timed_out():
+            print("Using fallback DFS traces due to timeout in main symbolic execution")
+            traces = traces + dfs_fallback_traces
+        traces, _ = collapse_traces(traces)
         if Reporter.get_timed_out():
             return SymbexecResult(SymbexecStatus.INTERRUPTED, traces)
         return SymbexecResult(SymbexecStatus.COMPLETED, traces)

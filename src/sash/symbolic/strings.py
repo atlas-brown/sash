@@ -120,12 +120,9 @@ class Field:
             content = replace(content, quoted=True)
         if isinstance(content, CompletelyArbitrary) and self.count.min > 0:
             content = replace(content, maybe_empty=False)
-        max_words = min(self.count.max, 1)
-        min_words = min(self.count.min, 1)
-        if isinstance(content, CompletelyArbitrary) and content.quoted:
-            if max_words > 0:
-                min_words = max(min_words, 1)
-        return Field(content, WordCount(min_words, max_words))
+        # Quoting suppresses word splitting: a quoted expansion contributes exactly one shell word,
+        # even when the underlying string is empty.
+        return Field(content, WordCount(1, 1))
 
     def is_constant(self) -> bool:
         return isinstance(self.content, SymStr) and all(isinstance(p, str) for p in self.content.parts) and self.count.min == self.count.max

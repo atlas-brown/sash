@@ -114,10 +114,20 @@ class State:
 
     external_data: Any = None # ASSUMPTION: must be hashable
 
-    _hash: int = None
+    _hash: int = field(default=None, compare=False)
     def __post_init__(self):
-        object.__setattr__(self, '_hash',
-                           hash(tuple(getattr(self, field.name) for field in fields(self))))
+        object.__setattr__(
+            self,
+            "_hash",
+            hash(
+                tuple(
+                    getattr(self, field.name)
+                    for field in fields(self)
+                    if field.name != "_hash"
+                )
+            ),
+        )
+
     def __hash__(self):
         return self._hash
 
@@ -137,7 +147,7 @@ class State:
         new_pathcond = self.pathcond + (Condition(self, cond, source_str, source_line),)
         return replace(self, pathcond=new_pathcond)
 
-    def add_assertion(self, assertion_constraint: Constraint, source_str: str | None = None, source_line: int | None = None, priority: int = 0, include_fs: bool = True) -> 'State':
+    def add_assertion(self, assertion_constraint: RefineableConstraint, source_str: str | None = None, source_line: int | None = None, priority: int = 0, include_fs: bool = True) -> 'State':
         assert isinstance(assertion_constraint, RefineableConstraint), f"Got non-RC assertion: {type(assertion_constraint)} : {assertion_constraint}"
         if assertion_constraint == Empty():
             logging.debug("Skipping empty assertion from %s at line %s", source_str, source_line)
@@ -283,11 +293,13 @@ def trace_map(traces: Traces, f: Callable[[State], State]) -> Traces:
     return [trace.extend(f) for trace in traces]
 
 def collapse_traces(traces: Traces) -> tuple[Traces, Traces]:
+    logging.debug("Collapsing %d traces", len(traces))
     traces_by_latest_states: dict[State, Trace] = {}
     for t in traces:
         if t.latest_state not in traces_by_latest_states:
             traces_by_latest_states[t.latest_state] = t
     # technically this isn't dropping any traces
+    logging.debug("Collapsed to %d traces", len(traces_by_latest_states))
     return list(traces_by_latest_states.values()), []
 
 @dataclass(frozen=True)

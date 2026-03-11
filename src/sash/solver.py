@@ -214,6 +214,10 @@ def model_to_reports(core: list[z3.BoolRef],
 
 
 def assume_unknowns_are_files(assertions: list[Assertion]) -> tuple[Assertion, ...]:
+    def is_redirection_assertion(assertion: Assertion) -> bool:
+        source = assertion.source_str
+        return ">" in source or "<" in source
+
     def add_condition(im):
         return lambda line: im(line).under_condition(Description("Assume unknown paths are files"))
     def with_file_condition(rc: RefineableConstraint) -> RefineableConstraint:
@@ -221,6 +225,8 @@ def assume_unknowns_are_files(assertions: list[Assertion]) -> tuple[Assertion, .
 
     new_assertions: list[Assertion] = []
     for assertion in assertions:
+        if is_redirection_assertion(assertion):
+            continue
         state = assertion.producing_state
         fs_model = state.fs_model
         new_fs_model = fs_model.set_default_path_state(FileInfo.mk_pair(File, Read))
@@ -254,6 +260,15 @@ def home_not_deleted_assertion(trace: Trace) -> Assertion | None:
         include_fs=True,
     )
 
+
+def _solver_assertions_for_trace(trace: Trace) -> tuple[Assertion, ...]:
+    assertions = trace.latest_state.assertions
+    home_assertion = home_not_deleted_assertion(trace)
+    if home_assertion is not None:
+        assertions = assertions + (home_assertion,)
+    assertions = assertions + assume_unknowns_are_files(assertions)
+    return assertions
+
 # <assertion_constraint>: if true, then things are OK, if false then there's a bug
 
 # assert not(<assertion_constraint>)
@@ -267,11 +282,15 @@ def run_solver(traces: list[Trace], config: InterpConfig, stop: threading.Event 
     total_issues_before_solver = len(Reporter._issues)
     timed_out = False
 
-    total_assertions = sum(len(trace.latest_state.assertions) for trace in traces)
+    total_assertions = sum(len(_solver_assertions_for_trace(trace)) for trace in traces)
     checked_assertions = 0
 
     if config.debug_instrumentation:
         debugger = solver_debugger()
+
+    solver = z3.Solver()
+    solver.set('timeout', 5000)
+    solver.set(unsat_core=True)
 
     logging.info("Checking %d total assertions from %d total traces", total_assertions, len(traces))
     for i, trace in enumerate(traces):
@@ -279,17 +298,13 @@ def run_solver(traces: list[Trace], config: InterpConfig, stop: threading.Event 
             logging.info("Ignoring %d/%d assertions due to solver timeout", total_assertions - checked_assertions, total_assertions)
             break
 
-        assertions = trace.latest_state.assertions
-        home_assertion = home_not_deleted_assertion(trace)
-        if home_assertion is not None:
-            assertions = assertions + (home_assertion,)
-        assertions = assertions + assume_unknowns_are_files(assertions)
+        assertions = _solver_assertions_for_trace(trace)
         if not config.disable_solver_optimizations:
             assertions = sorted(assertions, key=lambda a: a.priority, reverse=True)
         logging.debug("Trace %d/%d: checking %d assertions", i + 1, len(traces), len(assertions))
         for assertion in assertions:
             if logging.getLogger().isEnabledFor(logging.DEBUG):
-                logging.debug("Checking assertion id %s from line %s :: %s", id(assertion), assertion.source_str, pformat(assertion))
+                logging.debug("Checking assertion %d/%d id %s from line %s :: %s", checked_assertions + 1, total_assertions, id(assertion), assertion.source_line, assertion.source_str)
 
             if stop and stop.is_set():
                 timed_out = True
@@ -299,17 +314,18 @@ def run_solver(traces: list[Trace], config: InterpConfig, stop: threading.Event 
 
             checked_assertions += 1
 
-            solver = z3.Solver()
-            solver.set('timeout', 5000)
-            solver.set(unsat_core=True)
             include_fs_override = True if config.disable_solver_optimizations else None
             assertion_var, state_formula, assertion_formula, refinements = assertion_to_z3(
                 assertion,
                 include_fs_override=include_fs_override,
             )
+            solver.push()
             solver.add(state_formula)
 
-            if not config.disable_solver_optimizations and solver.check() == z3.unsat:
+            if (
+                not config.disable_solver_optimizations
+                and solver.check() == z3.unsat
+            ):
                 logging.debug("Path condition is unsat, skipping assertion check")
                 if config.debug_instrumentation:
                     log_assertion_result(
@@ -322,6 +338,7 @@ def run_solver(traces: list[Trace], config: InterpConfig, stop: threading.Event 
                         solver_time=0.0,
                         debugger=debugger,
                     )
+                solver.pop()
                 continue
 
             solver.push()
@@ -333,7 +350,7 @@ def run_solver(traces: list[Trace], config: InterpConfig, stop: threading.Event 
             result = solver.check()
             if logging.getLogger().isEnabledFor(logging.DEBUG):
                 logging.debug("State:\n%s", state_formula)
-                logging.debug("Assertion:\n%s", assertion_formula)
+                logging.debug("Assertion\n:%s\n\n", assertion_formula)
                 logging.debug("Assertion must be violated?: %s (ie %s)", result == z3.unsat, result)
 
             if result == z3.unsat:
@@ -345,7 +362,7 @@ def run_solver(traces: list[Trace], config: InterpConfig, stop: threading.Event 
             else:
                 model = None
                 if logging.getLogger().isEnabledFor(logging.DEBUG):
-                    model = solver.model() if result == z3.sat else None # Save time by only calling model() during debugging
+                    model = solver.model() if result == z3.sat else None
                 logging.debug("{z3.result}, model: %s", model)
                 if config.debug_instrumentation:
                     log_assertion_result(
@@ -359,5 +376,8 @@ def run_solver(traces: list[Trace], config: InterpConfig, stop: threading.Event 
                         sat_model=model,
                         debugger=debugger,
                     )
+                solver.pop()
+
+            solver.pop()
 
     logging.info("Solving produced %d new reports", len(Reporter._issues) - total_issues_before_solver)
