@@ -161,6 +161,7 @@ sources = {
 
     # Rest of citations
     "commits/const_cond": r"\cite{benchmark:commits:const-cond}",
+    "commits/cp_nonexistent": r"\cite{benchmark:commits:cp-nonexistent}",
     "commits/debootstrap_2": r"\cite{benchmark:commits:debootstrap-2}",
     "commits/ignored_command_v": r"\cite{benchmark:commits:ignored-command-v}",
     "commits/makefile": r"\cite{benchmark:commits:makefile}",
@@ -180,10 +181,33 @@ sources = {
     "simple_fs/overwrite_file_2": r"\cite{benchmark:simple-fs:overwrite-file-2}",
     "simple_fs/overwrite_file_3": r"\cite{benchmark:simple-fs:overwrite-file-3}",
     "simple_fs/overwrite_file_4": r"\cite{benchmark:simple-fs:overwrite-file-4}",
+    "web_forums/accident": r"\cite{benchmark:web-forums:accident}",
     "web_forums/capturing_empty_output": r"\cite{benchmark:web-forums:capturing-empty-output}",
+    "web_forums/claude2": r"\cite{benchmark:web-forums:claude-2}",
+    "web_forums/claude3": r"\cite{benchmark:web-forums:claude-3}",
+    "web_forums/claude4": r"\cite{benchmark:web-forums:claude-4}",
+    "web_forums/claude5": r"\cite{benchmark:web-forums:claude-5}",
+    "web_forums/claude6": r"\cite{benchmark:web-forums:claude-6}",
+    "web_forums/claude_wipe": r"\cite{benchmark:web-forums:claude-wipe}",
+    "web_forums/confused_mkdir": r"\cite{benchmark:web-forums:confused-mkdir}",
+    "web_forums/delete_home_user": r"\cite{benchmark:web-forums:delete-home-user}",
+    "web_forums/delete_slash": r"\cite{benchmark:web-forums:delete-slash}",
+    "web_forums/empty_path": r"\cite{benchmark:web-forums:empty-path}",
+    "web_forums/find_rm": r"\cite{benchmark:web-forums:find-rm}",
+    "web_forums/for_mv": r"\cite{benchmark:web-forums:for-mv}",
+    "web_forums/move_home": r"\cite{benchmark:web-forums:move-home}",
+    "web_forums/posix2": r"\cite{benchmark:web-forums:posix-2}",
+    "web_forums/replacement": r"\cite{benchmark:web-forums:replacement}",
     "web_forums/unexpected_stdin": r"\cite{benchmark:web-forums:unexpected-stdin}",
     "web_forums/unset_var": r"\cite{benchmark:web-forums:unset-var}",
     "web_forums/unset_var-cmd_always_fails": r"\cite{benchmark:web-forums:unset-var-cmd-always-fails}",
+    "web_forums/sc_author": r"\cite{shellcheck:issue-910}",
+    "web_forums/silly_q": r"\cite{benchmark:web-forums:silly-q}",
+    "web_forums/troll": r"\cite{benchmark:web-forums:troll}",
+    "web_forums/wrong_mkdir": r"\cite{benchmark:web-forums:wrong-mkdir}",
+    "web_forums/wrong_mv": r"\cite{benchmark:web-forums:wrong-mv}",
+    "web_forums/xargs_accident_rm": r"\cite{benchmark:web-forums:xargs-accident-rm}",
+    "web_forums/xargs_del_files": r"\cite{benchmark:web-forums:xargs-del-files}",
 }
 
 
@@ -208,30 +232,30 @@ descriptions = {
     "web_forums/accident": r"Wildcard \sh{rm} deletes cwd",
     "web_forums/unset_var-cmd_always_fails": r"Always empty \sh{mkdir} arg",
     "web_forums/capturing_empty_output": r"Captures \sh{mkdir} output",
-    "web_forums/claude2": r"Claude Code deletes \sh{$HOME} contents",
-    "web_forums/claude3": r"Deletes the only copy of a file",
-    "web_forums/claude4": r"Typo overwrites regular file",
+    "web_forums/claude2": r"Claude deletes \sh{$HOME}",
+    "web_forums/claude3": r"Deletes only file copy",
+    "web_forums/claude4": r"Typo overwrites file",
     "web_forums/claude5": r"Failed \sh{cd} to \sh{rm -rf *}",
-    "web_forums/claude6": r"Malformed command deletes project cache",
+    "web_forums/claude6": r"Deletes project cache",
     "web_forums/claude_wipe": r"Agent wipes \sh{$HOME}",
-    "web_forums/confused_mkdir": r"Assumes \sh{mkdir} prints created path",
+    "web_forums/confused_mkdir": r"Assumes \sh{mkdir} path output",
     "web_forums/delete_home_user": r"Deletes \sh{/home/user}",
     "web_forums/delete_slash": r"Deletes \sh{/} via extra \sh{rm} arg",
-    "web_forums/empty_path": r"Unset \sh{PATH} makes commands disappear",
-    "web_forums/find_rm": r"\sh{find} command deletes system files",
-    "web_forums/for_mv": r"Moves file to a missing destination",
-    "web_forums/move_home": r"Moves \sh{$HOME} onto loader path",
-    "web_forums/posix2": r"Quoted glob makes file test fail",
-    "web_forums/replacement": r"Typo in temp file path truncates file",
-    "web_forums/sc_author": r"\sh{eval} hides \sh{rm -rf /}",
+    "web_forums/empty_path": r"Unset \sh{PATH}",
+    "web_forums/find_rm": r"Deletes system files",
+    "web_forums/for_mv": r"Moves file to missing dest",
+    "web_forums/move_home": r"Moves user's \sh{$HOME}",
+    "web_forums/posix2": r"Quoted glob in file check",
+    "web_forums/replacement": r"Typo truncates file",
+    "web_forums/sc_author": r"Hidden \sh{rm -rf /}",
     "web_forums/silly_q": r"Passes multiple sources to \sh{mv}",
-    "web_forums/troll": r"Command substitution deletes \sh{/home}",
+    "web_forums/troll": r"Malware deletes \sh{/home}",
     "web_forums/unexpected_stdin": r"Empty \sh{$1} to stuck program",
     "web_forums/unset_var": r"Unset \sh{$bar} used",
-    "web_forums/wrong_mkdir": r"Captures empty \sh{mkdir} output as path",
-    "web_forums/wrong_mv": r"Multi-source \sh{mv} without destination",
-    "web_forums/xargs_accident_rm": r"\sh{xargs rm} consumes file list before \sh{mv}",
-    "web_forums/xargs_del_files": r"Moves files into a missing target dir",
+    "web_forums/wrong_mkdir": r"Captures \sh{mkdir} output",
+    "web_forums/wrong_mv": r"No destination \sh{mv}",
+    "web_forums/xargs_accident_rm": r"Deletes files before \sh{mv}",
+    "web_forums/xargs_del_files": r"Moves files to missing dir",
     "simple_fs/access_after_mv": r"Uses dir after moving it",
     "simple_fs/cd_into_file": r"May \sh{cd} into regular file",
     "simple_fs/access_del_resource": r"Move from deleted dir",
@@ -260,6 +284,7 @@ descriptions = {
 # SE: symbolic execution
 features = {
     "commits/const_cond": ["SE"], # SE to reason about set -e, the test semantics and condition being constant
+    "commits/cp_nonexistent": ["CS", "SE"], # CS to reason about cp/[ behavior, SE to carry the missing-.env branch condition to the copy
     "commits/debootstrap": ["WE", "CS"], # WE to reason about the various parameter expansions, CS to reason about rm
     "commits/debootstrap_2": ["WE", "CS"], # WE to reason about the various parameter expansions, CS to reason about rm
     "commits/ignored_command_v": ["CS"], # CS to reason about command -v and env
@@ -303,6 +328,7 @@ features = {
     "web_forums/claude4": ["SE", "FS"], # SE to reason about redirection, FS to reason about overwrite/data loss
     "web_forums/claude5": ["WE", "CS", "SE"], # WE for wildcard expansion, CS for rm/cd, SE for the && chain
     "web_forums/claude6": ["WE", "CS"], # WE to reason about ~ as an rm argument, CS to reason about rm
+    "web_forums/claude_wipe": ["WE", "CS"], # WE to expand ~, CS to reason about the destructive rm target
     "web_forums/confused_mkdir": ["CS"], # CS to reason about mkdir output/behavior
     "web_forums/delete_home_user": ["CS"], # CS to reason about rm
     "web_forums/delete_slash": ["CS"], # CS to reason about rm --no-preserve-root
@@ -440,13 +466,35 @@ def create_table_line(result, allow_fallback=False):
 
 rest_of_benchmarks = []
 
-print(r"""
+if args.appendix:
+    print(r"""
+\setlength{\LTleft}{0pt}
+\setlength{\LTright}{0pt}
+\begin{longtable}{@{}lllrcrcrrl@{}}
+\toprule
+\textbf{ID} & \textbf{Script name} & \textbf{Bug description} & \textbf{D?/\#B} & \textbf{F?} & \textbf{$t$} & $\mathcal{F}$ & \textbf{LoC} & \textbf{$\downarrow$} & \textbf{Source} \\
+\midrule
+\endfirsthead
+\multicolumn{10}{@{}l@{}}{\tablename\ \thetable{} (continued)}\\
+\toprule
+\textbf{ID} & \textbf{Script name} & \textbf{Bug description} & \textbf{D?/\#B} & \textbf{F?} & \textbf{$t$} & $\mathcal{F}$ & \textbf{LoC} & \textbf{$\downarrow$} & \textbf{Source} \\
+\midrule
+\endhead
+\midrule
+\multicolumn{10}{r@{}}{Continued on next page}\\
+\endfoot
+\bottomrule
+\endlastfoot
+"""
+    )
+else:
+    print(r"""
     \begin{tabular}{lllrcrcrrl}
     \toprule
     \textbf{ID} & \textbf{Script name} & \textbf{Bug description} & \textbf{D?/\#B} & \textbf{F?} & \textbf{$t$} & $\mathcal{F}$ & \textbf{LoC} & \textbf{$\downarrow$} & \textbf{Source} \\
     \midrule
 """
-)
+    )
 
 for result in buggy_results.to_dict(orient="records"):
     bm_name = get_bm_name(result["benchmark"])
@@ -523,7 +571,12 @@ print(rf"""
 \midrule
  & \textbf{{Total}} &  & {detected_bugs}/{total_bugs} & {fixed_clear_rate} & {time_avg_total_cell} & {feature_count_marks} & {loc_avg_total_cell} & {depth_avg_total_cell} &  \\ """)
 
-print(r"""
+if args.appendix:
+    print(r"""
+\end{longtable}
+""")
+else:
+    print(r"""
 \bottomrule
 \end{tabular}
 """)

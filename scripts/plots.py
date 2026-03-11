@@ -2628,92 +2628,121 @@ def plot_koala_timeout_cdf(koala_sweep_dir, output_path):
         timeout_value = float(m_plain.group(1))
         selected_by_timeout.setdefault(timeout_value, path)
 
-    paths = list(selected_by_timeout.values())
-
-    timeout_vals = []
-    complete_counts = []
-    total_counts = []
-
-    for path in paths:
-        base = os.path.basename(path)
-        m_dfs = timeout_re_dfs_on.search(base)
-        m_plain = timeout_re_plain.search(base)
-        if m_dfs:
-            timeout_value = float(m_dfs.group(1))
-        elif m_plain:
-            timeout_value = float(m_plain.group(1))
-        else:
-            continue
-        data = load_csv(path)
-
-        # Koala sweep files should contain full SaSh results only, but filter defensively.
-        if "tool" in data.columns:
-            data = data[data["tool"].astype(str).str.lower() == "sash"]
-
-        if data.empty:
-            continue
-
-        timed_out = (
-            data["timed_out"].map(_as_bool)
-            if "timed_out" in data.columns
-            else pd.Series([False] * len(data))
-        )
-        crashed = (
-            data["crashed"].map(_as_bool)
-            if "crashed" in data.columns
-            else pd.Series([False] * len(data))
-        )
-        complete = (~timed_out) & (~crashed)
-
-        timeout_vals.append(timeout_value)
-        complete_counts.append(int(complete.sum()))
-        total_counts.append(int(len(data)))
-
-    if not timeout_vals:
+    if not selected_by_timeout:
         print(
             f"% Koala timeout-sweep files in {koala_sweep_dir} did not match expected naming; skipping koala CDF plot",
             file=sys.stderr,
         )
         return
 
-    order = np.argsort(timeout_vals)
-    x = np.array(timeout_vals)[order]
-    y = np.array(complete_counts)[order]
-    totals_sorted = np.array(total_counts)[order]
+    max_timeout = max(selected_by_timeout.keys())
+    path = selected_by_timeout[max_timeout]
+    data = load_csv(path)
+
+    # Koala sweep files should contain full SaSh results only, but filter defensively.
+    if "tool" in data.columns:
+        data = data[data["tool"].astype(str).str.lower() == "sash"]
+
+    if data.empty:
+        print(
+            f"% Koala timeout CDF input {path} has no SaSh rows; skipping koala CDF plot",
+            file=sys.stderr,
+        )
+        return
+
+    timed_out = (
+        data["timed_out"].map(_as_bool)
+        if "timed_out" in data.columns
+        else pd.Series([False] * len(data), index=data.index)
+    )
+    crashed = (
+        data["crashed"].map(_as_bool)
+        if "crashed" in data.columns
+        else pd.Series([False] * len(data), index=data.index)
+    )
+    complete = (~timed_out) & (~crashed)
+    complete_data = data[complete].copy()
+
+    if complete_data.empty:
+        print(
+            f"% Koala timeout CDF input {path} has no completed rows; skipping koala CDF plot",
+            file=sys.stderr,
+        )
+        return
+
+    if "time" in complete_data.columns:
+        completion_times = pd.to_numeric(complete_data["time"], errors="coerce")
+    else:
+        exec_time = pd.to_numeric(complete_data.get("exec_time"), errors="coerce")
+        solver_time = pd.to_numeric(complete_data.get("solver_time"), errors="coerce")
+        completion_times = exec_time.fillna(0.0) + solver_time.fillna(0.0)
+
+    completion_times = completion_times.dropna().to_numpy(dtype=float)
+    completion_times.sort()
+
+    if completion_times.size == 0:
+        print(
+            f"% Koala timeout CDF input {path} has no numeric completion times; skipping koala CDF plot",
+            file=sys.stderr,
+        )
+        return
+
+    x = np.concatenate(([0.0], completion_times))
+    y = np.concatenate(([0], np.arange(1, len(completion_times) + 1)))
+    total_scripts = int(len(data))
 
     plt.figure(figsize=(5.2, 2.4))
+    shade_color = _lighten_color(color_scheme[0], 0.68)
+    plt.fill_between(
+        x,
+        y,
+        step="post",
+        color=shade_color,
+        alpha=0.7,
+        zorder=1,
+    )
     plt.step(
         x,
         y,
         where="post",
         color=color_scheme[0],
-        linewidth=1.8,
+        linewidth=2.0,
         label=f"Full {sysname}",
+        zorder=3,
     )
-    plt.plot(x, y, "o", color=color_scheme[0], markersize=4)
+    plt.plot(
+        x,
+        y,
+        "o",
+        color=color_scheme[0],
+        markerfacecolor=color_scheme[0],
+        markeredgecolor=color_scheme[0],
+        markersize=4,
+        zorder=4,
+    )
 
-    if len(totals_sorted) > 0:
-        total_scripts = int(np.median(totals_sorted))
-        plt.axhline(
-            y=total_scripts,
-            linestyle="--",
-            linewidth=1.0,
-            color="gray",
-            label="_nolegend_",
-        )
-        ax = plt.gca()
-        y_ticks = set(ax.get_yticks().tolist())
-        y_ticks.add(float(total_scripts))
-        ax.set_yticks(sorted(y_ticks))
-        ax.set_ylim(
-            bottom=max(0.0, float(np.min(y)) - 1.0), top=float(total_scripts) + 1.0
-        )
+    plt.axhline(
+        y=total_scripts,
+        linestyle="--",
+        linewidth=1.0,
+        color="gray",
+        label="_nolegend_",
+        zorder=2,
+    )
+    ax = plt.gca()
+    y_ticks = set(ax.get_yticks().tolist())
+    y_ticks.add(float(total_scripts))
+    ax.set_yticks(sorted(y_ticks))
+    ax.set_ylim(bottom=0.0, top=float(total_scripts) + 1.0)
+    ax.set_xlim(left=0.0, right=max(float(max_timeout), float(np.max(completion_times))))
 
-    plt.xlabel("Timeout (s)")
-    plt.ylabel("Scripts completely analyzed")
-    timeout_ticks = sorted({int(round(v)) for v in x})
-    plt.xticks(timeout_ticks, [str(t) for t in timeout_ticks])
-    plt.grid(axis="y", alpha=0.25, linestyle=":")
+    plt.xlabel("Analysis time (s)")
+    plt.ylabel("Scripts completed")
+    x_tick_candidates = [0, 1, 10, 30, 60, 120, 180, 240, 300]
+    x_ticks = [tick for tick in x_tick_candidates if tick <= ax.get_xlim()[1] + 1e-9]
+    if x_ticks:
+        plt.xticks(x_ticks, [str(int(t)) for t in x_ticks])
+    plt.grid(axis="y", alpha=0.25, linestyle=":", zorder=0)
     plt.legend(fontsize=8, loc="lower right", frameon=True)
     plt.tight_layout()
     plt.savefig(output_path, format="pdf")
