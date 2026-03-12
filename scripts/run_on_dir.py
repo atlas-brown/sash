@@ -175,6 +175,9 @@ def main():
                         "issue_severities": "",
                         "issue_messages_json": json.dumps([]),
                         "issue_count": 0,
+                        "ast_nodes_total": None,
+                        "ast_nodes_interpreted": None,
+                        "ast_coverage_pct": None,
                     }
                 )
                 continue
@@ -196,6 +199,9 @@ def main():
                         "issue_severities": "",
                         "issue_messages_json": json.dumps([]),
                         "issue_count": 0,
+                        "ast_nodes_total": None,
+                        "ast_nodes_interpreted": None,
+                        "ast_coverage_pct": None,
                     }
                 )
                 continue
@@ -229,10 +235,16 @@ def main():
             exec_time = None
             solver_time = None
             total_time = None
+            ast_nodes_total = None
+            ast_nodes_interpreted = None
+            ast_coverage_pct = None
         else:
             exec_time = report.time
             solver_time = report.solver_time
             total_time = (exec_time or 0.0) + (solver_time or 0.0)
+            ast_nodes_total = report.ast_nodes_total
+            ast_nodes_interpreted = report.ast_nodes_interpreted
+            ast_coverage_pct = report.ast_coverage_pct
 
         rows.append(
             {
@@ -249,6 +261,9 @@ def main():
                 "issue_severities": ";".join(issue_severities),
                 "issue_messages_json": json.dumps(issue_messages, ensure_ascii=False),
                 "issue_count": len(issues),
+                "ast_nodes_total": ast_nodes_total,
+                "ast_nodes_interpreted": ast_nodes_interpreted,
+                "ast_coverage_pct": ast_coverage_pct,
             }
         )
 
@@ -267,6 +282,9 @@ def main():
         "issue_severities",
         "issue_messages_json",
         "issue_count",
+        "ast_nodes_total",
+        "ast_nodes_interpreted",
+        "ast_coverage_pct",
     ]
     with args.csv.open("w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=columns)

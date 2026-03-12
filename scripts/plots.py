@@ -2602,6 +2602,13 @@ def _as_bool(value):
 
 
 def plot_koala_timeout_cdf(koala_sweep_dir, output_path):
+    excluded_script_names = {
+        "clean.sh",
+        "execute.sh",
+        "fetch.sh",
+        "install.sh",
+        "validate.sh",
+    }
     all_paths = glob.glob(os.path.join(koala_sweep_dir, "results_t*.csv"))
     timeout_re_dfs_on = re.compile(r"results_t([0-9]+(?:\.[0-9]+)?)_dfs_on\.csv$")
     timeout_re_plain = re.compile(r"results_t([0-9]+(?:\.[0-9]+)?)\.csv$")
@@ -2642,6 +2649,9 @@ def plot_koala_timeout_cdf(koala_sweep_dir, output_path):
     # Koala sweep files should contain full SaSh results only, but filter defensively.
     if "tool" in data.columns:
         data = data[data["tool"].astype(str).str.lower() == "sash"]
+    if "benchmark" in data.columns:
+        benchmark_names = data["benchmark"].astype(str).map(lambda p: Path(p).name)
+        data = data[~benchmark_names.isin(excluded_script_names)].copy()
 
     if data.empty:
         print(
@@ -2687,66 +2697,194 @@ def plot_koala_timeout_cdf(koala_sweep_dir, output_path):
         )
         return
 
-    x = np.concatenate(([0.0], completion_times))
-    y = np.concatenate(([0], np.arange(1, len(completion_times) + 1)))
-    total_scripts = int(len(data))
+    def koala_group_label(benchmark_path):
+        parts = Path(str(benchmark_path)).parts
+        if "koala" in parts:
+            idx = parts.index("koala")
+            if idx + 1 < len(parts):
+                label = parts[idx + 1]
+                if label.startswith("."):
+                    return None
+                return label
+        return "unknown"
 
-    plt.figure(figsize=(5.2, 2.4))
-    shade_color = _lighten_color(color_scheme[0], 0.68)
-    plt.fill_between(
-        x,
-        y,
-        step="post",
-        color=shade_color,
-        alpha=0.7,
-        zorder=1,
+    total_scripts = int(len(data))
+    completed_count = int(len(completion_times))
+    timeout_count = total_scripts - completed_count
+
+    positive_start = max(1e-2, float(np.min(completion_times)) * 0.5)
+    complete_x = np.concatenate(([positive_start], completion_times))
+    complete_y_counts = np.concatenate(([0], np.arange(1, completed_count + 1)))
+    complete_y = complete_y_counts.astype(float)
+    timeout_x = None
+    timeout_y = None
+    if timeout_count > 0:
+        timeout_x = np.full(timeout_count, float(max_timeout))
+        timeout_y = np.full(timeout_count, float(completed_count))
+
+    runtime_data = data.copy()
+    runtime_data["group"] = runtime_data["benchmark"].map(koala_group_label)
+    runtime_data["time_value"] = pd.to_numeric(runtime_data["time"], errors="coerce").fillna(0.0)
+    runtime_data = runtime_data[runtime_data["group"].notna()].copy()
+    sash_runtime_by_group = (
+        runtime_data.groupby("group", sort=False)["time_value"].sum().sort_values(ascending=False)
     )
-    plt.step(
-        x,
-        y,
-        where="post",
-        color=color_scheme[0],
-        linewidth=2.0,
-        label=f"Full {sysname}",
-        zorder=3,
+    runtime_groups = sash_runtime_by_group.index.tolist()
+
+    wall_runtime_by_group = pd.Series(dtype=float)
+    wall_csv_path = Path(koala_sweep_dir).resolve().parents[0] / "koala_wall_time.csv"
+    if wall_csv_path.exists():
+        wall_df = pd.read_csv(wall_csv_path)
+        if {"benchmark", "total_wall_time_sec"}.issubset(wall_df.columns):
+            wall_runtime_by_group = (
+                wall_df.assign(
+                    benchmark=wall_df["benchmark"].astype(str),
+                    total_wall_time_sec=pd.to_numeric(
+                        wall_df["total_wall_time_sec"], errors="coerce"
+                    ).fillna(0.0),
+                )
+                .groupby("benchmark", sort=False)["total_wall_time_sec"]
+                .sum()
+            )
+
+    sash_runtime_values = np.array(
+        [float(sash_runtime_by_group.get(group, 0.0)) for group in runtime_groups],
+        dtype=float,
     )
-    plt.plot(
-        x,
-        y,
-        "o",
-        color=color_scheme[0],
-        markerfacecolor=color_scheme[0],
-        markeredgecolor=color_scheme[0],
-        markersize=4,
+    wall_runtime_values = np.array(
+        [float(wall_runtime_by_group.get(group, 0.0)) for group in runtime_groups],
+        dtype=float,
+    )
+
+    fig = plt.figure(figsize=(5.2, 3.7))
+    gs = fig.add_gridspec(2, 1, height_ratios=[0.72, 0.65], hspace=0.76)
+    ax_top = fig.add_subplot(gs[0, 0])
+    ax = fig.add_subplot(gs[1, 0])
+
+    bar_x = np.arange(len(runtime_groups))
+    bar_width = 0.34
+    ax_top.bar(
+        bar_x - bar_width / 2,
+        sash_runtime_values,
+        width=bar_width,
+        color=color_green,
+        edgecolor=color_green,
+        linewidth=0.6,
+        label="SaSh",
+    )
+    ax_top.bar(
+        bar_x + bar_width / 2,
+        wall_runtime_values,
+        width=bar_width,
+        color="#9E9E9E",
+        edgecolor="#9E9E9E",
+        linewidth=0.6,
+        label="Execution",
+    )
+    ax_top.set_ylabel("Runtime (s)")
+    ax_top.set_yscale("log")
+    ax_top.set_xticks(bar_x)
+    ax_top.set_xticklabels(runtime_groups, rotation=35, ha="right")
+    ax_top.grid(axis="y", alpha=0.25, linestyle=":")
+    ax_top.set_axisbelow(True)
+    ax_top.legend(
+        loc="upper right",
+        frameon=True,
+        facecolor="white",
+        edgecolor="0.8",
+        framealpha=0.5,
+        fontsize=9,
+    )
+
+    completion_color = color_green
+    completion_timeout_color = _lighten_color(completion_color, 0.45)
+    ax.scatter(
+        complete_x,
+        complete_y,
+        color=completion_color,
+        s=5,
+        label=sysname,
         zorder=4,
     )
+    if timeout_x is not None and timeout_y is not None:
+        ax.scatter(
+            timeout_x,
+            timeout_y,
+            color=completion_timeout_color,
+            s=5,
+            zorder=4,
+        )
 
-    plt.axhline(
-        y=total_scripts,
+    ax.axhline(
+        y=float(total_scripts),
         linestyle="--",
         linewidth=1.0,
         color="gray",
         label="_nolegend_",
         zorder=2,
     )
-    ax = plt.gca()
-    y_ticks = set(ax.get_yticks().tolist())
-    y_ticks.add(float(total_scripts))
-    ax.set_yticks(sorted(y_ticks))
-    ax.set_ylim(bottom=0.0, top=float(total_scripts) + 1.0)
-    ax.set_xlim(left=0.0, right=max(float(max_timeout), float(np.max(completion_times))))
+    ax.axvline(
+        x=float(max_timeout),
+        linestyle="--",
+        linewidth=1.0,
+        color="gray",
+        label="_nolegend_",
+        zorder=2,
+    )
 
-    plt.xlabel("Analysis time (s)")
-    plt.ylabel("Scripts completed")
-    x_tick_candidates = [0, 1, 10, 30, 60, 120, 180, 240, 300]
+    ax.set_ylim(bottom=0.0, top=float(total_scripts))
+    ax.set_xscale("log")
+    ax.set_xlim(left=positive_start, right=float(max_timeout))
+
+    ax.set_xlabel("Runtime (s)")
+    ax.set_ylabel("Completed")
+    x_tick_candidates = [0.1, 1, 10, 30, 100, 300]
     x_ticks = [tick for tick in x_tick_candidates if tick <= ax.get_xlim()[1] + 1e-9]
     if x_ticks:
-        plt.xticks(x_ticks, [str(int(t)) for t in x_ticks])
-    plt.grid(axis="y", alpha=0.25, linestyle=":", zorder=0)
-    plt.legend(fontsize=8, loc="lower right", frameon=True)
-    plt.tight_layout()
-    plt.savefig(output_path, format="pdf")
-    plt.close()
+        ax.set_xticks(
+            x_ticks,
+            [f"{tick:g}" if tick < 1 else str(int(tick)) for tick in x_ticks],
+        )
+    ax.set_yticks(list(range(0, int(total_scripts) + 1, 20)))
+    ax.grid(axis="y", alpha=0.25, linestyle=":", zorder=0)
+    ax.text(
+        0.98,
+        0.06,
+        f"{completed_count}/{total_scripts} completed\n{timeout_count} timed out",
+        transform=ax.transAxes,
+        ha="right",
+        va="bottom",
+        fontsize=8,
+        bbox=dict(boxstyle="round,pad=0.25", facecolor="white", edgecolor="none", alpha=0.9),
+    )
+    bottom_handles = [
+        Line2D(
+            [],
+            [],
+            linestyle="None",
+            marker="s",
+            markersize=6,
+            markerfacecolor=completion_color,
+            markeredgecolor=completion_color,
+            label=sysname,
+        )
+    ]
+    ax.legend(
+        bottom_handles,
+        [sysname],
+        loc="lower right",
+        bbox_to_anchor=(0.98, 0.26),
+        ncol=1,
+        frameon=False,
+        fontsize=12,
+        handlelength=1.2,
+        handletextpad=0.6,
+        borderaxespad=0.0,
+        columnspacing=2.0,
+    )
+    fig.subplots_adjust(left=0.16, right=0.97, bottom=0.20, top=0.95)
+    fig.savefig(output_path, format="pdf")
+    plt.close(fig)
 
 
 def main():
