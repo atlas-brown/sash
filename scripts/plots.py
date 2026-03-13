@@ -2602,6 +2602,7 @@ def _as_bool(value):
 
 
 def plot_koala_timeout_cdf(koala_sweep_dir, output_path):
+    effective_timeout = 100.0
     excluded_script_names = {
         "clean.sh",
         "execute.sh",
@@ -2660,7 +2661,7 @@ def plot_koala_timeout_cdf(koala_sweep_dir, output_path):
         )
         return
 
-    timed_out = (
+    csv_timed_out = (
         data["timed_out"].map(_as_bool)
         if "timed_out" in data.columns
         else pd.Series([False] * len(data), index=data.index)
@@ -2670,7 +2671,15 @@ def plot_koala_timeout_cdf(koala_sweep_dir, output_path):
         if "crashed" in data.columns
         else pd.Series([False] * len(data), index=data.index)
     )
-    complete = (~timed_out) & (~crashed)
+    if "time" in data.columns:
+        total_time = pd.to_numeric(data["time"], errors="coerce")
+    else:
+        exec_time = pd.to_numeric(data.get("exec_time"), errors="coerce")
+        solver_time = pd.to_numeric(data.get("solver_time"), errors="coerce")
+        total_time = exec_time.fillna(0.0) + solver_time.fillna(0.0)
+
+    effective_timed_out = csv_timed_out | (total_time > effective_timeout)
+    complete = (~effective_timed_out) & (~crashed)
     complete_data = data[complete].copy()
 
     if complete_data.empty:
@@ -2680,14 +2689,7 @@ def plot_koala_timeout_cdf(koala_sweep_dir, output_path):
         )
         return
 
-    if "time" in complete_data.columns:
-        completion_times = pd.to_numeric(complete_data["time"], errors="coerce")
-    else:
-        exec_time = pd.to_numeric(complete_data.get("exec_time"), errors="coerce")
-        solver_time = pd.to_numeric(complete_data.get("solver_time"), errors="coerce")
-        completion_times = exec_time.fillna(0.0) + solver_time.fillna(0.0)
-
-    completion_times = completion_times.dropna().to_numpy(dtype=float)
+    completion_times = total_time.loc[complete_data.index].dropna().to_numpy(dtype=float)
     completion_times.sort()
 
     if completion_times.size == 0:
@@ -2710,7 +2712,7 @@ def plot_koala_timeout_cdf(koala_sweep_dir, output_path):
 
     total_scripts = int(len(data))
     completed_count = int(len(completion_times))
-    timeout_count = total_scripts - completed_count
+    timeout_count = int((effective_timed_out & (~crashed)).sum())
 
     positive_start = max(1e-2, float(np.min(completion_times)) * 0.5)
     complete_x = np.concatenate(([positive_start], completion_times))
@@ -2719,7 +2721,7 @@ def plot_koala_timeout_cdf(koala_sweep_dir, output_path):
     timeout_x = None
     timeout_y = None
     if timeout_count > 0:
-        timeout_x = np.full(timeout_count, float(max_timeout))
+        timeout_x = np.full(timeout_count, float(effective_timeout))
         timeout_y = np.full(timeout_count, float(completed_count))
 
     runtime_data = data.copy()
@@ -2824,7 +2826,7 @@ def plot_koala_timeout_cdf(koala_sweep_dir, output_path):
         zorder=2,
     )
     ax.axvline(
-        x=float(max_timeout),
+        x=float(effective_timeout),
         linestyle="--",
         linewidth=1.0,
         color="gray",
@@ -2834,11 +2836,11 @@ def plot_koala_timeout_cdf(koala_sweep_dir, output_path):
 
     ax.set_ylim(bottom=0.0, top=float(total_scripts))
     ax.set_xscale("log")
-    ax.set_xlim(left=positive_start, right=float(max_timeout))
+    ax.set_xlim(left=positive_start, right=float(effective_timeout))
 
     ax.set_xlabel("Runtime (s)")
     ax.set_ylabel("Completed")
-    x_tick_candidates = [0.1, 1, 10, 30, 100, 300]
+    x_tick_candidates = [0.1, 1, 10, 30, 100]
     x_ticks = [tick for tick in x_tick_candidates if tick <= ax.get_xlim()[1] + 1e-9]
     if x_ticks:
         ax.set_xticks(

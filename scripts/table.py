@@ -423,15 +423,18 @@ def deepest_bug_depth(path, expected_issues):
 fixed_actual_by_bm = {}
 for _, row in fixed_results.iterrows():
     bm_name = get_bm_name(row["benchmark"])
-    fixed_actual_by_bm.setdefault(bm_name, set()).update(parse_issue_list(row["actual_results"]))
+    fixed_actual_by_bm.setdefault(bm_name, []).extend(parse_issue_list(row["actual_results"]))
 
 # For each buggy benchmark: true iff fixed run does not report any corresponding buggy issue.
 fixed_clears_bug_by_bm = {}
+fixed_fp_count_by_bm = {}
 for _, row in buggy_results.iterrows():
     bm_name = get_bm_name(row["benchmark"])
-    buggy_expected = set(parse_issue_list(row["expected_results"]))
-    fixed_actual = fixed_actual_by_bm.get(bm_name, set())
-    fixed_clears_bug_by_bm[bm_name] = len(buggy_expected & fixed_actual) == 0
+    buggy_expected = parse_issue_list(row["expected_results"])
+    fixed_actual = fixed_actual_by_bm.get(bm_name, [])
+    fp_bug_count = count_matches(buggy_expected, fixed_actual)
+    fixed_fp_count_by_bm[bm_name] = fp_bug_count
+    fixed_clears_bug_by_bm[bm_name] = fp_bug_count == 0
 
 def create_table_line(result, allow_fallback=False):
     path, time = result["benchmark"], result["time"]
@@ -457,12 +460,11 @@ def create_table_line(result, allow_fallback=False):
     detected = count_matches(expected_issues, actual_issues)
     max_bfs_nodes = deepest_bug_depth(path, expected_issues)
     depth_cell = f"{max_bfs_nodes}"
-    fixed_clears_bug = fixed_clears_bug_by_bm.get(bm_name, False)
-    fixed_mark = r"\checkmark" if fixed_clears_bug else ""
+    fp_bug_count = fixed_fp_count_by_bm.get(bm_name, 0)
     feature_mark = feature_marks(features.get(bm_name, []))
 
-    bugs_detected_cell = f"{detected}/{n_bugs}"
-    return f"{bm_short_id} & {name} & {description} & {bugs_detected_cell} & {fixed_mark} & {time} & {feature_mark} & {loc} & {depth_cell} & {source}  \\\\"
+    bugs_detected_cell = f"{detected}/{fp_bug_count}/{n_bugs}"
+    return f"{bm_short_id} & {name} & {description} & {bugs_detected_cell} & {time} & {feature_mark} & {loc} & {depth_cell} & {source}  \\\\"
 
 rest_of_benchmarks = []
 
@@ -470,18 +472,18 @@ if args.appendix:
     print(r"""
 \setlength{\LTleft}{0pt}
 \setlength{\LTright}{0pt}
-\begin{longtable}{@{}lllrcrcrrl@{}}
+\begin{longtable}{@{}lllrccrrl@{}}
 \toprule
-\textbf{ID} & \textbf{Script name} & \textbf{Bug description} & \textbf{D?/\#B} & \textbf{F?} & \textbf{$t$} & $\mathcal{F}$ & \textbf{LoC} & \textbf{$\downarrow$} & \textbf{Source} \\
+\textbf{ID} & \textbf{Script name} & \textbf{Bug description} & \textbf{D/FP/\#B} & \textbf{$t$} & $\mathcal{F}$ & \textbf{LoC} & \textbf{$\downarrow$} & \textbf{Source} \\
 \midrule
 \endfirsthead
-\multicolumn{10}{@{}l@{}}{\tablename\ \thetable{} (continued)}\\
+\multicolumn{9}{@{}l@{}}{\tablename\ \thetable{} (continued)}\\
 \toprule
-\textbf{ID} & \textbf{Script name} & \textbf{Bug description} & \textbf{D?/\#B} & \textbf{F?} & \textbf{$t$} & $\mathcal{F}$ & \textbf{LoC} & \textbf{$\downarrow$} & \textbf{Source} \\
+\textbf{ID} & \textbf{Script name} & \textbf{Bug description} & \textbf{D/FP/\#B} & \textbf{$t$} & $\mathcal{F}$ & \textbf{LoC} & \textbf{$\downarrow$} & \textbf{Source} \\
 \midrule
 \endhead
 \midrule
-\multicolumn{10}{r@{}}{Continued on next page}\\
+\multicolumn{9}{r@{}}{Continued on next page}\\
 \endfoot
 \bottomrule
 \endlastfoot
@@ -489,9 +491,9 @@ if args.appendix:
     )
 else:
     print(r"""
-    \begin{tabular}{lllrcrcrrl}
+    \begin{tabular}{lllrccrrl}
     \toprule
-    \textbf{ID} & \textbf{Script name} & \textbf{Bug description} & \textbf{D?/\#B} & \textbf{F?} & \textbf{$t$} & $\mathcal{F}$ & \textbf{LoC} & \textbf{$\downarrow$} & \textbf{Source} \\
+    \textbf{ID} & \textbf{Script name} & \textbf{Bug description} & \textbf{D/FP/\#B} & \textbf{$t$} & $\mathcal{F}$ & \textbf{LoC} & \textbf{$\downarrow$} & \textbf{Source} \\
     \midrule
 """
     )
@@ -521,23 +523,24 @@ if not args.appendix and rest_of_benchmarks:
         count_matches(parse_issue_list(r["expected_results"]), parse_issue_list(r["actual_results"]))
         for r in rest_of_benchmarks
     )
+    fp_bugs_rest = sum(
+        fixed_fp_count_by_bm.get(get_bm_name(r["benchmark"]), 0)
+        for r in rest_of_benchmarks
+    )
     depth_values_rest = [
         deepest_bug_depth(r["benchmark"], parse_issue_list(r["expected_results"]))
         for r in rest_of_benchmarks
     ]
     avg_depth_rest = sum(depth_values_rest) / len(depth_values_rest)
     depth_avg_rest_cell = approx(avg_depth_rest, ".1f")
-    total = len(rest_of_benchmarks)
-    fixed_clear_count = sum(1 for r in rest_of_benchmarks if fixed_clears_bug_by_bm.get(get_bm_name(r["benchmark"]), False))
-    fixed_clear_rate = f"{fixed_clear_count}/{total}"
 
     we_count = sum(1 for r in rest_of_benchmarks if "WE" in features.get(get_bm_name(r["benchmark"]), []))
     cs_count = sum(1 for r in rest_of_benchmarks if "CS" in features.get(get_bm_name(r["benchmark"]), []))
     fs_count = sum(1 for r in rest_of_benchmarks if "FS" in features.get(get_bm_name(r["benchmark"]), []))
     feature_count_marks = f"{we_count} \\WE/{cs_count} \\SP/{fs_count} \\FS"
 
-    print(rf""" & \emph{{More buggy scripts}} &  & {detected_bugs_rest}/{total_bugs_rest} & {fixed_clear_rate} & {time_avg_cell} & {feature_count_marks} & {loc_avg_cell} & {depth_avg_rest_cell} & \cref{{sec:full-ds}} \\""")
-    print(r"\hspace{.5em}\dots & & & & & & & & & \\")
+    print(rf""" & \emph{{More buggy scripts}} &  & {detected_bugs_rest}/{fp_bugs_rest}/{total_bugs_rest} & {time_avg_cell} & {feature_count_marks} & {loc_avg_cell} & {depth_avg_rest_cell} & \cref{{sec:full-ds}} \\""")
+    print(r"\hspace{.5em}\dots & & & & & & & & \\")
 
 # Print summary line across all benchmarks
 locs = [get_loc(r["benchmark"]) for r in buggy_results.to_dict(orient="records")]
@@ -556,8 +559,10 @@ depth_values_total = [
 ]
 avg_depth_total = sum(depth_values_total) / len(depth_values_total)
 depth_avg_total_cell = approx(avg_depth_total, ".1f")
-fixed_clear_count = sum(1 for r in buggy_results.to_dict(orient="records") if fixed_clears_bug_by_bm.get(get_bm_name(r["benchmark"]), False))
-fixed_clear_rate = f"{fixed_clear_count}/{total}"
+fp_bugs_total = sum(
+    fixed_fp_count_by_bm.get(get_bm_name(r["benchmark"]), 0)
+    for r in buggy_results.to_dict(orient="records")
+)
 times = [r["time"] for r in buggy_results.to_dict(orient="records")]
 avg_time_total = sum(times) / len(times)
 time_avg_total_cell = f"{approx(avg_time_total, '.2f')}s"
@@ -569,7 +574,7 @@ feature_count_marks = f"{we_count} \\WE/{cs_count} \\SP/{fs_count} \\FS"
 
 print(rf"""
 \midrule
- & \textbf{{Total}} &  & {detected_bugs}/{total_bugs} & {fixed_clear_rate} & {time_avg_total_cell} & {feature_count_marks} & {loc_avg_total_cell} & {depth_avg_total_cell} &  \\ """)
+ & \textbf{{Total}} &  & {detected_bugs}/{fp_bugs_total}/{total_bugs} & {time_avg_total_cell} & {feature_count_marks} & {loc_avg_total_cell} & {depth_avg_total_cell} &  \\ """)
 
 if args.appendix:
     print(r"""
