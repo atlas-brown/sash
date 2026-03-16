@@ -111,6 +111,8 @@ class State:
     assertions:                  tuple[Assertion, ...]       = field(default_factory=tuple)
     fs_model:                    FSModel                     = field(default_factory=FSModel)
     is_returning:                bool                        = False # whether we're in the process of returning from a function (i.e. have executed a `return` but not yet popped the call stack)
+    break_level:                 int                         = 0
+    continue_level:              int                         = 0
 
     external_data: Any = None # ASSUMPTION: must be hashable
 
@@ -250,6 +252,18 @@ class State:
 
     def set_returning(self, is_returning: bool) -> 'State':
         return replace(self, is_returning=is_returning)
+
+    def set_break_level(self, level: int) -> 'State':
+        return replace(self, break_level=max(level, 0))
+
+    def set_continue_level(self, level: int) -> 'State':
+        return replace(self, continue_level=max(level, 0))
+
+    def decrement_break_level(self) -> 'State':
+        return self.set_break_level(self.break_level - 1)
+
+    def decrement_continue_level(self) -> 'State':
+        return self.set_continue_level(self.continue_level - 1)
 
     def exit_function(self) -> 'State':
         assert len(self.call_stack) > 0, "Tried to exit function when not in function"

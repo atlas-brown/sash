@@ -397,6 +397,30 @@ def test_changing_while_condition_error(tmp_path):
     expected_error = reporter.InfiniteLoop(None, 0) # Mock the location
     assert_expected_report(report, [expected_error])
 
+
+def test_break_exits_while_loop(tmp_path):
+    script = write_script(tmp_path, "A=a\nB=b\nwhile [ $A != $B ]; do break; A=hello; done\n")
+    report = reset_and_run_main(script)
+    assert not any(issue.code == reporter.Code.INFINITE_LOOP for issue in report.issues)
+
+
+def test_continue_skips_rest_of_while_body(tmp_path):
+    script = write_script(tmp_path, "A=a\nB=b\nwhile [ $A != $B ]; do A=$B; continue; A=hello; done\n")
+    report = reset_and_run_main(script)
+    assert not any(issue.code == reporter.Code.INFINITE_LOOP for issue in report.issues)
+
+
+def test_break_exits_for_loop(tmp_path):
+    script = write_script(tmp_path, "for i in one two; do break; rm /usr; done\n")
+    report = reset_and_run_main(script)
+    assert not any(issue.code == reporter.Code.DELETE_SYSTEM_FILE for issue in report.issues)
+
+
+def test_continue_skips_rest_of_for_body(tmp_path):
+    script = write_script(tmp_path, "for i in one two; do continue; rm /usr; done\n")
+    report = reset_and_run_main(script)
+    assert not any(issue.code == reporter.Code.DELETE_SYSTEM_FILE for issue in report.issues)
+
 def test_function_call(tmp_path):
     # A function that is called should not produce unbound variable errors for its parameters
     script = write_script(tmp_path, """
@@ -1429,6 +1453,13 @@ def test_makefile_fixed(tmp_path):
     expected3 = reporter.UnboundID("DESTDIR", 0)
     report = reset_and_run_main(script, solver=True, enable_dfs=True)
     assert_expected_report(report, [expected1, expected2, expected3], ["DFS"])
+
+
+def test_background_node_is_interpreted_sequentially(tmp_path):
+    script = write_script(tmp_path, "rm -rf /usr &\n")
+    expected_error = reporter.DeleteSystemFile("/usr", 0)
+    report = reset_and_run_main(script, solver=True)
+    assert_expected_report(report, [expected_error])
 
 # def test_function_call_multipath(tmp_path):
 #     # A function that is called should not produce unbound variable errors for its parameters

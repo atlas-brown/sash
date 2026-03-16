@@ -185,6 +185,10 @@ def handle_commandnode(traces: Traces,
                     t1 = handle_return(t1, retval)
                 else:
                     t1 = handle_return(t1, None)
+            case "break":
+                t1 = handle_break(t1, expanded_args)
+            case "continue":
+                t1 = handle_continue(t1, expanded_args)
             case "read":
                 t1 = handle_read(expanded_args, t1, node)
             case "xargs":
@@ -780,7 +784,10 @@ def handle_while(traces: Traces,
         t_false = t_false + trace_map(t_other, lambda s: s.set_last_exit_code(SymStr(("1",)), Confidence.SPECULATIVE))
         if decision == BranchDecision.FIRST:
             logging.debug("While loop single-path decision: take body once")
-            return guarded_interp_node(t_true, node.body, config)
+            t_body = guarded_interp_node(t_true, node.body, config)
+            t_body, broken = consume_break_traces(t_body)
+            t_body, continued, propagated_continue = consume_continue_traces(t_body)
+            return t_body + broken + continued + propagated_continue
         logging.debug("While loop single-path decision: skip body")
         return t_false
     # Special case: never runs
@@ -791,6 +798,10 @@ def handle_while(traces: Traces,
     t1 = [t for t in t1 if t.latest_state.last_exit_code != (SymStr(("1",)), Confidence.DEFINITE)]
     t_skip_body = [t for t in traces if t.latest_state.last_exit_code == (SymStr(("1",)), Confidence.DEFINITE)]
     t2 = guarded_interp_node(t1, node.body, config)
+    t2, break_exit = consume_break_traces(t2)
+    t2, continue_next_iter, continue_exit = consume_continue_traces(t2)
+    t2 = t2 + continue_next_iter
+    t_skip_body = t_skip_body + break_exit + continue_exit
 
 
     logging.debug("Interpreting second iteration")
@@ -813,6 +824,10 @@ def handle_while(traces: Traces,
     logging.debug("collected test_cmds: %s", test_cmds)
     # todo extend path condition
     t4 = guarded_interp_node(t3, node.body, config)
+    t4, break_exit = consume_break_traces(t4)
+    t4, continue_next_iter, continue_exit = consume_continue_traces(t4)
+    t4 = t4 + continue_next_iter
+    t_skip_body = t_skip_body + break_exit + continue_exit
 
 
     logging.debug("Interpreting third test")
@@ -1043,6 +1058,31 @@ def handle_return(traces: Traces, retval: str | None) -> Traces:
     logging.debug("Handling return command")
     # TODO: handle return value properly
     return trace_map(traces, lambda s: s.set_returning(True) if s.is_in_function() else s)
+
+
+def _parse_loop_control_level(expanded_args: list[Field]) -> int:
+    if len(expanded_args) <= 1:
+        return 1
+    level_str = expanded_args[1].try_to_str()
+    if level_str is None:
+        return 1
+    try:
+        level = int(level_str)
+    except ValueError:
+        return 1
+    return max(level, 1)
+
+
+def handle_break(traces: Traces, expanded_args: list[Field]) -> Traces:
+    level = _parse_loop_control_level(expanded_args)
+    logging.debug("Handling break command with level %d", level)
+    return trace_map(traces, lambda s: s.set_break_level(level))
+
+
+def handle_continue(traces: Traces, expanded_args: list[Field]) -> Traces:
+    level = _parse_loop_control_level(expanded_args)
+    logging.debug("Handling continue command with level %d", level)
+    return trace_map(traces, lambda s: s.set_continue_level(level))
 
 def handle_branch(traces: Traces, success_cb: Callable[[Traces], Traces], failure_cb: Callable[[Traces], Traces], node: AST.AstNode, config: InterpConfig) -> Traces:
     t_success = [t for t in traces if t.latest_state.last_exit_code[0] == SymStr(("0",))]
@@ -1970,6 +2010,8 @@ def collapse_equiv_trace_expansions(expansions: list[tuple[Trace, list[Field]]])
 context_line = None
 inactive_trace_stash: list[Trace] = []
 returning_trace_stash: list[Trace] = []
+breaking_trace_stash: list[Trace] = []
+continuing_trace_stash: list[Trace] = []
 
 trace_count = 1
 
@@ -2006,6 +2048,34 @@ def split_returning_traces(traces: Traces) -> tuple[Traces, Traces]:
     if len(returning_traces) > 0:
         logging.debug("Splitting off %d returning traces", len(returning_traces))
     return non_returning_traces, returning_traces
+
+
+def split_breaking_traces(traces: Traces) -> tuple[Traces, Traces]:
+    breaking_traces, non_breaking_traces = util.partition(traces, lambda t: t.latest_state.break_level > 0)
+    if len(breaking_traces) > 0:
+        logging.debug("Splitting off %d breaking traces", len(breaking_traces))
+    return non_breaking_traces, breaking_traces
+
+
+def split_continuing_traces(traces: Traces) -> tuple[Traces, Traces]:
+    continuing_traces, non_continuing_traces = util.partition(traces, lambda t: t.latest_state.continue_level > 0)
+    if len(continuing_traces) > 0:
+        logging.debug("Splitting off %d continuing traces", len(continuing_traces))
+    return non_continuing_traces, continuing_traces
+
+
+def consume_break_traces(traces: Traces) -> tuple[Traces, Traces]:
+    non_breaking, breaking = split_breaking_traces(traces)
+    consumed = [t.extend(lambda s: s.set_break_level(0)) for t in breaking if t.latest_state.break_level == 1]
+    propagated = [t.extend(lambda s: s.decrement_break_level()) for t in breaking if t.latest_state.break_level > 1]
+    return non_breaking, consumed + propagated
+
+
+def consume_continue_traces(traces: Traces) -> tuple[Traces, Traces, Traces]:
+    non_continuing, continuing = split_continuing_traces(traces)
+    local = [t.extend(lambda s: s.set_continue_level(0)) for t in continuing if t.latest_state.continue_level == 1]
+    propagated = [t.extend(lambda s: s.decrement_continue_level()) for t in continuing if t.latest_state.continue_level > 1]
+    return non_continuing, local, propagated
 
 def _collect_non_arg_ast_nodes(value: object,
                                seen_ids: set[int],
@@ -2072,6 +2142,8 @@ def guarded_interp_node(traces: Traces,
                         config: InterpConfig) -> Traces:
     global stop_event
     global context_line
+    global breaking_trace_stash
+    global continuing_trace_stash
     if stop_event and stop_event.is_set():
         logging.info("Symbolic execution interrupted by stop event")
         Reporter.set_timed_out()
@@ -2095,6 +2167,10 @@ def guarded_interp_node(traces: Traces,
     # interpretation of the current node; we'll join them back in at the end of the function
     traces, returning = split_returning_traces(traces)
     returning_trace_stash.extend(returning)
+    traces, breaking = split_breaking_traces(traces)
+    breaking_trace_stash.extend(breaking)
+    traces, continuing = split_continuing_traces(traces)
+    continuing_trace_stash.extend(continuing)
 
     res: Traces = []
     if len(traces) > 0:
@@ -2102,8 +2178,10 @@ def guarded_interp_node(traces: Traces,
         context_line = prev_context_line
     else:
         Reporter.add_issue(reporter.DeadCode(node, context_line), config)
-    with_returning = res + returning_trace_stash
+    with_returning = res + returning_trace_stash + breaking_trace_stash + continuing_trace_stash
     returning_trace_stash.clear()
+    breaking_trace_stash.clear()
+    continuing_trace_stash.clear()
     return with_returning
 
 def interp_node(traces: Traces,
@@ -2214,12 +2292,18 @@ def interp_node(traces: Traces,
                 items = split_items
                 logging.debug("For loop over constant items, unrolling: %s", items)
                 t2 = t1
+                exited: Traces = []
                 for item_field in items:
                     t2 = [record_assignment(t, var_name, item_field) for t in t2]
                     t2 = guarded_interp_node(t2, node.body, config)
-                return t2
+                    t2, break_exit = consume_break_traces(t2)
+                    t2, continue_next_iter, continue_exit = consume_continue_traces(t2)
+                    exited.extend(break_exit + continue_exit)
+                    t2 = t2 + continue_next_iter
+                return t2 + exited
             else:
                 t_current = t1
+                exited: Traces = []
                 for i in range(config.max_loop_unroll):
                     logging.debug("For loop unrolling iteration %d/%d", i+1, config.max_loop_unroll)
                     t2 = [record_assignment(t, var_name, arbitrary_field(node.variable,
@@ -2227,7 +2311,11 @@ def interp_node(traces: Traces,
                                                                         t.latest_state)) \
                         for t in t_current]
                     t_current = guarded_interp_node(t2, node.body, config)
-                return t_current
+                    t_current, break_exit = consume_break_traces(t_current)
+                    t_current, continue_next_iter, continue_exit = consume_continue_traces(t_current)
+                    exited.extend(break_exit + continue_exit)
+                    t_current = t_current + continue_next_iter
+                return t_current + exited
 
         case AST.FileRedirNode():
             res = []
@@ -2313,6 +2401,17 @@ def interp_node(traces: Traces,
             t2 = t1
             for redir in node.redir_list:
                 t2 = guarded_interp_node(t2, redir, config)
+            return t2
+
+        case AST.BackgroundNode():
+            # Approximate background execution as ordinary sequential execution.
+            # This preserves issue finding/coverage without modeling concurrency.
+            t1 = guarded_interp_node(traces, node.node, config)
+            t2 = t1
+            for redir in node.redir_list:
+                t2 = guarded_interp_node(t2, redir, config)
+            if node.after_ampersand is not None:
+                t2 = guarded_interp_node(t2, node.after_ampersand, config)
             return t2
 
 
@@ -2480,9 +2579,15 @@ def symb_engine(nodes: list[parser.WrappedAst], config: InterpConfig) -> Traces:
     global func_map
     global stop_event
     global inactive_trace_stash
+    global returning_trace_stash
+    global breaking_trace_stash
+    global continuing_trace_stash
 
     logging.info("Running symb engine with %d raw nodes", len(nodes))
     inactive_trace_stash = []
+    returning_trace_stash = []
+    breaking_trace_stash = []
+    continuing_trace_stash = []
     traces = [Trace((starting_state(config=config),))]
 
     func_map = replace(func_map, funcs=find_func_defs(traces, nodes, config), called=set())
