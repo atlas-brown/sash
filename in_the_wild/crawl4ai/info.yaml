@@ -1,0 +1,16 @@
+sources:
+  - https://github.com/unclecode/crawl4ai/blob/aa7b05072d5b6deb9d1b85f9bb8b8561b936ac5e/tests/test_webhook_feature.sh
+  - https://github.com/unclecode/crawl4ai/pull/1822
+
+bugs:
+  bug00:
+    description: Script checks $? with 'set -e' enabled
+    code: const_cond
+    shellcheck: null
+
+ground_truths:
+  # Base versions
+  - path: original.sh
+    kind: original
+    bugs:
+      bug00: { lines: [294] }

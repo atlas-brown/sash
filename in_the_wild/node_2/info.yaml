@@ -1,0 +1,16 @@
+sources:
+  - https://github.com/base/node/blob/main/op-node-entrypoint
+  - https://github.com/base/node/issues/988
+
+bugs:
+  bug00:
+    description: Script enables 'set -u' but checks if variables are empty
+    code: unbound_setu
+    shellcheck: null
+
+ground_truths:
+  # Base versions
+  - path: original.sh
+    kind: original
+    bugs:
+      bug00: { lines: [-1, -1] } # OP_NODE_NETWORK, OP_NODE_ROLLUP_CONFIG

@@ -1,0 +1,16 @@
+sources:
+  - https://github.com/commaai/openpilot/blob/4e239dbc22a22e425cd02162ee33f4eceea44c4e/tools/setup.sh
+  - https://github.com/commaai/openpilot/pull/37647
+
+bugs:
+  bug00:
+    description: The script uses 'set -u' but later checks if a variable is empty
+    code: unbound_setu
+    shellcheck: null
+
+ground_truths:
+  # Base versions
+  - path: original.sh
+    kind: original
+    bugs:
+      bug00: { lines: [-1, 9] } # INTERACTIVE, OPENPILOT_ROOT
