@@ -106,6 +106,23 @@ for _, row in loc_cache_df.iterrows():
     for key in benchmark_lookup_keys(bm_path):
         loc_by_benchmark[key] = loc
 
+timing_by_benchmark = {}
+timeout_sweep_dir = Path(results_path).resolve().parent / "timeout-sweep"
+timing_csv_candidates = [
+    timeout_sweep_dir / "results_t60_dfs_on.csv",
+    timeout_sweep_dir / "results_t60.csv",
+]
+for timing_csv_path in timing_csv_candidates:
+    if not timing_csv_path.exists():
+        continue
+    timing_df = pd.read_csv(timing_csv_path)
+    if "kind" in timing_df.columns:
+        timing_df = timing_df[timing_df["kind"] == "buggy"].copy()
+    for _, row in timing_df.iterrows():
+        bm_name = benchmark_key(row["benchmark"])
+        timing_by_benchmark[bm_name] = float(row["time"])
+    break
+
 def parse_issue_list(value):
     if pd.isna(value):
         return []
@@ -116,7 +133,7 @@ def count_matches(expected_issues, actual_issues):
     actual_counter = Counter(actual_issues)
     return sum(min(expected_counter[issue], actual_counter[issue]) for issue in expected_counter)
 
-def feature_marks(feature_names):
+def feature_marks(feature_names, optimistic_forking=False, targeted_pass=False):
     marks = []
     if "WE" in feature_names:
         marks.append(r"\WE")
@@ -124,9 +141,12 @@ def feature_marks(feature_names):
         marks.append(r"\SP")
     if "FS" in feature_names:
         marks.append(r"\FS")
-    if "SE" in feature_names:
+    if optimistic_forking:
         marks.append(r"\SE")
-    return " ".join(marks) if marks else "-"
+    marks_text = " ".join(marks) if marks else "-"
+    if targeted_pass:
+        return rf"{marks_text}\TE"
+    return marks_text
 
 def parse_issue_lines(issues):
     lines = []
@@ -139,6 +159,11 @@ def parse_issue_lines(issues):
 
 def approx(value, fmt=".1f"):
     return rf"$\sim${value:{fmt}}"
+
+
+def table_time_seconds(row):
+    bm_name = get_bm_name(row["benchmark"])
+    return float(timing_by_benchmark.get(bm_name, row["time"]))
 
 names = BENCHMARK_NAMES
 
@@ -281,15 +306,15 @@ descriptions = {
 # WE: word expansion
 # CS: command specs
 # FS: file system
-# SE: symbolic execution
+# SE: base SaSh optimisations (optimistic forking), computed from the 60s sweep
 features = {
-    "commits/const_cond": ["SE"], # SE to reason about set -e, the test semantics and condition being constant
-    "commits/cp_nonexistent": ["CS", "SE"], # CS to reason about cp/[ behavior, SE to carry the missing-.env branch condition to the copy
+    "commits/const_cond": [], # Needs optimistic forking in the 60s sweep; no extra manual feature tag here.
+    "commits/cp_nonexistent": ["CS"], # CS to reason about cp/[ behavior
     "commits/debootstrap": ["WE", "CS"], # WE to reason about the various parameter expansions, CS to reason about rm
     "commits/debootstrap_2": ["WE", "CS"], # WE to reason about the various parameter expansions, CS to reason about rm
     "commits/ignored_command_v": ["CS"], # CS to reason about command -v and env
     "commits/makefile": ["WE", "CS"], # WE to reason about variable expansion, CS to reason about rm
-    "commits/unset_func": ["SE"], # SE to reason about the unset function call
+    "commits/unset_func": ["CS"], # CS to reason about shell function lookup/use-before-def behavior
     "commits/unset_var_2": ["WE"], # WE to reason about the unset variable
     "commits/unset_var_3": ["WE"], # WE to reason about the unset variable
     "commits/unset_var_5": ["WE"], # WE to reason about the unset variable
@@ -303,30 +328,30 @@ features = {
     "high_profile/c02-n": ["WE", "FS", "CS"],
     "high_profile/c03-backup_manager": ["CS"],
 
-    "milestone_1/const_loop": ["WE", "SE"], # WE to determine what the condition is, SE to determine that it's const
-    "milestone_1/loop_once-useless_test": ["WE", "SE"], # WE to determine what the iteree is, SE to determine that it causes a for to loop once
-    "milestone_1/redir_to_func-redir_to_func": ["SE"], # SE to determine that the redirection is to a function
+    "milestone_1/const_loop": ["WE"], # WE to determine what the condition is
+    "milestone_1/loop_once-useless_test": ["WE"], # WE to determine what the iteree is
+    "milestone_1/redir_to_func-redir_to_func": ["CS"], # CS to reason about redirection targets needing files, not functions
     "milestone_1/unset_var_1": ["WE"], # WE to determine that the variable is unset
 
-    "milestone_2/loop_once": ["WE", "SE"], # WE to determine what the iteree is, SE to determine that it causes a for to loop once
-    "milestone_2/loop_once-loop_once": ["WE", "SE"], # WE to determine what the iteree is, SE to determine that it causes a for to loop once
+    "milestone_2/loop_once": ["WE"], # WE to determine what the iteree is
+    "milestone_2/loop_once-loop_once": ["WE"], # WE to determine what the iteree is
     "milestone_2/rm_root": ["CS", "WE"], # CS to determine dangerous rm, WE to determine unbound variables
     "milestone_2/unset_var-const_if-dead_code": ["WE"], # WE to detect unbound (the other bugs are oos)
 
     "simple_fs/access_after_mv": ["CS", "FS"], # CS to reason about mv, FS to reason about file access
-    "simple_fs/access_del_resource": ["WE", "CS", "FS", "SE"], # WE to reason about the loop condition, SE to reason about the loop, CS to reason about rm, FS to reason about file access
+    "simple_fs/access_del_resource": ["WE", "CS", "FS"], # WE to reason about the loop condition, CS to reason about rm, FS to reason about file access
     "simple_fs/cd_into_file": ["CS", "FS"], # CS to reason about cd, FS to reason about the file
-    "simple_fs/overwrite_file": ["SE", "FS"], # SE to reason about redirection, FS to reason about the file
-    "simple_fs/overwrite_file_2": ["WE", "SE", "CS", "FS"], # WE to reason about the iteree, SE to reason about the for loop, CS to reason about rm, FS to reason about overwrites
-    "simple_fs/overwrite_file_3": ["SE", "CS", "FS"], # SE to reason about the pipeline and the while loop, CS to reason about cp, FS to reason about overwrites
-    "simple_fs/overwrite_file_4": ["WE", "SE", "FS"], # WE to reason about the expansion of the filename, SE to reason about redirection and about all expansions being the same file, FS to reason about overwrites
+    "simple_fs/overwrite_file": ["FS"], # FS to reason about the file
+    "simple_fs/overwrite_file_2": ["WE", "CS", "FS"], # WE to reason about the iteree, CS to reason about rm, FS to reason about overwrites
+    "simple_fs/overwrite_file_3": ["CS", "FS"], # CS to reason about cp, FS to reason about overwrites
+    "simple_fs/overwrite_file_4": ["WE", "FS"], # WE to reason about the expansion of the filename, FS to reason about overwrites
 
     "web_forums/accident": ["WE", "CS"], # WE to reason about wildcard expansion, CS to reason about rm
-    "web_forums/capturing_empty_output": ["CS", "SE"], # SE to reason about the subshell, CS to reason about mkdir not having output
+    "web_forums/capturing_empty_output": ["CS"], # CS to reason about mkdir not having output
     "web_forums/claude2": ["WE", "CS"], # WE to reason about ~ and wildcard expansion, CS to reason about rm
     "web_forums/claude3": ["CS", "FS"], # CS to reason about rm/rmdir, FS to reason about file loss
-    "web_forums/claude4": ["SE", "FS"], # SE to reason about redirection, FS to reason about overwrite/data loss
-    "web_forums/claude5": ["WE", "CS", "SE"], # WE for wildcard expansion, CS for rm/cd, SE for the && chain
+    "web_forums/claude4": ["FS"], # FS to reason about overwrite/data loss
+    "web_forums/claude5": ["WE", "CS"], # WE for wildcard expansion, CS for rm/cd
     "web_forums/claude6": ["WE", "CS"], # WE to reason about ~ as an rm argument, CS to reason about rm
     "web_forums/claude_wipe": ["WE", "CS"], # WE to expand ~, CS to reason about the destructive rm target
     "web_forums/confused_mkdir": ["CS"], # CS to reason about mkdir output/behavior
@@ -338,16 +363,16 @@ features = {
     "web_forums/move_home": ["CS", "FS"], # CS to reason about mv, FS to reason about directory relocation
     "web_forums/posix2": ["WE", "CS"], # WE to reason about quoted glob behavior, CS to reason about test/mv
     "web_forums/rm_root_2": ["WE", "CS"], # WE to reason about unbound variable, CS to reason about rm
-    "web_forums/replacement": ["SE", "FS"], # SE to reason about redirection ordering, FS to reason about truncation/data loss
-    "web_forums/sc_author": ["CS", "SE"], # CS to reason about rm, SE to reason about eval/command substitution
+    "web_forums/replacement": ["FS"], # FS to reason about truncation/data loss
+    "web_forums/sc_author": ["CS"], # CS to reason about rm
     "web_forums/silly_q": ["CS"], # CS to reason about mv argument expectations
-    "web_forums/troll": ["CS", "SE"], # CS to reason about the hidden rm, SE to reason about command substitution
-    "web_forums/unexpected_stdin": ["CS", "SE"], # CS to reason about grep, SE to compare specs across traces
+    "web_forums/troll": ["CS"], # CS to reason about the hidden rm
+    "web_forums/unexpected_stdin": ["CS"], # CS to reason about grep
     "web_forums/unset_var": ["WE"], # WE to reason about unbound variable
     "web_forums/unset_var-cmd_always_fails": ["WE", "CS"], # WE to reason about unbound variable, CS to reason about test command and mkdir command
-    "web_forums/wrong_mkdir": ["CS", "SE"], # CS to reason about mkdir output, SE to reason about command substitution
+    "web_forums/wrong_mkdir": ["CS"], # CS to reason about mkdir output
     "web_forums/wrong_mv": ["WE", "CS"], # WE to reason about glob expansion, CS to reason about mv
-    "web_forums/xargs_accident_rm": ["CS", "SE"], # CS to reason about xargs/rm/mv, SE to reason about pipeline behavior
+    "web_forums/xargs_accident_rm": ["CS"], # CS to reason about xargs/rm/mv
     "web_forums/xargs_del_files": ["CS"], # CS to reason about xargs mv behavior
 }
 
@@ -436,8 +461,48 @@ for _, row in buggy_results.iterrows():
     fixed_fp_count_by_bm[bm_name] = fp_bug_count
     fixed_clears_bug_by_bm[bm_name] = fp_bug_count == 0
 
+# Frozen benchmark sets for paper tables. These were derived from the 60s sweep and
+# then inlined here so table output does not depend on whatever CSVs happen to be
+# present locally.
+targeted_pass_benchmarks = {
+    "commits/cp_nonexistent",
+    "commits/debootstrap",
+    "commits/makefile",
+    "milestone_2/rm_root",
+    "simple_fs/access_after_mv",
+    "simple_fs/access_del_resource",
+    "simple_fs/cd_into_file",
+    "web_forums/accident",
+    "web_forums/claude2",
+    "web_forums/claude3",
+    "web_forums/confused_mkdir",
+    "web_forums/for_mv",
+    "web_forums/posix2",
+    "web_forums/sc_author",
+    "web_forums/silly_q",
+    "web_forums/wrong_mkdir",
+    "web_forums/wrong_mv",
+    "web_forums/xargs_accident_rm",
+    "web_forums/xargs_del_files",
+}
+
+optimistic_forking_benchmarks = {
+    "commits/const_cond",
+    "commits/ignored_command_v",
+    "high_profile/c00-steam",
+    "high_profile/c01-bumblebee",
+    "high_profile/c02-n",
+    "high_profile/c03-backup_manager",
+    "high_profile/w01-squid",
+    "milestone_1/const_loop",
+    "simple_fs/access_after_mv",
+    "simple_fs/overwrite_file_2",
+    "web_forums/rm_root_2",
+}
+
 def create_table_line(result, allow_fallback=False):
-    path, time = result["benchmark"], result["time"]
+    path = result["benchmark"]
+    time = table_time_seconds(result)
     # Grab just the folder and benchmark subfolder
     bm_name = get_bm_name(path)
     bm_short_id = short_name(path, default=bm_name)
@@ -461,7 +526,11 @@ def create_table_line(result, allow_fallback=False):
     max_bfs_nodes = deepest_bug_depth(path, expected_issues)
     depth_cell = f"{max_bfs_nodes}"
     fp_bug_count = fixed_fp_count_by_bm.get(bm_name, 0)
-    feature_mark = feature_marks(features.get(bm_name, []))
+    feature_mark = feature_marks(
+        features.get(bm_name, []),
+        optimistic_forking=bm_name in optimistic_forking_benchmarks,
+        targeted_pass=bm_name in targeted_pass_benchmarks,
+    )
 
     bugs_detected_cell = f"{detected}/{fp_bug_count}/{n_bugs}"
     return f"{bm_short_id} & {name} & {description} & {bugs_detected_cell} & {time} & {feature_mark} & {loc} & {depth_cell} & {source}  \\\\"
@@ -469,7 +538,7 @@ def create_table_line(result, allow_fallback=False):
 rest_of_benchmarks = []
 
 if args.appendix:
-    print(r"""
+    print(r"""% \TE indicates at least one targeted pass was required (DFS, unbound-empty DFS, or unknown-paths-are-files).
 \setlength{\LTleft}{0pt}
 \setlength{\LTright}{0pt}
 \begin{longtable}{@{}lllrccrrl@{}}
@@ -490,7 +559,7 @@ if args.appendix:
 """
     )
 else:
-    print(r"""
+    print(r"""% \TE indicates at least one targeted pass was required (DFS, unbound-empty DFS, or unknown-paths-are-files).
     \begin{tabular}{lllrccrrl}
     \toprule
     \textbf{ID} & \textbf{Script name} & \textbf{Bug description} & \textbf{D/FP/\#B} & \textbf{$t$} & $\mathcal{F}$ & \textbf{LoC} & \textbf{$\downarrow$} & \textbf{Source} \\
@@ -511,7 +580,7 @@ for result in buggy_results.to_dict(orient="records"):
         rest_of_benchmarks.append(result)
 
 if not args.appendix and rest_of_benchmarks:
-    avg_time_rest = sum(r["time"] for r in rest_of_benchmarks) / len(rest_of_benchmarks)
+    avg_time_rest = sum(table_time_seconds(r) for r in rest_of_benchmarks) / len(rest_of_benchmarks)
     time_avg_cell = f"{approx(avg_time_rest, '.2f')}s"
 
     locs = [get_loc(r["benchmark"]) for r in rest_of_benchmarks]
@@ -537,7 +606,8 @@ if not args.appendix and rest_of_benchmarks:
     we_count = sum(1 for r in rest_of_benchmarks if "WE" in features.get(get_bm_name(r["benchmark"]), []))
     cs_count = sum(1 for r in rest_of_benchmarks if "CS" in features.get(get_bm_name(r["benchmark"]), []))
     fs_count = sum(1 for r in rest_of_benchmarks if "FS" in features.get(get_bm_name(r["benchmark"]), []))
-    feature_count_marks = f"{we_count} \\WE/{cs_count} \\SP/{fs_count} \\FS"
+    se_count = sum(1 for r in rest_of_benchmarks if get_bm_name(r["benchmark"]) in optimistic_forking_benchmarks)
+    feature_count_marks = f"{we_count} \\WE/{cs_count} \\SP/{fs_count} \\FS/{se_count} \\SE"
 
     print(rf""" & \emph{{More buggy scripts}} &  & {detected_bugs_rest}/{fp_bugs_rest}/{total_bugs_rest} & {time_avg_cell} & {feature_count_marks} & {loc_avg_cell} & {depth_avg_rest_cell} & \cref{{sec:full-ds}} \\""")
     print(r"\hspace{.5em}\dots & & & & & & & & \\")
@@ -563,14 +633,15 @@ fp_bugs_total = sum(
     fixed_fp_count_by_bm.get(get_bm_name(r["benchmark"]), 0)
     for r in buggy_results.to_dict(orient="records")
 )
-times = [r["time"] for r in buggy_results.to_dict(orient="records")]
+times = [table_time_seconds(r) for r in buggy_results.to_dict(orient="records")]
 avg_time_total = sum(times) / len(times)
 time_avg_total_cell = f"{approx(avg_time_total, '.2f')}s"
 
 we_count = sum(1 for r in buggy_results.to_dict(orient="records") if "WE" in features.get(get_bm_name(r["benchmark"]), []))
 cs_count = sum(1 for r in buggy_results.to_dict(orient="records") if "CS" in features.get(get_bm_name(r["benchmark"]), []))
 fs_count = sum(1 for r in buggy_results.to_dict(orient="records") if "FS" in features.get(get_bm_name(r["benchmark"]), []))
-feature_count_marks = f"{we_count} \\WE/{cs_count} \\SP/{fs_count} \\FS"
+se_count = sum(1 for r in buggy_results.to_dict(orient="records") if get_bm_name(r["benchmark"]) in optimistic_forking_benchmarks)
+feature_count_marks = f"{we_count} \\WE/{cs_count} \\SP/{fs_count} \\FS/{se_count} \\SE"
 
 print(rf"""
 \midrule
@@ -616,7 +687,7 @@ print(f"% Timed out benchmarks: {timed_out_count}", file=sys.stderr)
 
 # Averages
 avg_loc = sum(get_loc(r["benchmark"]) for r in buggy_results.to_dict(orient="records")) / total_benchmarks
-avg_time = sum(r["time"] for r in buggy_results.to_dict(orient="records")) / total_benchmarks
+avg_time = sum(table_time_seconds(r) for r in buggy_results.to_dict(orient="records")) / total_benchmarks
 print(f"% Average LoC: {avg_loc:.2f}", file=sys.stderr)
 print(f"% Average time: {avg_time:.2f}s", file=sys.stderr)
 

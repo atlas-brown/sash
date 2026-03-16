@@ -1035,7 +1035,7 @@ def plot_bug_detection_bars_split_versions(data, output_path):
     fig, (ax_left, ax_right) = plt.subplots(
         1,
         2,
-        figsize=(5.6, 2.8),
+        figsize=(6.4, 2.8),
         sharey=True,
         gridspec_kw={"width_ratios": [1.3, 1.0]},
     )
@@ -1050,7 +1050,7 @@ def plot_bug_detection_bars_split_versions(data, output_path):
 
     left_categories = ["Real Bugs", "Variants"]
     # Keep original/variant groups visually separated.
-    left_x = np.array([0.0, 1.08], dtype=float)
+    left_x = np.array([0.0, 1.22], dtype=float)
     left_sash = np.array([buggy_good[0], variants_good[0]], dtype=float)
     left_shell = np.array([buggy_good[1], variants_good[1]], dtype=float)
 
@@ -1060,6 +1060,7 @@ def plot_bug_detection_bars_split_versions(data, output_path):
         width=width,
         color=sash_color,
         edgecolor=sash_color,
+        linewidth=0.0,
     )
     ax_left.bar(
         left_x + bar_offset,
@@ -1067,6 +1068,7 @@ def plot_bug_detection_bars_split_versions(data, output_path):
         width=width,
         color=shellcheck_color,
         edgecolor=shellcheck_color,
+        linewidth=0.0,
     )
 
     # Visual reference: carry buggy ShellCheck catches over to the variants slot.
@@ -1091,6 +1093,7 @@ def plot_bug_detection_bars_split_versions(data, output_path):
         width=width,
         color=sash_color,
         edgecolor=sash_color,
+        linewidth=0.0,
     )
     ax_right.bar(
         right_x + bar_offset,
@@ -1123,6 +1126,14 @@ def plot_bug_detection_bars_split_versions(data, output_path):
     for ax in (ax_left, ax_right):
         ax.set_ylim(0, y_max)
         ax.set_yticks(y_ticks)
+        ax.axhline(
+            y=float(buggy_total),
+            color="black",
+            linewidth=0.5,
+            linestyle="--",
+            alpha=0.18,
+            zorder=0,
+        )
         ax.grid(axis="y", linestyle=":", linewidth=0.6, alpha=0.35)
         ax.set_axisbelow(True)
         ax.tick_params(axis="x", labelsize=14)
@@ -1133,7 +1144,7 @@ def plot_bug_detection_bars_split_versions(data, output_path):
     ax_right.set_xticklabels(right_categories, fontsize=14)
     # Match visual bar thickness across panels by keeping data-unit scales
     # proportional to the subplot width ratio (left:right = 1.3:1.0).
-    left_xlim = (-0.35, 1.34)
+    left_xlim = (-0.35, 1.52)
     left_span = left_xlim[1] - left_xlim[0]
     width_ratio_left = 1.3
     width_ratio_right = 1.0
@@ -1224,12 +1235,21 @@ def plot_bug_detection_bars_split_versions(data, output_path):
             edgecolor=shellcheck_color,
             label="ShellCheck",
         ),
+        Line2D(
+            [],
+            [],
+            color="black",
+            linewidth=0.5,
+            linestyle="--",
+            alpha=0.18,
+            label=f"Total bugs ({buggy_total})"
+        ),
     ]
     fig.legend(
         handles=side_handles,
         loc="lower center",
         bbox_to_anchor=(0.5, 0.08),
-        ncol=2,
+        ncol=3,
         frameon=False,
         fontsize=14,
         handlelength=1.2,
@@ -2078,13 +2098,13 @@ def plot_coverage_by_config(timeout_sweep_dir, base_buggy_data, output_path):
     series_specs = [
         (
             "no_opts",
-            f"{sysname} w/o optimizations",
+            f"{sysname} w/o optimisations",
             no_opts_color,
             re.compile(r"results_t([0-9]+(?:\.[0-9]+)?)_no_opts\.csv$"),
         ),
         (
             "smart_forking",
-            f"{sysname} w/o DFS",
+            f"{sysname} w/o effect-aware exploration",
             smart_forking_color,
             re.compile(r"results_t([0-9]+(?:\.[0-9]+)?)_smart_forking\.csv$"),
         ),
@@ -2120,7 +2140,10 @@ def plot_coverage_by_config(timeout_sweep_dir, base_buggy_data, output_path):
     timeout_sets = [set(timeout_maps[key].keys()) for key, _, _, _ in available_specs]
     common_timeouts = set.intersection(*timeout_sets) if timeout_sets else set()
     if common_timeouts:
-        chosen_timeout = max(common_timeouts)
+        preferred_timeout = 60.0
+        chosen_timeout = (
+            preferred_timeout if preferred_timeout in common_timeouts else max(common_timeouts)
+        )
         chosen_specs = [
             spec
             for spec in available_specs
@@ -2337,6 +2360,8 @@ def plot_coverage_by_config(timeout_sweep_dir, base_buggy_data, output_path):
         )
 
     handles, labels = plt.gca().get_legend_handles_labels()
+    handles = handles[::-1]
+    labels = labels[::-1]
     fig.legend(
         handles,
         labels,
@@ -2408,14 +2433,14 @@ def plot_timeout_sweep_bug_catch(timeout_sweep_dir, output_path):
     series_specs = [
         (
             "no_opts",
-            f"{sysname} w/o optimizations",
+            f"{sysname} w/o optimisations",
             no_opts_color,
             "o",
             re.compile(r"results_t([0-9]+(?:\.[0-9]+)?)_no_opts\.csv$"),
         ),
         (
             "smart_forking",
-            f"{sysname} w/o DFS",
+            f"{sysname} w/o effect-aware exploration",
             smart_forking_color,
             "^",
             re.compile(r"results_t([0-9]+(?:\.[0-9]+)?)_smart_forking\.csv$"),
@@ -2513,6 +2538,14 @@ def plot_timeout_sweep_bug_catch(timeout_sweep_dir, output_path):
     if all_totals:
         total = int(round(float(np.median(all_totals))))
         ax = plt.gca()
+        ax.axhline(
+            y=float(total),
+            color="black",
+            linewidth=0.5,
+            linestyle="--",
+            alpha=0.18,
+            zorder=0,
+        )
         if all_y_arrays:
             min_seen = float(np.min(np.concatenate(all_y_arrays)))
             y_lower = max(0.0, min_seen - 2.0)
@@ -2577,6 +2610,22 @@ def plot_timeout_sweep_bug_catch(timeout_sweep_dir, output_path):
     plt.yticks(fontsize=axis_label_size)
     plt.grid(axis="y", alpha=0.25, linestyle=":")
     handles, labels = ax.get_legend_handles_labels()
+    if len(handles) > 1:
+        handles = handles[::-1]
+        labels = labels[::-1]
+    if all_totals:
+        handles.append(
+            Line2D(
+                [],
+                [],
+                color="black",
+                linewidth=0.5,
+                linestyle="--",
+                alpha=0.18,
+                label=f"Total bugs ({total})",
+            )
+        )
+        labels.append(f"Total bugs ({total})")
     legend_size = max(8, axis_label_size - 2)
     plt.legend(
         handles,
@@ -2585,9 +2634,9 @@ def plot_timeout_sweep_bug_catch(timeout_sweep_dir, output_path):
         loc="upper center",
         bbox_to_anchor=(0.5, -0.34),
         frameon=False,
-        ncol=3,
+        ncol=2,
     )
-    plt.subplots_adjust(bottom=0.33)
+    plt.subplots_adjust(bottom=0.42)
     plt.savefig(output_path, format="pdf")
     plt.close()
 
@@ -2602,7 +2651,6 @@ def _as_bool(value):
 
 
 def plot_koala_timeout_cdf(koala_sweep_dir, output_path):
-    effective_timeout = 100.0
     excluded_script_names = {
         "clean.sh",
         "execute.sh",
@@ -2644,6 +2692,7 @@ def plot_koala_timeout_cdf(koala_sweep_dir, output_path):
         return
 
     max_timeout = max(selected_by_timeout.keys())
+    effective_timeout = float(max_timeout)
     path = selected_by_timeout[max_timeout]
     data = load_csv(path)
 
@@ -2758,45 +2807,47 @@ def plot_koala_timeout_cdf(koala_sweep_dir, output_path):
         dtype=float,
     )
 
-    fig = plt.figure(figsize=(5.2, 3.7))
-    gs = fig.add_gridspec(2, 1, height_ratios=[0.72, 0.65], hspace=0.76)
-    ax_top = fig.add_subplot(gs[0, 0])
-    ax = fig.add_subplot(gs[1, 0])
+    fig, ax = plt.subplots(figsize=(5.2, 1.72))
 
-    bar_x = np.arange(len(runtime_groups))
-    bar_width = 0.34
-    ax_top.bar(
-        bar_x - bar_width / 2,
-        sash_runtime_values,
-        width=bar_width,
-        color=color_green,
-        edgecolor=color_green,
-        linewidth=0.6,
-        label="SaSh",
-    )
-    ax_top.bar(
-        bar_x + bar_width / 2,
-        wall_runtime_values,
-        width=bar_width,
-        color="#9E9E9E",
-        edgecolor="#9E9E9E",
-        linewidth=0.6,
-        label="Execution",
-    )
-    ax_top.set_ylabel("Runtime (s)")
-    ax_top.set_yscale("log")
-    ax_top.set_xticks(bar_x)
-    ax_top.set_xticklabels(runtime_groups, rotation=35, ha="right")
-    ax_top.grid(axis="y", alpha=0.25, linestyle=":")
-    ax_top.set_axisbelow(True)
-    ax_top.legend(
-        loc="upper right",
-        frameon=True,
-        facecolor="white",
-        edgecolor="0.8",
-        framealpha=0.5,
-        fontsize=9,
-    )
+    # Top runtime subplot disabled for now; keep the code commented for easy restore.
+    # gs = fig.add_gridspec(2, 1, height_ratios=[0.72, 0.65], hspace=0.76)
+    # ax_top = fig.add_subplot(gs[0, 0])
+    # ax = fig.add_subplot(gs[1, 0])
+    #
+    # bar_x = np.arange(len(runtime_groups))
+    # bar_width = 0.34
+    # ax_top.bar(
+    #     bar_x - bar_width / 2,
+    #     sash_runtime_values,
+    #     width=bar_width,
+    #     color=color_green,
+    #     edgecolor=color_green,
+    #     linewidth=0.6,
+    #     label="SaSh",
+    # )
+    # ax_top.bar(
+    #     bar_x + bar_width / 2,
+    #     wall_runtime_values,
+    #     width=bar_width,
+    #     color="#9E9E9E",
+    #     edgecolor="#9E9E9E",
+    #     linewidth=0.6,
+    #     label="Execution",
+    # )
+    # ax_top.set_ylabel("Runtime (s)")
+    # ax_top.set_yscale("log")
+    # ax_top.set_xticks(bar_x)
+    # ax_top.set_xticklabels(runtime_groups, rotation=35, ha="right")
+    # ax_top.grid(axis="y", alpha=0.25, linestyle=":")
+    # ax_top.set_axisbelow(True)
+    # ax_top.legend(
+    #     loc="upper right",
+    #     frameon=True,
+    #     facecolor="white",
+    #     edgecolor="0.8",
+    #     framealpha=0.5,
+    #     fontsize=9,
+    # )
 
     completion_color = color_green
     completion_timeout_color = _lighten_color(completion_color, 0.45)
@@ -2817,37 +2868,28 @@ def plot_koala_timeout_cdf(koala_sweep_dir, output_path):
             zorder=4,
         )
 
-    ax.axhline(
-        y=float(total_scripts),
-        linestyle="--",
-        linewidth=1.0,
-        color="gray",
-        label="_nolegend_",
-        zorder=2,
-    )
-    ax.axvline(
-        x=float(effective_timeout),
-        linestyle="--",
-        linewidth=1.0,
-        color="gray",
-        label="_nolegend_",
-        zorder=2,
-    )
-
-    ax.set_ylim(bottom=0.0, top=float(total_scripts))
+    ax.set_ylim(bottom=0.0, top=float(max(total_scripts, 120)))
     ax.set_xscale("log")
     ax.set_xlim(left=positive_start, right=float(effective_timeout))
 
-    ax.set_xlabel("Runtime (s)")
+    ax.set_xlabel("Runtime")
     ax.set_ylabel("Completed")
-    x_tick_candidates = [0.1, 1, 10, 30, 100]
+    x_tick_candidates = [0.1, 1, 60, 600, 3600]
     x_ticks = [tick for tick in x_tick_candidates if tick <= ax.get_xlim()[1] + 1e-9]
     if x_ticks:
         ax.set_xticks(
             x_ticks,
-            [f"{tick:g}" if tick < 1 else str(int(tick)) for tick in x_ticks],
+            [
+                "0.1s" if abs(tick - 0.1) < 1e-9 else
+                "1s" if abs(tick - 1) < 1e-9 else
+                "1m" if abs(tick - 60) < 1e-9 else
+                "10m" if abs(tick - 600) < 1e-9 else
+                "1h" if abs(tick - 3600) < 1e-9 else
+                f"{tick:g}"
+                for tick in x_ticks
+            ],
         )
-    ax.set_yticks(list(range(0, int(total_scripts) + 1, 20)))
+    ax.set_yticks(list(range(0, max(int(total_scripts), 120) + 1, 20)))
     ax.grid(axis="y", alpha=0.25, linestyle=":", zorder=0)
     ax.text(
         0.98,
@@ -2884,7 +2926,7 @@ def plot_koala_timeout_cdf(koala_sweep_dir, output_path):
         borderaxespad=0.0,
         columnspacing=2.0,
     )
-    fig.subplots_adjust(left=0.16, right=0.97, bottom=0.20, top=0.95)
+    fig.subplots_adjust(left=0.16, right=0.97, bottom=0.38, top=0.94)
     fig.savefig(output_path, format="pdf")
     plt.close(fig)
 
