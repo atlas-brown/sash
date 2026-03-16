@@ -1,0 +1,16 @@
+sources:
+  - https://github.com/pytorch/pytorch/blob/cc57e0e7ca87ea3a9a2367a859112ea16b6afbee/.ci/pytorch/binary_populate_env.sh
+  - https://github.com/pytorch/pytorch/issues/177425
+
+bugs:
+  bug00:
+    description: The script uses 'set -u' but later checks if a variable is empty, having a fallback if it is (which will never run)
+    code: unbound_setu
+    shellcheck: null
+
+ground_truths:
+  # Base versions
+  - path: original.sh
+    kind: original
+    bugs:
+      bug00: { lines: [-1] } # The warning about PYTORCH_ROOT

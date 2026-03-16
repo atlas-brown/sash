@@ -1,0 +1,16 @@
+sources:
+  - https://github.com/vllm-project/vllm/blob/9efc4db9658a987390b809dbcc13a9a771701b7f/.buildkite/scripts/run-benchmarks.sh
+  - https://github.com/vllm-project/vllm/pull/37020
+
+bugs:
+  bug00:
+    description: Exit code is indirectly checked while 'set -e' is enabled
+    code: dead_code
+    shellcheck: null
+
+ground_truths:
+  # Base versions
+  - path: original.sh
+    kind: original
+    bugs:
+      bug00: { lines: [67, 71, 75] }
