@@ -5,6 +5,7 @@ import argparse
 import subprocess
 from pathlib import Path
 from collections import Counter
+import yaml
 import bugdepth
 from benchmark_metadata import BENCHMARK_NAMES, benchmark_key, short_name
 
@@ -22,6 +23,11 @@ parser.add_argument(
     type=str,
     default="results/results.csv",
     help="Path to results CSV (default: results/results.csv).",
+)
+parser.add_argument(
+    "--wild",
+    action="store_true",
+    help="Output only the in-the-wild script table (project, one-word purpose, citation).",
 )
 args = parser.parse_args()
 
@@ -235,6 +241,22 @@ sources = {
     "web_forums/xargs_del_files": r"\cite{benchmark:web-forums:xargs-del-files}",
 }
 
+WILD_PROJECT_NAMES = {
+    "pytorch": "PyTorch",
+    "vllm_1": "vLLM",
+    "vllm_2": "vLLM",
+}
+
+WILD_PROJECT_PURPOSES = {
+    "PyTorch": "CI",
+    "vLLM": "CI",
+}
+
+WILD_SOURCE_KEYS = {
+    "PyTorch": r"\cite{pytorch}",
+    "vLLM": r"\cite{vllm}",
+}
+
 
 descriptions = {
     "high_profile/c00-steam": r"Path traversal to \sh{/*} loss",
@@ -302,6 +324,49 @@ descriptions = {
     "commits/unset_var_set_u_1": r"Abort check from \sh{set -u}",
     "commits/unset_var_set_u_2": r"Var self-append break",
 }
+
+if args.wild:
+    wild_root = ROOT_DIR / "in_the_wild"
+    wild_rows_by_project = {}
+    for script_dir in sorted(p for p in wild_root.iterdir() if p.is_dir()):
+        info_path = script_dir / "info.yaml"
+        if not info_path.exists():
+            continue
+        with info_path.open("r", encoding="utf-8") as f:
+            info = yaml.safe_load(f) or {}
+        sources_list = info.get("sources", [])
+        ground_truths = info.get("ground_truths", [])
+        bug_count = 0
+        for gt in ground_truths:
+            for bug_info in (gt.get("bugs", {}) or {}).values():
+                bug_count += len(bug_info.get("lines", []) or [])
+        key = script_dir.name
+        project_name = WILD_PROJECT_NAMES.get(key, key)
+        row = wild_rows_by_project.setdefault(
+            project_name,
+            {"sources": [], "bug_count": 0},
+        )
+        for source in sources_list[:1]:
+            if source not in row["sources"]:
+                row["sources"].append(source)
+        row["bug_count"] += bug_count
+
+    print(r"""% Requires \usepackage{tabularx}
+\begin{tabularx}{\textwidth}{@{}lcrX@{}}
+\toprule
+\textbf{Project} & $\mathcal{D}$ & \textbf{\#B} & \textbf{Source} \\
+\midrule
+""")
+    for project_name in sorted(wild_rows_by_project):
+        row = wild_rows_by_project[project_name]
+        purpose = WILD_PROJECT_PURPOSES.get(project_name, "Util")
+        citation = WILD_SOURCE_KEYS.get(project_name, "")
+        print(f"{project_name} & {purpose} & {row['bug_count']} & {citation}  \\\\")
+    print(r"""
+\bottomrule
+\end{tabularx}
+""")
+    sys.exit(0)
 
 # WE: word expansion
 # CS: command specs
