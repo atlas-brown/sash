@@ -1,0 +1,16 @@
+sources:
+  - https://github.com/EhsanAramide/V2M/blob/97960029fc72d46f63cb11dad93a99702e179bfc/uninstall.sh
+  - https://github.com/EhsanAramide/V2M/pull/1
+
+bugs:
+  bug00:
+    description: Unquoted rm of variable with potential whitespace
+    code: word_split
+    shellcheck: SC2086
+
+ground_truths:
+  # Base versions
+  - path: original.sh
+    kind: original
+    bugs:
+      bug00: { lines: [4] }

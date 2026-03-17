@@ -1,0 +1,16 @@
+sources:
+  - https://github.com/ventoy/Ventoy/blob/master/IMG/cpio/ventoy/hook/debian/porteus-hook.sh
+  - https://github.com/ventoy/Ventoy/issues/3532
+
+bugs:
+  bug00:
+    description: A variable is assigned inside a subshell and then is checked outside the subshell
+    code: const_cond
+    shellcheck: SC2031
+
+ground_truths:
+  # Base versions
+  - path: original.sh
+    kind: original
+    bugs:
+      bug00: { lines: [42] }

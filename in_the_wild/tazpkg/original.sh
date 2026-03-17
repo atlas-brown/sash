@@ -1,0 +1,108 @@
+#!/bin/sh
+# TazPkg - Tiny autonomous zone packages manager, hg.slitaz.org/tazpkg
+# tazpkg-box - part of TazPkg
+# Small GTK boxes to TazPkg for deep desktop integration
+
+# Copyright (C) 2011-2015 SliTaz - GNU General Public License v3.
+# Authors: See the AUTHORS files
+
+
+# Internationalization.
+
+. /lib/libtaz.sh
+export TEXTDOMAIN='tazpkg'
+
+text="<b>$(_ 'SliTaz Package Action')</b>"
+icon="system-software-install"
+opts="--window-icon=$icon --image=$icon --image-on-top --center --on-top \
+--height=350 --width=550 --title=TazPkg"
+
+
+usage() {
+	cat <<EOT
+$(_ 'Usage:') $(basename $0) [actions|URL] [$(_ 'package')]
+
+Examples:
+
+$(basename $0) actions /path/to/package-1.0.tazpkg
+    display box to extract or install given package
+
+$(basename $0) tazpkg://example.com/path/to/package-1.0.tazpkg
+    download and install given package
+EOT
+}
+
+
+# Nice GTK output for install and extract.
+
+output() {
+	yad --text-info $opts --tail --margins='4' --text="$text" --fontname='monospace,10' \
+		--button='gtk-close:0'
+}
+
+
+pkginfo() {
+	tazpkg info --output=gtk "$dir/$pkg" | sed 's| *:</b> |</b>\n|'
+}
+
+
+# Main GUI box function with pure Yad spec
+
+actions_main() {
+	pkgname="${pkg%.tazpkg}"
+	pkginfo | yad $opts --list --no-headers --dclick-action="echo" --text="$text" \
+		--column='' --column='' \
+		--button="$(_ 'Install')!package-install:3" \
+		--button="$(_ 'Extract')!extract-archive:2" \
+		--button='gtk-cancel:1'
+}
+
+
+# Actions user can do when clicking on a package.
+
+actions() {
+	# Store box results
+	main="$(actions_main)"
+	# Deal with --button values
+	case "$?" in
+		1) exit 0 ;;
+		2) tazpkg extract "$pkg" . --output='raw' --cols=65 | output ;;
+		3) tazpkg -i "$pkg" . --forced --output='raw' --cols=65 | output ;;
+	esac
+}
+
+
+# TazPkg URL Handler.
+
+dl_inst() {
+	pkg="$(basename $url)"
+	_ 'Downloading: %s' "$pkg"; newline
+	TMP_DIR=$(mktemp); cd "$TMP_DIR"
+	wget "$url" 2>&1
+	tazpkg -i "$TMP_DIR/$pkg" --forced --output='raw' --cols=65 2>&1
+	rm -f "$TMP_DIR"
+}
+
+
+
+#
+# Script commands
+#
+
+case "$1" in
+	--help|-h|help|usage|-u)
+		usage ;;
+	tazpkg://*)
+		# TazPkg URL's handler.
+		url="http://${1#tazpkg://}"
+		dl_inst | output ;;
+	actions)
+		[ -z "$2" ] && exit 1
+		# fight against strange space at the end
+		pkg="$(basename "$(realpath "${2%% }")")"
+		dir="$(dirname "$(realpath "${2%% }")")"
+		cd "$dir"
+		actions ;;
+esac
+
+exit 0

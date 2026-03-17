@@ -1,0 +1,16 @@
+sources:
+  - https://github.com/petervislocky/Theme-Switcher/blob/5c285d94e5f32352dde199959a5830a637106d62/scripts/set_qt_theme.sh
+  - https://github.com/petervislocky/Theme-Switcher/pull/1
+
+bugs:
+  bug00:
+    description: Inverted command existence check
+    code: not_a_command
+    shellcheck: null
+
+ground_truths:
+  # Base versions
+  - path: original.sh
+    kind: original
+    bugs:
+      bug00: { lines: [17] }

@@ -1,0 +1,16 @@
+sources:
+  - https://github.com/gihrig/dotfiles-ooloth/blob/ab8081f1735d78792ba2ebdfabaa44a599f3ab31/bin/uninstall/rye.zsh
+  - https://github.com/gihrig/dotfiles-ooloth/pull/1
+
+bugs:
+  bug00:
+    description: Inverted command existence check
+    code: not_a_command
+    shellcheck: null
+
+ground_truths:
+  # Base versions
+  - path: original.sh
+    kind: original
+    bugs:
+      bug00: { lines: [14] }

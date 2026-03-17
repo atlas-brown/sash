@@ -1,0 +1,16 @@
+sources:
+  - https://github.com/vercel/next.js/blob/6a73374215e86da6e847526cdca7418f4450a1a1/scripts/deploy-docs.sh
+  - https://github.com/vercel/next.js/pull/91112
+
+bugs:
+  bug00:
+    description: The script enables 'set -u' but then checks if a variable is set
+    code: unbound_setu
+    shellcheck: null
+
+ground_truths:
+  # Base versions
+  - path: original.sh
+    kind: original
+    bugs:
+      bug00: { lines: [38] }

@@ -1,0 +1,126 @@
+#!/bin/bash
+# bashreduce: mapreduce in bash
+# erik@fawx.com
+
+usage() {
+  local prog="`basename $1`"
+  echo "Usage: $prog [-m host1 [host2...]] [-c column] [-r reduce] [-i input] [-o output]"
+  echo "       $prog -h for help."
+  exit 2
+}
+
+showhelp() {
+  echo "Usage: `basename $1`: [-m host1 [host2...]] [-c column] [-r reduce] [-i input] [-o output]"
+  echo   "bashreduce.  Map an input file to many hosts, sort/reduce, merge"
+  echo   "  -m: hosts to use, can repeat hosts for multiple cores"
+  echo   "      default hosts from /etc/br.hosts"
+  echo   "  -c: column to partition, default = 1 (1-based)"
+  echo   "  -r: reduce function, default = identity"
+  echo   "  -i: input file, default = stdin"
+  echo   "  -o: output file, default = stdout"
+  echo   "  -t: tmp dir to use, default = /tmp"
+  echo   "  -S: memory to use for sort, default = 256M"
+  echo   "  -h: this help message"
+  exit 2
+}
+
+hosts=
+mapcolumn=1
+reduce=
+input=
+output=
+tmp_dir=/tmp
+sort_mem=256M
+
+while getopts "m:c:r:i:o:t:S:h" name; do
+  case $name in
+    m)  hosts=$OPTARG;;
+    c)  mapcolumn=$OPTARG;;
+    r)  reduce=$OPTARG;;
+    i)  input=$OPTARG;;
+    o)  output=$OPTARG;;
+    t)  tmp_dir=$OPTARG;;
+    S)  sort_mem=$OPTARG;;
+    h)  showhelp $0;;
+    [?])  usage $0;;
+  esac
+done
+
+if [ -z "$hosts" ]; then
+  if [ -e /etc/br.hosts ]; then
+    hosts=`cat /etc/br.hosts`
+  else
+    echo "`basename $0`: must specify hosts with -m or provide /etc/br.hosts"
+    usage $0
+  fi
+fi
+
+# if we have a reduce, add the pipe explicitly
+[ -n "$reduce" ] && reduce="| $reduce 2>/dev/null"
+
+# okay let's get started!  first we need a name for our job
+jobid="`uuidgen`"
+jobpath="$tmp_dir/br_job_$jobid"
+nodepath="$tmp_dir/br_node_$jobid"
+mkdir -p $jobpath/{in,out}
+
+# now, for each host, set up in and out fifos (and a netcat for each), and ssh to each host to set up workers listening on netcat
+
+port_in=8192
+port_out=$(($port_in + 1))
+host_idx=0
+out_files=
+
+for host in $hosts; do
+  # our named pipes
+  mkfifo $jobpath/{in,out}/$host_idx
+  # lets get the pid of our listener
+  ssh -n $host "mkdir -p $nodepath"
+  pid=$(ssh -n $host "nc -l -p $port_out >$nodepath/in_$host_idx 2>/dev/null </dev/null & jobs -l" | awk {'print $2'})
+  ssh $host -n "tail -s0.1 -f --pid=$pid $nodepath/in_$host_idx 2>/dev/null </dev/null | LC_ALL='$LC_ALL' sort -S$sort_mem -T$tmp_dir -k$mapcolumn,$mapcolumn 2>/dev/null $reduce | nc -q0 -l -p $port_in >&/dev/null &"
+  # our local forwarders
+  nc $host $port_in >$jobpath/in/$host_idx &
+  nc -q0 $host $port_out <$jobpath/out/$host_idx &
+  # our vars
+  out_files="$out_files $jobpath/out/$host_idx"
+  port_in=$(($port_in + 2))
+  port_out=$(($port_in + 1))
+  host_idx=$(($host_idx + 1))
+done
+
+# okay, time to map
+if which brp >/dev/null; then
+  eval "${input:+pv $input |} brp - $(($mapcolumn - 1)) $out_files"
+else
+  # use awk if we don't have brp
+  # we're taking advantage of a special property that awk leaves its file handles open until its done
+  # i think this is universal
+  # we're also sending a zero length string to all the handles at the end, in case some pipe got no love
+  eval "${input:+pv $input |} awk '{
+      srand(\$$mapcolumn);
+      print \$0 >>\"$jobpath/out/\"int(rand() * $host_idx);
+    }
+    END {
+      for (i = 0; i != $host_idx; ++i)
+        printf \"\" >>\"$jobpath/out/\"i;
+    }'"
+fi
+
+# save it somewhere
+if which brm >/dev/null; then
+  eval "brm - $(($mapcolumn - 1)) `find $jobpath/in/ -type p | xargs` ${output:+| pv >$output}"
+else
+  # use sort -m if we don't have brm
+  # sort -m creates tmp files if too many input files are specified
+  # brm doesn't do this
+  eval "sort -k$mapcolumn,$mapcolumn -m $jobpath/in/* ${output:+| pv >$output}"
+fi
+
+# finally, clean up after ourselves
+rm -rf $jobpath
+for host in $hosts; do
+  ssh $host "rm -rf $nodepath"
+done
+
+# TODO: is there a safe way to kill subprocesses upon fail?
+# this seems to work: /bin/kill -- -$$

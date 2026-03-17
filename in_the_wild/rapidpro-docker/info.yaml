@@ -1,0 +1,16 @@
+sources:
+  - https://github.com/solid-lines/rapidpro-docker/blob/7833fd22243baf7e0cef833a1a4130e252c34823/uninstall.sh
+  - https://github.com/solid-lines/rapidpro-docker/pull/2
+
+bugs:
+  bug00:
+    description: Script removes pwd unquoted
+    code: word_split
+    shellcheck: SC2046
+
+ground_truths:
+  # Base versions
+  - path: original.sh
+    kind: original
+    bugs:
+      bug00: { lines: [20] }
