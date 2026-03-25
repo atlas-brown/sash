@@ -2762,16 +2762,12 @@ def plot_koala_timeout_cdf(koala_sweep_dir, output_path):
     total_scripts = int(len(data))
     completed_count = int(len(completion_times))
     timeout_count = int((effective_timed_out & (~crashed)).sum())
-
+    max_completed_runtime = float(np.max(completion_times))
     positive_start = max(1e-2, float(np.min(completion_times)) * 0.5)
     complete_x = np.concatenate(([positive_start], completion_times))
     complete_y_counts = np.concatenate(([0], np.arange(1, completed_count + 1)))
     complete_y = complete_y_counts.astype(float)
-    timeout_x = None
-    timeout_y = None
-    if timeout_count > 0:
-        timeout_x = np.full(timeout_count, float(effective_timeout))
-        timeout_y = np.full(timeout_count, float(completed_count))
+    plot_xmax = max(15 * 60, max_completed_runtime)
 
     runtime_data = data.copy()
     runtime_data["group"] = runtime_data["benchmark"].map(koala_group_label)
@@ -2807,7 +2803,7 @@ def plot_koala_timeout_cdf(koala_sweep_dir, output_path):
         dtype=float,
     )
 
-    fig, ax = plt.subplots(figsize=(5.2, 1.72))
+    fig, ax = plt.subplots(figsize=(2.65, 1.72))
 
     # Top runtime subplot disabled for now; keep the code commented for easy restore.
     # gs = fig.add_gridspec(2, 1, height_ratios=[0.72, 0.65], hspace=0.76)
@@ -2850,7 +2846,6 @@ def plot_koala_timeout_cdf(koala_sweep_dir, output_path):
     # )
 
     completion_color = color_green
-    completion_timeout_color = _lighten_color(completion_color, 0.45)
     ax.scatter(
         complete_x,
         complete_y,
@@ -2859,47 +2854,49 @@ def plot_koala_timeout_cdf(koala_sweep_dir, output_path):
         label=sysname,
         zorder=4,
     )
-    if timeout_x is not None and timeout_y is not None:
-        ax.scatter(
-            timeout_x,
-            timeout_y,
-            color=completion_timeout_color,
-            s=5,
-            zorder=4,
-        )
-
     ax.set_ylim(bottom=0.0, top=float(max(total_scripts, 120)))
     ax.set_xscale("log")
-    ax.set_xlim(left=positive_start, right=float(effective_timeout))
+    ax.set_xlim(left=positive_start, right=float(plot_xmax))
 
     ax.set_xlabel("Runtime")
     ax.set_ylabel("Completed")
-    x_tick_candidates = [0.1, 1, 60, 600, 3600]
-    x_ticks = [tick for tick in x_tick_candidates if tick <= ax.get_xlim()[1] + 1e-9]
+    x_tick_candidates = [1, 60, 15 * 60]
+    x_ticks = []
+    for tick in x_tick_candidates:
+        if tick <= ax.get_xlim()[1] + 1e-9 and not any(abs(tick - existing) < 1e-9 for existing in x_ticks):
+            x_ticks.append(tick)
     if x_ticks:
+        def _koala_runtime_tick_label(tick):
+            if abs(tick - 1) < 1e-9:
+                return "1s"
+            if abs(tick - 60) < 1e-9:
+                return "1m"
+            if abs(tick - 15 * 60) < 1e-9:
+                return "15m"
+            if tick >= 3600:
+                hours = tick / 3600.0
+                return f"{hours:.1f}h" if abs(hours - round(hours)) > 0.05 else f"{int(round(hours))}h"
+            if tick >= 60:
+                minutes = tick / 60.0
+                return f"{minutes:.1f}m" if abs(minutes - round(minutes)) > 0.05 else f"{int(round(minutes))}m"
+            return f"{tick:g}s"
+
         ax.set_xticks(
             x_ticks,
-            [
-                "0.1s" if abs(tick - 0.1) < 1e-9 else
-                "1s" if abs(tick - 1) < 1e-9 else
-                "1m" if abs(tick - 60) < 1e-9 else
-                "10m" if abs(tick - 600) < 1e-9 else
-                "1h" if abs(tick - 3600) < 1e-9 else
-                f"{tick:g}"
-                for tick in x_ticks
-            ],
+            [_koala_runtime_tick_label(tick) for tick in x_ticks],
         )
-    ax.set_yticks(list(range(0, max(int(total_scripts), 120) + 1, 20)))
+    ax.set_yticks([0, 40, 80, 120])
     ax.grid(axis="y", alpha=0.25, linestyle=":", zorder=0)
+    ax.grid(axis="x", alpha=0.18, linestyle=":", zorder=0)
     ax.text(
         0.98,
         0.06,
-        f"{completed_count}/{total_scripts} completed\n{timeout_count} timed out",
+        f"{completed_count} complete\n{timeout_count} timed out",
         transform=ax.transAxes,
         ha="right",
         va="bottom",
         fontsize=8,
-        bbox=dict(boxstyle="round,pad=0.25", facecolor="white", edgecolor="none", alpha=0.9),
+        color="0.45",
     )
     bottom_handles = [
         Line2D(
@@ -2920,13 +2917,15 @@ def plot_koala_timeout_cdf(koala_sweep_dir, output_path):
         bbox_to_anchor=(0.98, 0.26),
         ncol=1,
         frameon=False,
+        facecolor="none",
+        edgecolor="none",
         fontsize=12,
         handlelength=1.2,
         handletextpad=0.6,
         borderaxespad=0.0,
         columnspacing=2.0,
     )
-    fig.subplots_adjust(left=0.16, right=0.97, bottom=0.38, top=0.94)
+    fig.subplots_adjust(left=0.24, right=0.92, bottom=0.40, top=0.94)
     fig.savefig(output_path, format="pdf")
     plt.close(fig)
 
