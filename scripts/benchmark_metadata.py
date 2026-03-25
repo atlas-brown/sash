@@ -58,7 +58,7 @@ BENCHMARK_NAMES = {
     "web_forums/replacement": "Broken file replacement",
     "web_forums/sc_author": "ShellCheck author example",
     "web_forums/silly_q": "Broken multi-file rename",
-    "web_forums/troll": "Obfuscated rm troll",
+    "web_forums/troll": r"Obfuscated \sh{rm /}",
     "web_forums/unexpected_stdin": "System restoration script",
     "web_forums/unset_var":  "File check",
     "web_forums/unset_var-cmd_always_fails": "Filesystem preparation",

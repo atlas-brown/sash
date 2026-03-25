@@ -1010,26 +1010,9 @@ def plot_bug_detection_bars_split_versions(data, output_path):
     variants_good = [len(variants_sash), len(variants_shell)]
 
     fixed_good = [fixed_sash_no_fp, fixed_shell_no_fp]
-    (
-        fixed_shell_no_fp_from_orig_caught,
-        fixed_shell_no_fp_from_orig_missed,
-    ) = _get_fixed_shell_no_fp_split_by_buggy_detection(data)
-    split_total = (
-        fixed_shell_no_fp_from_orig_caught + fixed_shell_no_fp_from_orig_missed
-    )
-    # Keep bar height exactly aligned with the fixed ShellCheck total even if
-    # metadata mismatches create tiny accounting differences.
-    if split_total < fixed_good[1]:
-        fixed_shell_no_fp_from_orig_missed += fixed_good[1] - split_total
-    elif split_total > fixed_good[1]:
-        overflow = split_total - fixed_good[1]
-        trim_missed = min(overflow, fixed_shell_no_fp_from_orig_missed)
-        fixed_shell_no_fp_from_orig_missed -= trim_missed
-        overflow -= trim_missed
-        if overflow > 0:
-            fixed_shell_no_fp_from_orig_caught = max(
-                fixed_shell_no_fp_from_orig_caught - overflow, 0
-            )
+    fixed_shell_no_fp_from_orig_caught = _get_fixed_shell_buggy_detected_bucket_count(data)
+    fixed_shell_no_fp_from_orig_caught = min(fixed_shell_no_fp_from_orig_caught, fixed_good[1])
+    fixed_shell_no_fp_from_orig_missed = fixed_good[1] - fixed_shell_no_fp_from_orig_caught
 
     # Two-panel layout: Buggy/Variants (left) and Fixed (right).
     fig, (ax_left, ax_right) = plt.subplots(
@@ -1343,6 +1326,34 @@ def _get_fixed_shell_no_fp_split_by_buggy_detection(data):
                         no_fp_from_orig_missed += 1
 
     return no_fp_from_orig_caught, no_fp_from_orig_missed
+
+
+def _get_fixed_shell_buggy_detected_bucket_count(data):
+    buggy_rows = _benchmark_kind_rows(data, "buggy")
+    fixed_rows = _benchmark_kind_rows(data, "fixed")
+
+    buggy_shell_detected = set()
+    for _, row in buggy_rows.iterrows():
+        family = benchmark_group_key(row["benchmark"])
+        kind = str(row.get("kind", "buggy"))
+        expected_counter = Counter(parse_issue_list(row["expected_results"]))
+        shell_counter = get_info_shellcheck_expected_counter(
+            row["benchmark"], kind, fallback_to_bug_default=True
+        )
+        for issue, expected_count in expected_counter.items():
+            matched = min(expected_count, shell_counter[issue])
+            for idx in range(matched):
+                buggy_shell_detected.add((family, issue, idx))
+
+    fixed_expected = set()
+    for _, row in fixed_rows.iterrows():
+        family = benchmark_group_key(row["benchmark"])
+        expected_counter = Counter(parse_issue_list(row["expected_results"]))
+        for issue, expected_count in expected_counter.items():
+            for idx in range(expected_count):
+                fixed_expected.add((family, issue, idx))
+
+    return len(buggy_shell_detected & fixed_expected)
 
 
 def _benchmark_kind_rows(data, kind):

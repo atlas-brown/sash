@@ -126,7 +126,11 @@ for timing_csv_path in timing_csv_candidates:
         timing_df = timing_df[timing_df["kind"] == "buggy"].copy()
     for _, row in timing_df.iterrows():
         bm_name = benchmark_key(row["benchmark"])
-        timing_by_benchmark[bm_name] = float(row["time"])
+        timed_out = str(row.get("timed_out", "")).strip().lower() in {"1", "true", "yes"}
+        timing_by_benchmark[bm_name] = {
+            "time": float(row["time"]),
+            "timed_out": timed_out,
+        }
     break
 
 def parse_issue_list(value):
@@ -148,10 +152,10 @@ def feature_marks(feature_names, optimistic_forking=False, targeted_pass=False):
     if "FS" in feature_names:
         marks.append(r"\FS")
     if optimistic_forking:
-        marks.append(r"\SE")
-    marks_text = " ".join(marks) if marks else "-"
+        marks.append(r"\OF")
     if targeted_pass:
-        return rf"{marks_text}\TE"
+        marks.append(r"\TE")
+    marks_text = " ".join(marks) if marks else "-"
     return marks_text
 
 def parse_issue_lines(issues):
@@ -169,7 +173,22 @@ def approx(value, fmt=".1f"):
 
 def table_time_seconds(row):
     bm_name = get_bm_name(row["benchmark"])
-    return float(timing_by_benchmark.get(bm_name, row["time"]))
+    timing = timing_by_benchmark.get(bm_name)
+    if timing is None:
+        return float(row["time"])
+    return float(timing["time"])
+
+
+def table_time_cell(row):
+    bm_name = get_bm_name(row["benchmark"])
+    timing = timing_by_benchmark.get(bm_name)
+    if timing is None:
+        time = float(row["time"])
+        return f"{time:.2f}s" if time > EPSILON else "<1ms"
+    if timing["timed_out"]:
+        return ">60s"
+    time = float(timing["time"])
+    return f"{time:.2f}s" if time > EPSILON else "<1ms"
 
 names = BENCHMARK_NAMES
 
@@ -269,14 +288,14 @@ WILD_SOURCE_KEYS = {
 
 
 descriptions = {
-    "high_profile/c00-steam": r"Path traversal to \sh{/*} loss",
+    "high_profile/c00-steam": r"Failed \sh{cd} to \sh{rm /*}",
     "high_profile/c01-bumblebee": r"Deletes \sh{/usr}",
     "high_profile/w00-itunes": r"Deletes drive",
     "high_profile/w01-squid": r"Unknown \sh{rm} target",
     "high_profile/c02-n": r"Deletes \sh{/usr/local/*}",
-    "high_profile/c03-backup_manager": r"Bad \sh{$?} check to data loss",
+    "high_profile/c03-backup_manager": r"Bad \sh{$?} check",
 
-    "milestone_1/const_loop": r"Constant \sh{while} condition",
+    "milestone_1/const_loop": r"Constant \sh{while}",
     "milestone_1/loop_once-useless_test": r"Run-once \sh{for} loop",
     "milestone_1/unset_var_1": r"Unset variable in \sh{echo}",
     "milestone_2/rm_root": r"Typo causes DB loss",
@@ -330,7 +349,7 @@ descriptions = {
     "commits/unset_var_3": r"Unset var used in test",
     "commits/unset_var_2": r"File check on unset var",
     "commits/unset_var_5": r"Unset var used for download",
-    "commits/debootstrap_2": r"Deletes user-supplied dir",
+    "commits/debootstrap_2": r"Deletes supplied path",
     "commits/unset_var_set_u_1": r"Abort check from \sh{set -u}",
     "commits/unset_var_set_u_2": r"Var self-append break",
 }
@@ -534,6 +553,20 @@ for _, row in buggy_results.iterrows():
 # Frozen benchmark sets for paper tables. These were derived from the 60s sweep and
 # then inlined here so table output does not depend on whatever CSVs happen to be
 # present locally.
+optimistic_forking_benchmarks = {
+    "commits/const_cond",
+    "commits/ignored_command_v",
+    "high_profile/c00-steam",
+    "high_profile/c01-bumblebee",
+    "high_profile/c02-n",
+    "high_profile/c03-backup_manager",
+    "high_profile/w01-squid",
+    "milestone_1/const_loop",
+    "simple_fs/access_after_mv",
+    "simple_fs/overwrite_file_2",
+    "web_forums/rm_root_2",
+}
+
 targeted_pass_benchmarks = {
     "commits/cp_nonexistent",
     "commits/debootstrap",
@@ -554,25 +587,12 @@ targeted_pass_benchmarks = {
     "web_forums/wrong_mv",
     "web_forums/xargs_accident_rm",
     "web_forums/xargs_del_files",
-}
-
-optimistic_forking_benchmarks = {
-    "commits/const_cond",
-    "commits/ignored_command_v",
-    "high_profile/c00-steam",
-    "high_profile/c01-bumblebee",
-    "high_profile/c02-n",
-    "high_profile/c03-backup_manager",
-    "high_profile/w01-squid",
-    "milestone_1/const_loop",
-    "simple_fs/access_after_mv",
-    "simple_fs/overwrite_file_2",
-    "web_forums/rm_root_2",
+    *optimistic_forking_benchmarks
 }
 
 def create_table_line(result, allow_fallback=False):
     path = result["benchmark"]
-    time = table_time_seconds(result)
+    time = table_time_cell(result)
     # Grab just the folder and benchmark subfolder
     bm_name = get_bm_name(path)
     bm_short_id = short_name(path, default=bm_name)
@@ -586,7 +606,6 @@ def create_table_line(result, allow_fallback=False):
         if not allow_fallback:
             return
         description = ""
-    time = f"{time:.2f}s" if time > EPSILON else "<1ms"
     loc = get_loc(path)
     source = sources.get(bm_name, "")
     expected_issues = parse_issue_list(result["expected_results"])
@@ -602,8 +621,11 @@ def create_table_line(result, allow_fallback=False):
         targeted_pass=bm_name in targeted_pass_benchmarks,
     )
 
-    bugs_detected_cell = f"{detected}/{fp_bug_count}/{n_bugs}"
-    return f"{bm_short_id} & {name} & {description} & {bugs_detected_cell} & {time} & {feature_mark} & {loc} & {depth_cell} & {source}  \\\\"
+    detected_prefix = f"{detected}/{n_bugs}"
+    if detected < n_bugs:
+        detected_prefix = rf"\textcolor{{red}}{{{detected_prefix}}}"
+    bugs_detected_cell = f"{detected_prefix}|{fp_bug_count}"
+    return f"{bm_short_id} & {source} & {name} & {description} & {loc} & {depth_cell} & {bugs_detected_cell} & {time} & {feature_mark}  \\\\"
 
 rest_of_benchmarks = []
 
@@ -611,14 +633,14 @@ if args.appendix:
     print(r"""% \TE indicates at least one targeted pass was required (DFS, unbound-empty DFS, or unknown-paths-are-files).
 \setlength{\LTleft}{0pt}
 \setlength{\LTright}{0pt}
-\begin{longtable}{@{}lllrccrrl@{}}
+\begin{longtable}{@{}llllrrrcc@{}}
 \toprule
-\textbf{ID} & \textbf{Script name} & \textbf{Bug description} & \textbf{D/FP/\#B} & \textbf{$t$} & $\mathcal{F}$ & \textbf{LoC} & \textbf{$\downarrow$} & \textbf{Source} \\
+\textbf{ID} & \textbf{Source} & \textbf{Script name} & \textbf{Bug description} & \textbf{LoC} & \textbf{$\downarrow$} & \textbf{D/\#B|FP} & \textbf{$t$} & $\mathcal{F}$ \\
 \midrule
 \endfirsthead
 \multicolumn{9}{@{}l@{}}{\tablename\ \thetable{} (continued)}\\
 \toprule
-\textbf{ID} & \textbf{Script name} & \textbf{Bug description} & \textbf{D/FP/\#B} & \textbf{$t$} & $\mathcal{F}$ & \textbf{LoC} & \textbf{$\downarrow$} & \textbf{Source} \\
+\textbf{ID} & \textbf{Source} & \textbf{Script name} & \textbf{Bug description} & \textbf{LoC} & \textbf{$\downarrow$} & \textbf{D/\#B|FP} & \textbf{$t$} & $\mathcal{F}$ \\
 \midrule
 \endhead
 \midrule
@@ -630,9 +652,9 @@ if args.appendix:
     )
 else:
     print(r"""% \TE indicates at least one targeted pass was required (DFS, unbound-empty DFS, or unknown-paths-are-files).
-    \begin{tabular}{lllrccrrl}
+    \begin{tabular}{llllrrrcc}
     \toprule
-    \textbf{ID} & \textbf{Script name} & \textbf{Bug description} & \textbf{D/FP/\#B} & \textbf{$t$} & $\mathcal{F}$ & \textbf{LoC} & \textbf{$\downarrow$} & \textbf{Source} \\
+    \textbf{ID} & \textbf{Source} & \textbf{Script name} & \textbf{Bug description} & \textbf{LoC} & \textbf{$\downarrow$} & \textbf{D/\#B|FP} & \textbf{$t$} & $\mathcal{F}$ \\
     \midrule
 """
     )
@@ -676,10 +698,17 @@ if not args.appendix and rest_of_benchmarks:
     we_count = sum(1 for r in rest_of_benchmarks if "WE" in features.get(get_bm_name(r["benchmark"]), []))
     cs_count = sum(1 for r in rest_of_benchmarks if "CS" in features.get(get_bm_name(r["benchmark"]), []))
     fs_count = sum(1 for r in rest_of_benchmarks if "FS" in features.get(get_bm_name(r["benchmark"]), []))
-    se_count = sum(1 for r in rest_of_benchmarks if get_bm_name(r["benchmark"]) in optimistic_forking_benchmarks)
-    feature_count_marks = f"{we_count} \\WE/{cs_count} \\SP/{fs_count} \\FS/{se_count} \\SE"
+    te_count = sum(1 for r in rest_of_benchmarks if get_bm_name(r["benchmark"]) in targeted_pass_benchmarks)
+    of_count = sum(1 for r in rest_of_benchmarks if get_bm_name(r["benchmark"]) in optimistic_forking_benchmarks)
+    feature_count_marks = (
+        f"{we_count} \\WE/{cs_count} \\SP/{fs_count} \\FS/"
+        f"{te_count} \\TE/{of_count} \\OF"
+    )
 
-    print(rf""" & \emph{{More buggy scripts}} &  & {detected_bugs_rest}/{fp_bugs_rest}/{total_bugs_rest} & {time_avg_cell} & {feature_count_marks} & {loc_avg_cell} & {depth_avg_rest_cell} & \cref{{sec:full-ds}} \\""")
+    rest_detect_cell = f"{detected_bugs_rest}/{total_bugs_rest}"
+    if detected_bugs_rest < total_bugs_rest:
+        rest_detect_cell = rf"\textcolor{{red}}{{{rest_detect_cell}}}"
+    print(rf""" & \cref{{sec:full-ds}} & \emph{{More buggy scripts}} &  & {loc_avg_cell} & {depth_avg_rest_cell} & {rest_detect_cell}|{fp_bugs_rest} & {time_avg_cell} & {feature_count_marks} \\""")
     print(r"\hspace{.5em}\dots & & & & & & & & \\")
 
 # Print summary line across all benchmarks
@@ -710,12 +739,18 @@ time_avg_total_cell = f"{approx(avg_time_total, '.2f')}s"
 we_count = sum(1 for r in buggy_results.to_dict(orient="records") if "WE" in features.get(get_bm_name(r["benchmark"]), []))
 cs_count = sum(1 for r in buggy_results.to_dict(orient="records") if "CS" in features.get(get_bm_name(r["benchmark"]), []))
 fs_count = sum(1 for r in buggy_results.to_dict(orient="records") if "FS" in features.get(get_bm_name(r["benchmark"]), []))
-se_count = sum(1 for r in buggy_results.to_dict(orient="records") if get_bm_name(r["benchmark"]) in optimistic_forking_benchmarks)
-feature_count_marks = f"{we_count} \\WE/{cs_count} \\SP/{fs_count} \\FS/{se_count} \\SE"
+te_count = sum(1 for r in buggy_results.to_dict(orient="records") if get_bm_name(r["benchmark"]) in targeted_pass_benchmarks)
+of_count = sum(1 for r in buggy_results.to_dict(orient="records") if get_bm_name(r["benchmark"]) in optimistic_forking_benchmarks)
+feature_count_marks = (
+    f"{we_count} \\WE/{cs_count} \\SP/{fs_count} \\FS/"
+    f"{te_count} \\TE/{of_count} \\OF"
+)
+
+total_detect_cell = f"{detected_bugs}/{total_bugs}"
 
 print(rf"""
 \midrule
- & \textbf{{Total}} &  & {detected_bugs}/{fp_bugs_total}/{total_bugs} & {time_avg_total_cell} & {feature_count_marks} & {loc_avg_total_cell} & {depth_avg_total_cell} &  \\ """)
+\textbf{{Total}} &  &  &  & {loc_avg_total_cell} & {depth_avg_total_cell} & {total_detect_cell}|{fp_bugs_total} & {time_avg_total_cell} & {feature_count_marks} \\ """)
 
 if args.appendix:
     print(r"""
