@@ -242,17 +242,27 @@ sources = {
 }
 
 WILD_PROJECT_NAMES = {
+    "crawl4ai": "Crawl4AI",
+    "node_1": "Base Node",
+    "node_2": "Base Node",
+    "openpilot": "Openpilot",
     "pytorch": "PyTorch",
     "vllm_1": "vLLM",
     "vllm_2": "vLLM",
 }
 
 WILD_PROJECT_PURPOSES = {
+    "Base Node": "Setup",
+    "Crawl4AI": "CI",
+    "Openpilot": "Setup",
     "PyTorch": "CI",
     "vLLM": "CI",
 }
 
 WILD_SOURCE_KEYS = {
+    "Base Node": r"\cite{base-node}",
+    "Crawl4AI": r"\cite{crawl4ai}",
+    "Openpilot": r"\cite{openpilot}",
     "PyTorch": r"\cite{pytorch}",
     "vLLM": r"\cite{vllm}",
 }
@@ -351,8 +361,7 @@ if args.wild:
                 row["sources"].append(source)
         row["bug_count"] += bug_count
 
-    print(r"""% Requires \usepackage{tabularx}
-\begin{tabularx}{\textwidth}{@{}lcrX@{}}
+    print(r"""\begin{tabular}{lcrl}
 \toprule
 \textbf{Project} & $\mathcal{D}$ & \textbf{\#B} & \textbf{Source} \\
 \midrule
@@ -364,7 +373,7 @@ if args.wild:
         print(f"{project_name} & {purpose} & {row['bug_count']} & {citation}  \\\\")
     print(r"""
 \bottomrule
-\end{tabularx}
+\end{tabular}
 """)
     sys.exit(0)
 
@@ -452,13 +461,9 @@ DEFAULT_TABLE_SUBSET = {
     "high_profile/c02-n",
     "high_profile/c03-backup_manager",
     "milestone_1/const_loop",
-    "milestone_1/loop_once-useless_test",
-    "milestone_1/unset_var_1",
     "milestone_2/rm_root",
-    "web_forums/rm_root_2",
     "commits/debootstrap",
     "commits/debootstrap_2",
-    "simple_fs/overwrite_file",
 }
 
 def get_loc(path):
