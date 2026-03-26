@@ -2909,33 +2909,33 @@ def plot_koala_timeout_cdf(koala_sweep_dir, output_path):
         fontsize=8,
         color="0.45",
     )
-    bottom_handles = [
-        Line2D(
-            [],
-            [],
-            linestyle="None",
-            marker="s",
-            markersize=6,
-            markerfacecolor=completion_color,
-            markeredgecolor=completion_color,
-            label=sysname,
-        )
-    ]
-    ax.legend(
-        bottom_handles,
-        [sysname],
-        loc="lower right",
-        bbox_to_anchor=(0.98, 0.26),
-        ncol=1,
-        frameon=False,
-        facecolor="none",
-        edgecolor="none",
-        fontsize=12,
-        handlelength=1.2,
-        handletextpad=0.6,
-        borderaxespad=0.0,
-        columnspacing=2.0,
-    )
+    # bottom_handles = [
+    #     Line2D(
+    #         [],
+    #         [],
+    #         linestyle="None",
+    #         marker="s",
+    #         markersize=6,
+    #         markerfacecolor=completion_color,
+    #         markeredgecolor=completion_color,
+    #         label=sysname,
+    #     )
+    # ]
+    # ax.legend(
+    #     bottom_handles,
+    #     [sysname],
+    #     loc="lower right",
+    #     bbox_to_anchor=(0.98, 0.26),
+    #     ncol=1,
+    #     frameon=False,
+    #     facecolor="none",
+    #     edgecolor="none",
+    #     fontsize=12,
+    #     handlelength=1.2,
+    #     handletextpad=0.6,
+    #     borderaxespad=0.0,
+    #     columnspacing=2.0,
+    # )
     fig.subplots_adjust(left=0.24, right=0.92, bottom=0.40, top=0.94)
     fig.savefig(output_path, format="pdf")
     plt.close(fig)
