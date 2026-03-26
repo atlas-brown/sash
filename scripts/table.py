@@ -652,10 +652,10 @@ if args.appendix:
     )
 else:
     print(r"""% \TE indicates at least one targeted pass was required (DFS, unbound-empty DFS, or unknown-paths-are-files).
-    \begin{tabular}{llllrrrcc}
+    \begin{tabular}{llllrr @{\hspace{2em}} rcc}
     \toprule
     \textbf{ID} & \textbf{Source} & \textbf{Script name} & \textbf{Bug description} & \textbf{LoC} & \textbf{$\downarrow$} & \textbf{D/\#B|FP} & \textbf{$t$} & $\mathcal{F}$ \\
-    \midrule
+    \cmidrule(r){1-6} \cmidrule(l){7-9}
 """
     )
 
@@ -701,15 +701,14 @@ if not args.appendix and rest_of_benchmarks:
     te_count = sum(1 for r in rest_of_benchmarks if get_bm_name(r["benchmark"]) in targeted_pass_benchmarks)
     of_count = sum(1 for r in rest_of_benchmarks if get_bm_name(r["benchmark"]) in optimistic_forking_benchmarks)
     feature_count_marks = (
-        f"{we_count} \\WE/{cs_count} \\SP/{fs_count} \\FS/"
-        f"{te_count} \\TE/{of_count} \\OF"
+        f"{we_count}\\WE {cs_count}\\SP {fs_count}\\FS "
+        f"{of_count}\\OF {te_count}\\TE"
     )
 
     rest_detect_cell = f"{detected_bugs_rest}/{total_bugs_rest}"
     if detected_bugs_rest < total_bugs_rest:
         rest_detect_cell = rf"\textcolor{{red}}{{{rest_detect_cell}}}"
-    print(rf""" & \cref{{sec:full-ds}} & \emph{{More buggy scripts}} &  & {loc_avg_cell} & {depth_avg_rest_cell} & {rest_detect_cell}|{fp_bugs_rest} & {time_avg_cell} & {feature_count_marks} \\""")
-    print(r"\hspace{.5em}\dots & & & & & & & & \\")
+    print(rf""" ... & \cref{{sec:full-ds}} & \emph{{More buggy scripts}} &  & {loc_avg_cell} & {depth_avg_rest_cell} & {rest_detect_cell} | {fp_bugs_rest} & {time_avg_cell} & {feature_count_marks} \\""")
 
 # Print summary line across all benchmarks
 locs = [get_loc(r["benchmark"]) for r in buggy_results.to_dict(orient="records")]
@@ -742,15 +741,15 @@ fs_count = sum(1 for r in buggy_results.to_dict(orient="records") if "FS" in fea
 te_count = sum(1 for r in buggy_results.to_dict(orient="records") if get_bm_name(r["benchmark"]) in targeted_pass_benchmarks)
 of_count = sum(1 for r in buggy_results.to_dict(orient="records") if get_bm_name(r["benchmark"]) in optimistic_forking_benchmarks)
 feature_count_marks = (
-    f"{we_count} \\WE/{cs_count} \\SP/{fs_count} \\FS/"
-    f"{te_count} \\TE/{of_count} \\OF"
-)
+        f"{we_count}\\WE {cs_count}\\SP {fs_count}\\FS "
+        f"{of_count}\\OF {te_count}\\TE"
+    )
 
 total_detect_cell = f"{detected_bugs}/{total_bugs}"
 
 print(rf"""
-\midrule
-\textbf{{Total}} &  &  &  & {loc_avg_total_cell} & {depth_avg_total_cell} & {total_detect_cell}|{fp_bugs_total} & {time_avg_total_cell} & {feature_count_marks} \\ """)
+\cmidrule(r){{1-6}} \cmidrule(l){{7-9}}
+\textbf{{Total}} & /  & \textbf{{Arith. mean ($\sim$)}}  &  & {loc_avg_total_cell} & {depth_avg_total_cell} & {total_detect_cell} | {fp_bugs_total} & {time_avg_total_cell} & {feature_count_marks} \\ """)
 
 if args.appendix:
     print(r"""
