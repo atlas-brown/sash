@@ -2115,7 +2115,7 @@ def plot_coverage_by_config(timeout_sweep_dir, base_buggy_data, output_path):
         ),
         (
             "smart_forking",
-            f"{sysname} w/o effect-aware exploration",
+            f"{sysname} w/o risk-directed exploration",
             smart_forking_color,
             re.compile(r"results_t([0-9]+(?:\.[0-9]+)?)_smart_forking\.csv$"),
         ),
@@ -2451,7 +2451,7 @@ def plot_timeout_sweep_bug_catch(timeout_sweep_dir, output_path):
         ),
         (
             "smart_forking",
-            f"{sysname} w/o effect-aware exploration",
+            f"{sysname} w/o risk-directed exploration",
             smart_forking_color,
             "^",
             re.compile(r"results_t([0-9]+(?:\.[0-9]+)?)_smart_forking\.csv$"),
@@ -2548,13 +2548,15 @@ def plot_timeout_sweep_bug_catch(timeout_sweep_dir, output_path):
 
     if all_totals:
         total = int(round(float(np.median(all_totals))))
+        alpha=0.6
+        linewidth=0.75
         ax = plt.gca()
         ax.axhline(
             y=float(total),
             color="black",
-            linewidth=0.5,
+            linewidth=linewidth,
             linestyle="--",
-            alpha=0.18,
+            alpha=alpha,
             zorder=0,
         )
         if all_y_arrays:
@@ -2630,9 +2632,9 @@ def plot_timeout_sweep_bug_catch(timeout_sweep_dir, output_path):
                 [],
                 [],
                 color="black",
-                linewidth=0.5,
+                linewidth=linewidth,
                 linestyle="--",
-                alpha=0.18,
+                alpha=alpha,
                 label=f"Total bugs ({total})",
             )
         )
@@ -2643,7 +2645,7 @@ def plot_timeout_sweep_bug_catch(timeout_sweep_dir, output_path):
         labels,
         fontsize=legend_size,
         loc="upper center",
-        bbox_to_anchor=(0.5, -0.34),
+        bbox_to_anchor=(0.5, -0.41),
         frameon=False,
         ncol=2,
     )
