@@ -68,6 +68,28 @@ BENCHMARK_NAMES = {
     "web_forums/xargs_del_files": "Backup wipe",
 }
 
+WILD_BENCHMARK_DESCRIPTIONS = {
+    "Base Node": r"Unset-var guards abort node startup setup.",
+    "BashReduce": r"Unquoted input broadens \sh{rm} target.",
+    "Caker": r"Misquoted \sh{sudo rm -rf} can remove wrong paths.",
+    "Cosmos Omnibus": r"Unquoted cleanup path broadens \sh{rm} target.",
+    "Crawl4AI": r"Status check is dead under \sh{set -e}.",
+    "Dotfiles Ooloth": r"Inverted tool check skips uninstall cleanup.",
+    "Gloo Gateway": r"Typo makes uninstaller cleanup dead code.",
+    "Moby": r"Unset-var flag handling breaks test selection.",
+    "Next.js": r"Unset-var fallback is dead under \sh{set -u}.",
+    "Openpilot": r"Unset-var setup checks abort environment setup.",
+    "PyTorch": r"Unset-var fallback aborts environment setup.",
+    "RapidPro Docker": r"Unquoted \sh{pwd} broadens cleanup target.",
+    "Serverless": r"Empty capture breaks installer branch selection.",
+    "Tazpkg": r"Wrong \sh{mktemp} kind makes \sh{cd} fail.",
+    "Theme Switcher": r"Inverted tool check blocks theme update.",
+    "ToolSave": r"Unquoted uninstall path broadens \sh{rm} target.",
+    "V2M": r"Whitespace in path broadens \sh{rm} target.",
+    "Ventoy": r"Stale state makes file checks and copy logic misfire.",
+    "vLLM": r"Indirect status checks make failure handling dead.",
+}
+
 _WORD_RE = re.compile(r"[a-z0-9]+")
 _SHORT_NAME_CACHE = None
 _BASE36 = "0123456789abcdefghijklmnopqrstuvwxyz"

@@ -7,7 +7,12 @@ from pathlib import Path
 from collections import Counter
 import yaml
 import bugdepth
-from benchmark_metadata import BENCHMARK_NAMES, benchmark_key, short_name
+from benchmark_metadata import (
+    BENCHMARK_NAMES,
+    WILD_BENCHMARK_DESCRIPTIONS,
+    benchmark_key,
+    short_name,
+)
 
 EPSILON = 1e-3
 ROOT_DIR = Path(__file__).resolve().parents[1]
@@ -407,22 +412,35 @@ if args.wild:
             info = yaml.safe_load(f) or {}
         sources_list = info.get("sources", [])
         ground_truths = info.get("ground_truths", [])
+        bug_defs = info.get("bugs", {}) or {}
         bug_count = 0
+        descriptions_set = set()
         for gt in ground_truths:
-            for bug_info in (gt.get("bugs", {}) or {}).values():
+            for bug_id, bug_info in (gt.get("bugs", {}) or {}).items():
                 bug_count += len(bug_info.get("lines", []) or [])
+                desc = bug_info.get("description") or (bug_defs.get(bug_id) or {}).get("description")
+                if desc:
+                    descriptions_set.add(desc)
         key = script_dir.name
         project_name = WILD_PROJECT_NAMES.get(key, key)
         row = wild_rows_by_project.setdefault(
             project_name,
-            {"sources": [], "bug_count": 0},
+            {"sources": [], "bug_count": 0, "descriptions": set()},
         )
         for source in sources_list[:1]:
             if source not in row["sources"]:
                 row["sources"].append(source)
         row["bug_count"] += bug_count
+        row["descriptions"].update(descriptions_set)
 
-    print(r"""\begin{tabular}{lcr}
+    if args.appendix:
+        print(r"""\begin{tabular}{llllr}
+\toprule
+\textbf{Project} & \textbf{Source} & \textbf{Domain} & \textbf{Bug description} & \textbf{\#B} \\
+\midrule
+""")
+    else:
+        print(r"""\begin{tabular}{lcr}
 \toprule
 \textbf{Project} & \textbf{Domain} & \textbf{\#B} \\
 \midrule
@@ -433,9 +451,11 @@ if args.wild:
             row = wild_rows_by_project[project_name]
             purpose = WILD_PROJECT_PURPOSES.get(project_name, "Util")
             citation = WILD_SOURCE_KEYS.get(project_name, "")
-            project_cell = f"{project_name}~{citation}" if citation else project_name
+            description_cell = WILD_BENCHMARK_DESCRIPTIONS.get(
+                project_name, "; ".join(sorted(row["descriptions"]))
+            )
             total_bug_count += row["bug_count"]
-            print(f"{project_cell} & {purpose} & {row['bug_count']}  \\\\")
+            print(f"{project_name} & {citation} & {purpose} & {description_cell} & {row['bug_count']}  \\\\")
     else:
         for key, project_name, purpose in WILD_CURATED_ROWS:
             project_row_name = WILD_PROJECT_NAMES.get(key, key)
@@ -449,7 +469,7 @@ if args.wild:
             total_bug_count += row["bug_count"]
     print(r"\midrule")
     if args.appendix:
-        print(rf"Total &  & {total_bug_count}  \\")
+        print(rf"Total &  &  &  & {total_bug_count}  \\")
     else:
         print(rf"Total & \cf{{app:all-bug-reports}} & {total_bug_count}  \\")
     print(r"""
