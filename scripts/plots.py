@@ -2439,14 +2439,15 @@ def estimate_runtime_timeouts(data):
 
 def plot_timeout_sweep_bug_catch(timeout_sweep_dir, output_path):
     dfs_on_color = color_green
-    smart_forking_color = _lighten_color(dfs_on_color, 0.22)
-    no_opts_color = _lighten_color(dfs_on_color, 0.45)
+    smart_forking_color = "#70dba2" # _lighten_color(dfs_on_color, 0.22)
+    no_opts_color = _lighten_color("#555962", 0.3) # _lighten_color(dfs_on_color, 0.45)
     series_specs = [
         (
             "no_opts",
             f"{sysname} w/o optimisations",
             no_opts_color,
             "o",
+            ":",
             re.compile(r"results_t([0-9]+(?:\.[0-9]+)?)_no_opts\.csv$"),
         ),
         (
@@ -2454,6 +2455,7 @@ def plot_timeout_sweep_bug_catch(timeout_sweep_dir, output_path):
             f"{sysname} w/o risk-directed exploration",
             smart_forking_color,
             "^",
+            "-.",
             re.compile(r"results_t([0-9]+(?:\.[0-9]+)?)_smart_forking\.csv$"),
         ),
         (
@@ -2461,12 +2463,13 @@ def plot_timeout_sweep_bug_catch(timeout_sweep_dir, output_path):
             f"{sysname}",
             dfs_on_color,
             "s",
+            "-",
             re.compile(r"results_t([0-9]+(?:\.[0-9]+)?)_dfs_on\.csv$"),
         ),
     ]
     series_paths = {
         key: glob.glob(os.path.join(timeout_sweep_dir, f"results_t*_{key}.csv"))
-        for key, _, _, _, _ in series_specs
+        for key, _, _, _, _, _ in series_specs
     }
 
     if not any(series_paths.values()):
@@ -2480,6 +2483,7 @@ def plot_timeout_sweep_bug_catch(timeout_sweep_dir, output_path):
                 f"Full {sysname}",
                 dfs_on_color,
                 "o",
+                "-",
                 re.compile(r"results_t([0-9]+(?:\.[0-9]+)?)\.csv$"),
             ),
         ]
@@ -2521,7 +2525,7 @@ def plot_timeout_sweep_bug_catch(timeout_sweep_dir, output_path):
     all_y_arrays = []
     all_totals = []
     all_timeout_values = []
-    for key, label, color, marker, regex in series_specs:
+    for key, label, color, marker, linestyle, regex in series_specs:
         x_vals, y_vals, totals, timeout_vals = collect_series(
             series_paths.get(key, []), regex
         )
@@ -2537,6 +2541,7 @@ def plot_timeout_sweep_bug_catch(timeout_sweep_dir, output_path):
             x_vals,
             y_vals,
             marker=marker,
+            linestyle=linestyle,
             color=color,
             linewidth=1.8,
             markersize=4,
