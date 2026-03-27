@@ -2,6 +2,9 @@ sources:
   - https://github.com/day0ops/gloo-gateway-2.1-demo/blob/0502c0ac7b47cc841b80cd8c07a9b864ac98fd29/uninstall.sh
   - https://github.com/day0ops/gloo-gateway-2.1-demo/pull/1
 
+notes:
+  - Merged
+
 bugs:
   bug00:
     description: An unbound variable is used due to a typo

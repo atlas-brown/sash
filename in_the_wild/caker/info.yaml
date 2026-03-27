@@ -2,6 +2,9 @@ sources:
   - https://github.com/Fred78290/caker/blob/9636c907f8d8375d1046a5226c99ab2b7cc0ac2f/Scripts/build-signed-debug.sh
   - https://github.com/Fred78290/caker/issues/1
 
+notes:
+  - Merged
+
 bugs:
   bug00:
     description: \'sudo rm -rf' called with unquoted $0-derivative

@@ -1,0 +1,19 @@
+sources:
+  - https://github.com/OpenSC/OpenSC/blob/776e4cd2874108acc1b563be573dd96aaab58cdb/MacOSX/build-openssl-macos.sh
+  - https://github.com/OpenSC/OpenSC/pull/3625
+
+notes:
+  - Merged
+
+bugs:
+  bug00:
+    description: Arg-parsing loop can loop infinitely if an arg is missing its value
+    code: infinite_loop
+    shellcheck: null
+
+ground_truths:
+  # Base versions
+  - path: original.sh
+    kind: original
+    bugs:
+      bug00: { lines: [4] }

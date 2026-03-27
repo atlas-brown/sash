@@ -1,0 +1,19 @@
+sources:
+  - https://github.com/wanikua/danghuangshang/blob/952c17fc31c8a7903db3cf74389e164409943202/keepalive.sh
+  - https://github.com/wanikua/danghuangshang/issues/114
+
+notes:
+  - Merged
+
+bugs:
+  bug00:
+    description: A command is treated as possibly missing, but is later on used as if it definitely exists
+    code: not_a_command
+    shellcheck: null
+
+ground_truths:
+  # Base versions
+  - path: original.sh
+    kind: original
+    bugs:
+      bug00: { lines: [51] }

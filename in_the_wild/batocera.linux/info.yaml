@@ -1,0 +1,19 @@
+sources:
+  - https://github.com/batocera-linux/batocera.linux/blob/6b01e05f44a8e4a9c67e34df514c4d49e0e0d63c/board/batocera/x86/fsoverlay/etc/init.d/S93amdtdp
+  - https://github.com/batocera-linux/batocera.linux/pull/15600
+
+notes:
+  - Merged
+
+bugs:
+  bug00:
+    description: Script mistakenly overwrites log file with '>' instead of appending with '>>'
+    code: data_loss
+    shellcheck: null
+
+ground_truths:
+  # Base versions
+  - path: original.sh
+    kind: original
+    bugs:
+      bug00: { lines: [30] }

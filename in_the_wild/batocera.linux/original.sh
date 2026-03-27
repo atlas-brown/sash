@@ -1,0 +1,64 @@
+#!/bin/bash
+
+#
+# This file is part of the batocera distribution (https://batocera.org).
+# Copyright (c) 2025+.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, version 3.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+# YOU MUST KEEP THIS HEADER AS IT IS
+#
+
+log="/userdata/system/logs/amd-tdp.log"
+
+case "$1" in
+  start)
+    if ! lscpu | grep -q AuthenticAMD; then
+        echo "Authentic AMD CPU not found, exiting TDP..."
+        exit 1
+    else
+        # check if tdp capable processor exists for Ryzen Mobile Processor
+        if ! ryzenadj -i | head -n 1 | grep -q "unsupported model"; then
+            echo "" >> $log
+            echo "*** ------------------------------------- ***" >> $log
+            echo "" >> $log
+            echo "Supported Ryzen Mobile Processor found for TDP..." > $log
+            MAX_TDP=$(/usr/bin/ryzenadj -i | awk '/PPT LIMIT FAST/ {printf "%.0f\n", $6}')
+            # Check if MAX_TDP is defined and not-empty
+            if [ -n "$MAX_TDP" ]; then
+                echo "Maximum reported TDP is $MAX_TDP Watts" >> $log
+                /usr/bin/batocera-settings-set system.cpu.tdp "${MAX_TDP}"
+                # set the global TDP if set
+                TDP_PERCENTAGE=$(printf "%.0f" "$(/usr/bin/batocera-settings-get global.tdp)")
+                if [ -n "$TDP_PERCENTAGE" ] && [ "$TDP_PERCENTAGE" -ge 10 ]; then
+                    TDP_VALUE=$(awk -v max_tdp="$MAX_TDP" -v tdp_percentage="$TDP_PERCENTAGE" 'BEGIN { printf("%.0f\n", max_tdp * tdp_percentage / 100) }')
+                    echo "Setting Ryzen Mobile Processor global TDP to $TDP_VALUE Watts" >> $log
+                    /usr/bin/batocera-amd-tdp $TDP_VALUE
+                else
+                    echo "No global TDP value set, using detected maximum!" >> $log
+                fi
+            else
+                echo "Maximum TDP is not defined, exiting TDP..." >> $log
+                exit 1
+            fi
+        else
+            echo "Supported AMD Processor NOT found for TDP..."
+            exit 1
+        fi
+    fi
+    ;;
+  stop)
+    # no stop behavior necessary
+    ;;
+  *)
+    echo "Usage: $0 {start|stop}"
+    exit 1
+    ;;
+esac
+
+exit 0

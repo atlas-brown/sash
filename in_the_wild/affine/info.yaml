@@ -1,0 +1,19 @@
+sources:
+  - https://github.com/toeverything/AFFiNE/blob/59fd942f40365c8675691fea455a5f7728bf2dd1/scripts/set-version.sh
+  - https://github.com/toeverything/AFFiNE/pull/14684
+
+notes:
+  - Merged
+
+bugs:
+  bug00:
+    description: Indirect exit code check with 'set -e' enabled
+    code: const_cond
+    shellcheck: SC2181
+
+ground_truths:
+  # Base versions
+  - path: original.sh
+    kind: original
+    bugs:
+      bug00: { lines: [30] }

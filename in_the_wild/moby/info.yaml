@@ -2,6 +2,9 @@ sources:
   - https://github.com/moby/moby/blob/a52171f5eeb6e553e7c4744abf6b722962b2aca4/hack/test/unit
   - https://github.com/moby/moby/pull/52157
 
+notes:
+  - Merged
+
 bugs:
   bug00:
     description: The script enables 'set -u' but then checks if a variable is empty
