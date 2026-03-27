@@ -2,6 +2,9 @@ sources:
   - https://github.com/p4lang/p4c/blob/7a1c8709b05c7d41c4dac40ac5b10924cdd0eb62/backends/tofino/bootstrap_bfn_env.sh
   - https://github.com/p4lang/p4c/pull/5523/changes
 
+notes:
+  - Merged
+
 bugs:
   bug00:
     description: User-provided variable is used unquoted in rm

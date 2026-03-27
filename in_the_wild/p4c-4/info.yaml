@@ -2,6 +2,9 @@ sources:
   - https://github.com/zzmic/p4c/blob/2ee5a0104d7597b87b3ca448a3d8b7cd5246d63a/tools/debian-build/clean-deb
   - https://github.com/p4lang/p4c/pull/5523/changes
 
+notes:
+  - Merged
+
 bugs:
   bug00:
     description: User-provided variable is used unquoted in rm
