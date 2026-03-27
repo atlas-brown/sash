@@ -1,0 +1,16 @@
+sources:
+  - https://github.com/p4lang/p4c/blob/7a1c8709b05c7d41c4dac40ac5b10924cdd0eb62/backends/tofino/bootstrap_bfn_env.sh
+  - https://github.com/p4lang/p4c/pull/5523/changes
+
+bugs:
+  bug00:
+    description: User-provided variable is used unquoted in rm
+    code: word_split
+    shellcheck: SC2086
+
+ground_truths:
+  # Base versions
+  - path: original.sh
+    kind: original
+    bugs:
+      bug00: { lines: [39, 391] }
