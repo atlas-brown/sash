@@ -261,28 +261,70 @@ sources = {
 }
 
 WILD_PROJECT_NAMES = {
+    "bashreduce": "BashReduce",
+    "caker": "Caker",
+    "cosmos-omnibus": "Cosmos Omnibus",
     "crawl4ai": "Crawl4AI",
-    "node_1": "Base Node",
-    "node_2": "Base Node",
+    "dotfiles-ooloth-1": "Dotfiles Ooloth",
+    "dotfiles-ooloth-2": "Dotfiles Ooloth",
+    "gloo-gateway-2.1-demo": "Gloo Gateway",
+    "moby": "Moby",
+    "next.js": "Next.js",
+    "node-1": "Base Node",
+    "node-2": "Base Node",
     "openpilot": "Openpilot",
     "pytorch": "PyTorch",
-    "vllm_1": "vLLM",
-    "vllm_2": "vLLM",
+    "rapidpro-docker": "RapidPro Docker",
+    "serverless": "Serverless",
+    "tazpkg": "Tazpkg",
+    "theme-switcher": "Theme Switcher",
+    "toolsave": "ToolSave",
+    "v2m": "V2M",
+    "ventoy-1": "Ventoy",
+    "ventoy-2": "Ventoy",
+    "vllm-1": "vLLM",
+    "vllm-2": "vLLM",
 }
 
 WILD_PROJECT_PURPOSES = {
     "Base Node": "Setup",
+    "Caker": "Setup",
     "Crawl4AI": "CI",
+    "Gloo Gateway": "Uninstaller",
+    "Moby": "CI",
     "Openpilot": "Setup",
     "PyTorch": "CI",
     "vLLM": "CI",
 }
 
+WILD_CURATED_ROWS = [
+    ("moby", "Moby", "CI"),
+    ("p4-compiler", "P4 Compiler", "Setup"),
+    ("affine", "AFFiNE", "Updater"),
+    ("ghorg", "Ghorg", "CI"),
+    ("caker", "Caker", "Setup"),
+    ("gloo-gateway-2.1-demo", "Gloo Gateway", "Uninstaller"),
+]
+
 WILD_SOURCE_KEYS = {
+    "BashReduce": r"\cite{bashreduce}",
     "Base Node": r"\cite{base-node}",
+    "Caker": r"\cite{caker}",
+    "Cosmos Omnibus": r"\cite{cosmos-omnibus}",
     "Crawl4AI": r"\cite{crawl4ai}",
+    "Dotfiles Ooloth": r"\cite{dotfiles-ooloth}",
+    "Gloo Gateway": r"\cite{gloo-gateway-2.1-demo}",
+    "Moby": r"\cite{moby}",
+    "Next.js": r"\cite{nextjs}",
     "Openpilot": r"\cite{openpilot}",
     "PyTorch": r"\cite{pytorch}",
+    "RapidPro Docker": r"\cite{rapidpro-docker}",
+    "Serverless": r"\cite{serverless}",
+    "Tazpkg": r"\cite{tazpkg}",
+    "Theme Switcher": r"\cite{theme-switcher}",
+    "ToolSave": r"\cite{toolsave}",
+    "V2M": r"\cite{v2m}",
+    "Ventoy": r"\cite{ventoy}",
     "vLLM": r"\cite{vllm}",
 }
 
@@ -380,16 +422,36 @@ if args.wild:
                 row["sources"].append(source)
         row["bug_count"] += bug_count
 
-    print(r"""\begin{tabular}{lcrl}
+    print(r"""\begin{tabular}{lcr}
 \toprule
-\textbf{Project} & $\mathcal{D}$ & \textbf{\#B} & \textbf{Source} \\
+\textbf{Project} & \textbf{Domain} & \textbf{\#B} \\
 \midrule
 """)
-    for project_name in sorted(wild_rows_by_project):
-        row = wild_rows_by_project[project_name]
-        purpose = WILD_PROJECT_PURPOSES.get(project_name, "Util")
-        citation = WILD_SOURCE_KEYS.get(project_name, "")
-        print(f"{project_name} & {purpose} & {row['bug_count']} & {citation}  \\\\")
+    total_bug_count = 0
+    if args.appendix:
+        for project_name in sorted(wild_rows_by_project):
+            row = wild_rows_by_project[project_name]
+            purpose = WILD_PROJECT_PURPOSES.get(project_name, "Util")
+            citation = WILD_SOURCE_KEYS.get(project_name, "")
+            project_cell = f"{project_name}~{citation}" if citation else project_name
+            total_bug_count += row["bug_count"]
+            print(f"{project_cell} & {purpose} & {row['bug_count']}  \\\\")
+    else:
+        for key, project_name, purpose in WILD_CURATED_ROWS:
+            project_row_name = WILD_PROJECT_NAMES.get(key, key)
+            row = wild_rows_by_project.get(project_row_name)
+            if row is None:
+                continue
+            citation = WILD_SOURCE_KEYS.get(project_name, WILD_SOURCE_KEYS.get(project_row_name, ""))
+            project_cell = f"{project_name}~{citation}" if citation else project_name
+            print(f"{project_cell} & {purpose} & {row['bug_count']}  \\\\")
+        for row in wild_rows_by_project.values():
+            total_bug_count += row["bug_count"]
+    print(r"\midrule")
+    if args.appendix:
+        print(rf"Total &  & {total_bug_count}  \\")
+    else:
+        print(rf"Total & \cf{{app:all-bug-reports}} & {total_bug_count}  \\")
     print(r"""
 \bottomrule
 \end{tabular}

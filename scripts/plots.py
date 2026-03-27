@@ -2535,6 +2535,7 @@ def plot_timeout_sweep_bug_catch(timeout_sweep_dir, output_path):
         )
         if len(x_vals) == 0:
             continue
+        y_vals = np.maximum.accumulate(y_vals)
         all_x_arrays.append(x_vals)
         all_y_arrays.append(y_vals)
         plt.plot(
