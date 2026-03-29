@@ -1783,6 +1783,323 @@ def _get_variant_detection_counts(data):
     return len(all_bugs_expected), len(sash_detected), len(shellcheck_detected)
 
 
+
+def plot_bug_outcome_cells(data, output_path):
+    """
+    Like before, with tweaks:
+      1) Originals: columns sorted primarily by ShellCheck outcome, but with all
+         slots where SaSh is silent on buggy pushed to the far right.
+      2) Variants drawn in a separate subplot beneath the originals, with a
+         "Variants" title above it.
+      3) Print which variant slots are marked green for ShellCheck (including
+         benchmark path + slot index + expected token + ShellCheck counter).
+
+    Requires globals used elsewhere in your plotting module:
+      - sysname (label for SaSh)
+      - color_green, color_red
+      - get_info_shellcheck_expected_counter(...)
+    """
+    import os
+    from collections import Counter
+
+    import matplotlib.pyplot as plt
+    from matplotlib.patches import Rectangle
+
+    # ---- parsing / canonicalization -----------------------------------------
+
+    fontsize=15
+
+    def bench_dir(path_str: str) -> str:
+        return os.path.dirname(path_str)
+
+    def parse_results_list(s: str):
+        if s is None:
+            return []
+        s = str(s).strip()
+        if not s:
+            return []
+        return [p.strip() for p in s.split(";") if p.strip()]
+
+    def warned_slots_for_row(row, system: str, kind_for_shell: str):
+        expected = parse_results_list(row["expected_results"])
+
+        if system == "sash":
+            actual_ctr = Counter(parse_results_list(row["actual_results"]))
+        elif system == "shell":
+            actual_ctr = get_info_shellcheck_expected_counter(
+                row["benchmark"], kind_for_shell, fallback_to_bug_default=True
+            )
+        else:
+            raise ValueError(f"Unknown system: {system}")
+
+        warned = []
+        for tok in expected:
+            if actual_ctr[tok] > 0:
+                warned.append(True)
+                actual_ctr[tok] -= 1
+            else:
+                warned.append(False)
+        return warned
+
+    def outcome_code(bw, fw):
+        # G/Y/A/R
+        if bw and not fw:
+            return "G"
+        if bw and fw:
+            return "Y"
+        if (not bw) and (not fw):
+            return "A"
+        return "R"
+
+    # ---- split rows ----------------------------------------------------------
+
+    buggy = data[data["kind"] == "buggy"]
+    fixed = data[data["kind"] == "fixed"]
+    buggy_var = data[data["kind"] == "buggy_variant"]
+
+    if buggy.empty or fixed.empty:
+        return
+
+    buggy_by_dir = {bench_dir(p): r for p, r in zip(buggy["benchmark"], buggy.to_dict("records"))}
+    fixed_by_dir = {bench_dir(p): r for p, r in zip(fixed["benchmark"], fixed.to_dict("records"))}
+
+    common_dirs = sorted(set(buggy_by_dir) & set(fixed_by_dir))
+    if not common_dirs:
+        return
+
+    # ---- build originals slots + outcomes -----------------------------------
+
+    orig_slots = []
+    outcomes = {"sash": {}, "shell": {}}
+
+    for d in common_dirs:
+        brow = buggy_by_dir[d]
+        frow = fixed_by_dir[d]
+
+        b_expected = parse_results_list(brow["expected_results"])
+        f_expected = parse_results_list(frow["expected_results"])
+        assert len(b_expected) == len(
+            f_expected
+        ), f"Expected list length mismatch for {d}: buggy={len(b_expected)} fixed={len(f_expected)}"
+
+        b_sash = warned_slots_for_row(brow, "sash", "buggy")
+        f_sash = warned_slots_for_row(frow, "sash", "fixed")
+        b_shell = warned_slots_for_row(brow, "shell", "buggy")
+        f_shell = warned_slots_for_row(frow, "shell", "fixed")
+
+        for i in range(len(b_expected)):
+            key = (d, i)
+            orig_slots.append(key)
+            outcomes["sash"][key] = (b_sash[i], f_sash[i])
+            outcomes["shell"][key] = (b_shell[i], f_shell[i])
+
+    # Assertions requested earlier
+    assert len(orig_slots) == 116, f"Expected 116 original bug slots, found {len(orig_slots)}"
+    shell_yellow = sum(
+        1 for k in orig_slots if outcome_code(*outcomes["shell"][k]) == "Y"
+    )
+    assert shell_yellow == 7, (
+        f"Expected 7 ShellCheck 'warn buggy & warn fixed' (yellow) slots, found {shell_yellow}"
+    )
+
+    # ---- sort: ShellCheck groups, but push SaSh-silent-on-buggy to the right -
+
+    shell_code = {k: outcome_code(*outcomes["shell"][k]) for k in orig_slots}
+    sort_order = {"G": 0, "Y": 1, "A": 2, "R": 3}
+
+    def sash_silent_on_buggy(k):
+        bw, _fw = outcomes["sash"][k]
+        return not bw
+
+    # Primary: SaSh warned on buggy first; then ShellCheck outcome; then stable key.
+    orig_slots_sorted = sorted(
+        orig_slots,
+        key=lambda k: (
+            1 if sash_silent_on_buggy(k) else 0,     # 0 first, 1 last
+            sort_order[shell_code[k]],
+            k[0],
+            k[1],
+        ),
+    )
+
+    # ---- variants universe (buggy only; ignore variants/fix-*) ---------------
+
+    var_slots = []
+    var_warned = {"sash": {}, "shell": {}}
+    var_expected_tok = {}
+    var_shell_counter = {}
+
+    if not buggy_var.empty:
+        buggy_var2 = buggy_var[~buggy_var["benchmark"].astype(str).str.contains("/variants/fix-")]
+
+        # stable order by benchmark path then slot
+        for _, row in buggy_var2.sort_values("benchmark").iterrows():
+            expected = parse_results_list(row["expected_results"])
+            b_sash = warned_slots_for_row(row, "sash", "buggy_variant")
+
+            shell_ctr = get_info_shellcheck_expected_counter(
+                row["benchmark"], "buggy_variant", fallback_to_bug_default=True
+            )
+            b_shell = warned_slots_for_row(row, "shell", "buggy_variant")
+
+            d = bench_dir(row["benchmark"])  # includes .../variants
+            for i, tok in enumerate(expected):
+                key = (d, i)
+                var_slots.append(key)
+                var_warned["sash"][key] = b_sash[i]
+                var_warned["shell"][key] = False # b_shell[i] -- shellcheck warns on none of the variants by construction; the ground truths don't have that info bc there's no need
+                var_expected_tok[key] = tok
+                var_shell_counter[key] = shell_ctr
+
+    # Print any ShellCheck-green variants for debugging
+    green_vars = [k for k in var_slots if var_warned["shell"].get(k)]
+    if green_vars:
+        print("ShellCheck marked GREEN on these variant bug-slots (unexpected):")
+        for k in green_vars:
+            bench = k[0]
+            slot = k[1]
+            tok = var_expected_tok.get(k)
+            ctr = var_shell_counter.get(k, Counter())
+            # show expected token count and any SC-derived tokens that might match it
+            print(f"  - {bench}  slot={slot}  expected={tok}")
+            if tok is not None:
+                print(f"      counter[{tok}] = {ctr.get(tok, 0)}")
+            # also print a small sample of counter contents
+            sample = list(ctr.items())[:20]
+            print(f"      shell_ctr sample (up to 20): {sample}")
+    else:
+        print("ShellCheck marked GREEN on 0 variant bug-slots.")
+
+    # ---- plotting helpers ----------------------------------------------------
+
+    green = color_green
+    red = color_red
+    yellow = color_red # "#ffd966"
+    gray = "#d0d0d0"
+
+    def color_for_orig(system, key):
+        bw, fw = outcomes[system][key]
+        c = outcome_code(bw, fw)
+        if c == "G":
+            return green
+        if c == "Y":
+            return yellow
+        if c == "A":
+            return gray
+        return red
+
+    def color_for_var(system, key):
+        return green if var_warned[system][key] else gray
+
+    def draw_row(ax, colors, y_center, cell=1.0, inset=0.18):
+        box = cell - 2 * inset
+        for i, col in enumerate(colors):
+            x0 = i * cell + inset
+            y0 = y_center - 0.5 * cell + inset
+            ax.add_patch(
+                Rectangle(
+                    (x0, y0),
+                    box,
+                    box,
+                    facecolor=col,
+                    edgecolor="black",
+                    linewidth=0.25,
+                )
+            )
+
+    def format_x_ticks(ax, n_cells, cell=1.0):
+        if n_cells >= 10:
+            ticks = list(range(10, n_cells + 1, 10)) + ([n_cells] if n_cells > 100 else [])
+            ax.set_xticks([t * cell for t in ticks])
+            ax.set_xticklabels([str(t) for t in ticks], fontsize=fontsize)
+        else:
+            ax.set_xticks([])
+
+    # ---- figure: originals + variants subplots -------------------------------
+
+    n_orig = len(orig_slots_sorted)
+    n_var = len(var_slots)
+    import matplotlib.gridspec as gridspec
+    gs = gridspec.GridSpec(2, n_orig)
+
+    cell = 1.0
+    inset = 0.18
+
+    fig_w = max(6.0, 0.13 * n_orig + 2.0)
+    fig_h = 2.8 if n_var > 0 else 1.8
+
+    if n_var > 0:
+        fig = plt.figure(figsize=(fig_w, fig_h))
+        ax0 = fig.add_subplot(gs[0, :])
+        ax1 = fig.add_subplot(gs[1, :n_var])
+        # fig, (ax0, ax1) = plt.subplots(
+        #     2, 1, figsize=(fig_w, fig_h), gridspec_kw={"height_ratios": [2.0, 1.2]}
+        # )
+    else:
+        fig, ax0 = plt.subplots(1, 1, figsize=(fig_w, fig_h))
+        ax1 = None
+
+    # Originals subplot
+    label_offset = 0.3
+    y_sash = 1.0
+    y_shell = 0.0
+    draw_row(ax0, [color_for_orig("sash", k) for k in orig_slots_sorted], y_sash, cell=cell, inset=inset)
+    draw_row(ax0, [color_for_orig("shell", k) for k in orig_slots_sorted], y_shell, cell=cell, inset=inset)
+
+    ax0.text(-1.2, y_sash + label_offset, sysname, ha="right", va="center", fontsize=fontsize)
+    ax0.text(-1.2, y_shell - label_offset, "ShellCheck", ha="right", va="center", fontsize=fontsize)
+
+    ax0.set_xlim(-0.5, n_orig * cell + 0.5)
+    ax0.set_ylim(-0.8, 1.8)
+    ax0.set_aspect("equal", adjustable="box")
+    ax0.set_yticks([])
+    format_x_ticks(ax0, n_orig, cell=cell)
+    ax0.set_xlabel("Bug", fontsize=fontsize)
+
+    legend_handles = [
+        Rectangle((0, 0), 1, 1, facecolor=green, edgecolor="black", linewidth=0.3,
+                  label="Warn buggy, silent fixed"),
+        Rectangle((0, 0), 1, 1, facecolor=yellow, edgecolor="black", linewidth=0.3,
+                  label="Warn both buggy & fixed"),
+        Rectangle((0, 0), 1, 1, facecolor=gray, edgecolor="black", linewidth=0.3,
+                  label="Silent both buggy & fixed"),
+        # Rectangle((0, 0), 1, 1, facecolor=red, edgecolor="black", linewidth=0.3,
+        #           label="Silent buggy, warn fixed"),
+    ]
+    ax0.legend(
+        handles=legend_handles,
+        loc="upper center",
+        bbox_to_anchor=(0.65, -2),
+        ncol=2,
+        fontsize=fontsize,
+        frameon=True,
+    )
+
+    # Variants subplot
+    if ax1 is not None:
+        # ax1.set_title("Variants", fontsize=fontsize, pad=8)
+
+        y_sash_v = 1.0
+        y_shell_v = 0.0
+        draw_row(ax1, [color_for_var("sash", k) for k in var_slots], y_sash_v, cell=cell, inset=inset)
+        draw_row(ax1, [color_for_var("shell", k) for k in var_slots], y_shell_v, cell=cell, inset=inset)
+
+        ax1.text(-1.2, y_sash_v + label_offset, sysname, ha="right", va="center", fontsize=fontsize)
+        ax1.text(-1.2, y_shell_v - label_offset, "ShellCheck", ha="right", va="center", fontsize=fontsize)
+
+        ax1.set_xlim(-0.5, n_var * cell + 0.5)
+        ax1.set_ylim(-0.8, 1.8)
+        ax1.set_aspect("equal", adjustable="box")
+        ax1.set_yticks([])
+        format_x_ticks(ax1, n_var, cell=cell)
+
+        ax1.set_xlabel("Bug Variant", fontsize=fontsize)
+
+    plt.tight_layout()
+    plt.savefig(output_path, format="pdf")
+    plt.close()
+
+
 def plot_runtime(data, output_path):
     plt.figure(figsize=(9, 3))
     data = data.copy()
@@ -2988,6 +3305,9 @@ def main():
     )
     plot_bug_detection_heatmap(
         all_results, os.path.join(args.output_dir, "bug-detection-heatmap.pdf")
+    )
+    plot_bug_outcome_cells(
+        all_results, os.path.join(args.output_dir, "bug-detection-fingerprints.pdf")
     )
     plot_runtime(buggy_results, os.path.join(args.output_dir, "runtime.pdf"))
     # Sweep inputs live next to the main results CSV, not in the figure output dir.
