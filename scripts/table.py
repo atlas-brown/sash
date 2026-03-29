@@ -266,23 +266,41 @@ sources = {
 }
 
 WILD_PROJECT_NAMES = {
+    "affine": "AFFiNE",
     "bashreduce": "BashReduce",
+    "batocera.linux": "Batocera Linux",
     "caker": "Caker",
     "cosmos-omnibus": "Cosmos Omnibus",
     "crawl4ai": "Crawl4AI",
-    "dotfiles-ooloth-1": "Dotfiles Ooloth",
-    "dotfiles-ooloth-2": "Dotfiles Ooloth",
+    "danghuangshang": "Danghuangshang",
+    "dotfiles-1": "Dotfiles",
+    "dotfiles-2": "Dotfiles",
+    "dotfiles-ooloth-1": "Dotfiles",
+    "dotfiles-ooloth-2": "Dotfiles",
+    "dotfiles_ooloth-1": "Dotfiles",
+    "dotfiles_ooloth-2": "Dotfiles",
+    "ghorg": "Ghorg",
     "gloo-gateway-2.1-demo": "Gloo Gateway",
+    "gloo_gateway_2.1_demo": "Gloo Gateway",
     "moby": "Moby",
     "next.js": "Next.js",
     "node-1": "Base Node",
     "node-2": "Base Node",
     "openpilot": "Openpilot",
+    "opensc": "OpenSC",
+    "p4c-1": "P4 Compiler",
+    "p4c-2": "P4 Compiler",
+    "p4c-3": "P4 Compiler",
+    "p4c-4": "P4 Compiler",
+    "p4c-5": "P4 Compiler",
     "pytorch": "PyTorch",
     "rapidpro-docker": "RapidPro Docker",
+    "rapidpro_docker": "RapidPro Docker",
     "serverless": "Serverless",
     "tazpkg": "Tazpkg",
+    "test_infra": "Kubernetes Test Infra",
     "theme-switcher": "Theme Switcher",
+    "theme_switcher": "Theme Switcher",
     "toolsave": "ToolSave",
     "v2m": "V2M",
     "ventoy-1": "Ventoy",
@@ -292,36 +310,61 @@ WILD_PROJECT_NAMES = {
 }
 
 WILD_PROJECT_PURPOSES = {
+    "AFFiNE": "Updater",
     "Base Node": "Setup",
-    "Caker": "Setup",
+    "BashReduce": "CLI",
+    "Batocera Linux": "Init",
+    "Caker": "Build",
+    "Cosmos Omnibus": "Entrypoint",
     "Crawl4AI": "CI",
-    "Gloo Gateway": "Uninstaller",
+    "Danghuangshang": "Daemon",
+    "Dotfiles": "Setup",
+    "Ghorg": "CI",
+    "Gloo Gateway": "Uninstall",
+    "Kubernetes Test Infra": "CI",
     "Moby": "CI",
+    "Next.js": "Deploy",
+    "OpenSC": "Build",
     "Openpilot": "Setup",
+    "P4 Compiler": "Build",
     "PyTorch": "CI",
+    "RapidPro Docker": "Uninstall",
+    "Serverless": "Installer",
+    "Tazpkg": "Package",
+    "Theme Switcher": "Configuration",
+    "ToolSave": "Uninstall",
+    "V2M": "Uninstall",
+    "Ventoy": "Boot",
     "vLLM": "CI",
 }
 
 WILD_CURATED_ROWS = [
-    ("moby", "Moby", "CI"),
-    ("p4-compiler", "P4 Compiler", "Setup"),
-    ("affine", "AFFiNE", "Updater"),
-    ("ghorg", "Ghorg", "CI"),
-    ("caker", "Caker", "Setup"),
-    ("gloo-gateway-2.1-demo", "Gloo Gateway", "Uninstaller"),
+    ("moby", "Moby", "CI", 2),
+    ("p4-compiler", "P4 Compiler", "Build", 15),
+    ("affine", "AFFiNE", "Updater", 3),
+    ("ghorg", "Ghorg", "CI", 2),
+    ("caker", "Caker", "Build", 1),
+    ("gloo-gateway-2.1-demo", "Gloo Gateway", "Uninstall", 1),
 ]
 
 WILD_SOURCE_KEYS = {
     "BashReduce": r"\cite{bashreduce}",
     "Base Node": r"\cite{base-node}",
+    "AFFiNE": r"\cite{affine}",
+    "Batocera Linux": r"\cite{batocera-linux}",
     "Caker": r"\cite{caker}",
     "Cosmos Omnibus": r"\cite{cosmos-omnibus}",
     "Crawl4AI": r"\cite{crawl4ai}",
-    "Dotfiles Ooloth": r"\cite{dotfiles-ooloth}",
+    "Danghuangshang": r"\cite{danghuangshang}",
+    "Dotfiles": ["dotfiles-nicknisi", "dotfiles-gihrig"],
     "Gloo Gateway": r"\cite{gloo-gateway-2.1-demo}",
+    "Ghorg": r"\cite{ghorg}",
+    "Kubernetes Test Infra": r"\cite{kubernetes-test-infra}",
     "Moby": r"\cite{moby}",
     "Next.js": r"\cite{nextjs}",
+    "OpenSC": r"\cite{opensc}",
     "Openpilot": r"\cite{openpilot}",
+    "P4 Compiler": r"\cite{p4:comm:2014}",
     "PyTorch": r"\cite{pytorch}",
     "RapidPro Docker": r"\cite{rapidpro-docker}",
     "Serverless": r"\cite{serverless}",
@@ -332,6 +375,17 @@ WILD_SOURCE_KEYS = {
     "Ventoy": r"\cite{ventoy}",
     "vLLM": r"\cite{vllm}",
 }
+
+
+def render_wild_citation(project_name):
+    citation = WILD_SOURCE_KEYS.get(project_name, "")
+    if isinstance(citation, (list, tuple)):
+        if not citation:
+            return ""
+        return r"\cite{" + ",".join(citation) + "}"
+    if citation:
+        return citation
+    return ""
 
 
 descriptions = {
@@ -450,21 +504,18 @@ if args.wild:
         for project_name in sorted(wild_rows_by_project):
             row = wild_rows_by_project[project_name]
             purpose = WILD_PROJECT_PURPOSES.get(project_name, "Util")
-            citation = WILD_SOURCE_KEYS.get(project_name, "")
+            citation = render_wild_citation(project_name)
             description_cell = WILD_BENCHMARK_DESCRIPTIONS.get(
                 project_name, "; ".join(sorted(row["descriptions"]))
             )
             total_bug_count += row["bug_count"]
             print(f"{project_name} & {citation} & {purpose} & {description_cell} & {row['bug_count']}  \\\\")
     else:
-        for key, project_name, purpose in WILD_CURATED_ROWS:
+        for key, project_name, purpose, bug_count in WILD_CURATED_ROWS:
             project_row_name = WILD_PROJECT_NAMES.get(key, key)
-            row = wild_rows_by_project.get(project_row_name)
-            if row is None:
-                continue
-            citation = WILD_SOURCE_KEYS.get(project_name, WILD_SOURCE_KEYS.get(project_row_name, ""))
+            citation = render_wild_citation(project_name) or render_wild_citation(project_row_name)
             project_cell = f"{project_name}~{citation}" if citation else project_name
-            print(f"{project_cell} & {purpose} & {row['bug_count']}  \\\\")
+            print(f"{project_cell} & {purpose} & {bug_count}  \\\\")
         for row in wild_rows_by_project.values():
             total_bug_count += row["bug_count"]
     print(r"\midrule")
@@ -706,7 +757,7 @@ def create_table_line(result, allow_fallback=False):
     detected_prefix = f"{detected}/{n_bugs}"
     if detected < n_bugs:
         detected_prefix = rf"\textcolor{{red}}{{{detected_prefix}}}"
-    bugs_detected_cell = f"{detected_prefix}|{fp_bug_count}"
+    bugs_detected_cell = f"{detected_prefix} | {fp_bug_count}"
     return f"{bm_short_id} & {source} & {name} & {description} & {loc} & {depth_cell} & {bugs_detected_cell} & {time} & {feature_mark}  \\\\"
 
 rest_of_benchmarks = []
@@ -717,12 +768,12 @@ if args.appendix:
 \setlength{\LTright}{0pt}
 \begin{longtable}{@{}llllrrrcc@{}}
 \toprule
-\textbf{ID} & \textbf{Source} & \textbf{Script name} & \textbf{Bug description} & \textbf{LoC} & \textbf{$\downarrow$} & \textbf{D/\#B|FP} & \textbf{$t$} & $\mathcal{F}$ \\
+\textbf{ID} & \textbf{Source} & \textbf{Script name} & \textbf{Bug description} & \textbf{LoC} & \textbf{$\downarrow$} & \textbf{D/\#B | FP} & \textbf{$t$} & $\mathcal{F}$ \\
 \midrule
 \endfirsthead
 \multicolumn{9}{@{}l@{}}{\tablename\ \thetable{} (continued)}\\
 \toprule
-\textbf{ID} & \textbf{Source} & \textbf{Script name} & \textbf{Bug description} & \textbf{LoC} & \textbf{$\downarrow$} & \textbf{D/\#B|FP} & \textbf{$t$} & $\mathcal{F}$ \\
+\textbf{ID} & \textbf{Source} & \textbf{Script name} & \textbf{Bug description} & \textbf{LoC} & \textbf{$\downarrow$} & \textbf{D/\#B | FP} & \textbf{$t$} & $\mathcal{F}$ \\
 \midrule
 \endhead
 \midrule
@@ -736,7 +787,7 @@ else:
     print(r"""% \TE indicates at least one targeted pass was required (DFS, unbound-empty DFS, or unknown-paths-are-files).
     \begin{tabular}{llllrr @{\hspace{2em}} rcc}
     \toprule
-    \textbf{ID} & \textbf{Source} & \textbf{Script name} & \textbf{Bug description} & \textbf{LoC} & \textbf{$\downarrow$} & \textbf{D/\#B|FP} & \textbf{$t$} & $\mathcal{F}$ \\
+    \textbf{ID} & \textbf{Source} & \textbf{Script name} & \textbf{Bug description} & \textbf{LoC} & \textbf{$\downarrow$} & \textbf{D/\#B | FP} & \textbf{$t$} & $\mathcal{F}$ \\
     \cmidrule(r){1-6} \cmidrule(l){7-9}
 """
     )
