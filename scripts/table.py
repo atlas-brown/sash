@@ -339,12 +339,16 @@ WILD_PROJECT_PURPOSES = {
 }
 
 WILD_CURATED_ROWS = [
-    ("moby", "Moby", "CI", 2),
+    ("pytorch", "PyTorch", "CI", 1),
+    ("test_infra", "Kubernetes", "CI", 3),
+    ("next.js", "Next.js", "CI", 1),
     ("p4-compiler", "P4 Compiler", "Build", 15),
+    ("vllm-1", "vLLM", "CI", 4),
     ("affine", "AFFiNE", "Updater", 3),
-    ("ghorg", "Ghorg", "CI", 2),
-    ("caker", "Caker", "Build", 1),
-    ("gloo-gateway-2.1-demo", "Gloo Gateway", "Uninstall", 1),
+    ("moby", "Moby", "CI", 2),
+    # ("ghorg", "Ghorg", "CI", 2),
+    # ("caker", "Caker", "Build", 1),
+    # ("gloo-gateway-2.1-demo", "Gloo Gateway", "Uninstall", 1),
 ]
 
 WILD_SOURCE_KEYS = {
@@ -488,9 +492,9 @@ if args.wild:
         row["descriptions"].update(descriptions_set)
 
     if args.appendix:
-        print(r"""\begin{tabular}{llllr}
+        print(r"""\begin{tabular}{lllr}
 \toprule
-\textbf{Project} & \textbf{Source} & \textbf{Domain} & \textbf{Bug description} & \textbf{\#B} \\
+\textbf{Project} & \textbf{Domain} & \textbf{Bug description} & \textbf{\#B} \\
 \midrule
 """)
     else:
@@ -505,11 +509,12 @@ if args.wild:
             row = wild_rows_by_project[project_name]
             purpose = WILD_PROJECT_PURPOSES.get(project_name, "Util")
             citation = render_wild_citation(project_name)
+            project_cell = f"{project_name}~{citation}" if citation else project_name
             description_cell = WILD_BENCHMARK_DESCRIPTIONS.get(
                 project_name, "; ".join(sorted(row["descriptions"]))
             )
             total_bug_count += row["bug_count"]
-            print(f"{project_name} & {citation} & {purpose} & {description_cell} & {row['bug_count']}  \\\\")
+            print(f"{project_cell} & {purpose} & {description_cell} & {row['bug_count']}  \\\\")
     else:
         for key, project_name, purpose, bug_count in WILD_CURATED_ROWS:
             project_row_name = WILD_PROJECT_NAMES.get(key, key)
@@ -520,9 +525,9 @@ if args.wild:
             total_bug_count += row["bug_count"]
     print(r"\midrule")
     if args.appendix:
-        print(rf"Total &  &  &  & {total_bug_count}  \\")
+        print(rf"Total &  &  & {total_bug_count}  \\")
     else:
-        print(rf"Total & \cf{{app:all-bug-reports}} & {total_bug_count}  \\")
+        print(rf"Total \cf{{app:all-bug-reports}} & $\ldots$ & {total_bug_count}  \\")
     print(r"""
 \bottomrule
 \end{tabular}
