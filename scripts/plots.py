@@ -1065,7 +1065,7 @@ def plot_bug_detection_bars_split_versions(data, output_path):
         alpha=0.9,
     )
 
-    right_categories = ["Real Fixes"]
+    right_categories = ["Bug Fixes"]
     right_x = np.array([0.0], dtype=float)
     right_sash = np.array([fixed_good[0]], dtype=float)
     right_shell = np.array([fixed_good[1]], dtype=float)
@@ -1091,9 +1091,29 @@ def plot_bug_detection_bars_split_versions(data, output_path):
         np.array([fixed_shell_no_fp_from_orig_missed], dtype=float),
         width=width,
         bottom=np.array([fixed_shell_no_fp_from_orig_caught], dtype=float),
-        color=shellcheck_lighter,
-        edgecolor="none",
-        linewidth=0.0,
+        facecolor="none",
+        # edgecolor=shellcheck_lighter,
+        edgecolor="0.4",
+        alpha=0.5,
+        linewidth=1.5,
+        linestyle=(0, (1.0, 2.0)),
+    )
+
+    silent_label_color="0.6"
+    x_bar = float(right_x + bar_offset)
+    y_bottom = float(fixed_shell_no_fp_from_orig_caught)
+    y_height = float(fixed_shell_no_fp_from_orig_missed)
+    y_center = y_bottom + (y_height / 2.0)
+
+    ax_right.annotate(
+        "always\nsilent",
+        xy=(x_bar + width / 5.0, y_center),
+        xytext=(6, 0),
+        textcoords="offset points",
+        ha="left",
+        va="center",
+        fontsize="small",
+        color=silent_label_color,
     )
 
     max_good = max(
@@ -1155,7 +1175,7 @@ def plot_bug_detection_bars_split_versions(data, output_path):
         pad=1,
     )
     # Keep same label-to-tick gap as the left subplot.
-    ax_right.set_ylabel("True negatives", fontsize=14, labelpad=8)
+    ax_right.set_ylabel("Fixes recognized", fontsize=14, labelpad=8)
     ax_right.yaxis.set_label_position("left")
 
     label_offset = max(0.4, y_max * 0.012)
@@ -1194,6 +1214,7 @@ def plot_bug_detection_bars_split_versions(data, output_path):
             ha="center",
             va="bottom",
             fontsize=7,
+            color=silent_label_color,
         )
     # Extra fixed ShellCheck label: true negatives on issues ShellCheck
     # actually flags on original buggy scripts (exclude "says nothing" cases).
