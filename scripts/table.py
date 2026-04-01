@@ -156,8 +156,6 @@ def feature_marks(feature_names, optimistic_forking=False, targeted_pass=False):
         marks.append(r"\SP")
     if "FS" in feature_names:
         marks.append(r"\FS")
-    if optimistic_forking:
-        marks.append(r"\OF")
     if targeted_pass:
         marks.append(r"\TE")
     marks_text = " ".join(marks) if marks else "-"
@@ -541,8 +539,8 @@ if args.wild:
 features = {
     "commits/const_cond": [], # Needs optimistic forking in the 60s sweep; no extra manual feature tag here.
     "commits/cp_nonexistent": ["CS"], # CS to reason about cp/[ behavior
-    "commits/debootstrap": ["WE", "CS"], # WE to reason about the various parameter expansions, CS to reason about rm
-    "commits/debootstrap_2": ["WE", "CS"], # WE to reason about the various parameter expansions, CS to reason about rm
+    "commits/debootstrap": ["WE", "CS", "FS"], # WE to reason about the various parameter expansions, CS to reason about rm, FS for cwd/directory loss
+    "commits/debootstrap_2": ["WE", "CS", "FS"], # WE to reason about the various parameter expansions, CS to reason about rm, FS for directory loss
     "commits/ignored_command_v": ["CS"], # CS to reason about command -v and env
     "commits/makefile": ["WE", "CS"], # WE to reason about variable expansion, CS to reason about rm
     "commits/unset_func": ["CS"], # CS to reason about shell function lookup/use-before-def behavior
@@ -552,8 +550,8 @@ features = {
     "commits/unset_var_set_u_1": ["WE"], # WE to reason about the unset variable
     "commits/unset_var_set_u_2": ["WE"], # WE to reason about the unset variable
 
-    "high_profile/c00-steam": ["WE", "CS"],
-    "high_profile/c01-bumblebee": ["CS"],
+    "high_profile/c00-steam": ["WE", "CS", "FS"],
+    "high_profile/c01-bumblebee": ["CS", "FS"],
     "high_profile/w00-itunes": ["WE", "CS"],
     "high_profile/w01-squid": ["CS"],
     "high_profile/c02-n": ["WE", "FS", "CS"],
@@ -577,7 +575,7 @@ features = {
     "simple_fs/overwrite_file_3": ["CS", "FS"], # CS to reason about cp, FS to reason about overwrites
     "simple_fs/overwrite_file_4": ["WE", "FS"], # WE to reason about the expansion of the filename, FS to reason about overwrites
 
-    "web_forums/accident": ["WE", "CS"], # WE to reason about wildcard expansion, CS to reason about rm
+    "web_forums/accident": ["WE", "CS", "FS"], # WE to reason about wildcard expansion, CS to reason about rm, FS for cwd loss
     "web_forums/capturing_empty_output": ["CS"], # CS to reason about mkdir not having output
     "web_forums/claude2": ["WE", "CS"], # WE to reason about ~ and wildcard expansion, CS to reason about rm
     "web_forums/claude3": ["CS", "FS"], # CS to reason about rm/rmdir, FS to reason about file loss
@@ -586,25 +584,25 @@ features = {
     "web_forums/claude6": ["WE", "CS"], # WE to reason about ~ as an rm argument, CS to reason about rm
     "web_forums/claude_wipe": ["WE", "CS"], # WE to expand ~, CS to reason about the destructive rm target
     "web_forums/confused_mkdir": ["CS"], # CS to reason about mkdir output/behavior
-    "web_forums/delete_home_user": ["CS"], # CS to reason about rm
-    "web_forums/delete_slash": ["CS"], # CS to reason about rm --no-preserve-root
+    "web_forums/delete_home_user": ["CS", "FS"], # CS to reason about rm, FS for home-directory loss
+    "web_forums/delete_slash": ["CS", "FS"], # CS to reason about rm --no-preserve-root, FS for filesystem loss
     "web_forums/empty_path": ["CS"], # CS to reason about command lookup after PATH is unset
-    "web_forums/find_rm": ["CS"], # CS to reason about find -exec rm
-    "web_forums/for_mv": ["WE", "CS"], # WE to reason about variable/glob expansion, CS to reason about mv
+    "web_forums/find_rm": ["CS", "FS"], # CS to reason about find -exec rm, FS for filesystem loss
+    "web_forums/for_mv": ["WE", "CS", "FS"], # WE to reason about variable/glob expansion, CS to reason about mv, FS for file movement
     "web_forums/move_home": ["CS", "FS"], # CS to reason about mv, FS to reason about directory relocation
     "web_forums/posix2": ["WE", "CS"], # WE to reason about quoted glob behavior, CS to reason about test/mv
-    "web_forums/rm_root_2": ["WE", "CS"], # WE to reason about unbound variable, CS to reason about rm
+    "web_forums/rm_root_2": ["WE", "CS", "FS"], # WE to reason about unbound variable, CS to reason about rm, FS for data loss
     "web_forums/replacement": ["FS"], # FS to reason about truncation/data loss
-    "web_forums/sc_author": ["CS"], # CS to reason about rm
-    "web_forums/silly_q": ["CS"], # CS to reason about mv argument expectations
-    "web_forums/troll": ["CS"], # CS to reason about the hidden rm
+    "web_forums/sc_author": ["CS", "FS"], # CS to reason about rm, FS for filesystem loss
+    "web_forums/silly_q": ["CS", "FS"], # CS to reason about mv argument expectations, FS for file movement
+    "web_forums/troll": ["CS", "FS"], # CS to reason about the hidden rm, FS for filesystem loss
     "web_forums/unexpected_stdin": ["CS"], # CS to reason about grep
     "web_forums/unset_var": ["WE"], # WE to reason about unbound variable
     "web_forums/unset_var-cmd_always_fails": ["WE", "CS"], # WE to reason about unbound variable, CS to reason about test command and mkdir command
     "web_forums/wrong_mkdir": ["CS"], # CS to reason about mkdir output
-    "web_forums/wrong_mv": ["WE", "CS"], # WE to reason about glob expansion, CS to reason about mv
-    "web_forums/xargs_accident_rm": ["CS"], # CS to reason about xargs/rm/mv
-    "web_forums/xargs_del_files": ["CS"], # CS to reason about xargs mv behavior
+    "web_forums/wrong_mv": ["WE", "CS", "FS"], # WE to reason about glob expansion, CS to reason about mv, FS for file movement
+    "web_forums/xargs_accident_rm": ["CS", "FS"], # CS to reason about xargs/rm/mv, FS for file loss/movement
+    "web_forums/xargs_del_files": ["CS", "FS"], # CS to reason about xargs mv behavior, FS for file movement
 }
 
 get_bm_name = benchmark_key
@@ -733,7 +731,6 @@ def create_table_line(result, allow_fallback=False):
     time = table_time_cell(result)
     # Grab just the folder and benchmark subfolder
     bm_name = get_bm_name(path)
-    bm_short_id = short_name(path, default=bm_name)
     name = names.get(bm_name, None)
     description = descriptions.get(bm_name, None)
     if name is None:
@@ -763,7 +760,7 @@ def create_table_line(result, allow_fallback=False):
     if detected < n_bugs:
         detected_prefix = rf"\textcolor{{red}}{{{detected_prefix}}}"
     bugs_detected_cell = f"{detected_prefix} | {fp_bug_count}"
-    return f"{bm_short_id} & {source} & {name} & {description} & {loc} & {depth_cell} & {bugs_detected_cell} & {time} & {feature_mark}  \\\\"
+    return f"{name} & {source} & {description} & {loc} & {depth_cell} & {bugs_detected_cell} & {time} & {feature_mark}  \\\\"
 
 rest_of_benchmarks = []
 
@@ -771,18 +768,18 @@ if args.appendix:
     print(r"""% \TE indicates at least one targeted pass was required (DFS, unbound-empty DFS, or unknown-paths-are-files).
 \setlength{\LTleft}{0pt}
 \setlength{\LTright}{0pt}
-\begin{longtable}{@{}llllrrrcc@{}}
+\begin{longtable}{@{\extracolsep{\fill}}lllrrrcl@{}}
 \toprule
-\textbf{ID} & \textbf{Source} & \textbf{Script name} & \textbf{Bug description} & \textbf{LoC} & \textbf{$\downarrow$} & \textbf{D/\#B | FP} & \textbf{$t$} & $\mathcal{F}$ \\
-\midrule
+\textbf{Script name} & \textbf{Source} & \textbf{Bug description} & \textbf{LoC} & \textbf{$\downarrow$} & \textbf{D/\#B | FP} & \textbf{$t$} & $\mathcal{F}$ \\
+\cmidrule(r){1-5} \cmidrule(l){6-8}
 \endfirsthead
-\multicolumn{9}{@{}l@{}}{\tablename\ \thetable{} (continued)}\\
+\multicolumn{8}{@{}l@{}}{\tablename\ \thetable{} (continued)}\\
 \toprule
-\textbf{ID} & \textbf{Source} & \textbf{Script name} & \textbf{Bug description} & \textbf{LoC} & \textbf{$\downarrow$} & \textbf{D/\#B | FP} & \textbf{$t$} & $\mathcal{F}$ \\
-\midrule
+\textbf{Script name} & \textbf{Source} & \textbf{Bug description} & \textbf{LoC} & \textbf{$\downarrow$} & \textbf{D/\#B | FP} & \textbf{$t$} & $\mathcal{F}$ \\
+\cmidrule(r){1-5} \cmidrule(l){6-8}
 \endhead
 \midrule
-\multicolumn{9}{r@{}}{Continued on next page}\\
+\multicolumn{8}{r@{}}{Continued on next page}\\
 \endfoot
 \bottomrule
 \endlastfoot
@@ -790,10 +787,10 @@ if args.appendix:
     )
 else:
     print(r"""% \TE indicates at least one targeted pass was required (DFS, unbound-empty DFS, or unknown-paths-are-files).
-    \begin{tabular}{llllrr @{\hspace{2em}} rcc}
+    \begin{tabular*}{\textwidth}{@{\extracolsep{\fill}}lllrrrcl@{}}
     \toprule
-    \textbf{ID} & \textbf{Source} & \textbf{Script name} & \textbf{Bug description} & \textbf{LoC} & \textbf{$\downarrow$} & \textbf{D/\#B | FP} & \textbf{$t$} & $\mathcal{F}$ \\
-    \cmidrule(r){1-6} \cmidrule(l){7-9}
+    \textbf{Script name} & \textbf{Source} & \textbf{Bug description} & \textbf{LoC} & \textbf{$\downarrow$} & \textbf{D/\#B | FP} & \textbf{$t$} & $\mathcal{F}$ \\
+    \cmidrule(r){1-5} \cmidrule(l){6-8}
 """
     )
 
@@ -837,16 +834,15 @@ if not args.appendix and rest_of_benchmarks:
     cs_count = sum(1 for r in rest_of_benchmarks if "CS" in features.get(get_bm_name(r["benchmark"]), []))
     fs_count = sum(1 for r in rest_of_benchmarks if "FS" in features.get(get_bm_name(r["benchmark"]), []))
     te_count = sum(1 for r in rest_of_benchmarks if get_bm_name(r["benchmark"]) in targeted_pass_benchmarks)
-    of_count = sum(1 for r in rest_of_benchmarks if get_bm_name(r["benchmark"]) in optimistic_forking_benchmarks)
     feature_count_marks = (
         f"{we_count}\\WE {cs_count}\\SP {fs_count}\\FS "
-        f"{of_count}\\OF {te_count}\\TE"
+        f"{te_count}\\TE"
     )
 
     rest_detect_cell = f"{detected_bugs_rest}/{total_bugs_rest}"
     if detected_bugs_rest < total_bugs_rest:
         rest_detect_cell = rf"\textcolor{{red}}{{{rest_detect_cell}}}"
-    print(rf""" ... & \cref{{sec:full-ds}} & \emph{{More buggy scripts}} &  & {loc_avg_cell} & {depth_avg_rest_cell} & {rest_detect_cell} | {fp_bugs_rest} & {time_avg_cell} & {feature_count_marks} \\""")
+    print(rf"""\emph{{More buggy scripts}} & \cref{{sec:full-ds}} &  & {loc_avg_cell} & {depth_avg_rest_cell} & {rest_detect_cell} | {fp_bugs_rest} & {time_avg_cell} & {feature_count_marks} \\""")
 
 # Print summary line across all benchmarks
 locs = [get_loc(r["benchmark"]) for r in buggy_results.to_dict(orient="records")]
@@ -877,17 +873,16 @@ we_count = sum(1 for r in buggy_results.to_dict(orient="records") if "WE" in fea
 cs_count = sum(1 for r in buggy_results.to_dict(orient="records") if "CS" in features.get(get_bm_name(r["benchmark"]), []))
 fs_count = sum(1 for r in buggy_results.to_dict(orient="records") if "FS" in features.get(get_bm_name(r["benchmark"]), []))
 te_count = sum(1 for r in buggy_results.to_dict(orient="records") if get_bm_name(r["benchmark"]) in targeted_pass_benchmarks)
-of_count = sum(1 for r in buggy_results.to_dict(orient="records") if get_bm_name(r["benchmark"]) in optimistic_forking_benchmarks)
 feature_count_marks = (
         f"{we_count}\\WE {cs_count}\\SP {fs_count}\\FS "
-        f"{of_count}\\OF {te_count}\\TE"
+        f"{te_count}\\TE"
     )
 
 total_detect_cell = f"{detected_bugs}/{total_bugs}"
 
 print(rf"""
-\cmidrule(r){{1-6}} \cmidrule(l){{7-9}}
-\textbf{{Total}} & /  & \textbf{{Arith. mean ($\sim$)}}  &  & {loc_avg_total_cell} & {depth_avg_total_cell} & {total_detect_cell} | {fp_bugs_total} & {time_avg_total_cell} & {feature_count_marks} \\ """)
+\cmidrule(r){{1-5}} \cmidrule(l){{6-8}}
+\textbf{{Total}} &  & \textbf{{Arith. mean ($\sim$)}} & {loc_avg_total_cell} & {depth_avg_total_cell} & {total_detect_cell} | {fp_bugs_total} & {time_avg_total_cell} & {feature_count_marks} \\ """)
 
 if args.appendix:
     print(r"""
@@ -896,7 +891,7 @@ if args.appendix:
 else:
     print(r"""
 \bottomrule
-\end{tabular}
+\end{tabular*}
 """)
 
 # Print some stats about the benchmarks
