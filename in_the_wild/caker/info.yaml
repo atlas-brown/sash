@@ -7,7 +7,7 @@ notes:
 
 bugs:
   bug00:
-    description: \'sudo rm -rf' called with unquoted $0-derivative
+    description: Misquoted sudo rm -rf can remove wrong paths.
     code: word_split
     shellcheck: SC2086
 

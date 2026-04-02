@@ -7,7 +7,7 @@ notes:
 
 bugs:
   bug00:
-    description: Emptiness check and error handling logic with 'set -e' enabled
+    description: Dead failure checks hide CI cloning errors.
     code: unbound_setu
     shellcheck: null
 

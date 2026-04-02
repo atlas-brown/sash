@@ -4,7 +4,7 @@ sources:
 
 bugs:
   bug00:
-    description: Inverted command existence check
+    description: Inverted tool check blocks theme update.
     code: not_a_command
     shellcheck: null
 

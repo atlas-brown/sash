@@ -1,0 +1,16 @@
+sources:
+  - https://github.com/ClouGence/hasor/blob/6341a97e8e83847847e582598940f76c37d1f438/hasor-rsf/rsf-registry/src/launcher/binary/catalina.sh
+  - https://github.com/ClouGence/hasor/pull/136
+
+bugs:
+  bug00:
+    description: Unquoted directory changes break setup on whitespace paths.
+    code: cmd_expected_path_state
+    shellcheck: SC2164
+
+ground_truths:
+  # Base versions
+  - path: original.sh
+    kind: original
+    bugs:
+      bug00: { lines: [143] }

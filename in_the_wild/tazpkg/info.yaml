@@ -4,7 +4,7 @@ sources:
 
 bugs:
   bug00:
-    description: \'mktemp' is used without '-d' and its output is used in 'cd'
+    description: Wrong mktemp kind makes cd fail.
     code: cmd_expected_path_state
     shellcheck: SC2164
 

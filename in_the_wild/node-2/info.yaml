@@ -4,7 +4,7 @@ sources:
 
 bugs:
   bug00:
-    description: Script enables 'set -u' but checks if variables are empty
+    description: Unset-var guards abort node startup setup.
     code: unbound_setu
     shellcheck: null
 

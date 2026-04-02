@@ -7,7 +7,7 @@ notes:
 
 bugs:
   bug00:
-    description: Unbound non-external variable with 'set -u'
+    description: Shell option misuse and inverted tool checks break setup and uninstall flows.
     code: unbound_setu
     shellcheck: SC2154
 

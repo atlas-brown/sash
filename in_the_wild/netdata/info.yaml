@@ -1,0 +1,16 @@
+sources:
+  - https://github.com/netdata/netdata/blob/e0ec10411bcfaeeaba331a93d5f3d96e23fa72e5/src/collectors/charts.d.plugin/charts.d.dryrun-helper.sh
+  - https://github.com/netdata/netdata/pull/21901
+
+bugs:
+  bug00:
+    description: Broken dry-run error handling hides helper failures.
+    code: const_cond
+    shellcheck: SC2181
+
+ground_truths:
+  # Base versions
+  - path: original.sh
+    kind: original
+    bugs:
+      bug00: { lines: [29] }

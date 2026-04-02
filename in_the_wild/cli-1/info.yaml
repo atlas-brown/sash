@@ -1,0 +1,16 @@
+sources:
+  - https://github.com/ipinfo/cli/blob/a9ca4b1d939d42ef2343696283ddc6382771d3c4/cidr2ip/deb.sh
+  - https://github.com/ipinfo/cli/pull/249
+
+bugs:
+  bug00:
+    description: Unquoted self-path and root variables broaden cleanup targets.
+    code: word_split
+    shellcheck: SC2086
+
+ground_truths:
+  # Base versions
+  - path: original.sh
+    kind: original
+    bugs:
+      bug00: { lines: [37] }

@@ -4,7 +4,7 @@ sources:
 
 bugs:
   bug00:
-    description: Script calls rm with user-provided, unquoted variable
+    description: Unquoted cleanup path broadens rm target.
     code: word_split
     shellcheck: SC2086
 

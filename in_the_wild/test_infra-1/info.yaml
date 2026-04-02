@@ -7,7 +7,7 @@ notes:
 
 bugs:
   bug00:
-    description: Script accidentally iterates over first element array instead of all elements
+    description: Wrong array iteration skips parts of the test matrix.
     code: loop_once
     shellcheck: SC2128
 

@@ -4,7 +4,7 @@ sources:
 
 bugs:
   bug00:
-    description: Script removes pwd unquoted
+    description: Unquoted pwd broadens cleanup target.
     code: word_split
     shellcheck: SC2046
 

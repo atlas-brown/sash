@@ -4,7 +4,7 @@ sources:
 
 bugs:
   bug00:
-    description: The script enables 'set -u' but then checks if a variable is set
+    description: Unset-var fallback is dead under set -u.
     code: unbound_setu
     shellcheck: null
 

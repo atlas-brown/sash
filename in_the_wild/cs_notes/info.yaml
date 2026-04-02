@@ -1,0 +1,16 @@
+sources:
+  - https://github.com/huangrt01/CS-Notes/blob/512c140c0b2fb6eb2bc1a8799ff2aabfa3612942/Notes/snippets/shell-example-process-files.sh
+  - https://github.com/huangrt01/CS-Notes/pull/11
+
+bugs:
+  bug00:
+    description: Undefined variables abort note-build automation.
+    code: unbound
+    shellcheck: SC2154
+
+ground_truths:
+  # Base versions
+  - path: original.sh
+    kind: original
+    bugs:
+      bug00: { lines: [19] }

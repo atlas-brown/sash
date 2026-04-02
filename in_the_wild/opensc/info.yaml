@@ -7,7 +7,7 @@ notes:
 
 bugs:
   bug00:
-    description: Arg-parsing loop can loop infinitely if an arg is missing its value
+    description: Missing option values can trap argument parsing in a loop.
     code: infinite_loop
     shellcheck: null
 

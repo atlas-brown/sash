@@ -1,0 +1,16 @@
+sources:
+  - https://github.com/RenderKit/embree/blob/d436cb396bd5d66aa147cf8165074f04cbd27436/scripts/download_gfx.sh
+  - https://github.com/RenderKit/embree/pull/590
+
+bugs:
+  bug00:
+    description: Unquoted paths broaden build-script arguments.
+    code: word_split
+    shellcheck: SC2086
+
+ground_truths:
+  # Base versions
+  - path: original.sh
+    kind: original
+    bugs:
+      bug00: { lines: [94] }

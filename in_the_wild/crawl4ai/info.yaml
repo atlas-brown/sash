@@ -4,7 +4,7 @@ sources:
 
 bugs:
   bug00:
-    description: Script checks $? with 'set -e' enabled
+    description: Status check is dead under set -e.
     code: const_cond
     shellcheck: null
 

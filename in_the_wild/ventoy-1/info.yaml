@@ -4,7 +4,7 @@ sources:
 
 bugs:
   bug00:
-    description: The script checks if a file exists, and then tries to copy that file even if it doesn't
+    description: Stale state makes file checks and copy logic misfire.
     code: cmd_expected_path_state
     shellcheck: null
 

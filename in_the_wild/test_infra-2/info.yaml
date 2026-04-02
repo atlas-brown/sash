@@ -1,0 +1,16 @@
+sources:
+  - https://github.com/kubernetes/test-infra/blob/6d80c3fb209c45722761105c54eab1c500f0636a/experiment/compatibility-versions/kind-upgrade.sh
+  - https://github.com/kubernetes/test-infra/pull/36722
+
+bugs:
+  bug00:
+    description: Misplaced function definition prevents it from being used.
+    code: function_use_before_def
+    shellcheck: null
+
+ground_truths:
+  # Base versions
+  - path: original.sh
+    kind: original
+    bugs:
+      bug00: { lines: [57, 60] }

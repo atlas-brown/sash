@@ -1,0 +1,16 @@
+sources:
+  - https://github.com/Tencent/FaceDetection-DSFD/blob/a941d089d8ae2df5292a904e79d88649cb58a440/data/scripts/COCO2014.sh
+  - https://github.com/Tencent/FaceDetection-DSFD/pull/94
+
+bugs:
+  bug00:
+    description: Mishandling of user-provided arguments prevents branch execution.
+    code: const_cond
+    shellcheck: null
+
+ground_truths:
+  # Base versions
+  - path: original.sh
+    kind: original
+    bugs:
+      bug00: { lines: [6] }

@@ -4,7 +4,7 @@ sources:
 
 bugs:
   bug00:
-    description: The script uses 'set -u' but later checks if a variable is empty, having a fallback if it is (which will never run)
+    description: Unset-var fallback aborts environment setup.
     code: unbound_setu
     shellcheck: null
 

@@ -7,7 +7,7 @@ notes:
 
 bugs:
   bug00:
-    description: An unbound variable is used due to a typo
+    description: Typo makes uninstaller cleanup dead code.
     code: unbound
     shellcheck: SC2154
 

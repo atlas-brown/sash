@@ -7,7 +7,7 @@ notes:
 
 bugs:
   bug00:
-    description: A command is treated as possibly missing, but is later on used as if it definitely exists
+    description: Missing-command assumptions break later setup logic.
     code: not_a_command
     shellcheck: null
 

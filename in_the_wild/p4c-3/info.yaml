@@ -7,7 +7,7 @@ notes:
 
 bugs:
   bug00:
-    description: User-provided variable is used unquoted in rm
+    description: Unquoted cleanup paths broaden removal targets.
     code: word_split
     shellcheck: SC2086
 

@@ -7,7 +7,7 @@ notes:
 
 bugs:
   bug00:
-    description: Script mistakenly overwrites log file with '>' instead of appending with '>>'
+    description: Wrong redirection overwrites log file.
     code: data_loss
     shellcheck: null
 

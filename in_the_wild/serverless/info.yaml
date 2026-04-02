@@ -4,7 +4,7 @@ sources:
 
 bugs:
   bug00:
-    description: Command substitution captures output of 'grep -q', which does not produce any
+    description: Empty capture breaks installer branch selection.
     code: capturing_empty_output
     shellcheck: null
 

@@ -7,7 +7,7 @@ notes:
 
 bugs:
   bug00:
-    description: The script checks $? even though 'set -e' is enabled
+    description: Dead status checks hide driver update failures.
     code: const_cond
     shellcheck: SC2181
 

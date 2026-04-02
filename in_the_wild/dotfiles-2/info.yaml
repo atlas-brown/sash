@@ -7,7 +7,7 @@ notes:
 
 bugs:
   bug00:
-    description: Indirect exit code checking with 'set -e' enabled
+    description: Shell option misuse and inverted tool checks break setup and uninstall flows.
     code: const_cond
     shellcheck: SC2181
 

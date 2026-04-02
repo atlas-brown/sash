@@ -7,7 +7,7 @@ notes:
 
 bugs:
   bug00:
-    description: The script enables 'set -u' but then checks if a variable is empty
+    description: Unset-var flag handling breaks test selection.
     code: unbound_setu
     shellcheck: null
 

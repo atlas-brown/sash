@@ -1,0 +1,16 @@
+sources:
+  - https://github.com/edeliver/edeliver/blob/817fd818e16450b3dfe3d9906527b87af11083aa/strategies/erlang-update
+  - https://github.com/edeliver/edeliver/pull/374
+
+bugs:
+  bug00:
+    description: Broken multi-host validation blocks deployment startup.
+    code: loop_once
+    shellcheck: SC066
+
+ground_truths:
+  # Base versions
+  - path: original.sh
+    kind: original
+    bugs:
+      bug00: { lines: [108] }

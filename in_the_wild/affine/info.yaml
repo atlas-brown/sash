@@ -7,7 +7,7 @@ notes:
 
 bugs:
   bug00:
-    description: Indirect exit code check with 'set -e' enabled
+    description: Dead status handling blocks version updates.
     code: const_cond
     shellcheck: SC2181
 

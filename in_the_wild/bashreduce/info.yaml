@@ -4,7 +4,7 @@ sources:
 
 bugs:
   bug00:
-    description: User-provided variable is used unquoted in rm
+    description: Unquoted input broadens rm target.
     code: word_split
     shellcheck: SC2086
 

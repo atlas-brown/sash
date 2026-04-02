@@ -4,7 +4,7 @@ sources:
 
 bugs:
   bug00:
-    description: A variable is assigned inside a subshell and then is checked outside the subshell
+    description: Stale state makes file checks and copy logic misfire.
     code: const_cond
     shellcheck: SC2031
 

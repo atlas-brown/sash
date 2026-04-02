@@ -4,7 +4,7 @@ sources:
 
 bugs:
   bug00:
-    description: Exit code is indirectly checked while 'set -e' is enabled
+    description: Indirect status checks make failure handling dead.
     code: dead_code
     shellcheck: null
 
