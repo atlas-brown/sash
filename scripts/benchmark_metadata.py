@@ -72,7 +72,7 @@ WILD_BENCHMARK_DESCRIPTIONS = {
     "AFFiNE": r"Dead status handling blocks version updates.",
     "Base Node": r"Unset-var guards abort node startup setup.",
     "BashReduce": r"Unquoted input broadens \sh{rm} target.",
-    "Batocera Linux": r"Wrong redirection overwrites accumulated logs.",
+    "Batocera Linux": r"Wrong redirection overwrites log file.",
     "Caker": r"Misquoted \sh{sudo rm -rf} can remove wrong paths.",
     "Cosmos Omnibus": r"Unquoted cleanup path broadens \sh{rm} target.",
     "Crawl4AI": r"Status check is dead under \sh{set -e}.",
