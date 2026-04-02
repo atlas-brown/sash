@@ -109,207 +109,6 @@ def _update_pwd_for_cd(state: State, expanded_args: tuple[Field, ...]) -> State:
     state = _set_env_like(state, "PWD", target)
     return state
 
-def handle_commandnode(traces: Traces,
-                       node: AST.CommandNode,
-                       config: InterpConfig) -> Traces:
-    if logging.getLogger().isEnabledFor(logging.DEBUG):
-        logging.debug("Handling command node %s with %d traces", trim_string_for_logging(node.pretty()), len(traces))
-
-    # Handle variable expansion before we evaluate the command itself
-    t1, expanded_args = expand_args_dumb(traces, node.arguments, config)
-    t1_active, t1_inactive = drop_terminated_traces(t1)
-    if not t1_active:
-        logging.debug("All traces terminated during expansion of %s", trim_string_for_logging(node.pretty()))
-        return t1
-    logging.debug("Expanded cmd to %s", expanded_args)
-
-    if expanded_args and len(node.arguments) >= 2:
-        cmd_name = expanded_args[0].try_to_str()
-        if cmd_name == "grep":
-            # If the command is `grep` and the first argument is not provided (different from an empty string),
-            # meaning a pattern is not provided for the command,
-            # `grep` will expect input from stdin instead of treating the second argument as a file.
-            if expanded_args[1].count.min == 0 and not util.is_definitely_non_empty(expanded_args[1], t1_active[0]):
-                Reporter.add_issue(reporter.UnexpectedStdin(cmd_name, context_line), config)
-        if isinstance(cmd_name, str) and _path_lookup_disabled_for_command(cmd_name, t1_active):
-            # PATH is unset and command is not guaranteed to exist
-            Reporter.add_issue(reporter.NotACommand(cmd_name, context_line), config)
-        elif cmd_name == "sudo" and len(expanded_args) >= 2:
-            # PATH is not unset (otherwise sudo would not be found)
-            sudo_cmd_name = expanded_args[1].try_to_str()
-            if isinstance(sudo_cmd_name, str) and not sudo_cmd_name.startswith("-") and (sudo_cmd_name.endswith("/") \
-                or any(sudo_cmd_name in t.latest_state.known_nonexistent_commands for t in traces)):
-                # Since sudo is a metacommand we need to check if the command it tries to invoke is valid
-                Reporter.add_issue(reporter.NotACommand(sudo_cmd_name, context_line), config)
-
-    if expanded_args:
-        match expanded_args[0].try_to_str():
-            case "rm":
-                logging.debug("Exploring all possible expansions of rm args")
-                expansions = expand_args(t1, node.arguments, config)
-                simplified_expansions = collapse_equiv_trace_expansions(expansions)
-                cmd_traces = []
-                for arg_fields, traces in simplified_expansions.items():
-                    for trace in traces:
-                        ts, tf = handle_rm(arg_fields, trace, node, config)
-                        cmd_traces.append(ts)
-                        if config.in_checked_position or config.force_fork_all:
-                            logging.debug("Adding failure traces for rm")
-                            cmd_traces.append(tf)
-                t1 = cmd_traces
-            case "sudo" if len(expanded_args) >= 2 and expanded_args[1].try_to_str() == "rm":
-                logging.debug("Exploring all possible expansions of sudo rm args")
-                expansions = expand_args(t1, node.arguments, config)
-                simplified_expansions = collapse_equiv_trace_expansions(expansions)
-                cmd_traces = []
-                for arg_fields, traces in simplified_expansions.items():
-                    if len(arg_fields) < 2 or arg_fields[1].try_to_str() != "rm":
-                        continue
-                    rm_arg_fields = tuple(arg_fields[1:])
-                    for trace in traces:
-                        ts, tf = handle_rm(rm_arg_fields, trace, node, config)
-                        cmd_traces.append(ts)
-                        if config.in_checked_position or config.force_fork_all:
-                            logging.debug("Adding failure traces for sudo rm")
-                            cmd_traces.append(tf)
-                if cmd_traces:
-                    t1 = cmd_traces
-            case "set":
-                t1 = handle_set(expanded_args, t1)
-            case "unset":
-                t1 = handle_unset(expanded_args, t1)
-            case "exit":
-                t1 = handle_exit(t1)
-            case "return":
-                if len(expanded_args) > 2 and (retval := expanded_args[1].try_to_str()) is not None:
-                    t1 = handle_return(t1, retval)
-                else:
-                    t1 = handle_return(t1, None)
-            case "break":
-                t1 = handle_break(t1, expanded_args)
-            case "continue":
-                t1 = handle_continue(t1, expanded_args)
-            case "read":
-                t1 = handle_read(expanded_args, t1, node)
-            case "xargs":
-                t1 = handle_xargs(t1, node, expanded_args, config)
-            case "eval":
-                t1 = handle_eval(t1, node, expanded_args, config)
-            case "find":
-                t1 = handle_find(t1, node, expanded_args, config)
-            # TODO: Unify rm with other commands
-            case cmd_name if spec := get_spec(cmd_name, tuple(expanded_args)):
-                logging.debug("Adding %s precondition: %s", cmd_name, spec.check)
-                if cmd_name == "env":
-                    match spec.failure_postcond:
-                        case Not(CommandExists(non_existent_cmd_field)):
-                            non_existent_cmd_name = non_existent_cmd_field.try_to_str()
-                            if isinstance(non_existent_cmd_name, str):
-                                should_report = any(
-                                    non_existent_cmd_name not in trace.latest_state.known_existing_commands
-                                    for trace in t1
-                                )
-                                if should_report:
-                                    Reporter.add_issue(reporter.NotACommand(non_existent_cmd_name, context_line), config)
-                if spec.min_operands > 0:
-                    trace_expansions = expand_args(t1, node.arguments, config)
-                    has_sufficient_operands = False
-
-                    def check_if_constrained_to_empty(c: Constraint):
-                        """Check if a constraint constrains a field to be empty."""
-                        match c:
-                            case StringEq(_, rhs):
-                                return rhs == Field(SymStr(("",)), WordCount(0, 0)) or (isinstance(rhs.content, SymStr) and rhs.content.parts == ("",))
-                            case _:
-                                return False
-
-                    for trace, trace_expanded_args in trace_expansions:
-                        if len(trace_expanded_args) > 0:
-                            total_min_words = sum(f.count.min for f in trace_expanded_args[1:])
-                            # Short-circuit: if the minimum number of words is already sufficient, there is no need to check further.
-                            if spec.min_operands <= total_min_words:
-                                has_sufficient_operands = True
-                                break
-                            total_max_words: int | float = 0
-                            has_inf = False
-                            all_definitely_empty = True
-                            for f in trace_expanded_args[1:]:
-                                if f.count.max == inf:
-                                    has_inf = True
-                                    all_definitely_empty = False
-                                    break
-                                if f.count.max > 0:
-                                    all_definitely_empty = False
-                                total_max_words += f.count.max
-                            # If all operands are definitely empty, skip this trace.
-                            if all_definitely_empty:
-                                continue
-                            if has_inf:
-                                # Prevent false positives when there are constraints that force some arguments to be empty.
-                                if any(check_if_constrained_to_empty(cond.constraint) for cond in trace.latest_state.pathcond):
-                                    continue
-                                has_sufficient_operands = True
-                                break
-                            # If the total maximum number of words is sufficient, then we should not report a `command_can_only_fail` issue.
-                            if total_max_words >= spec.min_operands:
-                                has_sufficient_operands = True
-                                break
-                    if not has_sufficient_operands:
-                        assert isinstance(cmd_name, str), "cmd_name should be str when a spec is found"
-                        Reporter.add_issue(reporter.CommandCanOnlyFail(cmd_name, context_line), config)
-                if spec.check:
-                    t_precond = trace_map(t1, lambda s: s.add_assertion(spec.check, source_str=node.pretty(), source_line=context_line))
-                    if config.debug_instrumentation:
-                        for trace in t1:
-                            DebugLogger.log_assertion(spec.check, trace.latest_state, context_line, config.current_pass)
-                else:
-                    t_precond = t1
-
-                knowledge_before_exec, knowledge_after_exec = spec.success_postcond if isinstance(spec.success_postcond, tuple) else (Empty(), spec.success_postcond)
-                t_success_precond = [t for t in t_precond if not _pathcond_contradicts(t.latest_state, knowledge_after_exec)]
-                t_success = trace_map(t_success_precond,
-                                      lambda s: s.add_pathcond(knowledge_before_exec)\
-                                                 .update_fs(knowledge_after_exec)\
-                                                 .add_pathcond(knowledge_after_exec)\
-                                                 .update_known_commands(knowledge_after_exec)\
-                                                 .set_last_exit_code(SymStr(("0",)),
-                                                                     Confidence.DEFINITE if s.opts.is_set(SetOptions.NOFAIL) and not config.in_checked_position else Confidence.SPECULATIVE,
-                                                                     spec.failure_postcond))
-                if cmd_name == "cd": # TODO: Put this somewhere better
-                    t_success = trace_map(t_success, lambda s: _update_pwd_for_cd(s, tuple(expanded_args)))
-                t_failure = []
-                if config.in_checked_position or config.force_fork_all:
-                    t_failure_precond = [t for t in t_precond if not _pathcond_contradicts(t.latest_state, spec.failure_postcond)]
-                    t_failure = trace_map(t_failure_precond,
-                                          lambda s: s.update_fs(spec.failure_postcond)\
-                                                     .add_pathcond(spec.failure_postcond)\
-                                                     .update_known_commands(spec.failure_postcond)\
-                                                     .set_last_exit_code(SymStr(("1",)),
-                                                                         Confidence.SPECULATIVE,
-                                                                         spec.failure_postcond))
-                t1 = t_success + t_failure
-            case some_name if isinstance(some_name, str):
-                # todo: we could actually not use `expand_args_dumb` here, and instead do trace-specific expansion, since the function body is handled trace-specifically anyway
-                # deferred for now until we actually need it (see test_function_call_multipath)
-                t1 = handle_function_call_or_unknown(some_name, expanded_args[1:], t1, config)
-            case _:
-                logging.debug("Non-constant command invocation %s, optimistically treating as no-op", expanded_args)
-                # In checked positions (if/while conditions), non-constant commands may either
-                # succeed or fail. Keep both outcomes to avoid incorrectly pruning branches.
-                if config.in_checked_position or config.force_fork_all:
-                    t_success = trace_map(t1, lambda s: s.set_last_exit_code(SymStr(("0",)), Confidence.SPECULATIVE))
-                    t_failure = trace_map(t1, lambda s: s.set_last_exit_code(SymStr(("1",)), Confidence.SPECULATIVE))
-                    t1 = t_success + t_failure
-
-    for redir in node.redir_list:
-        t1 = guarded_interp_node(t1, redir, config)
-
-    config.apply_expanded_command_cbs(expanded_args)
-
-    if logging.getLogger().isEnabledFor(logging.DEBUG):
-        logging.debug("Done with command %s after expanding its args to %s (it had assignments: %s)",
-                      trim_string_for_logging(node.pretty()), expanded_args, node.assignments)
-    return t1
 
 def extract_literal_strings_from_arg(arg: list[AST.ArgChar]) -> str:
     """Extract all literal character strings from an argument."""
@@ -390,12 +189,14 @@ def _node_invocation_name(node: AST.CommandNode) -> str:
         return node.pretty()
     return _normalized_cmd_name(tokens[0])
 
+
 # Case where the output string can be determined
 def word_count_from_output(output: str) -> WordCount:
     if output == "":
         return WordCount(0, 0)
     words = output.split()
     return WordCount(len(words), len(words))
+
 
 def command_substitution_output(cmd_name: str,
                                 operands: list[Field],
@@ -436,417 +237,10 @@ def command_substitution_output(cmd_name: str,
         case _:
             return None, state
 
-def handle_rm(expanded_args: tuple[Field, ...], trace: Trace, node: AST.CommandNode, config: InterpConfig) -> tuple[Trace, Trace]:
-    logging.debug("Checking rm command with expansion possibility: %s", expanded_args)
-    spec = get_spec("rm", expanded_args)
-
-    assert spec is not None, "Expected rm spec to always be found"
-
-    if spec.check:
-        logging.debug("Adding rm precondition: %s", spec.check)
-        DebugLogger.log_assertion(spec.check, trace.latest_state, context_line, config.current_pass)
-        trace = trace.extend(lambda s: s.add_assertion(spec.check, source_str=node.pretty(), source_line=context_line))
-
-    non_flag_args = [arg for arg in expanded_args[1:] if not util.is_flag(arg)]
-
-    pwdval = trace.latest_state.lookup("PWD")
-    start_pwdval = trace.latest_state.lookup(config.pwd_init_var)
-    homeval = trace.latest_state.lookup("HOME")
-
-    def same_location(lhs: Field, rhs: Field) -> bool:
-        lhs_str = lhs.try_to_str()
-        rhs_str = rhs.try_to_str()
-        if lhs_str is not None and rhs_str is not None:
-            return lhs.try_without_trailing_slash() == rhs.try_without_trailing_slash()
-        lhs_core = util.field_core_key(lhs)
-        rhs_core = util.field_core_key(rhs)
-        return lhs_core is not None and lhs_core == rhs_core
-
-    def path_depth_from_base(base_path: str, target_path: str) -> int | None:
-        # Return how many segments `target_path` is below `base_path`.
-        # 0 means equal, 1 means immediate child, 2+ means deeper.
-        base_parts = [p for p in base_path.strip("/").split("/") if p]
-        target_parts = [p for p in target_path.strip("/").split("/") if p]
-        if target_parts[:len(base_parts)] != base_parts:
-            return None
-        return len(target_parts) - len(base_parts)
-
-    def home_depth(pwd: Field, home: Field) -> int | None:
-        pwd_str = pwd.try_to_str()
-        home_str = home.try_to_str()
-        if pwd_str is not None and home_str is not None:
-            return path_depth_from_base(home_str, pwd_str)
-
-        pwd_core = util.field_core_key(pwd)
-        home_core = util.field_core_key(home)
-        if pwd_core is None or home_core is None or pwd_core != home_core:
-            return None
-
-        pwd_suffix = ""
-        if isinstance(pwd.content, CompletelyArbitrary) and pwd.content.suffix is not None:
-            pwd_suffix = pwd.content.suffix.try_to_str()
-            if pwd_suffix is None:
-                return 0  # conservative fallback
-        home_suffix = ""
-        if isinstance(home.content, CompletelyArbitrary) and home.content.suffix is not None:
-            home_suffix = home.content.suffix.try_to_str()
-            if home_suffix is None:
-                return 0  # conservative fallback
-        return path_depth_from_base(home_suffix, pwd_suffix)
-
-    def could_equal_literal(field: Field, literal: str) -> bool:
-        field_str = field.try_to_str()
-        if field_str is not None:
-            return field_str == literal
-
-        if field.count.min > 1 or field.count.max < 1:
-            return False
-
-        match field.content:
-            case CompletelyArbitrary(prefix=prefix, suffix=suffix):
-                if prefix is not None and (prefix_str := prefix.try_to_str()) is not None and not literal.startswith(prefix_str):
-                    return False
-                if suffix is not None and (suffix_str := suffix.try_to_str()) is not None and not literal.endswith(suffix_str):
-                    return False
-                return True
-            case _:
-                return True
-
-    at_pwd_init = pwdval is not None and start_pwdval is not None and same_location(pwdval.value, start_pwdval.value)
-    home_level = home_depth(pwdval.value, homeval.value) if (pwdval is not None and homeval is not None) else None
-    at_home_top_level = home_level is not None and home_level <= 1
-    # TODO: Replace this heuristic with a proper "current working directory" abstraction independent of env-field shape.
-    if (
-        (at_pwd_init or at_home_top_level)
-        and any(arg.try_to_str() == "*" for arg in non_flag_args)
-    ):
-        Reporter.add_issue(reporter.DeleteSystemFile(pwdval.value.try_to_str() or "PWD", context_line), config)
-
-    if non_flag_args:
-        if pwdval is not None: # Can be empty if the script unsets it
-            trace = trace.extend(lambda s: s.add_assertion(SimpleConstraint(And.from_field_iter(non_flag_args,
-                                                                                                lambda arg_field: Not(StringEq(arg_field, pwdval.value))),
-                                                                            lambda line: reporter.DeleteSystemFile("PWD", line)),
-                                                        node.pretty(),
-                                                        context_line, priority=10, include_fs=False))
-
-    protected_paths = Config.get("PROTECTED_PATHS")
-    if protected_paths:
-        protected_checks = tuple(
-            (
-                And.from_field_iter(
-                    tuple(arg_field for arg_field in non_flag_args if could_equal_literal(arg_field, path)),
-                    lambda arg_field, p=path: Not(
-                        StringEq(arg_field, Field(SymStr((p,)), WordCount(1, 1)))
-                    ),
-                ),
-                lambda line, p=path: reporter.DeleteSystemFile(p, line),
-            )
-            for path in protected_paths
-            if any(could_equal_literal(arg_field, path) for arg_field in non_flag_args)
-        )
-        if protected_checks:
-            trace = trace.extend(
-                lambda s: s.add_assertion(
-                    SimpleConstraint(*protected_checks[0]) if len(protected_checks) == 1 else RefineableConstraint(
-                        And.from_iter(check for check, _ in protected_checks),
-                        protected_checks,
-                    ),
-                    node.pretty(),
-                    context_line,
-                    priority=10,
-                    include_fs=False,
-                )
-            )
-
-
-    for arg_idx, arg_field in enumerate(expanded_args[1:], start=1):
-        if util.is_flag(arg_field):
-            continue
-        definitely_non_empty = util.is_definitely_non_empty(arg_field, trace)
-        logging.debug("arg %d: %s, definitely_non_empty=%s", arg_idx, arg_field, definitely_non_empty)
-        if path := arg_field.try_to_str():
-            if util.is_protected(path):
-                Reporter.add_issue(reporter.DeleteSystemFile(path, context_line), config)
-            if util.is_user_directory(path):
-                Reporter.add_issue(reporter.DeleteUserDirectory(path, context_line), config)
-
-        def maybe_report_protected_split(content: CompletelyArbitrary, max_words: int | float) -> None:
-            if content.maybe_empty and content.quoted and not definitely_non_empty:
-                # "<pre>$VAR<post>" but $VAR could be empty
-                exp = ""
-                if content.prefix is not None and (pre := content.prefix.try_to_str()):
-                    exp += pre
-                if content.suffix is not None and (suf := content.suffix.try_to_str()):
-                    exp += suf
-                if util.is_protected(exp):
-                    Reporter.add_issue(reporter.WordSplitCouldDeleteSystemFile(exp, context_line), config)
-
-            if max_words > 1 and not content.quoted:
-                if content.prefix is not None and (pre := content.prefix.try_to_str()) and util.is_protected(pre):
-                    Reporter.add_issue(reporter.WordSplitCouldDeleteSystemFile(pre, context_line), config)
-                if content.suffix is not None and (suf := content.suffix.try_to_str()) and util.is_protected(suf):
-                    Reporter.add_issue(reporter.WordSplitCouldDeleteSystemFile(suf, context_line), config)
-
-        match arg_field:
-            case Field(CompletelyArbitrary() as content, WordCount(_, max_words)):
-                if not content.quoted and max_words > 1:
-                    Reporter.add_issue(reporter.DangerousWordSplit(content.source, context_line), config)
-                maybe_report_protected_split(content, max_words)
-
-    return (
-        trace.extend(lambda s: s.update_fs(spec.success_postcond)\
-                                .add_pathcond(spec.success_postcond)\
-                                .set_last_exit_code(SymStr(("0",)), Confidence.SPECULATIVE, spec.failure_postcond)),
-        trace.extend(lambda s: s.update_fs(spec.failure_postcond)\
-                                .add_pathcond(spec.failure_postcond)\
-                                .set_last_exit_code(SymStr(("1",)), Confidence.SPECULATIVE, spec.failure_postcond))
-    )
-
-
-def handle_find(traces: Traces,
-                node: AST.CommandNode,
-                expanded_args: list[Field],
-                config: InterpConfig) -> Traces:
-    arg_strs = [f.try_to_str() for f in expanded_args]
-    if any(arg is None for arg in arg_strs):
-        return handle_unknown_command("find", expanded_args[1:], traces, config)
-
-    args = [arg for arg in arg_strs if isinstance(arg, str)]
-
-    # Parse starting points: positional args before the first expression term.
-    search_roots: list[str] = []
-    for tok in args[1:]:
-        if tok.startswith("-") or tok in {"!", "(", ")"}:
-            break
-        search_roots.append(tok)
-    if not search_roots:
-        search_roots = ["."]
-
-    def literal_argchars(s: str) -> list[AST.ArgChar]:
-        return [AST.CArgChar(ord(ch)) for ch in s]
-
-    def symbolic_suffix_argchars(prefix: str) -> list[AST.ArgChar]:
-        # quoted command substitution -> one symbolic path segment
-        return literal_argchars(prefix) + [AST.QArgChar([AST.BArgChar(AST.CommandNode(node.line_number, [], [], []))])]
-
-    def path_variants(root: str) -> list[list[AST.ArgChar]]:
-        root_with_slash = root if root.endswith("/") else f"{root}/"
-        variants = [
-            literal_argchars(root),
-            symbolic_suffix_argchars(root),
-            symbolic_suffix_argchars(root_with_slash),
-        ]
-        deduped: list[list[AST.ArgChar]] = []
-        seen = set()
-        for argchars in variants:
-            key = tuple(ch.pretty() for ch in argchars)
-            if key not in seen:
-                seen.add(key)
-                deduped.append(argchars)
-        return deduped
-
-    generated_cmd_traces: Traces = []
-
-    # Approximate `find ... -exec cmd ... {} ... \;` by unrolling into synthetic command nodes.
-    # TODO: model find's expression language and -exec argument expansion soundly.
-    i = 1
-    while i < len(args):
-        if args[i] == "-exec" and i + 1 < len(args):
-            j = i + 1
-            exec_args: list[str] = []
-            has_placeholder = False
-            while j < len(args) and args[j] not in {";", "\\;", "+"}:
-                if args[j] == "{}":
-                    has_placeholder = True
-                j += 1
-                exec_args.append(args[j - 1])
-
-            if j < len(args) and has_placeholder and exec_args:
-                for root in search_roots:
-                    for placeholder_arg in path_variants(root):
-                        mangled_cmdnode = deepcopy(node)
-                        mangled_cmdnode.arguments = []
-                        mangled_cmdnode.assignments = []
-                        mangled_cmdnode.redir_list = []
-                        for tok in exec_args:
-                            if tok == "{}":
-                                mangled_cmdnode.arguments.append(deepcopy(placeholder_arg))
-                            else:
-                                mangled_cmdnode.arguments.append(literal_argchars(tok))
-                        generated_cmd_traces.extend(handle_commandnode(traces, mangled_cmdnode, config))
-                i = j
-        i += 1
-
-    if generated_cmd_traces:
-        return generated_cmd_traces
-    return handle_unknown_command("find", expanded_args[1:], traces, config)
-
-
-def handle_function_call_or_unknown(func_name: str,
-                                    arg_fields: list[Field],
-                                    traces: Traces,
-                                    config: InterpConfig) -> Traces:
-    # is it a known function, and the same one across all traces?
-    func_defs = {t.latest_state.lookup_fundef(func_name) for t in traces}
-    if len(func_defs) == 1:
-        if None in func_defs:
-            return handle_unknown_command(func_name, arg_fields, traces, config)
-        else:
-            if config.ignore_function_calls or func_name in config.ignore_function_calls_for:
-                logging.debug("Ignoring function call to %s (configured as no-op)", func_name)
-                return traces
-            the_func = func_defs.pop()
-            assert isinstance(the_func, FrozenAst)
-            return handle_function_call(func_name, the_func.ast, arg_fields, traces, config)
-    else:
-        logging.error("Name %s is defined as different functions across traces, giving up on this call", func_name)
-        return traces
-
-def handle_unknown_command(name: str,
-                           arg_fields: list[Field],
-                           traces: Traces,
-                           config: InterpConfig) -> Traces:
-    if name in func_map.funcs.keys():
-        Reporter.add_issue(reporter.UndefinedFunction(name, context_line), config)
-
-    if name.endswith("/") \
-       or any(name in t.latest_state.known_nonexistent_commands for t in traces):
-        Reporter.add_issue(reporter.NotACommand(name, context_line), config)
-
-    logging.debug("Unknown command %s, optimistically treating as no-op", name) # that reads its operands", name)
-    # mark all args as being read
-    #t = trace_map(traces, lambda s: s.update_fs(And.from_field_iter(arg_fields, lambda f: IsFile(f) >> IsRead(f))))
-    #return t
-    # this makes execution significantly slower, so for now leave it commented out
-    if config.in_checked_position or config.force_fork_all:
-        t_success = trace_map(traces, lambda s: s.set_last_exit_code(SymStr(("0",)), Confidence.SPECULATIVE))
-        t_failure = trace_map(traces, lambda s: s.set_last_exit_code(SymStr(("1",)), Confidence.SPECULATIVE))
-        return t_success + t_failure
-    return traces
-
-def handle_function_call(name: str,
-                         func_node: AST.DefunNode,
-                         arg_fields: list[Field],
-                         traces: Traces,
-                         config: InterpConfig) -> Traces:
-    if config.ignore_function_calls or name in config.ignore_function_calls_for:
-        logging.debug("Ignoring function call to %s (configured as no-op)", name)
-        return traces
-    if logging.getLogger().isEnabledFor(logging.DEBUG):
-        logging.debug("Handling function call to %s with args %s",
-                      trim_string_for_logging(func_node.pretty()), arg_fields)
-
-    func_map.called.add(name) # record that this function was called
-    # As long as arg_fields are a single word, map those to local positional parameters
-    # as soon as we hit a field that is not a single word, give up
-    localenv: dict[str, ShellVar] = {}
-    for i, arg in enumerate(arg_fields):
-        if arg.count == WordCount(1, 1):
-            localenv[str(i + 1)] = ShellVar(arg)
-        else:
-            logging.debug("Function argument %d is not guaranteed to be a single word, giving up on positional parameters (%s)", i, arg)
-            break
-    logging.debug("Bound localenv for call: %s", localenv)
-    t1 = []
-    for t in traces:
-        if name in t.latest_state.call_stack:
-            logging.error("Found recursive function definition! %s via %s", name, t.latest_state.call_stack)
-            return traces
-        t1.append(t.extend(lambda s: s.enter_function(name).extend_localenv(localenv)))
-    call_result_traces = guarded_interp_node(t1, func_node.body, config)
-    # TODO: should actually pop the localenv as well! need a stack of localenvs...
-    return [t.extend(lambda s: s.set_returning(False).exit_function()) for t in call_result_traces]
-
-def record_assignment(trace: Trace, var: str, rhs: Field, definite_confidence: bool = True) -> Trace:
-    conf = Confidence.DEFINITE if definite_confidence else Confidence.SPECULATIVE
-    return trace.extend(lambda s: s.set_env(var, ShellVar(rhs)).set_last_exit_code(SymStr(("0",)), conf))
-
-def handle_while(traces: Traces,
-                 node: AST.WhileNode,
-                 config: InterpConfig):
-    logging.debug("Checking while loop for an infinite loop")
-    test_cmds = []
-    def get_the_test(cmd_fields):
-        test_cmds.append(cmd_fields)
-    temp_config = config.add_expanded_command_callback(get_the_test)
-
-
-    logging.debug("Interpreting first iteration")
-    t1 = guarded_interp_node(traces, node.test, temp_config)
-    logging.debug("collected test_cmds: %s", test_cmds)
-    if config.branch_policy_pre is not None:
-        decision = config.branch_policy_pre(node)
-        t_true = [t for t in t1 if t.latest_state.last_exit_code[0] == SymStr(("0",))]
-        t_false = [t for t in t1 if t.latest_state.last_exit_code[0] == SymStr(("1",))]
-        t_other = [t for t in t1 if t.latest_state.last_exit_code[0] not in {SymStr(("0",)), SymStr(("1",))}]
-        t_true = t_true + trace_map(t_other, lambda s: s.set_last_exit_code(SymStr(("0",)), Confidence.SPECULATIVE))
-        t_false = t_false + trace_map(t_other, lambda s: s.set_last_exit_code(SymStr(("1",)), Confidence.SPECULATIVE))
-        if decision == BranchDecision.FIRST:
-            logging.debug("While loop single-path decision: take body once")
-            t_body = guarded_interp_node(t_true, node.body, config)
-            t_body, broken = consume_break_traces(t_body)
-            t_body, continued, propagated_continue = consume_continue_traces(t_body)
-            return t_body + broken + continued + propagated_continue
-        logging.debug("While loop single-path decision: skip body")
-        return t_false
-    # Special case: never runs
-    if len(test_cmds) > 0 and interpret_test(test_cmds[0]) == False:
-        logging.debug("While loop never runs")
-        return t1
-
-    t1 = [t for t in t1 if t.latest_state.last_exit_code != (SymStr(("1",)), Confidence.DEFINITE)]
-    t_skip_body = [t for t in traces if t.latest_state.last_exit_code == (SymStr(("1",)), Confidence.DEFINITE)]
-    t2 = guarded_interp_node(t1, node.body, config)
-    t2, break_exit = consume_break_traces(t2)
-    t2, continue_next_iter, continue_exit = consume_continue_traces(t2)
-    t2 = t2 + continue_next_iter
-    t_skip_body = t_skip_body + break_exit + continue_exit
-
-
-    logging.debug("Interpreting second iteration")
-    # If all traces happen to terminate in the body, t3 will be empty after the next line
-    # Additionally, test_cmds will not have a second entry
-    t3 = guarded_interp_node(t2, node.test, temp_config)
-    if len(t3) == 0:
-        logging.debug("All traces terminated on first iter of while body")
-        return t3 + t_skip_body
-    # Special case: only one iteration
-    if len(test_cmds) < 2:
-        logging.debug("Failing to collect test commands? Giving up on constant loop checks.")
-        return t3 + t_skip_body
-    elif interpret_test(test_cmds[1]) == False:
-        logging.debug("While loop only runs once")
-        return t3 + t_skip_body
-    elif is_constant_test(test_cmds[0], test_cmds[1]):
-        Reporter.add_issue(reporter.InfiniteLoop(node, context_line), config)
-        return t3 + t_skip_body
-    logging.debug("collected test_cmds: %s", test_cmds)
-    # todo extend path condition
-    t4 = guarded_interp_node(t3, node.body, config)
-    t4, break_exit = consume_break_traces(t4)
-    t4, continue_next_iter, continue_exit = consume_continue_traces(t4)
-    t4 = t4 + continue_next_iter
-    t_skip_body = t_skip_body + break_exit + continue_exit
-
-
-    logging.debug("Interpreting third test")
-    t5 = guarded_interp_node(t4, node.test, temp_config)
-    # If all traces happen to terminate on the second iteration, t5 will be empty
-    # Additionally, test_cmds will not have a third entry
-    if len(t5) == 0:
-        logging.debug("All traces terminated on second iter of while body")
-        return t5 + t_skip_body
-    logging.debug("collected test_cmds: %s", test_cmds)
-
-    logging.debug("Checking constant test cond")
-    if len(test_cmds) > 2 and is_constant_test(test_cmds[2], test_cmds[1]):
-        Reporter.add_issue(reporter.InfiniteLoop(node, context_line), config)
-
-    return t5 + t_skip_body
 
 def is_test(s):
     return s in ["test", "["]
+
 
 def is_constant_test(cmd1: list[Field], cmd2: list[Field]) -> bool:
     """Return true if `cmd1` and `cmd2` are both tests that always have the same result."""
@@ -859,205 +253,6 @@ def is_constant_test(cmd1: list[Field], cmd2: list[Field]) -> bool:
             return all(f1 == f2 for f1, f2 in zip(cmd1[1:], cmd2[1:]))
         case _:
             return False
-
-def interpret_test(cmd: list[Field]) -> bool | None:
-    """Return true or false if `cmd` is a test that always returns either of the two results. Return None if unknown."""
-    if len(cmd) < 1:
-        return None
-
-    if not isinstance(cmd[0].content, SymStr):
-        return None
-
-    if not is_test(cmd[0].content.parts[0]):
-        return None
-
-    args = cmd[1:]
-    if cmd[-1].content == SymStr(("]",)):
-        args = args[:-1]
-    if not len(args) in {2, 3}:
-        return None
-
-    def definitely_empty(field: Field) -> bool:
-        field_str = field.try_to_str()
-        if field_str is not None:
-            return field_str == ""
-        return field.count.max == 0
-
-    def definitely_non_empty(field: Field) -> bool:
-        field_str = field.try_to_str()
-        if field_str is not None:
-            return field_str != ""
-        return False
-
-    if len(args) == 2:
-        if args[0].content == SymStr(("!",)):
-            res = interpret_test(args[1:])
-            return not res if res is not None else None
-        match (args[0].content, args[1].content):
-            case (SymStr([op]), SymStr([s])) if op == "-n":
-                return s != ""
-            case (SymStr([op]), SymStr([s])) if op == "-z":
-                return s == ""
-            case (SymStr([op]), _) if op == "-n":
-                if definitely_non_empty(args[1]):
-                    return True
-                if definitely_empty(args[1]):
-                    return False
-                return None
-            case (SymStr([op]), _) if op == "-z":
-                if definitely_empty(args[1]):
-                    return True
-                if definitely_non_empty(args[1]):
-                    return False
-                return None
-            case (SymStr([op]), SymStr([s1])) if op in {"-f", "-d", "-e"} and s1 == "":
-                return False
-            case _:
-                return None
-
-    if len(args) == 3:
-        match (args[0].content, args[1].content, args[2].content):
-            case (SymStr([s1]), SymStr([op]), SymStr([s2])) if op == "=":
-                return s1 == s2
-            case (SymStr([s1]), SymStr([op]), SymStr([s2])) if op == "!=":
-                return s1 != s2
-            case (CompletelyArbitrary() as lhs, SymStr([op]), CompletelyArbitrary() as rhs) if op in ["=", "!="]:
-                # if the two are definitely the same, we can say something in this case
-                if lhs == rhs:
-                    return op == "="
-                else:
-                    return None
-            case (SymStr([s1]), SymStr([op]), SymStr([s2])) if op in ["-eq", "-ne", "-lt", "-le", "-gt", "-ge"]:
-                try:
-                    assert isinstance(s1, str) and isinstance(s2, str)
-                    n1 = int(s1)
-                    n2 = int(s2)
-                except ValueError:
-                    return None
-                match op:
-                    case "-eq":
-                        return n1 == n2
-                    case "-ne":
-                        return n1 != n2
-                    case "-lt":
-                        return n1 < n2
-                    case "-le":
-                        return n1 <= n2
-                    case "-gt":
-                        return n1 > n2
-                    case "-ge":
-                        return n1 >= n2
-            case _:
-                return None
-
-    return None
-
-def handle_set(expanded_args: list[Field], traces: Traces) -> Traces:
-    to_set = set()
-    for arg in expanded_args[1:]:
-        match arg:
-            case Field(SymStr([flag]), WordCount(1, 1)) if isinstance(flag, str):
-                if flag.startswith("-"):
-                    if SetOptions.relevant(flag):
-                        to_set.update(flag[1:])
-                    else:
-                        logging.debug("set: ignoring irrelevant option: %s", flag)
-                elif flag.startswith("+"):
-                    raise NotImplementedError(f"set: option unsetting not implemented: {expanded_args}")
-                else:
-                    logging.debug("set: ignoring non-option argument: %s", flag)
-                    pass # It's probably pipefail tbh
-            case _:
-                raise NotImplementedError(f"set with non-constant args: {expanded_args}")
-    return trace_map(traces, lambda s: s.set_options(to_set))
-
-def handle_unset(expanded_args: list[Field], traces: Traces) -> Traces:
-    vars_to_unset: list[str] = []
-    for arg in expanded_args[1:]:
-        var_name = arg.try_to_str()
-        if not var_name:
-            raise NotImplementedError(f"unset with non-constant args: {expanded_args}")
-        vars_to_unset.append(var_name)
-
-    empty = Field(SymStr(("",)), WordCount(0, 0))
-
-    def apply_unset(state: State) -> State:
-        updated = state
-        for var_name in vars_to_unset:
-            # Model unset as a ghost empty variable so expansions treat it as unset-like.
-            updated = updated.set_env(var_name, ShellVar(empty, ghost=True))
-        return updated
-
-    return trace_map(traces, apply_unset)
-
-def handle_if(traces: Traces, node: AST.IfNode, config: InterpConfig) -> Traces:
-    test_line_number = context_line
-    test_cmds = []
-    def get_the_test(cmd_fields):
-        nonlocal test_line_number
-        test_line_number = context_line
-        test_cmds.append(cmd_fields)
-    temp_config = config.add_expanded_command_callback(get_the_test)
-    temp_config = replace(temp_config, in_checked_position=True)
-    t1 = guarded_interp_node(traces, node.cond, temp_config)
-    logging.debug("collected test_cmds: %s", test_cmds)
-    logging.debug("Checking constant test cond")
-    if len(test_cmds) == 0:
-        logging.warning("Failed to collect any test commands? Giving up on constant condition check.")
-        test_result = None
-    else:
-        logging.debug("Checking if test command %s is constant true/false", test_cmds[-1])
-        test_result = interpret_test(test_cmds[-1])
-        logging.debug("Test command result: %s", test_result)
-    if test_result is not None:
-        Reporter.add_issue(reporter.ConstantCondition(test_cmds, test_line_number), config)
-        if test_result == True and (node.else_b is not None and node.else_b.pretty()):
-                                                             # Hack because libdash sometimes gives empty else bodies
-            t1 = trace_map(t1, lambda s: s.set_last_exit_code(SymStr(("0",)), Confidence.DEFINITE))
-            logging.debug("Reporting dead code in else branch.")
-            Reporter.add_issue(reporter.DeadCode(node.else_b, test_line_number), config)
-        elif test_result == False:
-            t1 = trace_map(t1, lambda s: s.set_last_exit_code(SymStr(("1",)), Confidence.DEFINITE))
-            logging.debug("Reporting dead code in then branch")
-            Reporter.add_issue(reporter.DeadCode(node.then_b, test_line_number), config)
-    else:
-        logging.debug("FORK: explicit if")
-    # Several possibilities here:
-    # 1. Constant test true -- interpret then_b and return that
-    # 2. Constant test false with no else -- just return t1
-    # 3. Constant test false with else -- interpret else_b and return that
-    # 4. Non-constant test -- interpret both branches and combine results
-    if test_result is True:
-        return guarded_interp_node(t1, node.then_b, config)
-    elif test_result is False:
-        if node.else_b is not None:
-            return guarded_interp_node(t1, node.else_b, config)
-        else:
-            return t1
-    else:
-        if config.branch_policy_pre is not None:
-            decision = config.branch_policy_pre(node)
-            logging.debug("If statement single-path decision: %s", decision)
-            if decision == BranchDecision.FIRST:
-                return guarded_interp_node(t1, node.then_b, config)
-            if decision == BranchDecision.SECOND:
-                if node.else_b is not None:
-                    return guarded_interp_node(t1, node.else_b, config)
-                return t1
-        return handle_branch(t1,
-                            lambda ts: guarded_interp_node(ts, node.then_b, config),
-                            lambda fs: guarded_interp_node(fs, node.else_b, config) if node.else_b is not None else fs,
-                            node,
-                            config)
-
-def handle_exit(traces: Traces) -> Traces:
-    logging.debug("Handling exit command, terminating %d traces", len(traces))
-    return trace_map(traces, lambda s: s.terminate())
-
-def handle_return(traces: Traces, retval: str | None) -> Traces:
-    logging.debug("Handling return command")
-    # TODO: handle return value properly
-    return trace_map(traces, lambda s: s.set_returning(True) if s.is_in_function() else s)
 
 
 def _parse_loop_control_level(expanded_args: list[Field]) -> int:
@@ -1072,128 +267,6 @@ def _parse_loop_control_level(expanded_args: list[Field]) -> int:
         return 1
     return max(level, 1)
 
-
-def handle_break(traces: Traces, expanded_args: list[Field]) -> Traces:
-    level = _parse_loop_control_level(expanded_args)
-    logging.debug("Handling break command with level %d", level)
-    return trace_map(traces, lambda s: s.set_break_level(level))
-
-
-def handle_continue(traces: Traces, expanded_args: list[Field]) -> Traces:
-    level = _parse_loop_control_level(expanded_args)
-    logging.debug("Handling continue command with level %d", level)
-    return trace_map(traces, lambda s: s.set_continue_level(level))
-
-def handle_branch(traces: Traces, success_cb: Callable[[Traces], Traces], failure_cb: Callable[[Traces], Traces], node: AST.AstNode, config: InterpConfig) -> Traces:
-    t_success = [t for t in traces if t.latest_state.last_exit_code[0] == SymStr(("0",))]
-    t_failure = [t for t in traces if t.latest_state.last_exit_code[0] == SymStr(("1",))]
-    t_other   = [t for t in traces if t.latest_state.last_exit_code[0] not in {SymStr(("0",)), SymStr(("1",))}]
-    t_then = success_cb(t_success + trace_map(t_other, lambda s: s.set_last_exit_code(SymStr(("0",)), Confidence.SPECULATIVE)))
-    t_else = failure_cb(t_failure + trace_map(t_other, lambda s: s.set_last_exit_code(SymStr(("1",)), Confidence.SPECULATIVE)))
-    t_then_bp, t_else_bp = config.branch_policy(node, t_then, t_else)
-    res = t_then_bp + t_else_bp
-    if all(t.latest_state.terminated for t in res):
-        logging.debug("All traces terminated with branch policy decision; ignoring policy for this branch (line %d)", context_line)
-        return t_then + t_else
-    else:
-        return res
-
-def handle_read(expanded_args: list[Field], traces: Traces, node: AST.AstNode) -> Traces:
-    """Handle a `read` command with given expanded args (list of `Fields`) on the given traces."""
-    collected: list[tuple[str, Field]] = []
-    # Collect (variable name, original field) pairs from args.
-    for arg in expanded_args[1:]:
-        try:
-            name = arg.try_to_str()
-        except Exception:
-            name = None
-        if isinstance(name, str) and name != "":
-            collected.append((name, arg))
-    # If there are no variable names, return traces with exit code set to 0, as `read` consumed input but bound nothing.
-    if not collected:
-        return [t.extend(lambda s: s.set_last_exit_code(SymStr(("0",)), Confidence.SPECULATIVE)) for t in traces]
-    new_traces: Traces = []
-    for trace in traces:
-        curr_trace = trace
-        # For each variable to be read into, record an assignment of that variable to the corresponding field.
-        for var_name, value_field in collected:
-            # TODO: Don't pass in the entire node, but the specific arg corresponding to this variable.
-            curr_trace = record_assignment(curr_trace, var_name, arbitrary_field(node, ArbitraryType.ENVIRONMENT, curr_trace.latest_state))
-        new_traces.append(curr_trace)
-    return new_traces
-
-def handle_xargs(traces: Traces, node: AST.CommandNode, expanded_args: list[Field], config: InterpConfig) -> Traces:
-    match expanded_args:
-        case [Field(SymStr(("xargs",)), _),
-              Field(SymStr(("-I",)), _),
-              Field(SymStr((thename,)), _),
-              *the_cmd]:
-            # beware major trickery here (sound but not clean):
-            # we unroll the xargs into two invocations of the command, each time replacing
-            # occurrences of thename with a command substitution that yields a fresh arbitrary each time
-            # to capture the fact that each invocation may get different inputs
-            the_name_unexpanded = freeze_thing(node.arguments[2])
-            mangled_cmdnode = deepcopy(node)
-            mangled_cmdnode.arguments = mangled_cmdnode.arguments[3:]
-            # Replace all occurrences of thename in the command with a command substitution that leads to a fresh arbitrary each time
-            def replace_arg(arg: list[AST.ArgChar]) -> list[AST.ArgChar]:
-                if freeze_thing(arg) == the_name_unexpanded:
-                    return [AST.BArgChar(AST.CommandNode(node.line_number,
-                                                         [],
-                                                         [],
-                                                         []))]
-                else:
-                    return arg
-            mangled_cmdnode.arguments = [replace_arg(arg) for arg in mangled_cmdnode.arguments]
-            t1 = handle_commandnode(traces, mangled_cmdnode, config)
-            t2 = handle_commandnode(t1, mangled_cmdnode, config)
-            return t2
-        case _:
-            logging.warning("Ignoring unsupported xargs invocation: %s", node.pretty())
-            return traces
-
-
-def handle_eval(traces: Traces,
-                node: AST.CommandNode,
-                expanded_args: list[Field],
-                config: InterpConfig) -> Traces:
-    if len(expanded_args) <= 1:
-        return trace_map(traces, lambda s: s.set_last_exit_code(SymStr(("0",)), Confidence.DEFINITE))
-
-    eval_parts: list[str] = []
-    for field in expanded_args[1:]:
-        part = field.try_to_str()
-        if part is None:
-            return handle_unknown_command("eval", expanded_args[1:], traces, config)
-        eval_parts.append(part)
-
-    eval_script = " ".join(eval_parts)
-    if eval_script.strip() == "":
-        return trace_map(traces, lambda s: s.set_last_exit_code(SymStr(("0",)), Confidence.DEFINITE))
-
-    temp_path = None
-    try:
-        with tempfile.NamedTemporaryFile("w", suffix=".sh", delete=False) as temp_file:
-            temp_path = temp_file.name
-            temp_file.write(eval_script)
-            if not eval_script.endswith("\n"):
-                temp_file.write("\n")
-        parsed_nodes = parser.parse_shell_script(temp_path)
-    except Exception:
-        logging.debug("Failed to parse constant eval payload; falling back to unknown eval handling", exc_info=True)
-        return handle_unknown_command("eval", expanded_args[1:], traces, config)
-    finally:
-        if temp_path is not None:
-            try:
-                os.unlink(temp_path)
-            except OSError:
-                pass
-
-    t = traces
-    for wrapped_node in parsed_nodes:
-        if isinstance(wrapped_node.ast_node, AST.Command):
-            t = guarded_interp_node(t, wrapped_node.ast_node, config)
-    return t
 
 # ============================================================
 #                  Symbolic Expander
@@ -1231,6 +304,7 @@ def expand(traces: Traces,
             new_trace = trace.extend(new_state)
             res.append((new_trace, prefix_fields + expanded_fields))
     return res
+
 
 # Different fields are definitely separated; things within a field *may be separated as well!*
 def expand_simple(stuff: list[AST.ArgChar],
@@ -1847,6 +921,7 @@ def expand_args_dumb(traces: Traces,
             expanded_args.append(arbitrary_field(arg, ArbitraryType.APPROXIMATION, None))
     return res_traces + terminated_traces, expanded_args
 
+
 def expand_args(traces: Traces,
                 args: list[list[AST.ArgChar]],
                 config: InterpConfig) -> list[tuple[Trace, list[Field]]]:
@@ -1863,6 +938,7 @@ def expand_args(traces: Traces,
             prefixes[id(res_trace)] = expanded_fields
 
     return [(trace, prefixes[id(trace)]) for trace in res_traces]
+
 
 def expand_assuming_single_constant_word(traces: Traces,
                                          stuff: list[AST.ArgChar],
@@ -1888,9 +964,11 @@ def arbitrary_field(ast: AST.AstNode, kind: ArbitraryType, producing_state: Stat
     return Field(CompletelyArbitrary(freeze_thing(ast), kind, producing_state),
                  WordCount(min_words, inf))
 
+
 def join_fields(fields: list[Field]) -> Field:
     """Join a list of fields into one field that approximates all of them."""
     return merge_partial_fields(fields, sep=" ", state=None)
+
 
 def merge_partial_fields(fields: list[Field], sep: str | None = " ", state: State | None = None) -> Field:
     """Merge a list of partial fields into one field, merging SymStrs and folding them into CompletelyArbitrarys as prefixes or suffixes."""
@@ -1971,6 +1049,7 @@ def collapse_fields(fields: list[Field], source: AST.AstNode | None = None) -> F
                                          None),
                      WordCount(min_words, max_words))
 
+
 def add_prefix(arbitrary_field: Field, prefix_symstr: Field) -> Field:
     match (arbitrary_field, prefix_symstr):
         case (Field(CompletelyArbitrary(prefix=None) as a, acount),
@@ -1981,6 +1060,8 @@ def add_prefix(arbitrary_field: Field, prefix_symstr: Field) -> Field:
             return Field(replace(a, prefix=SymStr(more_parts + pre_parts)), merge_counts(acount, scount))
         case _:
             assert False, "unreachable"
+
+
 def add_suffix(arbitrary_field: Field, suffix_symstr: Field) -> Field:
     match (arbitrary_field, suffix_symstr):
         case (Field(CompletelyArbitrary(suffix=None) as a, acount),
@@ -1991,9 +1072,12 @@ def add_suffix(arbitrary_field: Field, suffix_symstr: Field) -> Field:
             return Field(replace(a, suffix=SymStr(suf_parts + more_parts)), merge_counts(acount, scount))
         case _:
             assert False, "unreachable"
+
+
 def merge_counts(c1: WordCount, c2: WordCount, sep: int = 0) -> WordCount:
     return WordCount(c1.min + max(c2.min - 1, 0) + sep,
                      c1.max + max(c2.max - 1, 0) + sep)
+
 
 def collapse_equiv_trace_expansions(expansions: list[tuple[Trace, list[Field]]]) -> dict[tuple[Field], list[Trace]]:
     """Collect all originating traces for each unique expansion."""
@@ -2036,6 +1120,7 @@ def collapse_traces_if_too_many(traces: Traces) -> tuple[Traces, Traces]:
         logging.debug("Collapsed to %d traces", trace_count)
     return traces, new_inactive
 
+
 def drop_terminated_traces(traces: Traces) -> tuple[Traces, Traces]:
     inactive_traces, active_traces = util.partition(traces, lambda t: t.latest_state.terminated)
     if len(inactive_traces) > 0:
@@ -2077,6 +1162,7 @@ def consume_continue_traces(traces: Traces) -> tuple[Traces, Traces, Traces]:
     propagated = [t.extend(lambda s: s.decrement_continue_level()) for t in continuing if t.latest_state.continue_level > 1]
     return non_continuing, local, propagated
 
+
 def _collect_non_arg_ast_nodes(value: object,
                                seen_ids: set[int],
                                non_arg_ids: set[int]) -> None:
@@ -2110,6 +1196,7 @@ def count_non_arg_ast_nodes(nodes: list[parser.WrappedAst]) -> int:
         _collect_non_arg_ast_nodes(wrapped.ast_node, seen_ids, non_arg_ids)
     return len(non_arg_ids)
 
+
 def mark_subtree_as_interpreted_for_coverage(root: object) -> None:
     seen_ids: set[int] = set()
 
@@ -2135,6 +1222,1235 @@ def mark_subtree_as_interpreted_for_coverage(root: object) -> None:
                 walk(child)
 
     walk(root)
+
+
+def handle_commandnode(traces: Traces,
+                       node: AST.CommandNode,
+                       config: InterpConfig) -> Traces:
+    if logging.getLogger().isEnabledFor(logging.DEBUG):
+        logging.debug("Handling command node %s with %d traces", trim_string_for_logging(node.pretty()), len(traces))
+
+    # Handle variable expansion before we evaluate the command itself
+    t1, expanded_args = expand_args_dumb(traces, node.arguments, config)
+    t1_active, t1_inactive = drop_terminated_traces(t1)
+    if not t1_active:
+        logging.debug("All traces terminated during expansion of %s", trim_string_for_logging(node.pretty()))
+        return t1
+    logging.debug("Expanded cmd to %s", expanded_args)
+
+    if expanded_args and len(node.arguments) >= 2:
+        cmd_name = expanded_args[0].try_to_str()
+        if cmd_name == "grep":
+            # If the command is `grep` and the first argument is not provided (different from an empty string),
+            # meaning a pattern is not provided for the command,
+            # `grep` will expect input from stdin instead of treating the second argument as a file.
+            if expanded_args[1].count.min == 0 and not util.is_definitely_non_empty(expanded_args[1], t1_active[0]):
+                Reporter.add_issue(reporter.UnexpectedStdin(cmd_name, context_line), config)
+        if isinstance(cmd_name, str) and _path_lookup_disabled_for_command(cmd_name, t1_active):
+            # PATH is unset and command is not guaranteed to exist
+            Reporter.add_issue(reporter.NotACommand(cmd_name, context_line), config)
+        elif cmd_name == "sudo" and len(expanded_args) >= 2:
+            # PATH is not unset (otherwise sudo would not be found)
+            sudo_cmd_name = expanded_args[1].try_to_str()
+            if isinstance(sudo_cmd_name, str) and not sudo_cmd_name.startswith("-") and (sudo_cmd_name.endswith("/") \
+                or any(sudo_cmd_name in t.latest_state.known_nonexistent_commands for t in traces)):
+                # Since sudo is a metacommand we need to check if the command it tries to invoke is valid
+                Reporter.add_issue(reporter.NotACommand(sudo_cmd_name, context_line), config)
+
+    if expanded_args:
+        match expanded_args[0].try_to_str():
+            case "rm":
+                logging.debug("Exploring all possible expansions of rm args")
+                expansions = expand_args(t1, node.arguments, config)
+                simplified_expansions = collapse_equiv_trace_expansions(expansions)
+                cmd_traces = []
+                for arg_fields, traces in simplified_expansions.items():
+                    for trace in traces:
+                        ts, tf = handle_rm(arg_fields, trace, node, config)
+                        cmd_traces.append(ts)
+                        if config.in_checked_position or config.force_fork_all:
+                            logging.debug("Adding failure traces for rm")
+                            cmd_traces.append(tf)
+                t1 = cmd_traces
+            case "sudo" if len(expanded_args) >= 2 and expanded_args[1].try_to_str() == "rm":
+                logging.debug("Exploring all possible expansions of sudo rm args")
+                expansions = expand_args(t1, node.arguments, config)
+                simplified_expansions = collapse_equiv_trace_expansions(expansions)
+                cmd_traces = []
+                for arg_fields, traces in simplified_expansions.items():
+                    if len(arg_fields) < 2 or arg_fields[1].try_to_str() != "rm":
+                        continue
+                    rm_arg_fields = tuple(arg_fields[1:])
+                    for trace in traces:
+                        ts, tf = handle_rm(rm_arg_fields, trace, node, config)
+                        cmd_traces.append(ts)
+                        if config.in_checked_position or config.force_fork_all:
+                            logging.debug("Adding failure traces for sudo rm")
+                            cmd_traces.append(tf)
+                if cmd_traces:
+                    t1 = cmd_traces
+            case "set":
+                t1 = handle_set(expanded_args, t1)
+            case "unset":
+                t1 = handle_unset(expanded_args, t1)
+            case "exit":
+                t1 = handle_exit(t1)
+            case "return":
+                if len(expanded_args) > 2 and (retval := expanded_args[1].try_to_str()) is not None:
+                    t1 = handle_return(t1, retval)
+                else:
+                    t1 = handle_return(t1, None)
+            case "break":
+                t1 = handle_break(t1, expanded_args)
+            case "continue":
+                t1 = handle_continue(t1, expanded_args)
+            case "read":
+                t1 = handle_read(expanded_args, t1, node)
+            case "xargs":
+                t1 = handle_xargs(t1, node, expanded_args, config)
+            case "eval":
+                t1 = handle_eval(t1, node, expanded_args, config)
+            case "find":
+                t1 = handle_find(t1, node, expanded_args, config)
+            # TODO: Unify rm with other commands
+            case cmd_name if spec := get_spec(cmd_name, tuple(expanded_args)):
+                logging.debug("Adding %s precondition: %s", cmd_name, spec.check)
+                if cmd_name == "env":
+                    match spec.failure_postcond:
+                        case Not(CommandExists(non_existent_cmd_field)):
+                            non_existent_cmd_name = non_existent_cmd_field.try_to_str()
+                            if isinstance(non_existent_cmd_name, str):
+                                should_report = any(
+                                    non_existent_cmd_name not in trace.latest_state.known_existing_commands
+                                    for trace in t1
+                                )
+                                if should_report:
+                                    Reporter.add_issue(reporter.NotACommand(non_existent_cmd_name, context_line), config)
+                if spec.min_operands > 0:
+                    trace_expansions = expand_args(t1, node.arguments, config)
+                    has_sufficient_operands = False
+
+                    def check_if_constrained_to_empty(c: Constraint):
+                        """Check if a constraint constrains a field to be empty."""
+                        match c:
+                            case StringEq(_, rhs):
+                                return rhs == Field(SymStr(("",)), WordCount(0, 0)) or (isinstance(rhs.content, SymStr) and rhs.content.parts == ("",))
+                            case _:
+                                return False
+
+                    for trace, trace_expanded_args in trace_expansions:
+                        if len(trace_expanded_args) > 0:
+                            total_min_words = sum(f.count.min for f in trace_expanded_args[1:])
+                            # Short-circuit: if the minimum number of words is already sufficient, there is no need to check further.
+                            if spec.min_operands <= total_min_words:
+                                has_sufficient_operands = True
+                                break
+                            total_max_words: int | float = 0
+                            has_inf = False
+                            all_definitely_empty = True
+                            for f in trace_expanded_args[1:]:
+                                if f.count.max == inf:
+                                    has_inf = True
+                                    all_definitely_empty = False
+                                    break
+                                if f.count.max > 0:
+                                    all_definitely_empty = False
+                                total_max_words += f.count.max
+                            # If all operands are definitely empty, skip this trace.
+                            if all_definitely_empty:
+                                continue
+                            if has_inf:
+                                # Prevent false positives when there are constraints that force some arguments to be empty.
+                                if any(check_if_constrained_to_empty(cond.constraint) for cond in trace.latest_state.pathcond):
+                                    continue
+                                has_sufficient_operands = True
+                                break
+                            # If the total maximum number of words is sufficient, then we should not report a `command_can_only_fail` issue.
+                            if total_max_words >= spec.min_operands:
+                                has_sufficient_operands = True
+                                break
+                    if not has_sufficient_operands:
+                        assert isinstance(cmd_name, str), "cmd_name should be str when a spec is found"
+                        Reporter.add_issue(reporter.CommandCanOnlyFail(cmd_name, context_line), config)
+                if spec.check:
+                    t_precond = trace_map(t1, lambda s: s.add_assertion(spec.check, source_str=node.pretty(), source_line=context_line))
+                    if config.debug_instrumentation:
+                        for trace in t1:
+                            DebugLogger.log_assertion(spec.check, trace.latest_state, context_line, config.current_pass)
+                else:
+                    t_precond = t1
+
+                knowledge_before_exec, knowledge_after_exec = spec.success_postcond if isinstance(spec.success_postcond, tuple) else (Empty(), spec.success_postcond)
+                t_success_precond = [t for t in t_precond if not _pathcond_contradicts(t.latest_state, knowledge_after_exec)]
+                t_success = trace_map(t_success_precond,
+                                      lambda s: s.add_pathcond(knowledge_before_exec)\
+                                                 .update_fs(knowledge_after_exec)\
+                                                 .add_pathcond(knowledge_after_exec)\
+                                                 .update_known_commands(knowledge_after_exec)\
+                                                 .set_last_exit_code(SymStr(("0",)),
+                                                                     Confidence.DEFINITE if s.opts.is_set(SetOptions.NOFAIL) and not config.in_checked_position else Confidence.SPECULATIVE,
+                                                                     spec.failure_postcond))
+                if cmd_name == "cd": # TODO: Put this somewhere better
+                    t_success = trace_map(t_success, lambda s: _update_pwd_for_cd(s, tuple(expanded_args)))
+                t_failure = []
+                if config.in_checked_position or config.force_fork_all:
+                    t_failure_precond = [t for t in t_precond if not _pathcond_contradicts(t.latest_state, spec.failure_postcond)]
+                    t_failure = trace_map(t_failure_precond,
+                                          lambda s: s.update_fs(spec.failure_postcond)\
+                                                     .add_pathcond(spec.failure_postcond)\
+                                                     .update_known_commands(spec.failure_postcond)\
+                                                     .set_last_exit_code(SymStr(("1",)),
+                                                                         Confidence.SPECULATIVE,
+                                                                         spec.failure_postcond))
+                t1 = t_success + t_failure
+            case some_name if isinstance(some_name, str):
+                # todo: we could actually not use `expand_args_dumb` here, and instead do trace-specific expansion, since the function body is handled trace-specifically anyway
+                # deferred for now until we actually need it (see test_function_call_multipath)
+                t1 = handle_function_call_or_unknown(some_name, expanded_args[1:], t1, config)
+            case _:
+                logging.debug("Non-constant command invocation %s, optimistically treating as no-op", expanded_args)
+                # In checked positions (if/while conditions), non-constant commands may either
+                # succeed or fail. Keep both outcomes to avoid incorrectly pruning branches.
+                if config.in_checked_position or config.force_fork_all:
+                    t_success = trace_map(t1, lambda s: s.set_last_exit_code(SymStr(("0",)), Confidence.SPECULATIVE))
+                    t_failure = trace_map(t1, lambda s: s.set_last_exit_code(SymStr(("1",)), Confidence.SPECULATIVE))
+                    t1 = t_success + t_failure
+
+    for redir in node.redir_list:
+        t1 = guarded_interp_node(t1, redir, config)
+
+    config.apply_expanded_command_cbs(expanded_args)
+
+    if logging.getLogger().isEnabledFor(logging.DEBUG):
+        logging.debug("Done with command %s after expanding its args to %s (it had assignments: %s)",
+                      trim_string_for_logging(node.pretty()), expanded_args, node.assignments)
+    return t1
+
+
+def handle_rm(expanded_args: tuple[Field, ...], trace: Trace, node: AST.CommandNode, config: InterpConfig) -> tuple[Trace, Trace]:
+    logging.debug("Checking rm command with expansion possibility: %s", expanded_args)
+    spec = get_spec("rm", expanded_args)
+
+    assert spec is not None, "Expected rm spec to always be found"
+
+    if spec.check:
+        logging.debug("Adding rm precondition: %s", spec.check)
+        DebugLogger.log_assertion(spec.check, trace.latest_state, context_line, config.current_pass)
+        trace = trace.extend(lambda s: s.add_assertion(spec.check, source_str=node.pretty(), source_line=context_line))
+
+    non_flag_args = [arg for arg in expanded_args[1:] if not util.is_flag(arg)]
+
+    pwdval = trace.latest_state.lookup("PWD")
+    start_pwdval = trace.latest_state.lookup(config.pwd_init_var)
+    homeval = trace.latest_state.lookup("HOME")
+
+    def same_location(lhs: Field, rhs: Field) -> bool:
+        lhs_str = lhs.try_to_str()
+        rhs_str = rhs.try_to_str()
+        if lhs_str is not None and rhs_str is not None:
+            return lhs.try_without_trailing_slash() == rhs.try_without_trailing_slash()
+        lhs_core = util.field_core_key(lhs)
+        rhs_core = util.field_core_key(rhs)
+        return lhs_core is not None and lhs_core == rhs_core
+
+    def path_depth_from_base(base_path: str, target_path: str) -> int | None:
+        # Return how many segments `target_path` is below `base_path`.
+        # 0 means equal, 1 means immediate child, 2+ means deeper.
+        base_parts = [p for p in base_path.strip("/").split("/") if p]
+        target_parts = [p for p in target_path.strip("/").split("/") if p]
+        if target_parts[:len(base_parts)] != base_parts:
+            return None
+        return len(target_parts) - len(base_parts)
+
+    def home_depth(pwd: Field, home: Field) -> int | None:
+        pwd_str = pwd.try_to_str()
+        home_str = home.try_to_str()
+        if pwd_str is not None and home_str is not None:
+            return path_depth_from_base(home_str, pwd_str)
+
+        pwd_core = util.field_core_key(pwd)
+        home_core = util.field_core_key(home)
+        if pwd_core is None or home_core is None or pwd_core != home_core:
+            return None
+
+        pwd_suffix = ""
+        if isinstance(pwd.content, CompletelyArbitrary) and pwd.content.suffix is not None:
+            pwd_suffix = pwd.content.suffix.try_to_str()
+            if pwd_suffix is None:
+                return 0  # conservative fallback
+        home_suffix = ""
+        if isinstance(home.content, CompletelyArbitrary) and home.content.suffix is not None:
+            home_suffix = home.content.suffix.try_to_str()
+            if home_suffix is None:
+                return 0  # conservative fallback
+        return path_depth_from_base(home_suffix, pwd_suffix)
+
+    def could_equal_literal(field: Field, literal: str) -> bool:
+        field_str = field.try_to_str()
+        if field_str is not None:
+            return field_str == literal
+
+        if field.count.min > 1 or field.count.max < 1:
+            return False
+
+        match field.content:
+            case CompletelyArbitrary(prefix=prefix, suffix=suffix):
+                if prefix is not None and (prefix_str := prefix.try_to_str()) is not None and not literal.startswith(prefix_str):
+                    return False
+                if suffix is not None and (suffix_str := suffix.try_to_str()) is not None and not literal.endswith(suffix_str):
+                    return False
+                return True
+            case _:
+                return True
+
+    at_pwd_init = pwdval is not None and start_pwdval is not None and same_location(pwdval.value, start_pwdval.value)
+    home_level = home_depth(pwdval.value, homeval.value) if (pwdval is not None and homeval is not None) else None
+    at_home_top_level = home_level is not None and home_level <= 1
+    # TODO: Replace this heuristic with a proper "current working directory" abstraction independent of env-field shape.
+    if (
+        (at_pwd_init or at_home_top_level)
+        and any(arg.try_to_str() == "*" for arg in non_flag_args)
+    ):
+        Reporter.add_issue(reporter.DeleteSystemFile(pwdval.value.try_to_str() or "PWD", context_line), config)
+
+    if non_flag_args:
+        if pwdval is not None: # Can be empty if the script unsets it
+            trace = trace.extend(lambda s: s.add_assertion(SimpleConstraint(And.from_field_iter(non_flag_args,
+                                                                                                lambda arg_field: Not(StringEq(arg_field, pwdval.value))),
+                                                                            lambda line: reporter.DeleteSystemFile("PWD", line)),
+                                                        node.pretty(),
+                                                        context_line, priority=10, include_fs=False))
+
+    protected_paths = Config.get("PROTECTED_PATHS")
+    if protected_paths:
+        protected_checks = tuple(
+            (
+                And.from_field_iter(
+                    tuple(arg_field for arg_field in non_flag_args if could_equal_literal(arg_field, path)),
+                    lambda arg_field, p=path: Not(
+                        StringEq(arg_field, Field(SymStr((p,)), WordCount(1, 1)))
+                    ),
+                ),
+                lambda line, p=path: reporter.DeleteSystemFile(p, line),
+            )
+            for path in protected_paths
+            if any(could_equal_literal(arg_field, path) for arg_field in non_flag_args)
+        )
+        if protected_checks:
+            trace = trace.extend(
+                lambda s: s.add_assertion(
+                    SimpleConstraint(*protected_checks[0]) if len(protected_checks) == 1 else RefineableConstraint(
+                        And.from_iter(check for check, _ in protected_checks),
+                        protected_checks,
+                    ),
+                    node.pretty(),
+                    context_line,
+                    priority=10,
+                    include_fs=False,
+                )
+            )
+
+
+    for arg_idx, arg_field in enumerate(expanded_args[1:], start=1):
+        if util.is_flag(arg_field):
+            continue
+        definitely_non_empty = util.is_definitely_non_empty(arg_field, trace)
+        logging.debug("arg %d: %s, definitely_non_empty=%s", arg_idx, arg_field, definitely_non_empty)
+        if path := arg_field.try_to_str():
+            if util.is_protected(path):
+                Reporter.add_issue(reporter.DeleteSystemFile(path, context_line), config)
+            if util.is_user_directory(path):
+                Reporter.add_issue(reporter.DeleteUserDirectory(path, context_line), config)
+
+        def maybe_report_protected_split(content: CompletelyArbitrary, max_words: int | float) -> None:
+            if content.maybe_empty and content.quoted and not definitely_non_empty:
+                # "<pre>$VAR<post>" but $VAR could be empty
+                exp = ""
+                if content.prefix is not None and (pre := content.prefix.try_to_str()):
+                    exp += pre
+                if content.suffix is not None and (suf := content.suffix.try_to_str()):
+                    exp += suf
+                if util.is_protected(exp):
+                    Reporter.add_issue(reporter.WordSplitCouldDeleteSystemFile(exp, context_line), config)
+
+            if max_words > 1 and not content.quoted:
+                if content.prefix is not None and (pre := content.prefix.try_to_str()) and util.is_protected(pre):
+                    Reporter.add_issue(reporter.WordSplitCouldDeleteSystemFile(pre, context_line), config)
+                if content.suffix is not None and (suf := content.suffix.try_to_str()) and util.is_protected(suf):
+                    Reporter.add_issue(reporter.WordSplitCouldDeleteSystemFile(suf, context_line), config)
+
+        match arg_field:
+            case Field(CompletelyArbitrary() as content, WordCount(_, max_words)):
+                if not content.quoted and max_words > 1:
+                    Reporter.add_issue(reporter.DangerousWordSplit(content.source, context_line), config)
+                maybe_report_protected_split(content, max_words)
+
+    return (
+        trace.extend(lambda s: s.update_fs(spec.success_postcond)\
+                                .add_pathcond(spec.success_postcond)\
+                                .set_last_exit_code(SymStr(("0",)), Confidence.SPECULATIVE, spec.failure_postcond)),
+        trace.extend(lambda s: s.update_fs(spec.failure_postcond)\
+                                .add_pathcond(spec.failure_postcond)\
+                                .set_last_exit_code(SymStr(("1",)), Confidence.SPECULATIVE, spec.failure_postcond))
+    )
+
+
+def handle_find(traces: Traces,
+                node: AST.CommandNode,
+                expanded_args: list[Field],
+                config: InterpConfig) -> Traces:
+    arg_strs = [f.try_to_str() for f in expanded_args]
+    if any(arg is None for arg in arg_strs):
+        return handle_unknown_command("find", expanded_args[1:], traces, config)
+
+    args = [arg for arg in arg_strs if isinstance(arg, str)]
+
+    # Parse starting points: positional args before the first expression term.
+    search_roots: list[str] = []
+    for tok in args[1:]:
+        if tok.startswith("-") or tok in {"!", "(", ")"}:
+            break
+        search_roots.append(tok)
+    if not search_roots:
+        search_roots = ["."]
+
+    def literal_argchars(s: str) -> list[AST.ArgChar]:
+        return [AST.CArgChar(ord(ch)) for ch in s]
+
+    def symbolic_suffix_argchars(prefix: str) -> list[AST.ArgChar]:
+        # quoted command substitution -> one symbolic path segment
+        return literal_argchars(prefix) + [AST.QArgChar([AST.BArgChar(AST.CommandNode(node.line_number, [], [], []))])]
+
+    def path_variants(root: str) -> list[list[AST.ArgChar]]:
+        root_with_slash = root if root.endswith("/") else f"{root}/"
+        variants = [
+            literal_argchars(root),
+            symbolic_suffix_argchars(root),
+            symbolic_suffix_argchars(root_with_slash),
+        ]
+        deduped: list[list[AST.ArgChar]] = []
+        seen = set()
+        for argchars in variants:
+            key = tuple(ch.pretty() for ch in argchars)
+            if key not in seen:
+                seen.add(key)
+                deduped.append(argchars)
+        return deduped
+
+    generated_cmd_traces: Traces = []
+
+    # Approximate `find ... -exec cmd ... {} ... \;` by unrolling into synthetic command nodes.
+    # TODO: model find's expression language and -exec argument expansion soundly.
+    i = 1
+    while i < len(args):
+        if args[i] == "-exec" and i + 1 < len(args):
+            j = i + 1
+            exec_args: list[str] = []
+            has_placeholder = False
+            while j < len(args) and args[j] not in {";", "\\;", "+"}:
+                if args[j] == "{}":
+                    has_placeholder = True
+                j += 1
+                exec_args.append(args[j - 1])
+
+            if j < len(args) and has_placeholder and exec_args:
+                for root in search_roots:
+                    for placeholder_arg in path_variants(root):
+                        mangled_cmdnode = deepcopy(node)
+                        mangled_cmdnode.arguments = []
+                        mangled_cmdnode.assignments = []
+                        mangled_cmdnode.redir_list = []
+                        for tok in exec_args:
+                            if tok == "{}":
+                                mangled_cmdnode.arguments.append(deepcopy(placeholder_arg))
+                            else:
+                                mangled_cmdnode.arguments.append(literal_argchars(tok))
+                        generated_cmd_traces.extend(handle_commandnode(traces, mangled_cmdnode, config))
+                i = j
+        i += 1
+
+    if generated_cmd_traces:
+        return generated_cmd_traces
+    return handle_unknown_command("find", expanded_args[1:], traces, config)
+
+
+def handle_function_call_or_unknown(func_name: str,
+                                    arg_fields: list[Field],
+                                    traces: Traces,
+                                    config: InterpConfig) -> Traces:
+    # is it a known function, and the same one across all traces?
+    func_defs = {t.latest_state.lookup_fundef(func_name) for t in traces}
+    if len(func_defs) == 1:
+        if None in func_defs:
+            return handle_unknown_command(func_name, arg_fields, traces, config)
+        else:
+            if config.ignore_function_calls or func_name in config.ignore_function_calls_for:
+                logging.debug("Ignoring function call to %s (configured as no-op)", func_name)
+                return traces
+            the_func = func_defs.pop()
+            assert isinstance(the_func, FrozenAst)
+            return handle_function_call(func_name, the_func.ast, arg_fields, traces, config)
+    else:
+        logging.error("Name %s is defined as different functions across traces, giving up on this call", func_name)
+        return traces
+
+
+def handle_unknown_command(name: str,
+                           arg_fields: list[Field],
+                           traces: Traces,
+                           config: InterpConfig) -> Traces:
+    if name in func_map.funcs.keys():
+        Reporter.add_issue(reporter.UndefinedFunction(name, context_line), config)
+
+    if name.endswith("/") \
+       or any(name in t.latest_state.known_nonexistent_commands for t in traces):
+        Reporter.add_issue(reporter.NotACommand(name, context_line), config)
+
+    logging.debug("Unknown command %s, optimistically treating as no-op", name) # that reads its operands", name)
+    # mark all args as being read
+    #t = trace_map(traces, lambda s: s.update_fs(And.from_field_iter(arg_fields, lambda f: IsFile(f) >> IsRead(f))))
+    #return t
+    # this makes execution significantly slower, so for now leave it commented out
+    if config.in_checked_position or config.force_fork_all:
+        t_success = trace_map(traces, lambda s: s.set_last_exit_code(SymStr(("0",)), Confidence.SPECULATIVE))
+        t_failure = trace_map(traces, lambda s: s.set_last_exit_code(SymStr(("1",)), Confidence.SPECULATIVE))
+        return t_success + t_failure
+    return traces
+
+
+def handle_function_call(name: str,
+                         func_node: AST.DefunNode,
+                         arg_fields: list[Field],
+                         traces: Traces,
+                         config: InterpConfig) -> Traces:
+    if config.ignore_function_calls or name in config.ignore_function_calls_for:
+        logging.debug("Ignoring function call to %s (configured as no-op)", name)
+        return traces
+    if logging.getLogger().isEnabledFor(logging.DEBUG):
+        logging.debug("Handling function call to %s with args %s",
+                      trim_string_for_logging(func_node.pretty()), arg_fields)
+
+    func_map.called.add(name) # record that this function was called
+    # As long as arg_fields are a single word, map those to local positional parameters
+    # as soon as we hit a field that is not a single word, give up
+    localenv: dict[str, ShellVar] = {}
+    for i, arg in enumerate(arg_fields):
+        if arg.count == WordCount(1, 1):
+            localenv[str(i + 1)] = ShellVar(arg)
+        else:
+            logging.debug("Function argument %d is not guaranteed to be a single word, giving up on positional parameters (%s)", i, arg)
+            break
+    logging.debug("Bound localenv for call: %s", localenv)
+    t1 = []
+    for t in traces:
+        if name in t.latest_state.call_stack:
+            logging.error("Found recursive function definition! %s via %s", name, t.latest_state.call_stack)
+            return traces
+        t1.append(t.extend(lambda s: s.enter_function(name).extend_localenv(localenv)))
+    call_result_traces = guarded_interp_node(t1, func_node.body, config)
+    # TODO: should actually pop the localenv as well! need a stack of localenvs...
+    return [t.extend(lambda s: s.set_returning(False).exit_function()) for t in call_result_traces]
+
+
+def record_assignment(trace: Trace, var: str, rhs: Field, definite_confidence: bool = True) -> Trace:
+    conf = Confidence.DEFINITE if definite_confidence else Confidence.SPECULATIVE
+    return trace.extend(lambda s: s.set_env(var, ShellVar(rhs)).set_last_exit_code(SymStr(("0",)), conf))
+
+
+def handle_while(traces: Traces,
+                 node: AST.WhileNode,
+                 config: InterpConfig):
+    logging.debug("Checking while loop for an infinite loop")
+    test_cmds = []
+    def get_the_test(cmd_fields):
+        test_cmds.append(cmd_fields)
+    temp_config = config.add_expanded_command_callback(get_the_test)
+
+
+    logging.debug("Interpreting first iteration")
+    t1 = guarded_interp_node(traces, node.test, temp_config)
+    logging.debug("collected test_cmds: %s", test_cmds)
+    if config.branch_policy_pre is not None:
+        decision = config.branch_policy_pre(node)
+        t_true = [t for t in t1 if t.latest_state.last_exit_code[0] == SymStr(("0",))]
+        t_false = [t for t in t1 if t.latest_state.last_exit_code[0] == SymStr(("1",))]
+        t_other = [t for t in t1 if t.latest_state.last_exit_code[0] not in {SymStr(("0",)), SymStr(("1",))}]
+        t_true = t_true + trace_map(t_other, lambda s: s.set_last_exit_code(SymStr(("0",)), Confidence.SPECULATIVE))
+        t_false = t_false + trace_map(t_other, lambda s: s.set_last_exit_code(SymStr(("1",)), Confidence.SPECULATIVE))
+        if decision == BranchDecision.FIRST:
+            logging.debug("While loop single-path decision: take body once")
+            t_body = guarded_interp_node(t_true, node.body, config)
+            t_body, broken = consume_break_traces(t_body)
+            t_body, continued, propagated_continue = consume_continue_traces(t_body)
+            return t_body + broken + continued + propagated_continue
+        logging.debug("While loop single-path decision: skip body")
+        return t_false
+    # Special case: never runs
+    if len(test_cmds) > 0 and interpret_test(test_cmds[0]) == False:
+        logging.debug("While loop never runs")
+        return t1
+
+    t1 = [t for t in t1 if t.latest_state.last_exit_code != (SymStr(("1",)), Confidence.DEFINITE)]
+    t_skip_body = [t for t in traces if t.latest_state.last_exit_code == (SymStr(("1",)), Confidence.DEFINITE)]
+    t2 = guarded_interp_node(t1, node.body, config)
+    t2, break_exit = consume_break_traces(t2)
+    t2, continue_next_iter, continue_exit = consume_continue_traces(t2)
+    t2 = t2 + continue_next_iter
+    t_skip_body = t_skip_body + break_exit + continue_exit
+
+
+    logging.debug("Interpreting second iteration")
+    # If all traces happen to terminate in the body, t3 will be empty after the next line
+    # Additionally, test_cmds will not have a second entry
+    t3 = guarded_interp_node(t2, node.test, temp_config)
+    if len(t3) == 0:
+        logging.debug("All traces terminated on first iter of while body")
+        return t3 + t_skip_body
+    # Special case: only one iteration
+    if len(test_cmds) < 2:
+        logging.debug("Failing to collect test commands? Giving up on constant loop checks.")
+        return t3 + t_skip_body
+    elif interpret_test(test_cmds[1]) == False:
+        logging.debug("While loop only runs once")
+        return t3 + t_skip_body
+    elif is_constant_test(test_cmds[0], test_cmds[1]):
+        Reporter.add_issue(reporter.InfiniteLoop(node, context_line), config)
+        return t3 + t_skip_body
+    logging.debug("collected test_cmds: %s", test_cmds)
+    # todo extend path condition
+    t4 = guarded_interp_node(t3, node.body, config)
+    t4, break_exit = consume_break_traces(t4)
+    t4, continue_next_iter, continue_exit = consume_continue_traces(t4)
+    t4 = t4 + continue_next_iter
+    t_skip_body = t_skip_body + break_exit + continue_exit
+
+
+    logging.debug("Interpreting third test")
+    t5 = guarded_interp_node(t4, node.test, temp_config)
+    # If all traces happen to terminate on the second iteration, t5 will be empty
+    # Additionally, test_cmds will not have a third entry
+    if len(t5) == 0:
+        logging.debug("All traces terminated on second iter of while body")
+        return t5 + t_skip_body
+    logging.debug("collected test_cmds: %s", test_cmds)
+
+    logging.debug("Checking constant test cond")
+    if len(test_cmds) > 2 and is_constant_test(test_cmds[2], test_cmds[1]):
+        Reporter.add_issue(reporter.InfiniteLoop(node, context_line), config)
+
+    return t5 + t_skip_body
+
+
+def interpret_test(cmd: list[Field]) -> bool | None:
+    """Return true or false if `cmd` is a test that always returns either of the two results. Return None if unknown."""
+    if len(cmd) < 1:
+        return None
+
+    if not isinstance(cmd[0].content, SymStr):
+        return None
+
+    if not is_test(cmd[0].content.parts[0]):
+        return None
+
+    args = cmd[1:]
+    if cmd[-1].content == SymStr(("]",)):
+        args = args[:-1]
+    if not len(args) in {2, 3}:
+        return None
+
+    def definitely_empty(field: Field) -> bool:
+        field_str = field.try_to_str()
+        if field_str is not None:
+            return field_str == ""
+        return field.count.max == 0
+
+    def definitely_non_empty(field: Field) -> bool:
+        field_str = field.try_to_str()
+        if field_str is not None:
+            return field_str != ""
+        return False
+
+    if len(args) == 2:
+        if args[0].content == SymStr(("!",)):
+            res = interpret_test(args[1:])
+            return not res if res is not None else None
+        match (args[0].content, args[1].content):
+            case (SymStr([op]), SymStr([s])) if op == "-n":
+                return s != ""
+            case (SymStr([op]), SymStr([s])) if op == "-z":
+                return s == ""
+            case (SymStr([op]), _) if op == "-n":
+                if definitely_non_empty(args[1]):
+                    return True
+                if definitely_empty(args[1]):
+                    return False
+                return None
+            case (SymStr([op]), _) if op == "-z":
+                if definitely_empty(args[1]):
+                    return True
+                if definitely_non_empty(args[1]):
+                    return False
+                return None
+            case (SymStr([op]), SymStr([s1])) if op in {"-f", "-d", "-e"} and s1 == "":
+                return False
+            case _:
+                return None
+
+    if len(args) == 3:
+        match (args[0].content, args[1].content, args[2].content):
+            case (SymStr([s1]), SymStr([op]), SymStr([s2])) if op == "=":
+                return s1 == s2
+            case (SymStr([s1]), SymStr([op]), SymStr([s2])) if op == "!=":
+                return s1 != s2
+            case (CompletelyArbitrary() as lhs, SymStr([op]), CompletelyArbitrary() as rhs) if op in ["=", "!="]:
+                # if the two are definitely the same, we can say something in this case
+                if lhs == rhs:
+                    return op == "="
+                else:
+                    return None
+            case (SymStr([s1]), SymStr([op]), SymStr([s2])) if op in ["-eq", "-ne", "-lt", "-le", "-gt", "-ge"]:
+                try:
+                    assert isinstance(s1, str) and isinstance(s2, str)
+                    n1 = int(s1)
+                    n2 = int(s2)
+                except ValueError:
+                    return None
+                match op:
+                    case "-eq":
+                        return n1 == n2
+                    case "-ne":
+                        return n1 != n2
+                    case "-lt":
+                        return n1 < n2
+                    case "-le":
+                        return n1 <= n2
+                    case "-gt":
+                        return n1 > n2
+                    case "-ge":
+                        return n1 >= n2
+            case _:
+                return None
+
+    return None
+
+
+def handle_set(expanded_args: list[Field], traces: Traces) -> Traces:
+    to_set = set()
+    for arg in expanded_args[1:]:
+        match arg:
+            case Field(SymStr([flag]), WordCount(1, 1)) if isinstance(flag, str):
+                if flag.startswith("-"):
+                    if SetOptions.relevant(flag):
+                        to_set.update(flag[1:])
+                    else:
+                        logging.debug("set: ignoring irrelevant option: %s", flag)
+                elif flag.startswith("+"):
+                    raise NotImplementedError(f"set: option unsetting not implemented: {expanded_args}")
+                else:
+                    logging.debug("set: ignoring non-option argument: %s", flag)
+                    pass # It's probably pipefail tbh
+            case _:
+                raise NotImplementedError(f"set with non-constant args: {expanded_args}")
+    return trace_map(traces, lambda s: s.set_options(to_set))
+
+
+def handle_unset(expanded_args: list[Field], traces: Traces) -> Traces:
+    vars_to_unset: list[str] = []
+    for arg in expanded_args[1:]:
+        var_name = arg.try_to_str()
+        if not var_name:
+            raise NotImplementedError(f"unset with non-constant args: {expanded_args}")
+        vars_to_unset.append(var_name)
+
+    empty = Field(SymStr(("",)), WordCount(0, 0))
+
+    def apply_unset(state: State) -> State:
+        updated = state
+        for var_name in vars_to_unset:
+            # Model unset as a ghost empty variable so expansions treat it as unset-like.
+            updated = updated.set_env(var_name, ShellVar(empty, ghost=True))
+        return updated
+
+    return trace_map(traces, apply_unset)
+
+
+def handle_if(traces: Traces, node: AST.IfNode, config: InterpConfig) -> Traces:
+    test_line_number = context_line
+    test_cmds = []
+    def get_the_test(cmd_fields):
+        nonlocal test_line_number
+        test_line_number = context_line
+        test_cmds.append(cmd_fields)
+    temp_config = config.add_expanded_command_callback(get_the_test)
+    temp_config = replace(temp_config, in_checked_position=True)
+    t1 = guarded_interp_node(traces, node.cond, temp_config)
+    logging.debug("collected test_cmds: %s", test_cmds)
+    logging.debug("Checking constant test cond")
+    if len(test_cmds) == 0:
+        logging.warning("Failed to collect any test commands? Giving up on constant condition check.")
+        test_result = None
+    else:
+        logging.debug("Checking if test command %s is constant true/false", test_cmds[-1])
+        test_result = interpret_test(test_cmds[-1])
+        logging.debug("Test command result: %s", test_result)
+    if test_result is not None:
+        Reporter.add_issue(reporter.ConstantCondition(test_cmds, test_line_number), config)
+        if test_result == True and (node.else_b is not None and node.else_b.pretty()):
+                                                             # Hack because libdash sometimes gives empty else bodies
+            t1 = trace_map(t1, lambda s: s.set_last_exit_code(SymStr(("0",)), Confidence.DEFINITE))
+            logging.debug("Reporting dead code in else branch.")
+            Reporter.add_issue(reporter.DeadCode(node.else_b, test_line_number), config)
+        elif test_result == False:
+            t1 = trace_map(t1, lambda s: s.set_last_exit_code(SymStr(("1",)), Confidence.DEFINITE))
+            logging.debug("Reporting dead code in then branch")
+            Reporter.add_issue(reporter.DeadCode(node.then_b, test_line_number), config)
+    else:
+        logging.debug("FORK: explicit if")
+    # Several possibilities here:
+    # 1. Constant test true -- interpret then_b and return that
+    # 2. Constant test false with no else -- just return t1
+    # 3. Constant test false with else -- interpret else_b and return that
+    # 4. Non-constant test -- interpret both branches and combine results
+    if test_result is True:
+        return guarded_interp_node(t1, node.then_b, config)
+    elif test_result is False:
+        if node.else_b is not None:
+            return guarded_interp_node(t1, node.else_b, config)
+        else:
+            return t1
+    else:
+        if config.branch_policy_pre is not None:
+            decision = config.branch_policy_pre(node)
+            logging.debug("If statement single-path decision: %s", decision)
+            if decision == BranchDecision.FIRST:
+                return guarded_interp_node(t1, node.then_b, config)
+            if decision == BranchDecision.SECOND:
+                if node.else_b is not None:
+                    return guarded_interp_node(t1, node.else_b, config)
+                return t1
+        return handle_branch(t1,
+                            lambda ts: guarded_interp_node(ts, node.then_b, config),
+                            lambda fs: guarded_interp_node(fs, node.else_b, config) if node.else_b is not None else fs,
+                            node,
+                            config)
+
+
+def handle_exit(traces: Traces) -> Traces:
+    logging.debug("Handling exit command, terminating %d traces", len(traces))
+    return trace_map(traces, lambda s: s.terminate())
+
+
+def handle_return(traces: Traces, retval: str | None) -> Traces:
+    logging.debug("Handling return command")
+    # TODO: handle return value properly
+    return trace_map(traces, lambda s: s.set_returning(True) if s.is_in_function() else s)
+
+
+def handle_break(traces: Traces, expanded_args: list[Field]) -> Traces:
+    level = _parse_loop_control_level(expanded_args)
+    logging.debug("Handling break command with level %d", level)
+    return trace_map(traces, lambda s: s.set_break_level(level))
+
+
+def handle_continue(traces: Traces, expanded_args: list[Field]) -> Traces:
+    level = _parse_loop_control_level(expanded_args)
+    logging.debug("Handling continue command with level %d", level)
+    return trace_map(traces, lambda s: s.set_continue_level(level))
+
+
+def handle_branch(traces: Traces, success_cb: Callable[[Traces], Traces], failure_cb: Callable[[Traces], Traces], node: AST.AstNode, config: InterpConfig) -> Traces:
+    t_success = [t for t in traces if t.latest_state.last_exit_code[0] == SymStr(("0",))]
+    t_failure = [t for t in traces if t.latest_state.last_exit_code[0] == SymStr(("1",))]
+    t_other   = [t for t in traces if t.latest_state.last_exit_code[0] not in {SymStr(("0",)), SymStr(("1",))}]
+    t_then = success_cb(t_success + trace_map(t_other, lambda s: s.set_last_exit_code(SymStr(("0",)), Confidence.SPECULATIVE)))
+    t_else = failure_cb(t_failure + trace_map(t_other, lambda s: s.set_last_exit_code(SymStr(("1",)), Confidence.SPECULATIVE)))
+    t_then_bp, t_else_bp = config.branch_policy(node, t_then, t_else)
+    res = t_then_bp + t_else_bp
+    if all(t.latest_state.terminated for t in res):
+        logging.debug("All traces terminated with branch policy decision; ignoring policy for this branch (line %d)", context_line)
+        return t_then + t_else
+    else:
+        return res
+
+
+def handle_read(expanded_args: list[Field], traces: Traces, node: AST.AstNode) -> Traces:
+    """Handle a `read` command with given expanded args (list of `Fields`) on the given traces."""
+    collected: list[tuple[str, Field]] = []
+    # Collect (variable name, original field) pairs from args.
+    for arg in expanded_args[1:]:
+        try:
+            name = arg.try_to_str()
+        except Exception:
+            name = None
+        if isinstance(name, str) and name != "":
+            collected.append((name, arg))
+    # If there are no variable names, return traces with exit code set to 0, as `read` consumed input but bound nothing.
+    if not collected:
+        return [t.extend(lambda s: s.set_last_exit_code(SymStr(("0",)), Confidence.SPECULATIVE)) for t in traces]
+    new_traces: Traces = []
+    for trace in traces:
+        curr_trace = trace
+        # For each variable to be read into, record an assignment of that variable to the corresponding field.
+        for var_name, value_field in collected:
+            # TODO: Don't pass in the entire node, but the specific arg corresponding to this variable.
+            curr_trace = record_assignment(curr_trace, var_name, arbitrary_field(node, ArbitraryType.ENVIRONMENT, curr_trace.latest_state))
+        new_traces.append(curr_trace)
+    return new_traces
+
+
+def handle_xargs(traces: Traces, node: AST.CommandNode, expanded_args: list[Field], config: InterpConfig) -> Traces:
+    match expanded_args:
+        case [Field(SymStr(("xargs",)), _),
+              Field(SymStr(("-I",)), _),
+              Field(SymStr((thename,)), _),
+              *the_cmd]:
+            # beware major trickery here (sound but not clean):
+            # we unroll the xargs into two invocations of the command, each time replacing
+            # occurrences of thename with a command substitution that yields a fresh arbitrary each time
+            # to capture the fact that each invocation may get different inputs
+            the_name_unexpanded = freeze_thing(node.arguments[2])
+            mangled_cmdnode = deepcopy(node)
+            mangled_cmdnode.arguments = mangled_cmdnode.arguments[3:]
+            # Replace all occurrences of thename in the command with a command substitution that leads to a fresh arbitrary each time
+            def replace_arg(arg: list[AST.ArgChar]) -> list[AST.ArgChar]:
+                if freeze_thing(arg) == the_name_unexpanded:
+                    return [AST.BArgChar(AST.CommandNode(node.line_number,
+                                                         [],
+                                                         [],
+                                                         []))]
+                else:
+                    return arg
+            mangled_cmdnode.arguments = [replace_arg(arg) for arg in mangled_cmdnode.arguments]
+            t1 = handle_commandnode(traces, mangled_cmdnode, config)
+            t2 = handle_commandnode(t1, mangled_cmdnode, config)
+            return t2
+        case _:
+            logging.warning("Ignoring unsupported xargs invocation: %s", node.pretty())
+            return traces
+
+
+def handle_eval(traces: Traces,
+                node: AST.CommandNode,
+                expanded_args: list[Field],
+                config: InterpConfig) -> Traces:
+    if len(expanded_args) <= 1:
+        return trace_map(traces, lambda s: s.set_last_exit_code(SymStr(("0",)), Confidence.DEFINITE))
+
+    eval_parts: list[str] = []
+    for field in expanded_args[1:]:
+        part = field.try_to_str()
+        if part is None:
+            return handle_unknown_command("eval", expanded_args[1:], traces, config)
+        eval_parts.append(part)
+
+    eval_script = " ".join(eval_parts)
+    if eval_script.strip() == "":
+        return trace_map(traces, lambda s: s.set_last_exit_code(SymStr(("0",)), Confidence.DEFINITE))
+
+    temp_path = None
+    try:
+        with tempfile.NamedTemporaryFile("w", suffix=".sh", delete=False) as temp_file:
+            temp_path = temp_file.name
+            temp_file.write(eval_script)
+            if not eval_script.endswith("\n"):
+                temp_file.write("\n")
+        parsed_nodes = parser.parse_shell_script(temp_path)
+    except Exception:
+        logging.debug("Failed to parse constant eval payload; falling back to unknown eval handling", exc_info=True)
+        return handle_unknown_command("eval", expanded_args[1:], traces, config)
+    finally:
+        if temp_path is not None:
+            try:
+                os.unlink(temp_path)
+            except OSError:
+                pass
+
+    t = traces
+    for wrapped_node in parsed_nodes:
+        if isinstance(wrapped_node.ast_node, AST.Command):
+            t = guarded_interp_node(t, wrapped_node.ast_node, config)
+    return t
+
+
+def handle_case(traces: Traces, node: AST.CaseNode, config: InterpConfig) -> Traces:
+    t1, case_arg_fields = expand_args_dumb(traces, [node.argument], config)
+    res = []
+    for case in node.cases:
+        logging.debug("FORK: explicit case")
+        # todo handle patterns; this is like a conditional, we could learn something about pathcond here
+        res.extend(guarded_interp_node(trace_map(t1, lambda s: s.add_pathcond(Description(f"case_L{context_line}_pattern_{case['cpattern']}:matched"))),
+                                        case["cbody"],
+                                        config))
+    return res
+
+
+def handle_assign_node(traces: Traces, node: AST.AssignNode, config: InterpConfig) -> Traces:
+    # The expand() function is used everywhere where expansion is needed.
+    # For that reason, if a quoted argument is passed in, the resulting Field will always contain a maximum word count of 1.
+    # If that weren't the case, the following command would be interpreted wrongly: cp "filename with spaces" dest.
+    # However, in the context of assignments, we want the resulting Field to have the correct word count, even if the argument is quoted.
+    # A simple way to achieve this is to unquote the argument before passing it to expand().
+
+    # "if the value of the node is a single quoted argument, remove the quotes"
+
+    val = node.val[0].arg if len(node.val) == 1 and isinstance(node.val[0], AST.QArgChar) else node.val
+
+    trace_expansion_pairs = expand(traces, val, config)
+
+    # If the assignment contains a command substitution do not set exit code to 0 with definite confidence
+    assignment_definitely_succeeds = not any(isinstance(ac, AST.BArgChar) for ac in util.iter_argchar_list(node.val, [AST.AArgChar]))
+    return [record_assignment(t, node.var, join_fields(rhs), assignment_definitely_succeeds) for (t, rhs) in trace_expansion_pairs]
+
+
+def handle_semi_node(traces: Traces, node: AST.SemiNode, config: InterpConfig) -> Traces:
+    t2 = guarded_interp_node(traces, node.left_operand, config)
+    return guarded_interp_node(t2, node.right_operand, config)
+
+
+def handle_for_node(traces: Traces, node: AST.ForNode, config: InterpConfig) -> Traces:
+    t0, var_name = expand_assuming_single_constant_word(traces, node.variable, config)
+    t1, items = expand_args_dumb(t0, node.argument, config)
+    if join_fields(items).count.max <= 1:
+        Reporter.add_issue(reporter.LoopRunsOnce(node, context_line), config)
+    # if all items are constant, we can unroll the loop
+    logging.debug("For loop items: %s", items)
+    if all(field.is_constant() for field in items):
+        # Word-split constant items within the for-loop list (e.g. $VAR="a b")
+        split_items: list[Field] = []
+        for item in items:
+            item_str = item.try_to_str()
+            IFS = " \t\n" # TODO: Grab this from the config
+            if item_str is not None and any(ch in IFS for ch in item_str):
+                split_items.extend(Field(SymStr((word,)), WordCount(1, 1)) for word in item_str.split())
+                continue
+            split_items.append(item)
+        items = split_items
+        logging.debug("For loop over constant items, unrolling: %s", items)
+        t2 = t1
+        exited: Traces = []
+        for item_field in items:
+            t2 = [record_assignment(t, var_name, item_field) for t in t2]
+            t2 = guarded_interp_node(t2, node.body, config)
+            t2, break_exit = consume_break_traces(t2)
+            t2, continue_next_iter, continue_exit = consume_continue_traces(t2)
+            exited.extend(break_exit + continue_exit)
+            t2 = t2 + continue_next_iter
+        return t2 + exited
+    else:
+        t_current = t1
+        exited: Traces = []
+        for i in range(config.max_loop_unroll):
+            logging.debug("For loop unrolling iteration %d/%d", i+1, config.max_loop_unroll)
+            t2 = [record_assignment(t, var_name, arbitrary_field(node.variable,
+                                                                ArbitraryType.APPROXIMATION,
+                                                                t.latest_state)) \
+                for t in t_current]
+            t_current = guarded_interp_node(t2, node.body, config)
+            t_current, break_exit = consume_break_traces(t_current)
+            t_current, continue_next_iter, continue_exit = consume_continue_traces(t_current)
+            exited.extend(break_exit + continue_exit)
+            t_current = t_current + continue_next_iter
+        return t_current + exited
+
+
+def handle_file_redir_node(traces: Traces, node: AST.FileRedirNode, config: InterpConfig) -> Traces:
+    res = []
+    for t, redir_args in expand(traces, node.arg, config):
+        # If the redir_arg is already known to be a safe path to overwrite, we don't need to add any assertions
+        if all(redir_arg.is_constant() and \
+            redir_arg.content.try_to_str() in Config.get("SAFE_OVERWRITE_PATHS") \
+            for redir_arg in redir_args):
+            res.append(t)
+            continue
+
+        t_precond = t
+        if node.redir_type in ["To", "Clobber"]: # >, >|
+            safe_paths = Config.get("SAFE_OVERWRITE_PATHS")
+            def not_safe_path(op: Field) -> Constraint:
+                return And.from_iter(Not(StringEq(op, Field.create_constant(p, 1))) for p in safe_paths)
+
+            assertion_constraint = SimpleConstraint(And.from_field_iter(redir_args, lambda op: Implies(not_safe_path(op), IsRead(op) | IsDeleted(op))),
+                                                    lambda line: reporter.DataLoss(node.pretty(), redir_args, line))
+            if assertion_constraint:
+                t_precond = t.extend(t.latest_state.add_assertion(
+                    assertion_constraint,
+                    source_str=node.pretty(),
+                    source_line=context_line
+                ))
+                DebugLogger.log_assertion(assertion_constraint, t.latest_state, context_line, config.current_pass)
+            else:
+                t_precond = t
+            t_postcond = t_precond.extend(t_precond.latest_state.update_fs(And.from_field_iter(redir_args, IsFile)))
+
+        elif node.redir_type == "Append": # >>
+            # NOTE: asserting IsFile also implicitly asserts that the file is *unread*
+            assertion_constraint = SimpleConstraint(And.from_field_iter(redir_args, lambda op: ~IsDir(op)),
+                                                    lambda line: reporter.ExpectedPathState(node.pretty(), 'non-directories', redir_args, line))
+            if assertion_constraint:
+                t_precond = t.extend(t.latest_state.add_assertion(assertion_constraint, source_str=node.pretty(), source_line=context_line))
+                DebugLogger.log_assertion(assertion_constraint, t.latest_state, context_line, config.current_pass)
+            else:
+                t_precond = t
+            t_postcond = t_precond.extend(t_precond.latest_state.update_fs(And.from_field_iter(redir_args, IsFile)))
+
+        elif node.redir_type == "From": # <
+            # The targets of the redirection were read from
+            assertion_constraint = SimpleConstraint(And.from_field_iter(redir_args, IsFile),
+                                                    lambda line: reporter.ExpectedPathState(node.pretty(), 'files', redir_args, line))
+            if assertion_constraint:
+                t_precond = t.extend(t.latest_state.add_assertion(assertion_constraint, source_str=node.pretty(), source_line=context_line))
+                DebugLogger.log_assertion(assertion_constraint, t.latest_state, context_line, config.current_pass)
+            else:
+                t_precond = t
+            t_postcond = t_precond.extend(t_precond.latest_state.update_fs(And.from_field_iter(redir_args, IsRead)))
+
+        elif node.redir_type == "FromTo":
+            # Conservatively assume the file is opened for reading
+            assertion_constraint = SimpleConstraint(And.from_field_iter(redir_args, lambda op: ~IsDir(op)),
+                                                    lambda line: reporter.ExpectedPathState(node.pretty(), 'non-directories', redir_args, line))
+            if assertion_constraint:
+                t_precond = t.extend(t.latest_state.add_assertion(assertion_constraint, source_str=node.pretty(), source_line=context_line))
+                DebugLogger.log_assertion(assertion_constraint, t.latest_state, context_line, config.current_pass)
+            else:
+                t_precond = t
+            t_postcond = t_precond.extend(t_precond.latest_state.update_fs(And.from_field_iter(redir_args, IsRead)))
+
+        else:
+            assert False, f"Unexpected redirection type: {node.redir_type}"
+
+        res.append(t_postcond)
+
+        match redir_args:
+            case [Field(SymStr([something]), WordCount(1, 1))]:
+                if isinstance(something, str) and something in t.latest_state.fundefs:
+                    # TODO: Associate the warning with the trace that caused it
+                    Reporter.add_issue(reporter.RedirectToFunction(something, context_line), config)
+            case [Field(CompletelyArbitrary(), _)]:
+                pass
+            case _:
+                logging.warning("Found a redir to multiple words: %s - Ignoring.", trim_string_for_logging(str(redir_args)))
+                pass
+    return res
+
+
+def handle_redir_node(traces: Traces, node: AST.RedirNode, config: InterpConfig) -> Traces:
+    t1 = guarded_interp_node(traces, node.node, config)
+    t2 = t1
+    for redir in node.redir_list:
+        t2 = guarded_interp_node(t2, redir, config)
+    return t2
+
+
+def handle_background_node(traces: Traces, node: AST.BackgroundNode, config: InterpConfig) -> Traces:
+    # Approximate background execution as ordinary sequential execution.
+    # This preserves issue finding/coverage without modeling concurrency.
+    t1 = guarded_interp_node(traces, node.node, config)
+    t2 = t1
+    for redir in node.redir_list:
+        t2 = guarded_interp_node(t2, redir, config)
+    if node.after_ampersand is not None:
+        t2 = guarded_interp_node(t2, node.after_ampersand, config)
+    return t2
+
+
+def handle_defun_node(traces: Traces, node: AST.DefunNode, config: InterpConfig) -> Traces:
+    # Note: the type annotation in the Shasta source code is *wrong* for node.name -- it's a string
+    t1, name = expand_assuming_single_constant_word(traces, node.name, config)
+    return trace_map(t1, lambda s: s.set_fundef(name, freeze(node)))
+
+
+def handle_and_or_node(traces: Traces, node: AST.AndNode | AST.OrNode, config: InterpConfig) -> Traces:
+    logging.debug("FORK: explicit AND/OR")
+    # Workaround the `checked_position` by manually adding the failure traces back only when
+    # the left operand was *not* evaluated in a checked position.
+    left_config = config if config.in_checked_position else replace(config, in_checked_position=False)
+    right_config = config
+    t1 = guarded_interp_node(traces, node.left_operand, left_config)
+    t_failure: Traces = []
+    if not left_config.in_checked_position:
+        t_failure = [t.fail_last_command() for t in t1 if t.latest_state.last_exit_code[0] == SymStr(("0",))]
+    def success(traces_with_exit_0: Traces) -> Traces:
+        if isinstance(node, AST.AndNode):
+            return guarded_interp_node(traces_with_exit_0, node.right_operand, right_config)
+        else:
+            return traces_with_exit_0
+    def failure(traces_with_exit_1: Traces) -> Traces:
+        logging.debug("Inside the failure case of %s node with %d traces",
+                    'AND' if isinstance(node, AST.AndNode) else 'OR',
+                    len(traces_with_exit_1))
+        if isinstance(node, AST.AndNode):
+            return traces_with_exit_1
+        else:
+            return guarded_interp_node(traces_with_exit_1, node.right_operand, right_config)
+    return handle_branch(t1 + t_failure, success, failure, node, config)
+
+
+def handle_not_node(traces: Traces, node: AST.NotNode, config: InterpConfig) -> Traces:
+    t1 = guarded_interp_node(traces, node.body, config)
+    t2 = trace_map(t1,
+                lambda s: s if s.last_exit_code[0] not in {SymStr(("0",)), SymStr(("1",))}
+                            else s.set_last_exit_code(SymStr(("1",)) if s.last_exit_code[0] == SymStr(("0",)) else SymStr(("0",)),
+                                                        s.last_exit_code[1]))
+    return t2
+
+
+def handle_subshell_node(traces: Traces, node: AST.SubshellNode, config: InterpConfig) -> Traces:
+    # TODO: Re-enable subshells
+    # # A subshell executes its body but does not persist shell-local state
+    # # changes (variables, function definitions, options, etc.) back to the
+    # # parent shell. Keep side effects like fs/assertions/path conditions.
+    # res: Traces = []
+    # for parent_trace in traces:
+    #     parent_state = parent_trace.latest_state
+    #     sub_traces = guarded_interp_node([parent_trace], node.body, config)
+    #     for sub_trace in sub_traces:
+    #         res.append(
+    #             sub_trace.extend(
+    #                 lambda s, p=parent_state: replace(
+    #                     s,
+    #                     env=p.env,
+    #                     localenv=p.localenv,
+    #                     call_stack=p.call_stack,
+    #                     fundefs=p.fundefs,
+    #                     opts=p.opts,
+    #                     known_nonexistent_commands=p.known_nonexistent_commands,
+    #                     known_existing_commands=p.known_existing_commands,
+    #                     terminated=p.terminated,
+    #                 )
+    #             )
+    #         )
+    # return res
+    # Keep subshell nodes as analysis no-ops.
+    # Coverage is still tracked by guarded_interp_node via mark_interpreted_ast_node(node).
+    mark_subtree_as_interpreted_for_coverage(node.body)
+    return traces
+
+
+def handle_pipe_node(traces: Traces, node: AST.PipeNode, config: InterpConfig) -> Traces:
+    # Since variable assignments from parameter expansion, such as `${var:=default}`, in pipeline commands
+    # should not persist beyond the pipeline, save the environment before the pipeline and restore it after.
+    saved_envs = [(t.latest_state.env, t.latest_state.localenv) for t in traces]
+    t = traces
+    # Sequentially interpret each command in the pipeline, and return the aggregated traces.
+    for i, cmd in enumerate(node.items):
+        if (
+            i > 0
+            and isinstance(cmd, AST.CommandNode)
+            and isinstance(node.items[i - 1], AST.CommandNode)
+        ):
+            lhs = node.items[i - 1]
+            rhs = cmd
+            if _node_invocation_has_no_stdout(lhs) and _node_invocation_expects_stdin(rhs):
+                Reporter.add_issue(reporter.UnexpectedStdin(_node_invocation_name(rhs), context_line), config)
+        t = guarded_interp_node(t, cmd, config)
+    # Since traces can fork and merge, we need to match traces back to their original saved environments.
+    # Thus, restore the environment of each trace to the environment of the first trace that matches its current state.
+    restored_traces = []
+    for trace in t:
+        saved_env, saved_localenv = saved_envs[0] if saved_envs else (trace.latest_state.env, trace.latest_state.localenv)
+        restored_traces.append(trace.extend(lambda s, env=saved_env, localenv=saved_localenv:
+                                            replace(s, env=env, localenv=localenv)))
+    return restored_traces
 
 
 def guarded_interp_node(traces: Traces,
@@ -2184,6 +2500,7 @@ def guarded_interp_node(traces: Traces,
     continuing_trace_stash.clear()
     return with_returning
 
+
 def interp_node(traces: Traces,
                 node: AST.AstNode,
                 config: InterpConfig) -> Traces:
@@ -2200,6 +2517,7 @@ def interp_node(traces: Traces,
                   context_line, trim_string_for_logging(node.pretty()), len(traces))
     DebugLogger.log_interp_line(context_line, traces, config.current_pass)
 
+    # fmt: off
     match node:
         case AST.CommandNode():
             if len(node.arguments) == 0:
@@ -2232,289 +2550,28 @@ def interp_node(traces: Traces,
 
             return handle_commandnode(t, node, config)
 
-        case AST.IfNode():
-            return handle_if(traces, node, config)
-
-        case AST.CaseNode():
-            t1, case_arg_fields = expand_args_dumb(traces, [node.argument], config)
-            res = []
-            for case in node.cases:
-                logging.debug("FORK: explicit case")
-                # todo handle patterns; this is like a conditional, we could learn something about pathcond here
-                res.extend(guarded_interp_node(trace_map(t1, lambda s: s.add_pathcond(Description(f"case_L{context_line}_pattern_{case['cpattern']}:matched"))),
-                                               case["cbody"],
-                                               config))
-            return res
-
-        case AST.AssignNode():
-            # The expand() function is used everywhere where expansion is needed.
-            # For that reason, if a quoted argument is passed in, the resulting Field will always contain a maximum word count of 1.
-            # If that weren't the case, the following command would be interpreted wrongly: cp "filename with spaces" dest.
-            # However, in the context of assignments, we want the resulting Field to have the correct word count, even if the argument is quoted.
-            # A simple way to achieve this is to unquote the argument before passing it to expand().
-
-            # "if the value of the node is a single quoted argument, remove the quotes"
-
-            val = node.val[0].arg if len(node.val) == 1 and isinstance(node.val[0], AST.QArgChar) else node.val
-
-            trace_expansion_pairs = expand(traces, val, config)
-
-            # If the assignment contains a command substitution do not set exit code to 0 with definite confidence
-            assignment_definitely_succeeds = not any(isinstance(ac, AST.BArgChar) for ac in util.iter_argchar_list(node.val, [AST.AArgChar]))
-            return [record_assignment(t, node.var, join_fields(rhs), assignment_definitely_succeeds) for (t, rhs) in trace_expansion_pairs]
-
-
-        case AST.SemiNode():
-            t2 = guarded_interp_node(traces, node.left_operand, config)
-            return guarded_interp_node(t2, node.right_operand, config)
-
-
-        case AST.WhileNode():
-            return handle_while(traces, node, config)
-
-        case AST.ForNode():
-            t0, var_name = expand_assuming_single_constant_word(traces, node.variable, config)
-            t1, items = expand_args_dumb(t0, node.argument, config)
-            if join_fields(items).count.max <= 1:
-                Reporter.add_issue(reporter.LoopRunsOnce(node, context_line), config)
-            # if all items are constant, we can unroll the loop
-            logging.debug("For loop items: %s", items)
-            if all(field.is_constant() for field in items):
-                # Word-split constant items within the for-loop list (e.g. $VAR="a b")
-                split_items: list[Field] = []
-                for item in items:
-                    item_str = item.try_to_str()
-                    IFS = " \t\n" # TODO: Grab this from the config
-                    if item_str is not None and any(ch in IFS for ch in item_str):
-                        split_items.extend(Field(SymStr((word,)), WordCount(1, 1)) for word in item_str.split())
-                        continue
-                    split_items.append(item)
-                items = split_items
-                logging.debug("For loop over constant items, unrolling: %s", items)
-                t2 = t1
-                exited: Traces = []
-                for item_field in items:
-                    t2 = [record_assignment(t, var_name, item_field) for t in t2]
-                    t2 = guarded_interp_node(t2, node.body, config)
-                    t2, break_exit = consume_break_traces(t2)
-                    t2, continue_next_iter, continue_exit = consume_continue_traces(t2)
-                    exited.extend(break_exit + continue_exit)
-                    t2 = t2 + continue_next_iter
-                return t2 + exited
-            else:
-                t_current = t1
-                exited: Traces = []
-                for i in range(config.max_loop_unroll):
-                    logging.debug("For loop unrolling iteration %d/%d", i+1, config.max_loop_unroll)
-                    t2 = [record_assignment(t, var_name, arbitrary_field(node.variable,
-                                                                        ArbitraryType.APPROXIMATION,
-                                                                        t.latest_state)) \
-                        for t in t_current]
-                    t_current = guarded_interp_node(t2, node.body, config)
-                    t_current, break_exit = consume_break_traces(t_current)
-                    t_current, continue_next_iter, continue_exit = consume_continue_traces(t_current)
-                    exited.extend(break_exit + continue_exit)
-                    t_current = t_current + continue_next_iter
-                return t_current + exited
-
-        case AST.FileRedirNode():
-            res = []
-            for t, redir_args in expand(traces, node.arg, config):
-                # If the redir_arg is already known to be a safe path to overwrite, we don't need to add any assertions
-                if all(redir_arg.is_constant() and \
-                       redir_arg.content.try_to_str() in Config.get("SAFE_OVERWRITE_PATHS") \
-                    for redir_arg in redir_args):
-                    res.append(t)
-                    continue
-
-                t_precond = t
-                if node.redir_type in ["To", "Clobber"]: # >, >|
-                    safe_paths = Config.get("SAFE_OVERWRITE_PATHS")
-                    def not_safe_path(op: Field) -> Constraint:
-                        return And.from_iter(Not(StringEq(op, Field.create_constant(p, 1))) for p in safe_paths)
-
-                    assertion_constraint = SimpleConstraint(And.from_field_iter(redir_args, lambda op: Implies(not_safe_path(op), IsRead(op) | IsDeleted(op))),
-                                                            lambda line: reporter.DataLoss(node.pretty(), redir_args, line))
-                    if assertion_constraint:
-                        t_precond = t.extend(t.latest_state.add_assertion(
-                            assertion_constraint,
-                            source_str=node.pretty(),
-                            source_line=context_line
-                        ))
-                        DebugLogger.log_assertion(assertion_constraint, t.latest_state, context_line, config.current_pass)
-                    else:
-                        t_precond = t
-                    t_postcond = t_precond.extend(t_precond.latest_state.update_fs(And.from_field_iter(redir_args, IsFile)))
-
-                elif node.redir_type == "Append": # >>
-                    # NOTE: asserting IsFile also implicitly asserts that the file is *unread*
-                    assertion_constraint = SimpleConstraint(And.from_field_iter(redir_args, lambda op: ~IsDir(op)),
-                                                            lambda line: reporter.ExpectedPathState(node.pretty(), 'non-directories', redir_args, line))
-                    if assertion_constraint:
-                        t_precond = t.extend(t.latest_state.add_assertion(assertion_constraint, source_str=node.pretty(), source_line=context_line))
-                        DebugLogger.log_assertion(assertion_constraint, t.latest_state, context_line, config.current_pass)
-                    else:
-                        t_precond = t
-                    t_postcond = t_precond.extend(t_precond.latest_state.update_fs(And.from_field_iter(redir_args, IsFile)))
-
-                elif node.redir_type == "From": # <
-                    # The targets of the redirection were read from
-                    assertion_constraint = SimpleConstraint(And.from_field_iter(redir_args, IsFile),
-                                                            lambda line: reporter.ExpectedPathState(node.pretty(), 'files', redir_args, line))
-                    if assertion_constraint:
-                        t_precond = t.extend(t.latest_state.add_assertion(assertion_constraint, source_str=node.pretty(), source_line=context_line))
-                        DebugLogger.log_assertion(assertion_constraint, t.latest_state, context_line, config.current_pass)
-                    else:
-                        t_precond = t
-                    t_postcond = t_precond.extend(t_precond.latest_state.update_fs(And.from_field_iter(redir_args, IsRead)))
-
-                elif node.redir_type == "FromTo":
-                    # Conservatively assume the file is opened for reading
-                    assertion_constraint = SimpleConstraint(And.from_field_iter(redir_args, lambda op: ~IsDir(op)),
-                                                            lambda line: reporter.ExpectedPathState(node.pretty(), 'non-directories', redir_args, line))
-                    if assertion_constraint:
-                        t_precond = t.extend(t.latest_state.add_assertion(assertion_constraint, source_str=node.pretty(), source_line=context_line))
-                        DebugLogger.log_assertion(assertion_constraint, t.latest_state, context_line, config.current_pass)
-                    else:
-                        t_precond = t
-                    t_postcond = t_precond.extend(t_precond.latest_state.update_fs(And.from_field_iter(redir_args, IsRead)))
-
-                else:
-                    assert False, f"Unexpected redirection type: {node.redir_type}"
-
-                res.append(t_postcond)
-
-                match redir_args:
-                    case [Field(SymStr([something]), WordCount(1, 1))]:
-                        if isinstance(something, str) and something in t.latest_state.fundefs:
-                            # TODO: Associate the warning with the trace that caused it
-                            Reporter.add_issue(reporter.RedirectToFunction(something, context_line), config)
-                    case [Field(CompletelyArbitrary(), _)]:
-                        pass
-                    case _:
-                        logging.warning("Found a redir to multiple words: %s - Ignoring.", trim_string_for_logging(str(redir_args)))
-                        pass
-            return res
-
-        case AST.RedirNode():
-            t1 = guarded_interp_node(traces, node.node, config)
-            t2 = t1
-            for redir in node.redir_list:
-                t2 = guarded_interp_node(t2, redir, config)
-            return t2
-
-        case AST.BackgroundNode():
-            # Approximate background execution as ordinary sequential execution.
-            # This preserves issue finding/coverage without modeling concurrency.
-            t1 = guarded_interp_node(traces, node.node, config)
-            t2 = t1
-            for redir in node.redir_list:
-                t2 = guarded_interp_node(t2, redir, config)
-            if node.after_ampersand is not None:
-                t2 = guarded_interp_node(t2, node.after_ampersand, config)
-            return t2
-
-
-        case AST.DefunNode():
-            # Note: the type annotation in the Shasta source code is *wrong* for node.name -- it's a string
-            t1, name = expand_assuming_single_constant_word(traces, node.name, config)
-            return trace_map(t1, lambda s: s.set_fundef(name, freeze(node)))
-
-        case AST.AndNode() | AST.OrNode():
-            logging.debug("FORK: explicit AND/OR")
-            # Workaround the `checked_position` by manually adding the failure traces back only when
-            # the left operand was *not* evaluated in a checked position.
-            left_config = config if config.in_checked_position else replace(config, in_checked_position=False)
-            right_config = config
-            t1 = guarded_interp_node(traces, node.left_operand, left_config)
-            t_failure: Traces = []
-            if not left_config.in_checked_position:
-                t_failure = [t.fail_last_command() for t in t1 if t.latest_state.last_exit_code[0] == SymStr(("0",))]
-            def success(traces_with_exit_0: Traces) -> Traces:
-                if isinstance(node, AST.AndNode):
-                    return guarded_interp_node(traces_with_exit_0, node.right_operand, right_config)
-                else:
-                    return traces_with_exit_0
-            def failure(traces_with_exit_1: Traces) -> Traces:
-                logging.debug("Inside the failure case of %s node with %d traces",
-                              'AND' if isinstance(node, AST.AndNode) else 'OR',
-                              len(traces_with_exit_1))
-                if isinstance(node, AST.AndNode):
-                    return traces_with_exit_1
-                else:
-                    return guarded_interp_node(traces_with_exit_1, node.right_operand, right_config)
-            return handle_branch(t1 + t_failure, success, failure, node, config)
-
-        case AST.NotNode():
-            t1 = guarded_interp_node(traces, node.body, config)
-            t2 = trace_map(t1,
-                          lambda s: s if s.last_exit_code[0] not in {SymStr(("0",)), SymStr(("1",))}
-                                      else s.set_last_exit_code(SymStr(("1",)) if s.last_exit_code[0] == SymStr(("0",)) else SymStr(("0",)),
-                                                                s.last_exit_code[1]))
-            return t2
-
-        case AST.SubshellNode():
-            # TODO: Re-enable subshells
-            # # A subshell executes its body but does not persist shell-local state
-            # # changes (variables, function definitions, options, etc.) back to the
-            # # parent shell. Keep side effects like fs/assertions/path conditions.
-            # res: Traces = []
-            # for parent_trace in traces:
-            #     parent_state = parent_trace.latest_state
-            #     sub_traces = guarded_interp_node([parent_trace], node.body, config)
-            #     for sub_trace in sub_traces:
-            #         res.append(
-            #             sub_trace.extend(
-            #                 lambda s, p=parent_state: replace(
-            #                     s,
-            #                     env=p.env,
-            #                     localenv=p.localenv,
-            #                     call_stack=p.call_stack,
-            #                     fundefs=p.fundefs,
-            #                     opts=p.opts,
-            #                     known_nonexistent_commands=p.known_nonexistent_commands,
-            #                     known_existing_commands=p.known_existing_commands,
-            #                     terminated=p.terminated,
-            #                 )
-            #             )
-            #         )
-            # return res
-            # Keep subshell nodes as analysis no-ops.
-            # Coverage is still tracked by guarded_interp_node via mark_interpreted_ast_node(node).
-            mark_subtree_as_interpreted_for_coverage(node.body)
-            return traces
-
-        case AST.PipeNode():
-            # Since variable assignments from parameter expansion, such as `${var:=default}`, in pipeline commands
-            # should not persist beyond the pipeline, save the environment before the pipeline and restore it after.
-            saved_envs = [(t.latest_state.env, t.latest_state.localenv) for t in traces]
-            t = traces
-            # Sequentially interpret each command in the pipeline, and return the aggregated traces.
-            for i, cmd in enumerate(node.items):
-                if (
-                    i > 0
-                    and isinstance(cmd, AST.CommandNode)
-                    and isinstance(node.items[i - 1], AST.CommandNode)
-                ):
-                    lhs = node.items[i - 1]
-                    rhs = cmd
-                    if _node_invocation_has_no_stdout(lhs) and _node_invocation_expects_stdin(rhs):
-                        Reporter.add_issue(reporter.UnexpectedStdin(_node_invocation_name(rhs), context_line), config)
-                t = guarded_interp_node(t, cmd, config)
-            # Since traces can fork and merge, we need to match traces back to their original saved environments.
-            # Thus, restore the environment of each trace to the environment of the first trace that matches its current state.
-            restored_traces = []
-            for trace in t:
-                saved_env, saved_localenv = saved_envs[0] if saved_envs else (trace.latest_state.env, trace.latest_state.localenv)
-                restored_traces.append(trace.extend(lambda s, env=saved_env, localenv=saved_localenv:
-                                                    replace(s, env=env, localenv=localenv)))
-            return restored_traces
+        case AST.AndNode():        return handle_and_or_node(traces, node, config)
+        case AST.AssignNode():     return handle_assign_node(traces, node, config)
+        case AST.BackgroundNode(): return handle_background_node(traces, node, config)
+        case AST.CaseNode():       return handle_case(traces, node, config)
+        case AST.DefunNode():      return handle_defun_node(traces, node, config)
+        case AST.FileRedirNode():  return handle_file_redir_node(traces, node, config)
+        case AST.ForNode():        return handle_for_node(traces, node, config)
+        case AST.IfNode():         return handle_if(traces, node, config)
+        case AST.NotNode():        return handle_not_node(traces, node, config)
+        case AST.OrNode():         return handle_and_or_node(traces, node, config)
+        case AST.PipeNode():       return handle_pipe_node(traces, node, config)
+        case AST.RedirNode():      return handle_redir_node(traces, node, config)
+        case AST.SemiNode():       return handle_semi_node(traces, node, config)
+        case AST.SubshellNode():   return handle_subshell_node(traces, node, config)
+        case AST.WhileNode():      return handle_while(traces, node, config)
 
         # todo bring other cases as needed
-
         case _:
             logging.debug("Unhandled node type '%s'; treating as no-op", node.NodeName)
             return traces
+    # fmt: on
+
 
 def starting_state(fs_model: FSModel | None = None, config: InterpConfig | None = None) -> State:
     # env["IFS"] = ShellVar(" \t\n")
@@ -2532,8 +2589,10 @@ def starting_state(fs_model: FSModel | None = None, config: InterpConfig | None 
     starter_env[pwd_init_var] = ShellVar(starter_env["PWD"].value, readonly=True, ghost=True)
     return root.extend_env(starter_env)
 
+
 def trim_string_for_logging(s: str, max_len: int = 300) -> str:
     return s if len(s) <= max_len else s[:max_len] + "..."
+
 
 def find_func_defs(traces: Traces, nodes: list[parser.WrappedAst], config: InterpConfig) -> FrozenDict[str, AST.Command]:
     # TODO: Write unit tests for function definitions being recorded correctly (low priority)
@@ -2612,6 +2671,7 @@ def symb_engine(nodes: list[parser.WrappedAst], config: InterpConfig) -> Traces:
 
 
     return traces + [t for ts in func_traces.values() for t in ts] + inactive_trace_stash
+
 
 def symbexec_file(input_file: str,
                   config: InterpConfig,
@@ -2861,4 +2921,5 @@ def _set_timer(timeout: float | None) -> Event | None:
     _timers.append(timer)
     timer.start()
     return event
+
 func_map = FuncMap()
