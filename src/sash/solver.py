@@ -38,9 +38,7 @@ def field_to_z3(field: Field) -> z3.ExprRef:
 def field_content_to_z3(field_content: SymStr | CompletelyArbitrary) -> z3.ExprRef:
     match field_content:
         case SymStr(parts):
-            if any(not isinstance(part, str) for part in parts):
-                raise NotImplementedError(f"SymStr with SymVars not supported in Z3 translation yet (got parts {parts})")
-            return z3.StringVal("".join(parts)) # type: ignore
+            return z3.StringVal("".join(parts))
         case CompletelyArbitrary() as arbitrary:
             arbitrary_no_pfx_sfx = replace(arbitrary, prefix=None, suffix=None,
                                            # As far as paths are concerned, whether they're quoted or not is irrelevant

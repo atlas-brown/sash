@@ -3,7 +3,6 @@ from collections.abc import Iterable
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
-from sash.symbolic.strings import SymVar
 from sash.symbolic.strings import SymStr
 from sash.util import create_fresh_varname
 
@@ -19,36 +18,9 @@ def test_symbstr_to_str_with_strings(l: list[str]) -> None:
     assert symbstr.try_to_str() == "".join(l)
 
 
-@st.composite
-def lst_with_at_least_one_symvar(draw) -> list[str | SymVar]:
-    """Hypothesis strategy to generate a list with at least one SymVar."""
-    strs = draw(st.lists(st.text(), min_size=1))
-    symvar = draw(st.builds(SymVar, st.text(min_size=1)))
-    pos = draw(st.integers(min_value=0, max_value=len(strs)))
-    return strs[:pos] + [symvar] + strs[pos:]
-
-
-@given(seq=lst_with_at_least_one_symvar())
-def test_symbstr_to_str_with_symvars(seq: list[str | SymVar]) -> None:
-    """Property-based test for `symbstr_to_str` with `SymVar` components."""
-    # If there exists any `SymVar` in the iterable, the result should be None.
-    assert SymStr(tuple(seq)).try_to_str() is None
-
-
-@given(seq=st.lists(st.one_of(st.text(), st.builds(SymVar, st.text(min_size=1)))))
-def test_symbstr_to_str_equivalence(seq: list[str | SymVar]) -> None:
-    """Property-based test for `symbstr_to_str` checking structural equivalence."""
-    # If all components are strings, the result should be their concatenation.
-    if all(isinstance(x, str) for x in seq):
-        assert SymStr(tuple(seq)).try_to_str() == "".join(x for x in seq if isinstance(x, str))
-    # Otherwise (i.e., if any component is a `SymVar`), the result should be None.
-    else:
-        assert SymStr(tuple(seq)).try_to_str() is None
-
-
 def test_symbstr_to_str_empty_iterable() -> None:
     """Property-based test `symbstr_to_str` with an empty iterable."""
-    symbstr: Iterable[str | SymVar] = []
+    symbstr: Iterable[str] = []
 
     # The result should be an empty string.
     assert SymStr(tuple(symbstr)).try_to_str() == ""

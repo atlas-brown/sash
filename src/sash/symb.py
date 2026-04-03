@@ -18,7 +18,7 @@ import shasta.ast_node as AST
 from sash.fs import FSModel, FSModelSimple
 import sash.parser as parser
 import sash.reporter as reporter
-from sash.symbolic.strings import ArbitraryType, CompletelyArbitrary, Field, SymStr, SymVar, WordCount
+from sash.symbolic.strings import ArbitraryType, CompletelyArbitrary, Field, SymStr, WordCount
 import sash.util as util
 from sash.config import Config # TODO: refactor to delete sash.config, move all needed stuff to InterpConfig
 from sash.constraints import *
@@ -530,7 +530,7 @@ def expand_simple(stuff: list[AST.ArgChar],
         quoted: bool
         state: State
         combined_fields_so_far: list[Field | None] = field(default_factory=list) # None's mean a hard break due to IFS
-        field_so_far: list[str | SymVar] = field(default_factory=list)
+        field_so_far: list[str] = field(default_factory=list)
         field_so_far_words_min: int = 1
         field_so_far_words_max: int | float = 1
 

@@ -30,7 +30,6 @@ from sash.symbolic.strings import (
     CompletelyArbitrary,
     Field,
     SymStr,
-    SymVar,
     WordCount,
 )
 from sash.symbolic.state import RefineableConstraint, SimpleConstraint
@@ -73,8 +72,6 @@ def parse_command(cmd_inv: tuple[Field, ...]) -> CmdInvocation:
         match field.content:
             case SymStr(parts):
                 part_strs = []
-                if any(not isinstance(part, str) for part in parts):
-                    raise NotImplementedError(f"SymStr with SymVars not supported in command parsing yet (got parts {parts})")
                 for part in parts:
                     match part:
                         case str(s):
@@ -82,9 +79,6 @@ def parse_command(cmd_inv: tuple[Field, ...]) -> CmdInvocation:
                                 # If an part contains spaces, that means it was quoted in the original command (TODO: verify this assumption)
                                 s = f'"{s}"'
                             part_strs.append(s)
-                        case SymVar(name):
-                            # TODO: This might not work when we handle SymVars
-                            part_strs.append(f"${{{name}}}__idx__{cmd_inv.index(field)}")
                 curr_field = "".join(part_strs)
             case CompletelyArbitrary():
                 curr_field = f"$arbitrary__idx__{cmd_inv.index(field)}"
@@ -147,11 +141,6 @@ def extract_flags_naively(cmd: str, operands: list[Field]) -> tuple[set[str], li
 
         # Operand is SymStr with exactly one part
         part = operand.content.parts[0]
-        if isinstance(part, SymVar):
-            remaining_operands.append(operand)
-            continue
-
-        # Operand is SymStr with exactly one str part
         if part == "--":
             # Stop flag parsing after '--'
             remaining_operands.extend(operands[idx + 1:])

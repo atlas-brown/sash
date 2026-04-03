@@ -9,13 +9,8 @@ if TYPE_CHECKING:
 
 
 @dataclass(frozen=True)
-class SymVar:
-    name: str
-
-
-@dataclass(frozen=True)
 class SymStr:
-    parts: tuple[str | SymVar, ...] = field(default_factory=tuple)
+    parts: tuple[str, ...] = field(default_factory=tuple)
 
     def is_simple(self) -> bool:
         """Return true if there are no adjacent strings in `parts`."""
