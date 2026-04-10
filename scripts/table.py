@@ -352,6 +352,7 @@ WILD_PROJECT_PURPOSES = {
     "Multigres": "Tooling",
     "Netdata": "Monitoring",
     "Next.js": "Deploy",
+    "Netdata": "Monitoring",
     "OpenSC": "Build",
     "Openpilot": "Setup",
     "P4 Compiler": "Build",
@@ -359,16 +360,20 @@ WILD_PROJECT_PURPOSES = {
     "PlantsVsZombies Fan Game": "Build",
     "PyTorch": "CI",
     "RapidPro Docker": "Uninstall",
-    "Serverless": "Installer",
     "SourcererCC": "Tooling",
+    "Serverless": "Installer",
     "Watt SteamTools": "Utility",
+    "Swiftenv": "Setup",
     "Tazpkg": "Package",
     "Theme Switcher": "Configuration",
     "ToolSave": "Uninstall",
     "V2M": "Uninstall",
     "Ventoy": "Boot",
+    "Whishper": "Installer",
     "vLLM": "CI",
-    "Whishper": "Installer"
+    "Whishper": "Installer",
+    "ch32-data": "Build",
+    "CS-Notes": "Docs",
 }
 
 WILD_CURATED_ROWS = [
@@ -394,23 +399,59 @@ WILD_SOURCE_KEYS = {
     "Crawl4AI": r"\cite{crawl4ai}",
     "Danghuangshang": r"\cite{danghuangshang}",
     "Dotfiles": ["dotfiles-nicknisi", "dotfiles-gihrig"],
+    "Edeliver": r"\cite{edeliver}",
+    "Embree": r"\cite{embree}",
+    "FaceDetection-DSFD": r"\cite{facedetection-dsfd}",
     "Gloo Gateway": r"\cite{gloo-gateway-2.1-demo}",
     "Ghorg": r"\cite{ghorg}",
+    "Hasor": r"\cite{hasor}",
+    "IPinfo CLI": r"\cite{ipinfo-cli}",
     "Kubernetes Test Infra": r"\cite{kubernetes-test-infra}",
+    "La Capitaine Icon Theme": r"\cite{la-capitaine-icon-theme}",
+    "LibreELEC": r"\cite{libreelec}",
     "Moby": r"\cite{moby}",
+    "Multigres": r"\cite{multigres}",
     "Next.js": r"\cite{nextjs}",
+    "Netdata": r"\cite{netdata}",
     "OpenSC": r"\cite{opensc}",
     "Openpilot": r"\cite{openpilot}",
     "P4 Compiler": r"\cite{p4:comm:2014}",
+    "PgBouncer": r"\cite{pgbouncer}",
+    "PlantsVsZombies": r"\cite{plantsvszombies}",
     "PyTorch": r"\cite{pytorch}",
     "RapidPro Docker": r"\cite{rapidpro-docker}",
+    "SourcererCC": r"\cite{sourcerercc}",
     "Serverless": r"\cite{serverless}",
+    "SteamTools": r"\cite{steamtools}",
+    "Swiftenv": r"\cite{swiftenv}",
     "Tazpkg": r"\cite{tazpkg}",
     "Theme Switcher": r"\cite{theme-switcher}",
     "ToolSave": r"\cite{toolsave}",
     "V2M": r"\cite{v2m}",
     "Ventoy": r"\cite{ventoy}",
+    "Whishper": r"\cite{whishper}",
     "vLLM": r"\cite{vllm}",
+    "ch32-data": r"\cite{ch32-data}",
+    "CS-Notes": r"\cite{cs-notes}",
+}
+
+WILD_MANUAL_APPENDIX_ROWS = {
+    "Netdata": {"bug_count": 1},
+    "SourcererCC": {"bug_count": 1},
+    "Embree": {"bug_count": 1},
+    "SteamTools": {"bug_count": 1},
+    "PlantsVsZombies": {"bug_count": 1},
+    "IPinfo CLI": {"bug_count": 2},
+    "La Capitaine Icon Theme": {"bug_count": 1},
+    "Swiftenv": {"bug_count": 1},
+    "Edeliver": {"bug_count": 1},
+    "Multigres": {"bug_count": 1},
+    "Whishper": {"bug_count": 1},
+    "FaceDetection-DSFD": {"bug_count": 1},
+    "ch32-data": {"bug_count": 1},
+    "PgBouncer": {"bug_count": 1},
+    "CS-Notes": {"bug_count": 1},
+    "Hasor": {"bug_count": 1},
 }
 
 
@@ -524,11 +565,31 @@ if args.wild:
         row["bug_count"] += bug_count
         row["descriptions"].update(descriptions_set)
 
+    for project_name, meta in WILD_MANUAL_APPENDIX_ROWS.items():
+        row = wild_rows_by_project.setdefault(
+            project_name,
+            {"sources": [], "bug_count": 0, "descriptions": set()},
+        )
+        row["bug_count"] += int(meta["bug_count"])
+
     if args.appendix:
-        print(r"""\begin{tabular}{lllr}
+        print(r"""\setlength{\LTleft}{0pt}
+\setlength{\LTright}{0pt}
+\begin{longtable}{@{}lllr@{}}
 \toprule
 \textbf{Project} & \textbf{Domain} & \textbf{Bug description} & \textbf{\#B} \\
 \midrule
+\endfirsthead
+\multicolumn{4}{@{}l@{}}{\tablename\ \thetable{} (continued)}\\
+\toprule
+\textbf{Project} & \textbf{Domain} & \textbf{Bug description} & \textbf{\#B} \\
+\midrule
+\endhead
+\midrule
+\multicolumn{4}{r@{}}{Continued on next page}\\
+\endfoot
+\bottomrule
+\endlastfoot
 """)
     else:
         print(r"""\begin{tabular}{lcr}
@@ -558,10 +619,15 @@ if args.wild:
             total_bug_count += row["bug_count"]
     print(r"\midrule")
     if args.appendix:
-        print(rf"Total &  &  & {total_bug_count}  \\")
+        print(rf"\textbf{{Total}} &  &  & {total_bug_count}  \\")
     else:
         print(rf"Total \cf{{app:all-bug-reports}} & $\ldots$ & {total_bug_count}  \\")
-    print(r"""
+    if args.appendix:
+        print(r"""
+\end{longtable}
+""")
+    else:
+        print(r"""
 \bottomrule
 \end{tabular}
 """)
