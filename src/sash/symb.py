@@ -1,3 +1,4 @@
+import fnmatch
 import logging
 import os
 import threading
@@ -5,20 +6,31 @@ import traceback
 import time
 import tempfile
 from collections import defaultdict
-from copy import copy
+from copy import deepcopy
 from dataclasses import dataclass, field, replace
 from enum import Enum
 from math import inf
 from threading import Event
 from typing import NamedTuple, Callable
-from copy import deepcopy
 
 import shasta.ast_node as AST
 
 from sash.fs import FSModel, FSModelSimple
 import sash.parser as parser
 import sash.reporter as reporter
-from sash.symbolic.strings import ArbitraryType, CompletelyArbitrary, Field, SymStr, WordCount
+from sash.symbolic.strings import (
+    ArbitraryType,
+    CompletelyArbitrary,
+    ExpandedChunk,
+    Field,
+    LiteralChunk,
+    PreSplitWord,
+    SymStr,
+    WordCount,
+    presplit_from_field,
+    presplit_to_field,
+    presplit_try_to_str,
+)
 import sash.util as util
 from sash.config import Config # TODO: refactor to delete sash.config, move all needed stuff to InterpConfig
 from sash.constraints import *
@@ -32,14 +44,15 @@ from sash.symbolic.state import *
 from sash.debugtools.logger import DebugLogger
 
 
-def _set_env_like(state: State, name: str, value: Field) -> State:
+def _set_env_like(state: State, name: str, value: Field | PreSplitWord) -> State:
+    stored_value = value if isinstance(value, PreSplitWord) else presplit_from_field(value)
     existing = state.lookup(name)
     if existing is None:
-        return state.set_env(name, ShellVar(value))
+        return state.set_env(name, ShellVar(stored_value))
     return state.set_env(
         name,
         ShellVar(
-            value,
+            stored_value,
             readonly=existing.readonly,
             export=existing.export,
             ghost=existing.ghost,
@@ -77,7 +90,7 @@ def _path_lookup_disabled_for_command(name: str, traces: Traces) -> bool:
         path_var = trace.latest_state.lookup("PATH")
         if path_var is None:
             return True
-        path_str = path_var.value.try_to_str()
+        path_str = path_var.try_to_str()
         if path_str == "":
             return True
     return False
@@ -92,13 +105,13 @@ def _update_pwd_for_cd(state: State, expanded_args: tuple[Field, ...]) -> State:
     if len(expanded_args) <= 1:
         home = state.lookup("HOME")
         if home is not None:
-            target = home.value
+            target = home.as_field()
     else:
         operand = expanded_args[1]
         if operand.try_to_str() == "-":
             oldpwd = state.lookup("OLDPWD")
             if oldpwd is not None:
-                target = oldpwd.value
+                target = oldpwd.as_field()
         else:
             target = operand
 
@@ -212,7 +225,7 @@ def command_substitution_output(cmd_name: str,
         case "pwd":
             pwd_var = state.lookup("PWD")
             assert pwd_var is not None, "PWD should always be defined"
-            return pwd_var.value, state
+            return pwd_var.as_field(), state
         case "echo":
             output_field = merge_partial_fields(operands, sep=" ", state=state) # TODO: sep should be from IFS
             if (output_str := output_field.try_to_str()) is not None:
@@ -267,10 +280,98 @@ def _parse_loop_control_level(expanded_args: list[Field]) -> int:
         return 1
     return max(level, 1)
 
-
 # ============================================================
 #                  Symbolic Expander
 # ============================================================
+
+# PreSplitWord is used inside ShellVar values in the new storage IR; make it hashable for FrozenDict.
+def _presplitword_hash(self) -> int:  # type: ignore[override]
+    return hash(tuple(self.chunks))
+
+PreSplitWord.__hash__ = _presplitword_hash  # type: ignore[assignment]
+
+
+DEFAULT_IFS = " \t\n"
+
+
+def _concrete_ifs_value(curr_state: State) -> str | None:
+    ifs_value = curr_state.lookup("IFS")
+    if ifs_value is None:
+        return DEFAULT_IFS
+    stored = ifs_value.value
+    if isinstance(stored, PreSplitWord):
+        # If more than one chunks are present, at least one of them will be symbolic
+        if len(stored.chunks) == 1:
+            chunk = stored.chunks[0]
+            if isinstance(chunk, LiteralChunk):
+                return chunk.content
+            if isinstance(chunk, ExpandedChunk) and isinstance(chunk.content, str):
+                return chunk.content
+        return None
+    if isinstance(stored, Field):
+        return stored.try_to_str()
+    return None
+
+
+def _collect_positional_params(curr_state: State) -> list[PreSplitWord]:
+    params: dict[int, PreSplitWord] = {}
+    for mapping in (curr_state.localenv, curr_state.env):
+        for name, shellvar in mapping.items():
+            if not name.isdecimal():
+                continue
+            idx = int(name)
+            if idx <= 0 or idx in params:
+                continue
+            params[idx] = shellvar.value
+    return [params[i] for i in sorted(params)]
+
+
+def _literal_argchars(argchars: list[AST.ArgChar]) -> str | None:
+    chars: list[str] = []
+    for ch in argchars:
+        match ch:
+            case AST.CArgChar() | AST.EArgChar():
+                chars.append(chr(ch.char))
+            case AST.QArgChar() as qarg:
+                inner = _literal_argchars(qarg.arg)
+                if inner is None:
+                    return None
+                chars.append(inner)
+            case _:
+                return None
+    return "".join(chars)
+
+
+def _trim_pattern(value: str, pattern: str, mode: str) -> str:
+    if mode in {"TrimR", "TrimRMax"}:
+        indices = [i for i in range(len(value) + 1) if fnmatch.fnmatch(value[i:], pattern)]
+        if not indices:
+            return value
+        idx = min(indices) if mode == "TrimRMax" else max(indices)
+        return value[:idx]
+    if mode in {"TrimL", "TrimLMax"}:
+        indices = [i for i in range(len(value) + 1) if fnmatch.fnmatch(value[:i], pattern)]
+        if not indices:
+            return value
+        idx = max(indices) if mode == "TrimLMax" else min(indices)
+        return value[idx:]
+    return value
+
+
+def _maybe_report_inconsistent_ifs(traces: Traces, config: InterpConfig) -> None:
+    if not traces:
+        return
+    concrete_values: list[str] = []
+    for trace in traces:
+        ifs_value = _concrete_ifs_value(trace.latest_state)
+        if ifs_value is not None:
+            concrete_values.append(ifs_value)
+    unique_values = sorted(set(concrete_values))
+    if len(unique_values) > 1:
+        from sash import symb as symb_module
+
+        Reporter.add_issue(reporter.InconsistentIFS(unique_values, symb_module.context_line), config)
+
 
 # Symbolic expander design overview:
 #
@@ -297,6 +398,7 @@ def expand(traces: Traces,
     If supplied, `prefix` specifies a prefix to prepend to each expansion produced by each trace (mapped by its id).
     """
     res = []
+    _maybe_report_inconsistent_ifs(traces, config)
     for trace in traces:
         prefix_fields = prefix.get(id(trace), [])
         # expand_simple(stuff, trace.latest_state, config)
@@ -306,15 +408,164 @@ def expand(traces: Traces,
     return res
 
 
-# Different fields are definitely separated; things within a field *may be separated as well!*
 def expand_simple(stuff: list[AST.ArgChar],
                   state: State,
-                  config: InterpConfig) -> list[tuple[list[Field], State]]: # TODO why is this order swapped wrt `expand`?
+                  config: InterpConfig) -> list[tuple[list[Field], State]]:
     """
-    Return all possible expansions of `stuff` for the given `state`.
-    Result is a list of pairs of: an expansion plus a new state associated with that expansion.
+    (MODIFIED) Retrofitted to act as the Command Context bridge.
+    Generates PreSplitWords, applies IFS splitting, and handles glob approximation.
     """
-    IFS = " \t\n"
+    def positional_match(argchars: list[AST.ArgChar]) -> tuple[AST.VArgChar, bool] | None:
+        if len(argchars) != 1:
+            return None
+        match argchars[0]:
+            case AST.VArgChar() as var_node if var_node.var in {"@", "*"}:
+                return var_node, False
+            case AST.QArgChar() as qarg:
+                if len(qarg.arg) == 1 and isinstance(qarg.arg[0], AST.VArgChar) and qarg.arg[0].var in {"@", "*"}:
+                    return qarg.arg[0], True
+        return None
+
+    def expand_positional(var_node: AST.VArgChar, quoted: bool) -> list[tuple[list[Field], State]]:
+        params = _collect_positional_params(state)
+        if not params:
+            return [([], state)]
+        if var_node.var == "*" and quoted:
+            ifs_value = _concrete_ifs_value(state)
+            if ifs_value is None:
+                arbitrary = CompletelyArbitrary(freeze_thing(var_node), ArbitraryType.APPROXIMATION, state)
+                return [([Field(arbitrary, WordCount(0, inf))], state)]
+            sep = ifs_value[:1]
+            pieces: list[str] = []
+            for param in params:
+                param_str = presplit_try_to_str(param)
+                if param_str is None:
+                    arbitrary = CompletelyArbitrary(freeze_thing(var_node), ArbitraryType.APPROXIMATION, state)
+                    return [([Field(arbitrary, WordCount(0, inf))], state)]
+                pieces.append(param_str)
+            joined = sep.join(pieces)
+            return [([Field(SymStr((joined,)), WordCount(1, 1))], state)]
+
+        if quoted:
+            fields = [presplit_to_field(param).quote() for param in params]
+            return [(fields, state)]
+
+        ifs_value = _concrete_ifs_value(state)
+        if ifs_value is None:
+            arbitrary = CompletelyArbitrary(freeze_thing(var_node), ArbitraryType.APPROXIMATION, state)
+            return [([Field(arbitrary, WordCount(0, inf))], state)]
+        expanded_fields: list[Field] = []
+        for param in params:
+            expanded_fields.extend(param.expand_from_storage(False).split_into_fields(ifs_value))
+        return [(expanded_fields, state)]
+
+    positional = positional_match(stuff)
+    if positional is not None:
+        var_node, quoted = positional
+        return expand_positional(var_node, quoted)
+
+    def word_needs_ifs(word: PreSplitWord) -> bool:
+        return any(isinstance(chunk, ExpandedChunk) and not chunk.is_quoted for chunk in word.chunks)
+
+    expansions = expand_to_word_simple(stuff, state, config)
+    res: list[tuple[list[Field], State]] = []
+    for word, new_state in expansions:
+        ifs_value = _concrete_ifs_value(new_state)
+        if ifs_value is None and word_needs_ifs(word):
+            arbitrary = CompletelyArbitrary(freeze_thing(stuff), ArbitraryType.APPROXIMATION, new_state)
+            res.append(([Field(arbitrary, WordCount(0, inf))], new_state))
+            continue
+        split_ifs = ifs_value if ifs_value is not None else DEFAULT_IFS
+        res.append((word.split_into_fields(split_ifs), new_state))
+    return res
+
+
+def expand_args_dumb(traces: Traces,
+                     args: list[list[AST.ArgChar]],
+                     config: InterpConfig) -> tuple[Traces, list[Field]]:
+    """
+    Expand `args` into a *single* list of fields, collapsing differences in the expansion of each arg between traces by approximating that arg with `CompletelyArbitrary`.
+    Result is a pair of: a new set of traces, and the expansion of `args`.
+
+    This function is a simplified interface to `expand`, which collapses the different expansion possibilities arising from different traces.
+    The simplification comes at the cost of approximation.
+    """
+    expanded_args: list[Field] = []
+    res_traces = traces
+    terminated_traces: Traces = []
+    for arg in args:
+        expansions = expand(res_traces, arg, config)
+        res_traces = [expansion[0] for expansion in expansions]
+        active_expansions = [expansion for expansion in expansions if not expansion[0].latest_state.terminated]
+        terminated_traces.extend([expansion[0] for expansion in expansions if expansion[0].latest_state.terminated])
+        if not active_expansions:
+            logging.debug(f"Stopping expansion of entire args because all traces terminated on {arg}")
+            return terminated_traces, []
+        expanded_fields = [expansion[1] for expansion in active_expansions]
+        # for each trace, we have a list of fields that this arg expands to
+
+        # # Design 1: collapse each field individually across all traces
+        # final_number_of_fields = max(len(field_list) for field_list in expanded_fields)
+        # # for each final field at index i, obtain field by collapsing all fields at index i
+        # # across all traces (if a trace has fewer fields, it contributes an empty field)
+        # for i in range(final_number_of_fields):
+        #     fields_at_i = [field_list[i] if i < len(field_list) else Field(SymStr([""]), WordCount(0, 0)) for field_list in expanded_fields]
+        #     collapsed_field = collapse_fields(fields_at_i)
+        #     expanded_args.append(collapsed_field)
+
+        # Design 2: if all fields are the same across all traces, keep that, else give up entirely
+        if all(field == expanded_fields[0] for field in expanded_fields):
+            expanded_args.extend(expanded_fields[0])
+        else:
+            # todo could be smarter about the ranges of word counts and prefix/suffix preservation, but wont do unless needed
+            expanded_args.append(arbitrary_field(arg, ArbitraryType.APPROXIMATION, None))
+    return res_traces + terminated_traces, expanded_args
+
+
+def expand_args(traces: Traces,
+                args: list[list[AST.ArgChar]],
+                config: InterpConfig) -> list[tuple[Trace, list[Field]]]:
+    """
+    Return all possible expansions of `args`, across all `traces`.
+    Result is a list of pairs of: a trace, and an associated expansion of `args`.
+    """
+    prefixes = {id(trace): [] for trace in traces}
+    res_traces = traces
+    for arg in args:
+        expansions = expand(res_traces, arg, config, prefixes)
+        res_traces = [expansion[0] for expansion in expansions]
+        for res_trace, expanded_fields in expansions:
+            prefixes[id(res_trace)] = expanded_fields
+
+    return [(trace, prefixes[id(trace)]) for trace in res_traces]
+
+
+def expand_assuming_single_constant_word(traces: Traces,
+                                         stuff: list[AST.ArgChar],
+                                         config: InterpConfig) -> tuple[Traces, str]:
+    """
+    Expand `stuff` into a string, under the assumption that it expands to a single constant word across all `traces`.
+    Result is a pair of: a new set of traces, and the string.
+
+    If the assumption is violated, raises an AssertionError.
+    """
+    t0, fields = expand_args_dumb(traces, [stuff], config)
+    match fields:
+        case [Field(SymStr((one_word,)), WordCount(1, 1))] if isinstance(one_word, str):
+            return t0, one_word
+        case _:
+            assert False, f"expected {stuff} to be a single constant word, but found something else after expansion: {fields}"
+
+
+def expand_to_word_simple(stuff: list[AST.ArgChar],
+                          state: State,
+                          config: InterpConfig) -> list[tuple[PreSplitWord, State]]:
+    """
+    (NEW) Core AST evaluator.
+    Walks the AST, resolves parameter/command expansions, and preserves quotes.
+    Returns all possible expansions as intermediate PreSplitWords.
+    """
+    from sash import symb as symb_module
 
     def field_core_key(field: Field) -> CompletelyArbitrary | None:
         match field.content:
@@ -327,10 +578,10 @@ def expand_simple(stuff: list[AST.ArgChar],
         if len(argchars) != 1:
             return None
         match argchars[0]:
-            case AST.VArgChar() as var:
-                return var.var
-            case AST.QArgChar() as q:
-                return argchars_var_name(q.arg)
+            case AST.VArgChar() as var_node:
+                return var_node.var
+            case AST.QArgChar() as qarg:
+                return argchars_var_name(qarg.arg)
             case _:
                 return None
 
@@ -338,10 +589,10 @@ def expand_simple(stuff: list[AST.ArgChar],
         match source:
             case FrozenAst(ast=ast):
                 match ast:
-                    case AST.VArgChar() as var:
-                        return var.var
-                    case AST.QArgChar() as q:
-                        return argchars_var_name(q.arg)
+                    case AST.VArgChar() as var_node:
+                        return var_node.var
+                    case AST.QArgChar() as qarg:
+                        return argchars_var_name(qarg.arg)
                     case _:
                         return None
             case tuple() | list():
@@ -351,7 +602,6 @@ def expand_simple(stuff: list[AST.ArgChar],
             case _:
                 return None
 
-    # TODO: Move into util
     def core_matches_field(core: CompletelyArbitrary, field: Field) -> bool:
         other_core = field_core_key(field)
         if other_core is None:
@@ -422,6 +672,105 @@ def expand_simple(stuff: list[AST.ArgChar],
         if core is None:
             return False
         return any(constraint_implies_non_empty(core, cond.constraint) for cond in state.pathcond)
+
+    def word_is_definitely_empty(value: PreSplitWord | Field) -> bool:
+        if isinstance(value, Field):
+            return field_is_definitely_empty(value)
+        if not value.chunks:
+            return True
+        if any(isinstance(chunk, LiteralChunk) and chunk.content for chunk in value.chunks):
+            return False
+        if any(isinstance(chunk, ExpandedChunk) and isinstance(chunk.content, str) and chunk.content for chunk in value.chunks):
+            return False
+        for chunk in value.chunks:
+            if isinstance(chunk, ExpandedChunk) and isinstance(chunk.content, CompletelyArbitrary):
+                if chunk.count.max > 0:
+                    return False
+        return all(
+            (isinstance(chunk, LiteralChunk) and chunk.content == "")
+            or (isinstance(chunk, ExpandedChunk) and isinstance(chunk.content, str) and chunk.content == "")
+            or (isinstance(chunk, ExpandedChunk) and isinstance(chunk.content, CompletelyArbitrary) and chunk.count.max == 0)
+            for chunk in value.chunks
+        )
+
+    def word_is_definitely_non_empty(value: PreSplitWord | Field) -> bool:
+        if isinstance(value, Field):
+            return field_is_definitely_non_empty(value)
+        if any(isinstance(chunk, LiteralChunk) and chunk.content for chunk in value.chunks):
+            return True
+        if any(isinstance(chunk, ExpandedChunk) and isinstance(chunk.content, str) and chunk.content for chunk in value.chunks):
+            return True
+        for chunk in value.chunks:
+            if isinstance(chunk, ExpandedChunk) and isinstance(chunk.content, CompletelyArbitrary):
+                if chunk.count.min >= 1:
+                    return True
+        return False
+
+    def empty_word(quoted: bool) -> PreSplitWord:
+        return PreSplitWord([ExpandedChunk(content="", is_quoted=quoted, count=WordCount(0, 0))])
+
+    def as_expansion_word(word: PreSplitWord) -> PreSplitWord:
+        converted: list[LiteralChunk | ExpandedChunk] = []
+        for chunk in word.chunks:
+            if isinstance(chunk, LiteralChunk):
+                converted.append(
+                    ExpandedChunk(
+                        content=chunk.content,
+                        is_quoted=chunk.is_quoted,
+                        count=WordCount(1, 1),
+                    )
+                )
+            else:
+                converted.append(chunk)
+        return PreSplitWord(converted)
+
+    def arbitrary_word(source: AST.AstNode, kind: ArbitraryType, producing_state: State, min_words: int = 0, quoted: bool = False) -> PreSplitWord:
+        return PreSplitWord([
+            ExpandedChunk(
+                content=CompletelyArbitrary(freeze_thing(source), kind, producing_state),
+                is_quoted=quoted,
+                count=WordCount(min_words, inf),
+            )
+        ])
+
+    def word_from_field(field: Field, quoted: bool, producing_state: State) -> PreSplitWord:
+        content = field.content
+        if isinstance(content, SymStr):
+            text = content.try_to_str()
+            if text is not None:
+                return PreSplitWord([
+                    ExpandedChunk(content=text, is_quoted=quoted, count=field.count)
+                ])
+            arbitrary = CompletelyArbitrary(freeze_thing(content), ArbitraryType.APPROXIMATION, producing_state)
+            return PreSplitWord([
+                ExpandedChunk(content=arbitrary, is_quoted=quoted, count=field.count)
+            ])
+        return PreSplitWord([
+            ExpandedChunk(content=content, is_quoted=quoted, count=field.count)
+        ])
+
+    def word_from_value(value: PreSplitWord | Field, quoted: bool, producing_state: State) -> PreSplitWord:
+        if isinstance(value, PreSplitWord):
+            return value.expand_from_storage(quoted)
+        return word_from_field(value, quoted, producing_state)
+
+    def ensure_non_empty_word(value: PreSplitWord | Field, quoted: bool, producing_state: State) -> PreSplitWord:
+        if isinstance(value, PreSplitWord):
+            for chunk in value.chunks:
+                if isinstance(chunk, ExpandedChunk) and isinstance(chunk.content, CompletelyArbitrary):
+                    if chunk.count.min < 1:
+                        return PreSplitWord([
+                            ExpandedChunk(
+                                content=chunk.content,
+                                is_quoted=quoted,
+                                count=WordCount(1, chunk.count.max),
+                            )
+                        ])
+            return value.expand_from_storage(quoted)
+        if value.count.min < 1:
+            adjusted = replace(value, count=WordCount(1, value.count.max))
+            return word_from_field(adjusted, quoted, producing_state)
+        return word_from_field(value, quoted, producing_state)
 
     def qarg_literal(qarg: AST.QArgChar) -> str | None:
         chars: list[str] = []
@@ -511,7 +860,6 @@ def expand_simple(stuff: list[AST.ArgChar],
                 i = j + 8
                 continue
 
-            # Unknown escapes evaluate to the escaped character itself.
             result.append(esc)
             i += 1
 
@@ -519,51 +867,44 @@ def expand_simple(stuff: list[AST.ArgChar],
 
     @dataclass
     class Partial:
-        ## Notes on what's happening here:
-        # Need to build up fields with individual characters, and also SymStrs that we come across
-        # Along the way, will see some CompletelyArbitrarys
-        # The CompletelyArbitrarys kind of soak up the whole field -- if any part of a final field
-        # is arbitrary, then the whole field is arbitrary
-        # BUT -- we can preserve some info that will lead to better error messages:
-        # if there's some SymStr that's being prepended or appended to an arbitrary thing, we can
-        # record that the SymStr is a known prefix or suffix of the arbitrary thing
         quoted: bool
         state: State
-        combined_fields_so_far: list[Field | None] = field(default_factory=list) # None's mean a hard break due to IFS
-        field_so_far: list[str] = field(default_factory=list)
-        field_so_far_words_min: int = 1
-        field_so_far_words_max: int | float = 1
+        chunks: list[LiteralChunk | ExpandedChunk] = field(default_factory=list)
+        literal_buffer: list[str] = field(default_factory=list)
+        literal_buffer_quoted: bool | None = None
 
-        def add_a_field(self, one_field: Field) -> None:
-            match one_field.content:
-                case CompletelyArbitrary():
-                    self.finish_field_so_far()
-                    self.combined_fields_so_far.append(one_field)
-                case SymStr(parts):
-                    if parts == () and one_field.count == WordCount(1, 1):
-                        self.field_so_far.append("")
-                        return
-                    self.field_so_far.extend(parts)
-                    if one_field.count.min > 1:
-                        self.field_so_far_words_min += one_field.count.min - 1
-                    if one_field.count.max > 1:
-                        self.field_so_far_words_max += one_field.count.max - 1
+        def flush_literal(self) -> None:
+            if not self.literal_buffer:
+                return
+            text = "".join(self.literal_buffer)
+            quoted = bool(self.literal_buffer_quoted)
+            self.chunks.append(LiteralChunk(content=text, is_quoted=quoted))
+            self.literal_buffer.clear()
+            self.literal_buffer_quoted = None
 
-        def finish_field_so_far(self, IFS: bool = False) -> None:
-            if self.field_so_far != []:
-                self.combined_fields_so_far.append(Field(SymStr(tuple(self.field_so_far)).simplify(),
-                                                         WordCount(self.field_so_far_words_min, self.field_so_far_words_max)))
-                if IFS:
-                    self.combined_fields_so_far.append(None)
-                self.field_so_far = []
-                self.field_so_far_words_min = 1
-                self.field_so_far_words_max = 1
+        def add_literal(self, text: str) -> None:
+            if self.literal_buffer and self.literal_buffer_quoted != self.quoted:
+                self.flush_literal()
+            if not self.literal_buffer:
+                self.literal_buffer_quoted = self.quoted
+            self.literal_buffer.append(text)
+
+        def add_word(self, word: PreSplitWord) -> None:
+            self.flush_literal()
+            self.chunks.extend(word.chunks)
+
+        def add_expanded(self, content: str | CompletelyArbitrary, count: WordCount) -> None:
+            self.flush_literal()
+            self.chunks.append(ExpandedChunk(content=content, is_quoted=self.quoted, count=count))
+
+        def add_empty(self) -> None:
+            self.add_word(empty_word(self.quoted))
 
         def try_expand_dollar_quoted_literal(self, qarg: AST.QArgChar) -> bool:
-            if self.quoted or not self.field_so_far:
+            if self.quoted or not self.literal_buffer:
                 return False
-            last_part = self.field_so_far[-1]
-            if not isinstance(last_part, str) or not last_part.endswith("$"):
+            last_part = self.literal_buffer[-1]
+            if not last_part.endswith("$"):
                 return False
 
             raw = qarg_literal(qarg)
@@ -574,301 +915,275 @@ def expand_simple(stuff: list[AST.ArgChar],
                 return False
 
             if last_part == "$":
-                self.field_so_far.pop()
+                self.literal_buffer.pop()
             else:
-                self.field_so_far[-1] = last_part[:-1]
-            self.field_so_far.append(decoded)
+                self.literal_buffer[-1] = last_part[:-1]
+            self.literal_buffer.append(decoded)
             return True
 
-        @classmethod
-        def add_the_default(cls, who: 'Partial', var: AST.VArgChar):
-            default_expansions = expand_inner(var.arg, Partial(False, who.state))
-            if len(default_expansions) != 1:
-                raise NotImplementedError(f"default value expansion forking is not implemented (got {len(default_expansions)} expansions)")
-            default_fields, default_state = default_expansions[0].finish()
-            #assert default_state == who.state, "default value expansion should not change state"
-            who.state = default_state # if the default value contains previously unknown variables, the state gets updated
-            for default_field in default_fields:
-                who.add_a_field(default_field)
-
-        def next(self, argchar: AST.ArgChar) -> list['Partial']:
-            match argchar:
-                # todo what about globs?
-                case AST.CArgChar() as c:
-                    if not self.quoted and c.pretty() in IFS:
-                        self.finish_field_so_far(True)
-                    else:
-                        self.field_so_far.append(c.pretty(AST.QUOTED if self.quoted else AST.UNQUOTED))
-                        if c.pretty() == "*" and not self.quoted:
-                            self.field_so_far_words_max = inf
-                case AST.TArgChar() as t:
-                    # Tilde expansion: only plain "~" expands to $HOME.
-                    if not self.quoted and getattr(t, "string", None) in (None, "None"):
-                        home_var = self.state.lookup("HOME")
-                        if home_var is not None:
-                            self.add_a_field(home_var.value.quote())
-                        else:
-                            self.add_a_field(arbitrary_field(t, ArbitraryType.ENVIRONMENT, self.state))
-                    else:
-                        logging.debug("Expansion: treating tilde '%s' as completely arbitrary", t.pretty())
-                        self.add_a_field(arbitrary_field(t, ArbitraryType.APPROXIMATION, self.state))
-                case AST.EArgChar() as c:
-                    self.field_so_far.append(c.pretty(AST.QUOTED if self.quoted else AST.UNQUOTED))
-                case AST.QArgChar() as q:
-                    if self.try_expand_dollar_quoted_literal(q):
-                        return [self]
-                    partial_for_inside = Partial(True, self.state)
-                    res = []
-                    for inside_partial in expand_inner(q.arg, partial_for_inside):
-                        fields_inside, state_inside = inside_partial.finish()
-                        one_field = join_fields(fields_inside).quote()
-                        continuing_partial = self.fork_state(state_inside)
-                        continuing_partial.add_a_field(one_field)
-                        res.append(continuing_partial)
-                    return res
-                case AST.VArgChar() as var:
-                    def expand_default_value(partial: 'Partial') -> tuple[list[Field], State]:
-                        default_expansions = expand_inner(var.arg, Partial(False, partial.state))
-                        if len(default_expansions) != 1:
-                            raise NotImplementedError(f"default value expansion forking is not implemented (got {len(default_expansions)} expansions)")
-                        default_fields, default_state = default_expansions[0].finish()
-                        return default_fields, default_state
-
-                    def assign_default_value(partial: 'Partial', default_fields: list[Field], default_state: State) -> None:
-                        partial.state = default_state.set_env(var.var, ShellVar(join_fields(default_fields)))
-                        for default_field in default_fields:
-                            partial.add_a_field(default_field)
-
-                    if var.var == "?":
-                        if self.state.last_exit_code[1] == Confidence.DEFINITE:
-                            logging.debug("expansion: treating special var $? as constant due to definite confidence")
-                            self.add_a_field(Field(self.state.last_exit_code[0], WordCount(1, 1)))
-                        else:
-                            self.add_a_field(Field(CompletelyArbitrary(freeze(var),
-                                                                       ArbitraryType.APPROXIMATION,
-                                                                       self.state),
-                                             WordCount(1, 1)))
-                    elif (v := self.state.lookup(var.var)):
-                        if var.fmt == "Normal" \
-                            or (var.fmt == "Minus" and not var.null and not v.ghost) \
-                            or (var.fmt == "Question" and not var.null and not v.ghost):
-                            # explanation of the minus case: the POSIX spec says that for
-                            # ${VAR-default} the result is the value of $VAR as long as $VAR is set -- whether it's empty ("null") or not
-                            # ^^ this corresponds to the second part of the condition above (var.null false means no `:`)
-                            # same explanation for the question case (which corresponds to ${VAR?errmessage})
-                            self.add_a_field(v.value)
-                        elif var.fmt == "Minus" and (var.null or v.ghost):
-                            # This is the case that it's ${VAR:-default}:
-                            # IF $VAR is empty, take the default
-                            # Otherwise, take the result is $VAR
-                            match v.value:
-                                case Field(_, WordCount(0, 0)):
-                                    # We know $VAR is empty
-                                    Partial.add_the_default(self, var)
-                                case Field(SymStr(stuff), _) if all(isinstance(thing, str) for thing in stuff):
-                                    # We know $VAR is NOT empty
-                                    self.add_a_field(v.value)
-                                case something_not_constant: # either a symbolic str or arbitrary
-                                    non_default, default = self.fork(Description(f"{var.pretty()} takes the default value"))
-                                    Partial.add_the_default(default, var)
-                                    non_default.add_a_field(arbitrary_field(var, ArbitraryType.APPROXIMATION, self.state))
-                                    return [non_default, default]
-                        elif var.fmt in {"Length", "TrimR", "TrimRMax", "TrimL", "TrimLMax"}:
-                            definitely_empty = field_is_definitely_empty(v.value)
-                            definitely_non_empty = field_is_definitely_non_empty(v.value)
-                            if definitely_empty:
-                                # All of these manipulations have known results on the empty string
-                                logging.info("Special casing string manipulation expansion on empty string")
-                                match var.fmt:
-                                    case "Length":
-                                        self.add_a_field(Field(SymStr(("0",)), WordCount(1, 1)))
-                                    case "TrimR" | "TrimRMax" | "TrimL" | "TrimLMax":
-                                        self.add_a_field(Field(SymStr(("",)), WordCount(0, 0)))
-                            else:
-                                match var.fmt:
-                                    case "Length":
-                                        if (value_str := v.value.try_to_str()) is not None:
-                                            self.add_a_field(Field(SymStr((str(len(value_str)),)), WordCount(1, 1)))
-                                        else:
-                                            self.add_a_field(arbitrary_field(var,
-                                                                             ArbitraryType.APPROXIMATION,
-                                                                             self.state,
-                                                                             min_words=1))
-                                    case "TrimR" | "TrimRMax" | "TrimL" | "TrimLMax":
-                                        min_words = 1 if definitely_non_empty else 0
-                                        self.add_a_field(arbitrary_field(var,
-                                                                         ArbitraryType.APPROXIMATION,
-                                                                         self.state,
-                                                                         min_words=min_words))
-                        elif var.fmt == "Assign":
-                            # This is the case of `${VAR:=word}` with VAR set.
-                            if not var.null:
-                                self.add_a_field(v.value)
-                            else:
-                                match v.value:
-                                    case Field(_, WordCount(0, 0)):
-                                        logging.debug("expansion: ${%s:=word} with VAR empty, assigning default", var.var)
-                                        default_fields, default_state = expand_default_value(self)
-                                        assign_default_value(self, default_fields, default_state)
-                                    case Field(SymStr(stuff), _) if all(isinstance(thing, str) for thing in stuff):
-                                        logging.debug("expansion: ${%s:=word} with VAR non-empty, using current value", var.var)
-                                        self.add_a_field(v.value)
-                                    case Field(content, WordCount(min_words, max_words)):
-                                        logging.debug("expansion: forking on ${%s:=word} with potentially empty VAR", var.var)
-                                        empty_case, non_empty = self.fork(Description(f"{var.var} is non-empty for := expansion"))
-                                        default_fields, default_state = expand_default_value(empty_case)
-                                        assign_default_value(empty_case, default_fields, default_state)
-                                        non_empty.add_a_field(Field(content, WordCount(max(min_words, 1), max_words)))
-                                        return [non_empty, empty_case]
-                                    case _:
-                                        self.add_a_field(v.value)
-                        elif var.fmt == "Question" and (var.null or v.ghost):
-                            # This is the case of ${VAR:?errmessage}
-                            match v.value:
-                                case Field(_, WordCount(0, 0)):
-                                    # If $VAR is empty, the script would exit here
-                                    logging.debug("expansion: terminating due to ${%s:?} with definitely empty value", var.var)
-                                    # terminate trace; script would exit here
-                                    self.state = self.state.terminate()
-                                    return [self]
-                                case Field(SymStr(stuff), _) if all(isinstance(thing, str) for thing in stuff):
-                                    # If $VAR cannot be empty, just use its value
-                                    logging.debug("expansion: treating ${%s:?} with definitely non-empty value as normal", var.var)
-                                    self.add_a_field(v.value)
-                                case something_not_constant:
-                                    # If $VAR might be empty, force min>=1 to continue.
-                                    match v.value:
-                                        case Field(content, WordCount(min_words, max_words)):
-                                            logging.debug("expansion: treating ${%s:?} as non-empty to continue", var.var)
-                                            self.add_a_field(Field(content,
-                                                                   WordCount(max(min_words, 1), max_words)))
-                                        case _:
-                                            self.add_a_field(Field(CompletelyArbitrary(freeze_thing(var),
-                                                                                      ArbitraryType.APPROXIMATION,
-                                                                                      self.state),
-                                                                   WordCount(1, inf)))
-                        elif var.fmt == "Plus" and not var.null:
-                            # This is the case of `${VAR+word}`, where `VAR` is set: just expand to `word`.
-                            logging.debug("Expansion: '${%s+word}' with VAR set (non-colon form), expanding to word", var.var)
-                            Partial.add_the_default(self, var)
-                        elif var.fmt == "Plus" and var.null:
-                            # This is the case of `${VAR:+word}`, where `VAR` is set, we need to check whether it's empty or not and expand accordingly.
-                            match v.value:
-                                case Field(_, WordCount(0, 0)):
-                                    logging.debug("Expansion: '${%s:+word}' with VAR empty, returning empty", var.var)
-                                    self.add_a_field(Field(SymStr(("",)), WordCount(0, 0)))
-                                case Field(SymStr(stuff), _) if all(isinstance(thing, str) for thing in stuff):
-                                    logging.debug("Expansion: '${%s:+word}' with VAR non-empty, expanding to word", var.var)
-                                    Partial.add_the_default(self, var)
-                                case _:
-                                    logging.debug("Expansion: forking on '${%s:+word}' with potentially empty VAR", var.var)
-                                    empty_case, word_case = self.fork(Description(f"{var.var} is non-empty for :+ expansion"))
-                                    empty_case.add_a_field(Field(SymStr(("",)), WordCount(0, 0)))
-                                    Partial.add_the_default(word_case, var)
-                                    return [empty_case, word_case]
-                        else:
-                            logging.info("Expansion: treating var '%s' with unhandled fmt '%s' as completely arbitrary", var.pretty(), var.fmt)
-                            self.add_a_field(arbitrary_field(var, ArbitraryType.APPROXIMATION, self.state))
-                    elif var.fmt == "Minus":
-                        # This is the case that $VAR is unset: take the default
-                        if config.unbound_policy == UnboundVariablePolicy.EMPTY:
-                            logging.info("Expansion: treating unset var '%s' as empty string due to config; taking the default ('%s') unconditionally",
-                                         var.pretty(), util.shasta_pretty(var.arg))
-                            Partial.add_the_default(self, var)
-                        else:
-                            logging.debug("Expansion: forking on unset var '%s' to take default ('%s') or arbitrary",
-                                          var.var, util.shasta_pretty(var.arg))
-                            non_default, default = self.fork(Description(f"{var.var} takes the default value {Field.create_constant(util.shasta_pretty(var.arg))}"))
-                            Partial.add_the_default(default, var)
-                            arbitrary_for_this_var = arbitrary_field(var, ArbitraryType.ENVIRONMENT, non_default.state)
-                            # localenv to avoid creating an arbitrary that persists beyond a function body
-                            non_default.state = non_default.state.extend_localenv({var.var: ShellVar(arbitrary_for_this_var, ghost=True)})
-                            non_default.add_a_field(arbitrary_for_this_var)
-                            return [non_default, default]
-                    elif var.fmt == "Question":
-                        # This is the case that $VAR is unset
-                        if config.unbound_policy == UnboundVariablePolicy.EMPTY:
-                            # In the EMPTY pass, treat unset as definitely empty, so ${:?} terminates.
-                            logging.debug("Expansion: terminating due to unset var '%s' with '${:?}' (EMPTY policy)", var.var)
-                            self.state = self.state.terminate()
-                            return [self]
-                        else:
-                            # In the SYMBOLIC pass, assume it might be set and non-empty; do not terminate.
-                            logging.debug("Expansion: treating unset var '%s' with '${:?}' as non-empty to continue", var.var)
-                            self.add_a_field(Field(CompletelyArbitrary(freeze_thing(var),
-                                                                      ArbitraryType.ENVIRONMENT,
-                                                                      self.state),
-                                                   WordCount(1, inf)))
-                    elif var.fmt == "Plus":
-                        # This is the case where $VAR is unset.
-                        logging.info("Expansion: treating unset var '%s' with '${%s+...}' as an empty string", var.pretty(), var.fmt)
-                        self.add_a_field(Field(SymStr(("",)), WordCount(0, 0)))
-                    elif var.fmt == "Assign":
-                        # This is the case where $VAR is unset and ${VAR:=word} assigns the default.
-                        logging.debug("Expansion: '${%s:=word}' with VAR unset; assigning default", var.var)
-                        default_fields, default_state = expand_default_value(self)
-                        assign_default_value(self, default_fields, default_state)
-                    else:
-                        # todo we should report path information
-                        if not is_special_var(var.var):
-                            error_code = reporter.UnboundIDSetU if self.state.opts.is_set(SetOptions.NOUNSET) else reporter.UnboundID
-                            Reporter.add_issue(error_code(var.pretty(), context_line), config)
-                        if config.unbound_policy == UnboundVariablePolicy.EMPTY:
-                            logging.info("Expansion: treating unbound var '%s' as empty string due to config", var.pretty())
-                            empty_str_field = Field(SymStr(("",)), WordCount(0, 0))
-                            self.add_a_field(empty_str_field)
-                            self.state = self.state.extend_localenv({var.var: ShellVar(empty_str_field, ghost=True)})
-                        else:
-                            arbitrary_for_this_var = arbitrary_field(var,
-                                                                    ArbitraryType.APPROXIMATION if is_special_var(var.var) else ArbitraryType.ENVIRONMENT,
-                                                                    self.state)
-                            # localenv to avoid creating an arbitrary that persists beyond a function body
-                            self.state = self.state.extend_localenv({var.var: ShellVar(arbitrary_for_this_var, ghost=True)})
-                            self.add_a_field(arbitrary_for_this_var)
-                case AST.BArgChar() as b:
-                    # TODO use the trace: this case suggests we should really generalize the interface of `expand_simple` to be from one trace to many, instead of one state to many
-                    inner_cmds = []
-                    temp_config = config.add_expanded_command_callback(lambda expanded: inner_cmds.append(expanded))
-                    t = guarded_interp_node([Trace((self.state,))], b.node, temp_config)
-                    output_field = None
-                    if len(inner_cmds) != 0 and isinstance(b.node, AST.CommandNode):
-                        expanded_args = inner_cmds[-1]
-                        if expanded_args and (cmd_name := expanded_args[0].try_to_str()):
-                            spec = get_spec(cmd_name, tuple(expanded_args))
-                            output_field, new_state = command_substitution_output(cmd_name, expanded_args[1:], b, self.state, spec, config)
-                            self.state = new_state
-                    # We found one of our special commands with known output
-                    if output_field is not None:
-                        logging.info(f"expansion: determined commandsubst output as: {output_field}")
-                        self.add_a_field(output_field)
-                    # Everything else is completely arbitrary
-                    else:
-                        logging.info("expansion: treating backquote argchar %s as completely arbitrary field", b.pretty())
-                        self.add_a_field(arbitrary_field(b, ArbitraryType.APPROXIMATION, self.state))
-                case _:
-                    logging.error("Unsupported argchar of type '%s': '%s'; treating as completely arbitrary", argchar.NodeName, argchar.pretty())
-                    self.add_a_field(arbitrary_field(argchar, ArbitraryType.APPROXIMATION, self.state))
-
-            # Most cases fall through to here, no forking going on
-            return [self]
-
-        def finish(self) -> tuple[list[Field], State]:
-            self.finish_field_so_far()
-            # Join the combined fields so far, folding symstrs into arbitrary fields as prefixes and suffixes
-            split = util.split_at(self.combined_fields_so_far, None)
-            return ([merge_partial_fields(part, None, self.state) for part in split if part != []], self.state)
+        def finish(self) -> tuple[PreSplitWord, State]:
+            self.flush_literal()
+            return PreSplitWord(self.chunks), self.state
 
         def fork(self, pathcond: Constraint) -> tuple['Partial', 'Partial']:
-            logging.debug("FORK: expansion")
             lhs = self.fork_state(self.state.add_pathcond(pathcond))
             rhs = self.fork_state(self.state.add_pathcond(Not(pathcond)))
             return (lhs, rhs)
 
         def fork_state(self, new_state: State) -> 'Partial':
-            return replace(self,
-                           state=new_state,
-                           combined_fields_so_far=copy(self.combined_fields_so_far),
-                           field_so_far=copy(self.field_so_far))
+            return replace(
+                self,
+                state=new_state,
+                chunks=list(self.chunks),
+                literal_buffer=list(self.literal_buffer),
+                literal_buffer_quoted=self.literal_buffer_quoted,
+            )
+
+        def next(self, argchar: AST.ArgChar) -> list['Partial']:
+            match argchar:
+                case AST.CArgChar() as c:
+                    self.add_literal(c.pretty(AST.QUOTED if self.quoted else AST.UNQUOTED))
+                case AST.EArgChar() as c:
+                    self.add_literal(c.pretty(AST.QUOTED if self.quoted else AST.UNQUOTED))
+                case AST.TArgChar() as t:
+                    if not self.quoted and getattr(t, "string", None) in (None, "None"):
+                        home_var = self.state.lookup("HOME")
+                        if home_var is not None:
+                            home_word = word_from_value(home_var.value, True, self.state)
+                            self.add_word(home_word)
+                        else:
+                            self.add_word(arbitrary_word(t, ArbitraryType.ENVIRONMENT, self.state))
+                    else:
+                        logging.debug("Expansion: treating tilde '%s' as completely arbitrary", t.pretty())
+                        self.add_word(arbitrary_word(t, ArbitraryType.APPROXIMATION, self.state))
+                case AST.QArgChar() as qarg:
+                    if self.try_expand_dollar_quoted_literal(qarg):
+                        return [self]
+                    partial_for_inside = Partial(True, self.state)
+                    res: list[Partial] = []
+                    for inside_partial in expand_inner(qarg.arg, partial_for_inside):
+                        inner_word, inner_state = inside_partial.finish()
+                        continuing = self.fork_state(inner_state)
+                        continuing.add_word(inner_word)
+                        res.append(continuing)
+                    return res
+                case AST.VArgChar() as var_node:
+                    def expand_default_value(partial: 'Partial') -> tuple[PreSplitWord, State]:
+                        default_expansions = expand_inner(var_node.arg, Partial(partial.quoted, partial.state))
+                        if len(default_expansions) != 1:
+                            raise NotImplementedError(
+                                f"default value expansion forking is not implemented (got {len(default_expansions)} expansions)"
+                            )
+                        return default_expansions[0].finish()
+
+                    def assign_default_value(partial: 'Partial', default_word: PreSplitWord, default_state: State) -> None:
+                        partial.state = default_state.set_env(var_node.var, ShellVar(default_word.prepare_for_storage()))
+                        partial.add_word(as_expansion_word(default_word))
+
+                    def add_value_word(value: PreSplitWord | Field) -> None:
+                        self.add_word(word_from_value(value, self.quoted, self.state))
+
+                    if var_node.var == "?":
+                        if self.state.last_exit_code[1] == Confidence.DEFINITE:
+                            code_str = self.state.last_exit_code[0].try_to_str()
+                            if code_str is not None:
+                                self.add_expanded(code_str, WordCount(1, 1))
+                            else:
+                                self.add_word(arbitrary_word(var_node, ArbitraryType.APPROXIMATION, self.state, min_words=1, quoted=self.quoted))
+                        else:
+                            self.add_word(arbitrary_word(var_node, ArbitraryType.APPROXIMATION, self.state, min_words=1, quoted=self.quoted))
+                        return [self]
+
+                    if (v := self.state.lookup(var_node.var)):
+                        value = v.value
+                        if var_node.fmt == "Normal" \
+                            or (var_node.fmt == "Minus" and not var_node.null and not v.ghost) \
+                            or (var_node.fmt == "Question" and not var_node.null and not v.ghost):
+                            add_value_word(value)
+                        elif var_node.fmt == "Minus" and (var_node.null or v.ghost):
+                            if word_is_definitely_empty(value):
+                                default_word, default_state = expand_default_value(self)
+                                self.state = default_state
+                                self.add_word(as_expansion_word(default_word))
+                            elif word_is_definitely_non_empty(value):
+                                add_value_word(value)
+                            else:
+                                value_field = presplit_to_field(value) if isinstance(value, PreSplitWord) else value
+                                empty_field = Field(SymStr(("",)), WordCount(0, 0))
+                                empty_cond = StringEq(value_field, empty_field)
+                                non_default = self.fork_state(self.state.add_pathcond(Not(empty_cond)))
+                                default = self.fork_state(self.state.add_pathcond(empty_cond))
+                                default_word, default_state = expand_default_value(default)
+                                default.state = default_state
+                                default.add_word(as_expansion_word(default_word))
+                                non_default.add_word(arbitrary_word(var_node, ArbitraryType.APPROXIMATION, non_default.state, quoted=self.quoted))
+                                return [non_default, default]
+                        elif var_node.fmt in {"Length", "TrimR", "TrimRMax", "TrimL", "TrimLMax"}:
+                            definitely_empty = word_is_definitely_empty(value)
+                            definitely_non_empty = word_is_definitely_non_empty(value)
+                            if definitely_empty:
+                                if var_node.fmt == "Length":
+                                    self.add_expanded("0", WordCount(1, 1))
+                                else:
+                                    self.add_word(empty_word(self.quoted))
+                            else:
+                                if var_node.fmt == "Length":
+                                    if isinstance(value, Field):
+                                        value_str = value.try_to_str()
+                                    else:
+                                        value_str = presplit_try_to_str(value)
+                                    if value_str is not None:
+                                        self.add_expanded(str(len(value_str)), WordCount(1, 1))
+                                    else:
+                                        self.add_word(arbitrary_word(var_node, ArbitraryType.APPROXIMATION, self.state, min_words=1, quoted=self.quoted))
+                                else:
+                                    pattern = _literal_argchars(var_node.arg)
+                                    if isinstance(value, Field):
+                                        value_str = value.try_to_str()
+                                    else:
+                                        value_str = presplit_try_to_str(value)
+                                    if pattern is not None and value_str is not None:
+                                        trimmed = _trim_pattern(value_str, pattern, var_node.fmt)
+                                        if trimmed == "":
+                                            self.add_word(empty_word(self.quoted))
+                                        else:
+                                            self.add_expanded(trimmed, WordCount(1, 1))
+                                    else:
+                                        min_words = 1 if definitely_non_empty else 0
+                                        self.add_word(arbitrary_word(var_node, ArbitraryType.APPROXIMATION, self.state, min_words=min_words, quoted=self.quoted))
+                        elif var_node.fmt == "Assign":
+                            if not var_node.null:
+                                add_value_word(value)
+                            else:
+                                if word_is_definitely_empty(value):
+                                    default_word, default_state = expand_default_value(self)
+                                    assign_default_value(self, default_word, default_state)
+                                elif word_is_definitely_non_empty(value):
+                                    add_value_word(value)
+                                else:
+                                    empty_case, non_empty = self.fork(Description(f"{var_node.var} is non-empty for := expansion"))
+                                    default_word, default_state = expand_default_value(empty_case)
+                                    assign_default_value(empty_case, default_word, default_state)
+                                    non_empty.add_word(ensure_non_empty_word(value, non_empty.quoted, non_empty.state))
+                                    return [non_empty, empty_case]
+                        elif var_node.fmt == "Question" and (var_node.null or v.ghost):
+                            if word_is_definitely_empty(value):
+                                self.state = self.state.terminate()
+                                self.chunks = []
+                                self.literal_buffer = []
+                                self.literal_buffer_quoted = None
+                                return [self]
+                            if word_is_definitely_non_empty(value):
+                                add_value_word(value)
+                            else:
+                                self.add_word(ensure_non_empty_word(value, self.quoted, self.state))
+                        elif var_node.fmt == "Plus" and not var_node.null:
+                            default_word, default_state = expand_default_value(self)
+                            self.state = default_state
+                            self.add_word(as_expansion_word(default_word))
+                        elif var_node.fmt == "Plus" and var_node.null:
+                            if word_is_definitely_empty(value):
+                                self.add_word(empty_word(self.quoted))
+                            elif word_is_definitely_non_empty(value):
+                                default_word, default_state = expand_default_value(self)
+                                self.state = default_state
+                                self.add_word(as_expansion_word(default_word))
+                            else:
+                                empty_case, word_case = self.fork(Description(f"{var_node.var} is non-empty for :+ expansion"))
+                                empty_case.add_word(empty_word(self.quoted))
+                                default_word, default_state = expand_default_value(word_case)
+                                word_case.state = default_state
+                                word_case.add_word(as_expansion_word(default_word))
+                                return [empty_case, word_case]
+                        else:
+                            logging.info("Expansion: treating var '%s' with unhandled fmt '%s' as completely arbitrary", var_node.pretty(), var_node.fmt)
+                            self.add_word(arbitrary_word(var_node, ArbitraryType.APPROXIMATION, self.state, quoted=self.quoted))
+                        return [self]
+
+                    if var_node.fmt == "Minus":
+                        if config.unbound_policy == UnboundVariablePolicy.EMPTY:
+                            default_word, default_state = expand_default_value(self)
+                            self.state = default_state
+                            self.add_word(as_expansion_word(default_word))
+                        else:
+                            non_default, default = self.fork(Description(f"{var_node.var} takes the default value {Field.create_constant(util.shasta_pretty(var_node.arg))}"))
+                            default_word, default_state = expand_default_value(default)
+                            default.state = default_state
+                            default.add_word(as_expansion_word(default_word))
+                            arbitrary_for_this_var = arbitrary_word(var_node, ArbitraryType.ENVIRONMENT, non_default.state, quoted=non_default.quoted)
+                            non_default.state = non_default.state.extend_localenv({
+                                var_node.var: ShellVar(arbitrary_for_this_var.prepare_for_storage(), ghost=True)
+                            })
+                            non_default.add_word(arbitrary_for_this_var)
+                            return [non_default, default]
+                    elif var_node.fmt == "Question":
+                        if config.unbound_policy == UnboundVariablePolicy.EMPTY:
+                            self.state = self.state.terminate()
+                            self.chunks = []
+                            self.literal_buffer = []
+                            self.literal_buffer_quoted = None
+                            return [self]
+                        self.add_word(arbitrary_word(var_node, ArbitraryType.ENVIRONMENT, self.state, min_words=1, quoted=self.quoted))
+                    elif var_node.fmt == "Plus":
+                        self.add_word(empty_word(self.quoted))
+                    elif var_node.fmt == "Assign":
+                        default_word, default_state = expand_default_value(self)
+                        assign_default_value(self, default_word, default_state)
+                    else:
+                        if not is_special_var(var_node.var):
+                            error_code = reporter.UnboundIDSetU if self.state.opts.is_set(SetOptions.NOUNSET) else reporter.UnboundID
+                            Reporter.add_issue(error_code(var_node.pretty(), symb_module.context_line), config)
+                        if config.unbound_policy == UnboundVariablePolicy.EMPTY:
+                            empty_word_value = empty_word(self.quoted)
+                            self.add_word(empty_word_value)
+                            self.state = self.state.extend_localenv({
+                                var_node.var: ShellVar(empty_word_value.prepare_for_storage(), ghost=True)
+                            })
+                        else:
+                            arbitrary_for_this_var = arbitrary_word(
+                                var_node,
+                                ArbitraryType.APPROXIMATION if is_special_var(var_node.var) else ArbitraryType.ENVIRONMENT,
+                                self.state,
+                                quoted=self.quoted,
+                            )
+                            self.state = self.state.extend_localenv({
+                                var_node.var: ShellVar(arbitrary_for_this_var.prepare_for_storage(), ghost=True)
+                            })
+                            self.add_word(arbitrary_for_this_var)
+                    return [self]
+                case AST.BArgChar() as barg:
+                    inner_cmds = []
+                    temp_config = config.add_expanded_command_callback(lambda expanded: inner_cmds.append(expanded))
+                    _ = symb_module.guarded_interp_node([Trace((self.state,))], barg.node, temp_config)
+                    output_word: PreSplitWord | None = None
+                    if len(inner_cmds) != 0 and isinstance(barg.node, AST.CommandNode):
+                        expanded_args = inner_cmds[-1]
+                        if expanded_args and (cmd_name := expanded_args[0].try_to_str()):
+                            spec = get_spec(cmd_name, tuple(expanded_args))
+                            output_field, new_state = symb_module.command_substitution_output(
+                                cmd_name,
+                                expanded_args[1:],
+                                barg,
+                                self.state,
+                                spec,
+                                config,
+                            )
+                            self.state = new_state
+                            if output_field is not None:
+                                output_word = word_from_field(output_field, self.quoted, self.state)
+                    if output_word is not None:
+                        self.add_word(output_word)
+                    else:
+                        self.add_word(arbitrary_word(barg, ArbitraryType.APPROXIMATION, self.state, quoted=self.quoted))
+                case _:
+                    logging.error(
+                        "Unsupported argchar of type '%s': '%s'; treating as completely arbitrary",
+                        argchar.NodeName,
+                        argchar.pretty(),
+                    )
+                    self.add_word(arbitrary_word(argchar, ArbitraryType.APPROXIMATION, self.state, quoted=self.quoted))
+
+            return [self]
 
     def expand_inner(chars: list[AST.ArgChar], partial: Partial) -> list[Partial]:
         expansions = [partial]
@@ -880,81 +1195,19 @@ def expand_simple(stuff: list[AST.ArgChar],
     return [partial.finish() for partial in partials]
 
 
-def expand_args_dumb(traces: Traces,
-                     args: list[list[AST.ArgChar]],
-                     config: InterpConfig) -> tuple[Traces, list[Field]]:
+def expand_to_word(traces: Traces,
+                   stuff: list[AST.ArgChar],
+                   config: InterpConfig) -> list[tuple[Trace, PreSplitWord]]:
     """
-    Expand `args` into a *single* list of fields, collapsing differences in the expansion of each arg between traces by approximating that arg with `CompletelyArbitrary`.
-    Result is a pair of: a new set of traces, and the expansion of `args`.
-
-    This function is a simplified interface to `expand`, which collapses the different expansion possibilities arising from different traces.
-    The simplification comes at the cost of approximation.
+    (NEW) Generic interface for Assignment Contexts.
+    Returns traces and their un-split intermediate representations.
     """
-    expanded_args: list[Field] = []
-    res_traces = traces
-    terminated_traces: Traces = []
-    for arg in args:
-        expansions = expand(res_traces, arg, config)
-        res_traces = [expansion[0] for expansion in expansions]
-        active_expansions = [expansion for expansion in expansions if not expansion[0].latest_state.terminated]
-        terminated_traces.extend([expansion[0] for expansion in expansions if expansion[0].latest_state.terminated])
-        if not active_expansions:
-            logging.debug(f"Stopping expansion of entire args because all traces terminated on {arg}")
-            return terminated_traces, []
-        expanded_fields = [expansion[1] for expansion in active_expansions]
-        # for each trace, we have a list of fields that this arg expands to
-
-        # # Design 1: collapse each field individually across all traces
-        # final_number_of_fields = max(len(field_list) for field_list in expanded_fields)
-        # # for each final field at index i, obtain field by collapsing all fields at index i
-        # # across all traces (if a trace has fewer fields, it contributes an empty field)
-        # for i in range(final_number_of_fields):
-        #     fields_at_i = [field_list[i] if i < len(field_list) else Field(SymStr([""]), WordCount(0, 0)) for field_list in expanded_fields]
-        #     collapsed_field = collapse_fields(fields_at_i)
-        #     expanded_args.append(collapsed_field)
-
-        # Design 2: if all fields are the same across all traces, keep that, else give up entirely
-        if all(field == expanded_fields[0] for field in expanded_fields):
-            expanded_args.extend(expanded_fields[0])
-        else:
-            # todo could be smarter about the ranges of word counts and prefix/suffix preservation, but wont do unless needed
-            expanded_args.append(arbitrary_field(arg, ArbitraryType.APPROXIMATION, None))
-    return res_traces + terminated_traces, expanded_args
-
-
-def expand_args(traces: Traces,
-                args: list[list[AST.ArgChar]],
-                config: InterpConfig) -> list[tuple[Trace, list[Field]]]:
-    """
-    Return all possible expansions of `args`, across all `traces`.
-    Result is a list of pairs of: a trace, and an associated expansion of `args`.
-    """
-    prefixes = {id(trace): [] for trace in traces}
-    res_traces = traces
-    for arg in args:
-        expansions = expand(res_traces, arg, config, prefixes)
-        res_traces = [expansion[0] for expansion in expansions]
-        for res_trace, expanded_fields in expansions:
-            prefixes[id(res_trace)] = expanded_fields
-
-    return [(trace, prefixes[id(trace)]) for trace in res_traces]
-
-
-def expand_assuming_single_constant_word(traces: Traces,
-                                         stuff: list[AST.ArgChar],
-                                         config: InterpConfig) -> tuple[Traces, str]:
-    """
-    Expand `stuff` into a string, under the assumption that it expands to a single constant word across all `traces`.
-    Result is a pair of: a new set of traces, and the string.
-
-    If the assumption is violated, raises an AssertionError.
-    """
-    t0, fields = expand_args_dumb(traces, [stuff], config)
-    match fields:
-        case [Field(SymStr((one_word,)), WordCount(1, 1))] if isinstance(one_word, str):
-            return t0, one_word
-        case _:
-            assert False, f"expected {stuff} to be a single constant word, but found something else after expansion: {fields}"
+    res = []
+    for trace in traces:
+        for word, new_state in expand_to_word_simple(stuff, trace.latest_state, config):
+            new_trace = trace.extend(new_state)
+            res.append((new_trace, word.prepare_for_storage()))
+    return res
 
 # =====================
 #  Field manipulation
@@ -1244,7 +1497,11 @@ def handle_commandnode(traces: Traces,
             # If the command is `grep` and the first argument is not provided (different from an empty string),
             # meaning a pattern is not provided for the command,
             # `grep` will expect input from stdin instead of treating the second argument as a file.
-            if expanded_args[1].count.min == 0 and not util.is_definitely_non_empty(expanded_args[1], t1_active[0]):
+            pattern_expansions = expand(t1_active, node.arguments[1], config)
+            pattern_missing = any(len(fields) == 0 for _, fields in pattern_expansions)
+            if pattern_missing:
+                Reporter.add_issue(reporter.UnexpectedStdin(cmd_name, context_line), config)
+            elif expanded_args[1].count.min == 0 and not util.is_definitely_non_empty(expanded_args[1], t1_active[0]):
                 Reporter.add_issue(reporter.UnexpectedStdin(cmd_name, context_line), config)
         if isinstance(cmd_name, str) and _path_lookup_disabled_for_command(cmd_name, t1_active):
             # PATH is unset and command is not guaranteed to exist
@@ -1503,20 +1760,20 @@ def handle_rm(expanded_args: tuple[Field, ...], trace: Trace, node: AST.CommandN
             case _:
                 return True
 
-    at_pwd_init = pwdval is not None and start_pwdval is not None and same_location(pwdval.value, start_pwdval.value)
-    home_level = home_depth(pwdval.value, homeval.value) if (pwdval is not None and homeval is not None) else None
+    at_pwd_init = pwdval is not None and start_pwdval is not None and same_location(pwdval.as_field(), start_pwdval.as_field())
+    home_level = home_depth(pwdval.as_field(), homeval.as_field()) if (pwdval is not None and homeval is not None) else None
     at_home_top_level = home_level is not None and home_level <= 1
     # TODO: Replace this heuristic with a proper "current working directory" abstraction independent of env-field shape.
     if (
         (at_pwd_init or at_home_top_level)
         and any(arg.try_to_str() == "*" for arg in non_flag_args)
     ):
-        Reporter.add_issue(reporter.DeleteSystemFile(pwdval.value.try_to_str() or "PWD", context_line), config)
+        Reporter.add_issue(reporter.DeleteSystemFile(pwdval.try_to_str() or "PWD", context_line), config)
 
     if non_flag_args:
         if pwdval is not None: # Can be empty if the script unsets it
             trace = trace.extend(lambda s: s.add_assertion(SimpleConstraint(And.from_field_iter(non_flag_args,
-                                                                                                lambda arg_field: Not(StringEq(arg_field, pwdval.value))),
+                                                                                                lambda arg_field: Not(StringEq(arg_field, pwdval.as_field()))),
                                                                             lambda line: reporter.DeleteSystemFile("PWD", line)),
                                                         node.pretty(),
                                                         context_line, priority=10, include_fs=False))
@@ -1736,7 +1993,7 @@ def handle_function_call(name: str,
     localenv: dict[str, ShellVar] = {}
     for i, arg in enumerate(arg_fields):
         if arg.count == WordCount(1, 1):
-            localenv[str(i + 1)] = ShellVar(arg)
+            localenv[str(i + 1)] = ShellVar(presplit_from_field(arg))
         else:
             logging.debug("Function argument %d is not guaranteed to be a single word, giving up on positional parameters (%s)", i, arg)
             break
@@ -1752,7 +2009,7 @@ def handle_function_call(name: str,
     return [t.extend(lambda s: s.set_returning(False).exit_function()) for t in call_result_traces]
 
 
-def record_assignment(trace: Trace, var: str, rhs: Field, definite_confidence: bool = True) -> Trace:
+def record_assignment(trace: Trace, var: str, rhs: PreSplitWord, definite_confidence: bool = True) -> Trace:
     conf = Confidence.DEFINITE if definite_confidence else Confidence.SPECULATIVE
     return trace.extend(lambda s: s.set_env(var, ShellVar(rhs)).set_last_exit_code(SymStr(("0",)), conf))
 
@@ -1962,7 +2219,7 @@ def handle_unset(expanded_args: list[Field], traces: Traces) -> Traces:
             raise NotImplementedError(f"unset with non-constant args: {expanded_args}")
         vars_to_unset.append(var_name)
 
-    empty = Field(SymStr(("",)), WordCount(0, 0))
+    empty = PreSplitWord([ExpandedChunk(content="", is_quoted=False, count=WordCount(0, 0))])
 
     def apply_unset(state: State) -> State:
         updated = state
@@ -2093,7 +2350,11 @@ def handle_read(expanded_args: list[Field], traces: Traces, node: AST.AstNode) -
         # For each variable to be read into, record an assignment of that variable to the corresponding field.
         for var_name, value_field in collected:
             # TODO: Don't pass in the entire node, but the specific arg corresponding to this variable.
-            curr_trace = record_assignment(curr_trace, var_name, arbitrary_field(node, ArbitraryType.ENVIRONMENT, curr_trace.latest_state))
+            curr_trace = record_assignment(
+                curr_trace,
+                var_name,
+                presplit_from_field(arbitrary_field(node, ArbitraryType.ENVIRONMENT, curr_trace.latest_state)),
+            )
         new_traces.append(curr_trace)
     return new_traces
 
@@ -2195,11 +2456,11 @@ def handle_assign_node(traces: Traces, node: AST.AssignNode, config: InterpConfi
 
     val = node.val[0].arg if len(node.val) == 1 and isinstance(node.val[0], AST.QArgChar) else node.val
 
-    trace_expansion_pairs = expand(traces, val, config)
+    trace_expansion_pairs = expand_to_word(traces, val, config)
 
     # If the assignment contains a command substitution do not set exit code to 0 with definite confidence
     assignment_definitely_succeeds = not any(isinstance(ac, AST.BArgChar) for ac in util.iter_argchar_list(node.val, [AST.AArgChar]))
-    return [record_assignment(t, node.var, join_fields(rhs), assignment_definitely_succeeds) for (t, rhs) in trace_expansion_pairs]
+    return [record_assignment(t, node.var, word, assignment_definitely_succeeds) for (t, word) in trace_expansion_pairs]
 
 
 def handle_semi_node(traces: Traces, node: AST.SemiNode, config: InterpConfig) -> Traces:
@@ -2229,7 +2490,7 @@ def handle_for_node(traces: Traces, node: AST.ForNode, config: InterpConfig) -> 
         t2 = t1
         exited: Traces = []
         for item_field in items:
-            t2 = [record_assignment(t, var_name, item_field) for t in t2]
+            t2 = [record_assignment(t, var_name, presplit_from_field(item_field)) for t in t2]
             t2 = guarded_interp_node(t2, node.body, config)
             t2, break_exit = consume_break_traces(t2)
             t2, continue_next_iter, continue_exit = consume_continue_traces(t2)
@@ -2241,9 +2502,9 @@ def handle_for_node(traces: Traces, node: AST.ForNode, config: InterpConfig) -> 
         exited: Traces = []
         for i in range(config.max_loop_unroll):
             logging.debug("For loop unrolling iteration %d/%d", i+1, config.max_loop_unroll)
-            t2 = [record_assignment(t, var_name, arbitrary_field(node.variable,
+            t2 = [record_assignment(t, var_name, presplit_from_field(arbitrary_field(node.variable,
                                                                 ArbitraryType.APPROXIMATION,
-                                                                t.latest_state)) \
+                                                                t.latest_state))) \
                 for t in t_current]
             t_current = guarded_interp_node(t2, node.body, config)
             t_current, break_exit = consume_break_traces(t_current)
@@ -2580,10 +2841,10 @@ def starting_state(fs_model: FSModel | None = None, config: InterpConfig | None 
     root = State(fs_model = FSModelSimple(field_to_z3)) if fs_model is None else State(fs_model = fs_model)
     make_ast = lambda var: AST.VArgChar("Normal", False, var, [])
     starter_env = {
-        "HOME": ShellVar(arbitrary_field(make_ast("HOME"), ArbitraryType.ENVIRONMENT, root, min_words=1)),
-        "PWD": ShellVar(arbitrary_field(make_ast("PWD"), ArbitraryType.ENVIRONMENT, root, min_words=1)),
-        "OLDPWD": ShellVar(arbitrary_field(make_ast("OLDPWD"), ArbitraryType.ENVIRONMENT, root, min_words=1)),
-        "PATH": ShellVar(arbitrary_field(make_ast("PATH"), ArbitraryType.ENVIRONMENT, root, min_words=1))
+        "HOME": ShellVar(presplit_from_field(arbitrary_field(make_ast("HOME"), ArbitraryType.ENVIRONMENT, root, min_words=1))),
+        "PWD": ShellVar(presplit_from_field(arbitrary_field(make_ast("PWD"), ArbitraryType.ENVIRONMENT, root, min_words=1))),
+        "OLDPWD": ShellVar(presplit_from_field(arbitrary_field(make_ast("OLDPWD"), ArbitraryType.ENVIRONMENT, root, min_words=1))),
+        "PATH": ShellVar(presplit_from_field(arbitrary_field(make_ast("PATH"), ArbitraryType.ENVIRONMENT, root, min_words=1)))
     }
     pwd_init_var = config.pwd_init_var if config is not None else InterpConfig().pwd_init_var
     starter_env[pwd_init_var] = ShellVar(starter_env["PWD"].value, readonly=True, ghost=True)

@@ -7,7 +7,7 @@ from typing import Any, Optional
 import shasta.ast_node as AST
 
 from sash.fs import FSModel, FSModelSimple
-from sash.symbolic.strings import Field, SymStr
+from sash.symbolic.strings import Field, PreSplitWord, SymStr, presplit_to_field, presplit_try_to_str
 import sash.util as util
 from sash.constraints import (
     CommandExists,
@@ -22,10 +22,16 @@ from sash.debugtools.logger import DebugLogger
 
 @dataclass(frozen=True)
 class ShellVar:
-    value: Field
+    value: PreSplitWord
     readonly : bool = False
     export : bool = False
     ghost : bool = False # was this variable binding created implicitly by the engine, but has never actually been set?
+
+    def as_field(self) -> Field:
+        return presplit_to_field(self.value)
+
+    def try_to_str(self) -> str | None:
+        return presplit_try_to_str(self.value)
 
 @dataclass(frozen=True)
 class SetOptions:

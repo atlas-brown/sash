@@ -121,7 +121,7 @@ def state_to_z3(s: State, include_fs: bool = True) -> z3.ExprRef:
     env_formula = []
     for var, val in (s.env | s.localenv).items():
         var_z3 = z3.String(var)
-        val_z3 = field_content_to_z3(val.value.content)
+        val_z3 = field_content_to_z3(val.as_field().content)
         eq_formula = (var_z3 == val_z3)
         env_formula.append(eq_formula)
     env_formula = z3.And(env_formula)
@@ -241,9 +241,9 @@ def home_not_deleted_assertion(trace: Trace) -> Assertion | None:
     init_home = trace.states[0].lookup("HOME")
     if init_home is None:
         return None
-    home_label = init_home.value.try_to_str() or "HOME"
+    home_label = init_home.try_to_str() or "HOME"
     constraint = SimpleConstraint(
-        Not(IsDeleted(init_home.value)),
+        Not(IsDeleted(init_home.as_field())),
         lambda line: DeleteUserDirectory(home_label, line),
     )
     if constraint is None:
