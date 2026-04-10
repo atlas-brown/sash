@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field, replace
 from enum import Enum
 from typing import TYPE_CHECKING
+import re
 
 from sash.frozen import FrozenAst
 
@@ -147,3 +148,329 @@ class Field:
     @staticmethod
     def create_constant(s: str, words: int = 1) -> "Field":
         return Field(SymStr((s,)), WordCount(words, words))
+
+
+def _merge_counts(c1: WordCount, c2: WordCount, sep: int = 0) -> WordCount:
+    """
+    Calculates the resulting field count bounds when two shell words/chunks are concatenated.
+
+    When two expansions are placed next to each other without an unquoted
+    space (e.g., `${VAR1}${VAR2}`), the last field of the first expansion and the
+    first field of the second expansion fuse together into a single field.
+
+    The mathematical logic follows the formula: `Base Sum - Fusion Penalty + Separator`
+
+    Args:
+        c1 (WordCount): The minimum and maximum field bounds of the first chunk.
+        c2 (WordCount): The minimum and maximum field bounds of the second chunk.
+        sep (int, optional): Explicit boundary modifiers (e.g., if an explicit space
+            was parsed between them). Defaults to 0.
+
+    Returns:
+        WordCount: A new WordCount representing the merged bounds.
+
+    Logic / Edge Cases:
+        - Normal Fusion: If c1=2 ("a", "b") and c2=2 ("x", "y"), the result is 3
+          ("a", "bx", "y"). The logic subtracts 1 because the boundary fields fused.
+        - Ghost Fields: The `-1` fusion penalty is ONLY applied if BOTH chunks
+          produce at least one field (c > 0). If one chunk evaluates to an empty
+          variable (0 fields), there is nothing to fuse with, so the penalty is 0.
+    """
+    min_merge = c1.min + c2.min - (1 if c1.min > 0 and c2.min > 0 else 0) + sep
+    max_merge = c1.max + c2.max - (1 if c1.max > 0 and c2.max > 0 else 0) + sep
+    return WordCount(min_merge, max_merge)
+
+
+def _merge_symstrs(sym_fields: list[Field]) -> Field:
+    assert all(isinstance(field.content, SymStr) for field in sym_fields), "All fields must contain SymStr to be merged with _merge_symstrs"
+    if not sym_fields:
+        return Field(SymStr(()), WordCount(0, 0))
+    content = sym_fields[0].content.parts # type: ignore
+    count = sym_fields[0].count
+    for field in sym_fields[1:]:
+        content = content + field.content.parts # type: ignore
+        count = _merge_counts(count, field.count, 0)
+    return Field(SymStr(tuple(content)), count)
+
+
+def _collect_prefixes_suffixes(fields: list[Field]) -> tuple[Field | None, Field | None]:
+    prefixes = []
+    for field in fields:
+        if isinstance(field.content, SymStr):
+            prefixes.append(field)
+        else:
+            break
+    suffixes = []
+    for field in reversed(fields):
+        if isinstance(field.content, SymStr):
+            suffixes.append(field)
+        else:
+            break
+    suffixes.reverse()
+    return (
+        _merge_symstrs(prefixes) if prefixes else None,
+        _merge_symstrs(suffixes) if suffixes else None,
+    )
+
+
+def _add_prefix(arbitrary_field: Field, prefix_symstr: Field) -> Field:
+    match (arbitrary_field, prefix_symstr):
+        case (Field(CompletelyArbitrary(prefix=None) as a, acount),
+              Field(SymStr() as s, scount)):
+            return Field(replace(a, prefix=s), _merge_counts(acount, scount))
+        case (Field(CompletelyArbitrary(prefix=SymStr(pre_parts)) as a, acount),
+              Field(SymStr(more_parts) as s, scount)):
+            return Field(replace(a, prefix=SymStr(more_parts + pre_parts)), _merge_counts(acount, scount))
+        case _:
+            assert False, "unreachable"
+
+
+def _add_suffix(arbitrary_field: Field, suffix_symstr: Field) -> Field:
+    match (arbitrary_field, suffix_symstr):
+        case (Field(CompletelyArbitrary(suffix=None) as a, acount),
+              Field(SymStr() as s, scount)):
+            return Field(replace(a, suffix=s), _merge_counts(acount, scount))
+        case (Field(CompletelyArbitrary(suffix=SymStr(suf_parts)) as a, acount),
+              Field(SymStr(more_parts) as s, scount)):
+            return Field(replace(a, suffix=SymStr(suf_parts + more_parts)), _merge_counts(acount, scount))
+        case _:
+            assert False, "unreachable"
+
+
+def _merge_partial_fields(fields: list[Field]) -> Field:
+    num_arbitraries = sum(1 for field in fields if isinstance(field.content, CompletelyArbitrary))
+    if num_arbitraries == 0:
+        return _merge_symstrs(fields)
+    if num_arbitraries == 1:
+        arbitrary_field = next(field for field in fields if isinstance(field.content, CompletelyArbitrary))
+        prefix, suffix = _collect_prefixes_suffixes(fields)
+        if prefix is not None:
+            arbitrary_field = _add_prefix(arbitrary_field, prefix)
+        if suffix is not None:
+            arbitrary_field = _add_suffix(arbitrary_field, suffix)
+        return arbitrary_field
+
+    arbitrary_fields = [field for field in fields if isinstance(field.content, CompletelyArbitrary)]
+    base = arbitrary_fields[0].content
+    quoted = all(field.content.quoted for field in arbitrary_fields) # type: ignore
+    maybe_empty = any(field.content.maybe_empty for field in arbitrary_fields) # type: ignore
+    merged = CompletelyArbitrary(
+        source=base.source, # type: ignore
+        kind=ArbitraryType.APPROXIMATION,
+        producing_state=base.producing_state, # type: ignore
+        quoted=quoted,
+        maybe_empty=maybe_empty,
+    )
+    merged_field = Field(merged, WordCount(0, float("inf")))
+    prefix, suffix = _collect_prefixes_suffixes(fields)
+    if prefix is not None:
+        merged_field = _add_prefix(merged_field, prefix)
+    if suffix is not None:
+        merged_field = _add_suffix(merged_field, suffix)
+    return merged_field
+
+
+@dataclass(frozen=True)
+class LiteralChunk:
+    """
+    Text explicitly typed by the programmer in the source code.
+    Origin: Generated by the AST parser before execution begins.
+
+    Splitting Rules:
+    - NEVER subject to IFS field splitting (only expansions split).
+
+    Globbing Rules:
+    - Subject to pathname expansion ONLY IF `is_quoted == False`.
+    """
+    content: str
+    is_quoted: bool
+
+
+@dataclass(frozen=True)
+class ExpandedChunk:
+    """
+    Text resulting from parameter/command/arithmetic expansion.
+    Origin: Evaluation state.
+
+    Splitting rules:
+    - Subject to field splitting ONLY IF `is_quoted == False`.
+
+    Globbing rules:
+    - Subject to pathname expansion ONLY IF `is_quoted == False`.
+    """
+    content: str | CompletelyArbitrary
+    is_quoted: bool
+    count: WordCount
+
+
+@dataclass(frozen=True)
+class PreSplitWord:
+    """
+    The core Intermediate Representation for a shell word.
+    Preserves the boundary between literal text and symbolic expansions
+    until the context demands evaluation (splitting, globbing, or storage).
+    """
+    chunks: list[LiteralChunk | ExpandedChunk]
+
+    def prepare_for_storage(self) -> 'PreSplitWord':
+        """
+        CONTEXT: Assignment Context (e.g., VAR="a b" or VAR=$OTHER)
+
+        Removes the AST quoting context, as quotes are consumed by the assignment.
+        Returns a new PreSplitWord safe to be stored in the symbolic state variable map.
+        """
+        stored_chunks = []
+        for chunk in self.chunks:
+            if isinstance(chunk, LiteralChunk):
+                stored_chunks.append(LiteralChunk(content=chunk.content, is_quoted=False))
+            elif isinstance(chunk, ExpandedChunk):
+                stored_chunks.append(
+                    ExpandedChunk(
+                        content=chunk.content,
+                        is_quoted=False,
+                        count=chunk.count
+                    )
+                )
+        return PreSplitWord(stored_chunks)
+
+    def expand_from_storage(self, in_quoted_context: bool) -> 'PreSplitWord':
+        """
+        CONTEXT: Variable Reference (e.g., $VAR or "$VAR")
+
+        Converts stored chunks into ExpandedChunks (because retrieving a var
+        IS an expansion), applying the current AST quoting context.
+        """
+        retrieved_chunks = []
+        for chunk in self.chunks:
+            # If the stored chunk is completely arbitrary, preserve its count.
+            # If it was a literal string, it is guaranteed to have a count of 1.
+            chunk_count = getattr(chunk, 'count', WordCount(1, 1))
+
+            retrieved_chunks.append(
+                ExpandedChunk(
+                    content=chunk.content,
+                    is_quoted=in_quoted_context,
+                    count=chunk_count
+                )
+            )
+        return PreSplitWord(retrieved_chunks)
+
+    def split_into_fields(self, ifs_value: str) -> list[Field]:
+        """
+        CONTEXT: Command Execution (e.g., echo $VAR, ls *.txt).
+
+        Executes Field Splitting. Iterates through chunks and splits
+        unquoted ExpandedChunks based on the provided IFS string.
+        """
+        if not self.chunks:
+            return []
+
+        resulting_fields: list[Field] = []
+        current_parts: list[Field] = []
+        current_text: list[tuple[str, bool]] = []
+
+        def flush_text() -> None:
+            if not current_text:
+                return
+            joined = "".join(text for text, _ in current_text)
+            has_glob = any(eligible and "*" in text for text, eligible in current_text)
+            min_words = 1
+            max_words: int | float = 1
+            if has_glob:
+                max_words = float("inf")
+                only_globs = True
+                for text, eligible in current_text:
+                    if not text:
+                        continue
+                    if not eligible:
+                        only_globs = False
+                        break
+                    if any(ch != "*" for ch in text):
+                        only_globs = False
+                        break
+                if only_globs:
+                    min_words = 0
+            current_parts.append(Field(SymStr((joined,)), WordCount(min_words, max_words)))
+            current_text.clear()
+
+        def commit_field(allow_empty: bool = False) -> None:
+            flush_text()
+            if not current_parts:
+                if allow_empty:
+                    resulting_fields.append(Field(SymStr(("",)), WordCount(1, 1)))
+                return
+            resulting_fields.append(_merge_partial_fields(current_parts))
+            current_parts.clear()
+
+        def split_by_ifs(text: str) -> tuple[list[str], bool]:
+            if text == "":
+                return [], False
+            if ifs_value == "":
+                return [text], False
+            ifs_chars = ifs_value if ifs_value is not None else " \t\n"
+            whitespace = {ch for ch in ifs_chars if ch in " \t\n"}
+            non_whitespace = [ch for ch in ifs_chars if ch not in " \t\n"]
+
+            if not non_whitespace:
+                parts = [p for p in re.split(r"[ \t\n]+", text) if p != ""]
+                return parts, False
+            if not whitespace:
+                pattern = f"[{re.escape(''.join(non_whitespace))}]"
+                return re.split(pattern, text), True
+
+            pattern = f"[{re.escape(''.join(non_whitespace))}]"
+            pieces = re.split(pattern, text)
+            result: list[str] = []
+            for piece in pieces:
+                if piece == "":
+                    result.append("")
+                    continue
+                result.extend([p for p in re.split(r"[ \t\n]+", piece) if p != ""])
+            return result, True
+
+        for chunk in self.chunks:
+            if isinstance(chunk, LiteralChunk):
+                current_text.append((chunk.content, not chunk.is_quoted))
+                continue
+
+            if chunk.is_quoted:
+                if isinstance(chunk.content, CompletelyArbitrary):
+                    flush_text()
+                    current_parts.append(Field(chunk.content, chunk.count).quote())
+                else:
+                    current_text.append((chunk.content, False))
+                continue
+
+            if isinstance(chunk.content, CompletelyArbitrary):
+                flush_text()
+                current_parts.append(Field(chunk.content, chunk.count))
+                continue
+
+            segments, preserve_empty = split_by_ifs(chunk.content)
+            if not preserve_empty:
+                for i, segment in enumerate(segments):
+                    if not segment:
+                        continue
+                    current_text.append((segment, True))
+                    if i < len(segments) - 1:
+                        commit_field()
+                continue
+
+            for i, segment in enumerate(segments):
+                if segment:
+                    current_text.append((segment, True))
+                if i < len(segments) - 1:
+                    if segment:
+                        commit_field()
+                    else:
+                        if current_parts or current_text:
+                            commit_field()
+                        commit_field(allow_empty=True)
+
+            if segments and segments[-1] == "":
+                if current_parts or current_text:
+                    commit_field()
+                commit_field(allow_empty=True)
+
+        commit_field()
+        return resulting_fields
