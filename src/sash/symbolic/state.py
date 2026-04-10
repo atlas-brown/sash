@@ -136,6 +136,11 @@ class State:
     def set_env(self, var: str, value: ShellVar) -> 'State':
         return replace(self, env=self.env.set(var, value))
 
+    def unset_env(self, var: str) -> 'State':
+        env = dict(self.env)
+        env.pop(var, None)
+        return replace(self, env=FrozenDict(env))
+
     def extend_env(self, new_vars: dict[str, ShellVar]) -> 'State':
         return replace(self, env=(self.env | new_vars))
 
