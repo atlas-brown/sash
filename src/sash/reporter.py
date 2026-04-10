@@ -37,6 +37,7 @@ class Code(Enum):
     CMD_ASSERTION_PATH_STATE = "cmd_expected_path_state"
     DATA_LOSS = "data_loss"
     DELETE_USER_DIRECTORY = "del_user_dir"
+    INCONSISTENT_IFS = "inconsistent_ifs"
 
 
 @dataclass(frozen=True)
@@ -194,6 +195,12 @@ class DataLoss(Issue):
 class DeleteUserDirectory(Issue):
     def __init__(self, directory: str, line):
         super().__init__(Code.DELETE_USER_DIRECTORY, f"deletes user directory '{directory}'", Severity.WARNING, line)
+
+
+class InconsistentIFS(Issue):
+    def __init__(self, ifs_values: list[str], line):
+        values = ", ".join(repr(value) for value in ifs_values)
+        super().__init__(Code.INCONSISTENT_IFS, f"IFS differs across traces: {values}", Severity.WARNING, line)
 
 class Report(NamedTuple):
     filename: str
