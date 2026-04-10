@@ -3,7 +3,7 @@ from enum import Enum
 from typing import TYPE_CHECKING
 import re
 
-from sash.frozen import FrozenAst
+from sash.frozen import FrozenAst, freeze_thing
 
 if TYPE_CHECKING:
     from sash.symbolic.state import State
@@ -474,3 +474,38 @@ class PreSplitWord:
 
         commit_field()
         return resulting_fields
+
+
+def presplit_from_field(field: Field) -> PreSplitWord:
+    content = field.content
+    if isinstance(content, SymStr):
+        text = content.try_to_str()
+        if text is not None:
+            return PreSplitWord([
+                ExpandedChunk(content=text, is_quoted=False, count=field.count),
+            ])
+        arbitrary = CompletelyArbitrary(freeze_thing(content), ArbitraryType.APPROXIMATION, None)
+        return PreSplitWord([
+            ExpandedChunk(content=arbitrary, is_quoted=False, count=field.count),
+        ])
+    return PreSplitWord([
+        ExpandedChunk(content=content, is_quoted=False, count=field.count),
+    ])
+
+
+def presplit_to_field(word: PreSplitWord) -> Field:
+    if not word.chunks:
+        return Field(SymStr(()), WordCount(0, 0))
+    fields: list[Field] = []
+    for chunk in word.chunks:
+        if isinstance(chunk, LiteralChunk):
+            fields.append(Field(SymStr((chunk.content,)), WordCount(1, 1)))
+        elif isinstance(chunk.content, str):
+            fields.append(Field(SymStr((chunk.content,)), chunk.count))
+        else:
+            fields.append(Field(chunk.content, chunk.count))
+    return _merge_partial_fields(fields)
+
+
+def presplit_try_to_str(word: PreSplitWord) -> str | None:
+    return presplit_to_field(word).try_to_str()
