@@ -29,8 +29,7 @@ class RunResult(NamedTuple):
 def generate_html_report(html_file: Path, run_results: list[RunResult], ran: int, skipped: int, failed: int, unknown: int, timed_out: int,
                          total_issues: int, detected_issues_expected: int, detected_issues_extra: int,
                          detected_issues_extra_unsat_preconds: int, detected_issues_extra_unset_vars: int,
-                         total_exec_time: float, total_solver_time: float,
-                         SE_timeout: float | None = None, solver_timeout: float | None = None):
+                         total_exec_time: float, total_solver_time: float):
 
     html_parts = []
 

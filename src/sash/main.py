@@ -4,6 +4,7 @@ import logging
 import pathlib
 import threading
 import time
+from inspect import signature
 
 import sash.symb
 from sash.interpreter_config import InterpConfig
@@ -11,20 +12,235 @@ from sash.reporter import Report, Reporter
 from sash.solver import reset_z3cache, run_solver
 import sash.specs as specs
 from sash.debugtools.logger import DebugLogger
+from typing import Literal
+
+def build_cli(options_only=False) -> argparse.ArgumentParser:
+    SHOW_ADVANCED_HELP_STRS = {"a", "advanced"}
+
+    # Custom help action to hide advanced options unless the user
+    # passed -h/--help with one of the SHOW_ADVANCED_HELP_STRS values
+    def make_custom_help_action(*advanced_groups: argparse._ArgumentGroup) -> type[argparse.Action]:
+        class HelpAction(argparse.Action):
+            def __call__(self, parser, namespace, values, option_string=None):
+                if values not in SHOW_ADVANCED_HELP_STRS:
+                    # Suppress all advanced groups and their actions from the help message
+                    for group in advanced_groups:
+                        group.title = None
+                        group.description = None
+                        for action in group._group_actions:
+                            action.help = argparse.SUPPRESS
+                parser.print_help()
+                parser.exit()
+        return HelpAction
+
+    parser = argparse.ArgumentParser(
+        description="Static analysis for POSIX shell scripts",
+        add_help=False,  # Needed to allow defining a -h/--help argument
+    )
+
+    # Group advanced options by category
+    timeouts_grp = parser.add_argument_group("timeout options (advanced)", "Options for configuring timeouts for different phases of the analysis")
+    execution_grp = parser.add_argument_group("execution options (advanced)", "Options for configuring the symbolic execution phase")
+    solver_grp = parser.add_argument_group("solver options (advanced)", "Options for configuring the solver phase")
+    logging_grp = parser.add_argument_group("logging options (advanced)", "Options for configuring logging")
+    debug_grp = parser.add_argument_group("debug options (advanced)")
+
+    # Basic arguments
+    if not options_only:
+        parser.add_argument(
+            "file",
+            type=pathlib.Path,
+            help="The shell script to analyze",
+        )
+    parser.add_argument(
+        "-t",
+        "--timeout",
+        metavar="SEC",
+        type=float,
+        default=signature(main).parameters["timeout"].default,  # Define like this to avoid duplication of the defaults
+        help=f"Timeout budget (in seconds); shared between the execution and solver phases; set to 'inf' for no timeout (default: %(default)s)",
+    )
+    parser.add_argument(
+        "-h",
+        "--help",
+        metavar="advanced",
+        nargs="?",
+        type=str,
+        const="basic",
+        choices=["b", "basic", *SHOW_ADVANCED_HELP_STRS],
+        action=make_custom_help_action(timeouts_grp, execution_grp, solver_grp, logging_grp, debug_grp),
+        help="Show this help message and exit; with "
+        + " or ".join(f"'{s}'" for s in SHOW_ADVANCED_HELP_STRS)
+        + " also show advanced options",
+    )
+
+    # Advanced arguments
+
+    # Timeout-related arguments
+    timeouts_grp.add_argument(
+        "--exec-timeout-pct",
+        metavar="PCT",
+        type=float,
+        default=signature(main).parameters["exec_timeout_pct"].default,
+        help=f"Execution phase timeout budget as a percentage of the total timeout (0.0--1.0) (default: %(default)s)",
+    )
+    timeouts_grp.add_argument(
+        "--dfs-timeout-pct",
+        metavar="PCT",
+        type=float,
+        default=signature(main).parameters["dfs_timeout_pct"].default,
+        help=f"DFS passes timeout budget as a percentage of the execution timeout (0.0--1.0) (default: %(default)s)",
+    )
+    timeouts_grp.add_argument(
+        "--targeted-dfs-timeout-pct",
+        metavar="PCT",
+        type=float,
+        default=signature(main).parameters["targeted_dfs_timeout_pct"].default,
+        help=f"Targeted DFS pass timeout budget as a percentage of the DFS timeout (0.0--1.0) (default: %(default)s)",
+    )
+
+    # Execution-related arguments
+    execution_grp.add_argument(
+        "--disable-optimistic-forking",
+        action="store_true",
+        help=f"Force symbolic execution to fork even outside of checked positions",
+    )
+    execution_grp.add_argument(
+        "--disable-trace-collapsing",
+        action="store_true",
+        help=f"Disable trace collapsing",
+    )
+    execution_grp.add_argument(
+        "--disable-dfs",
+        action="store_true",
+        help="Disable all DFS passes (equivalent to '--disable-targeted-dfs --disable-unbound-as-empty-dfs')",
+    )
+    execution_grp.add_argument(
+        "--disable-targeted-dfs",
+        action="store_true",
+        help=f"Disable the DFS pass that prioritizes paths containing potentially dangerous commands",
+    )
+    execution_grp.add_argument(
+        "--disable-unbound-as-empty-dfs",
+        action="store_true",
+        help=f"Disable the DFS passes that treat unbound variables as empty strings",
+    )
+
+    # Solver-related arguments
+    solver_grp.add_argument(
+        "--disable-solver",
+        action="store_true",
+        help=f"Disable the solver phase; only run symbolic execution",
+    )
+    solver_grp.add_argument(
+        "--disable-solver-optimizations",
+        action="store_true",
+        help=f"Disable solver optimizations (assertion prioritization, FS omission, obvious-assertion skipping)",
+    )
+
+    # Logging-related arguments
+    logging_grp.add_argument(
+        "-F",
+        "--log-file",
+        metavar="FILE",
+        type=pathlib.Path,
+        default=signature(main).parameters["log_file"].default,
+        help=f"File to write logs to; will use stderr if not provided",
+    )
+    logging_grp.add_argument(
+        "-L",
+        "--log-level",
+        metavar="LEVEL",
+        type=str,
+        default=signature(main).parameters["log_level"].default,
+        choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL", "DISABLED"],
+        help=f"Set the logging level to one of DEBUG, INFO, WARNING, ERROR, CRITICAL or DISABLED (default: %(default)s)",
+    )
+
+    # Debug-related arguments
+    debug_grp.add_argument(
+        "--collect-debug-info",
+        action="store_true",
+        help=f"Enable debug instrumentation (WARNING: will slow down execution and produce large logs)",
+    )
+
+    return parser
+
+
+def main(file: pathlib.Path,
+         timeout: float = 60.0,
+         exec_timeout_pct: float = 1/2,
+         dfs_timeout_pct: float = 2/3,
+         targeted_dfs_timeout_pct: float = 1/1,
+         disable_optimistic_forking: bool = False,
+         disable_trace_collapsing: bool = False,
+         disable_targeted_dfs: bool = False,
+         disable_unbound_as_empty_dfs: bool = False,
+         disable_solver: bool = False,
+         disable_solver_optimizations: bool = False,
+         log_file: pathlib.Path | None = None,
+         log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL", "DISABLED"] = "INFO",
+         collect_debug_info: bool = False) -> Report:
+
+    logging.basicConfig(
+        format="[%(levelname)s:%(module)s:%(lineno)d] %(message)s",
+        level=getattr(logging, log_level.upper()) if log_level.upper() != "DISABLED" else logging.CRITICAL + 10,
+        filename=log_file
+    )
+
+    symbexec_main(
+        file=file.as_posix(),
+        timeout=timeout,
+        exec_timeout_pct=exec_timeout_pct,
+        dfs_timeout_pct=dfs_timeout_pct,
+        targeted_dfs_timeout_pct=targeted_dfs_timeout_pct,
+        disable_optimistic_forking=disable_optimistic_forking,
+        disable_trace_collapsing=disable_trace_collapsing,
+        disable_targeted_dfs=disable_targeted_dfs,
+        disable_unbound_as_empty_dfs=disable_unbound_as_empty_dfs,
+        disable_solver=disable_solver,
+        disable_solver_optimizations=disable_solver_optimizations,
+        collect_debug_info=collect_debug_info,
+    )
+
+    return Reporter.get_report()
+
+
+def cli_main():
+    args = build_cli().parse_args()
+
+    report = main(
+        file=args.file.resolve(strict=True),
+        timeout=args.timeout,
+        exec_timeout_pct=args.exec_timeout_pct,
+        dfs_timeout_pct=args.dfs_timeout_pct,
+        targeted_dfs_timeout_pct=args.targeted_dfs_timeout_pct,
+        disable_optimistic_forking=args.disable_optimistic_forking,
+        disable_trace_collapsing=args.disable_trace_collapsing,
+        disable_targeted_dfs=args.disable_dfs or args.disable_targeted_dfs,
+        disable_unbound_as_empty_dfs=args.disable_dfs or args.disable_unbound_as_empty_dfs,
+        disable_solver=args.disable_solver,
+        disable_solver_optimizations=args.disable_solver_optimizations,
+        log_file=args.log_file.resolve(strict=True) if args.log_file else None,
+        log_level=args.log_level,
+        collect_debug_info=args.collect_debug_info,
+    )
+
+    print(json.dumps(report.to_dict(), indent=2))
 
 
 def symbexec_main(file: str,
-                  solver: bool = False,
-                  symbexec_timeout: float | None = None,
-                  dfs_timeout: float | None = None,
-                  targeted_dfs_timeout: float | None = None,
-                  solver_timeout: float | None = None,
-                  enable_dfs: bool = False,
-                  enable_targeted_dfs: bool = True,
-                  enable_unbound_empty_dfs: bool = True,
-                  fork_everywhere: bool = False,
-                  disable_solver_optimizations: bool = False,
-                  debug_instrumentation: bool = False) -> sash.symb.SymbexecResult:
+                  timeout: float,
+                  exec_timeout_pct: float,
+                  dfs_timeout_pct: float,
+                  targeted_dfs_timeout_pct: float,
+                  disable_optimistic_forking: bool,
+                  disable_trace_collapsing: bool,
+                  disable_targeted_dfs: bool,
+                  disable_unbound_as_empty_dfs: bool,
+                  disable_solver: bool,
+                  disable_solver_optimizations: bool,
+                  collect_debug_info: bool) -> sash.symb.SymbexecResult:
     global timers
     timers = []
     # Per-analysis reset: symbolic execution builds FS formulas using field_to_z3.
@@ -32,52 +248,86 @@ def symbexec_main(file: str,
     # while avoiding cross-analysis leakage.
     reset_z3cache()
 
-    if debug_instrumentation:
-        logging.info(f"Debug instrumentation enabled: detailed json execution logging to {DebugLogger.default_log_file}")
+    if collect_debug_info:
+        logging.info("Debug instrumentation enabled: detailed JSON execution logging to '%s'", DebugLogger.default_log_file)
         DebugLogger.initialize(file)
 
     config = InterpConfig(
         trace_collapser=sash.symb.collapse_traces_if_too_many,
-        disable_trace_collapsing=fork_everywhere,
-        force_fork_all=fork_everywhere,
-        debug_instrumentation=debug_instrumentation,
+        disable_trace_collapsing=disable_trace_collapsing,
+        force_fork_all=disable_optimistic_forking,
+        debug_instrumentation=collect_debug_info,
         disable_solver_optimizations=disable_solver_optimizations,
-        DFS_first=enable_dfs,
+        DFS_first=not disable_targeted_dfs and not disable_unbound_as_empty_dfs, # TODO: remove field?
     )
 
     Reporter.initialize(file)
-    total_timeout = symbexec_timeout
-    symbexec_timeout_cap = symbexec_timeout
-    if solver and symbexec_timeout is not None and symbexec_timeout > 0 and solver_timeout is None:
-        symbexec_timeout_cap = symbexec_timeout / 2.0
+    # Clamp percentages to [0.0, 1.0]
+    exec_timeout_pct = max(0.0, min(exec_timeout_pct, 1.0))
+    dfs_timeout_pct = max(0.0, min(dfs_timeout_pct, 1.0))
+    targeted_dfs_timeout_pct = max(0.0, min(targeted_dfs_timeout_pct, 1.0))
+
+    disable_solver = disable_solver or exec_timeout_pct == 1.0
+    total_timeout = timeout
+    symbexec_timeout_cap = total_timeout
+    if not disable_solver:
+        symbexec_timeout_cap = symbexec_timeout_cap * exec_timeout_pct
+
+    disable_dfs = (disable_targeted_dfs and disable_unbound_as_empty_dfs) or dfs_timeout_pct == 0.0
+    dfs_timeout = 0.0
+    targeted_dfs_timeout = 0.0
+    if not disable_dfs:
+        dfs_timeout = symbexec_timeout_cap * dfs_timeout_pct
+        targeted_dfs_timeout = dfs_timeout * targeted_dfs_timeout_pct
+
+    logging.info(
+        "Analyzing '%s'; solver phase is %s; total timeout budget is %.2fs",
+        file,
+        "disabled" if disable_solver else "enabled",
+        timeout,
+    )
+
+    logging.info(
+        "Targeted DFS pass is %s; unbound-as-empty DFS passes are %s",
+        "disabled" if disable_targeted_dfs else "enabled",
+        "disabled" if disable_unbound_as_empty_dfs else "enabled",
+    )
+
+    if not disable_solver:
         logging.info(
-            "No solver timeout provided; using timeout %.3fs as exec_cap=%.3fs and solver budget=max(remaining, %.3fs)",
-            symbexec_timeout,
+            "Execution phase budget: at least %.2fs; solver phase budget: at least %.2fs",
             symbexec_timeout_cap,
-            symbexec_timeout_cap,
+            total_timeout - symbexec_timeout_cap,
         )
+
+    if not disable_dfs:
+        logging.info(
+            "Total DFS passes budget: %.2fs; targeted DFS pass budget: %.2fs",
+            dfs_timeout,
+            targeted_dfs_timeout,
+        )
+
+    logging.debug("Commands with specs: %s", [name for name, _ in specs.CMD_SPECS.items()])
+
     start_time = time.perf_counter()
-    if enable_dfs and dfs_timeout is None:
-        dfs_timeout = symbexec_timeout_cap
     stop = None
     result = sash.symb.symbexec_file(
-        file,
-        config,
-        stop=stop,
+        file=file,
+        exec_timeout=symbexec_timeout_cap,
         dfs_timeout=dfs_timeout,
         targeted_dfs_timeout=targeted_dfs_timeout,
-        main_timeout=symbexec_timeout_cap,
-        enable_targeted_dfs=enable_targeted_dfs,
-        enable_unbound_empty_dfs=enable_unbound_empty_dfs,
+        enable_unbound_empty_dfs=not disable_unbound_as_empty_dfs,
+        config=config,
+        stop=stop,
     )
     exec_elapsed = time.perf_counter() - start_time
     Reporter.set_exec_time(exec_elapsed)
 
     match result.status:
         case sash.symb.SymbexecStatus.COMPLETED:
-            logging.info("Symbolic execution completed")
+            logging.info("Symbolic execution completed in %.2fs", exec_elapsed)
         case sash.symb.SymbexecStatus.INTERRUPTED:
-            logging.warning("Symbolic execution timed out; got partial results")
+            logging.info("Symbolic execution timed out after %.2fs", exec_elapsed)
         case sash.symb.SymbexecStatus.FAILED:
             logging.error("Symbolic execution failed; exiting")
             assert result.exception is not None
@@ -85,197 +335,33 @@ def symbexec_main(file: str,
         case _:
             assert False, "unreachable"
 
-    if solver:
-        logging.info("Running solver")
-        effective_solver_timeout = solver_timeout
-        if solver_timeout is None and total_timeout is not None and total_timeout > 0:
-            min_solver_budget = total_timeout / 2.0
-            effective_solver_timeout = max(
-                min_solver_budget,
-                total_timeout - exec_elapsed,
-            )
+    if not disable_solver:
+        solver_timeout = total_timeout - exec_elapsed
+        if exec_elapsed >= symbexec_timeout_cap:
             logging.info(
-                "Dynamic solver timeout from total budget: total=%.3fs, exec=%.3fs, min_solver=%.3fs, solver=%.3fs",
-                total_timeout,
-                exec_elapsed,
-                min_solver_budget,
-                effective_solver_timeout,
+                "Execution phase exceeded its timeout cap of %.2fs by %.2fs",
+                symbexec_timeout_cap,
+                exec_elapsed - symbexec_timeout_cap
             )
+            # Since timeout is soft, we give the solver some extra time if exec took too long
+            solver_timeout = total_timeout - symbexec_timeout_cap
+
+
+        logging.info(
+            "Starting solver phase with timeout budget: %.2fs",
+            solver_timeout,
+        )
+
         start_time = time.perf_counter()
-        if effective_solver_timeout is not None and effective_solver_timeout <= 0:
+        if solver_timeout <= 0.0:
             solver_stop = threading.Event()
             solver_stop.set()
         else:
-            solver_stop = set_timer(effective_solver_timeout, "solver")
+            solver_stop = set_timer(solver_timeout, "solver")
         run_solver(result.traces, config, stop=solver_stop)
         Reporter.set_solver_time(time.perf_counter() - start_time)
-        logging.info("Solver finished running")
-    else:
-        logging.info("Skipping solver")
 
     return result
-
-
-def main(file: str,
-         log_level: str = "warning",
-         log_file: pathlib.Path | None=None,
-         solver=True,
-         timeout: float | None = None,
-         dfs_timeout: float | None = None,
-         targeted_dfs_timeout: float | None = None,
-         solver_timeout: float | None = None,
-         enable_dfs: bool = False,
-         enable_targeted_dfs: bool = True,
-         enable_unbound_empty_dfs: bool = True,
-         fork_everywhere: bool = False,
-         disable_solver_optimizations: bool = False,
-         debug_instrumentation: bool = False) -> Report:
-
-    logging.basicConfig(
-        format="[%(levelname)s:%(module)s:%(lineno)d] %(message)s",
-        level=getattr(logging, log_level.upper()) if log_level.lower() != "disabled" else logging.CRITICAL + 10,
-        filename=log_file
-    )
-
-    logging.info(
-        "Processing file %s with solver=%s, timeout=%s, solver_timeout=%s",
-        file,
-        solver,
-        timeout,
-        solver_timeout,
-    )
-    logging.info("Commands with specs: %s", [name for name, _ in specs.CMD_SPECS.items()])
-
-    symbexec_main(
-        file,
-        solver,
-        timeout,
-        dfs_timeout,
-        targeted_dfs_timeout,
-        solver_timeout,
-        enable_dfs,
-        enable_targeted_dfs,
-        enable_unbound_empty_dfs,
-        fork_everywhere,
-        disable_solver_optimizations,
-        debug_instrumentation,
-    )
-    return Reporter.get_report()
-
-
-def cli_main():
-    args = parse_cli()
-
-    report = main(
-        args.filename.resolve(strict=True).as_posix(),
-        log_level=args.log_level,
-        log_file=args.log_file.resolve().as_posix() if args.log_file else None,
-        solver=True,
-        timeout=args.timeout,
-        dfs_timeout=args.dfs_timeout,
-        targeted_dfs_timeout=args.targeted_dfs_timeout,
-        solver_timeout=None,
-        enable_dfs=args.enable_dfs,
-        enable_targeted_dfs=not args.disable_targeted_dfs,
-        enable_unbound_empty_dfs=not args.disable_unbound_empty_dfs,
-        fork_everywhere=args.fork_everywhere,
-        disable_solver_optimizations=args.disable_solver_optimizations,
-        debug_instrumentation=args.enable_debug_instrumentation,
-    )
-
-    print(json.dumps(report.to_dict(), indent=2))
-
-
-def parse_cli():
-    parser = argparse.ArgumentParser(
-        description="Static analysis for POSIX shell scripts",
-    )
-
-    parser.add_argument(
-        "filename",
-        type=pathlib.Path,
-        help="Path to the shell script to analyze",
-    )
-
-    parser.add_argument(
-        "-L",
-        "--log-level",
-        type=str,
-        default="warning",
-        choices=["debug", "info", "warning", "error", "critical", "disabled"],
-        help="Set the logging level (default: warning)",
-    )
-
-    parser.add_argument(
-        "-l",
-        "--log-file",
-        type=pathlib.Path,
-        default=None,
-        help="Path to a file to write logs to (default: stdout)",
-    )
-
-    parser.add_argument(
-        "-D",
-        "--enable-dfs",
-        action="store_true",
-        help="Use depth-first search strategy for symbolic execution (default: breadth-first search)",
-    )
-
-    parser.add_argument(
-        "--disable-targeted-dfs",
-        action="store_true",
-        help="Disable the dangerous-command-targeted DFS pass while keeping other DFS passes (only applies with --enable-dfs).",
-    )
-
-    parser.add_argument(
-        "--disable-unbound-empty-dfs",
-        action="store_true",
-        help="Disable DFS passes that treat unbound variables as empty strings (only applies with --enable-dfs).",
-    )
-
-    parser.add_argument(
-        "--fork-everywhere",
-        action="store_true",
-        help="Force symbolic execution to fork even outside checked positions and disable trace collapsing.",
-    )
-
-    parser.add_argument(
-        "--disable-solver-optimizations",
-        action="store_true",
-        help="Disable solver optimizations: assertion prioritization, FS omission, and obvious-assertion skipping.",
-    )
-
-    parser.add_argument(
-        "-t",
-        "--timeout",
-        type=float,
-        default=None,
-        help="Set a timeout budget in seconds; symbolic execution gets up to half and solver gets at least half",
-    )
-
-    parser.add_argument(
-        "-dfsT",
-        type=float,
-        dest="dfs_timeout",
-        default=None,
-        help="Set a timeout (in seconds) for the DFS-first phase only (defaults to --timeout when -D is used)",
-    )
-    parser.add_argument(
-        "--targeted-dfs-timeout",
-        type=float,
-        default=None,
-        help="Set a timeout (in seconds) for only the targeted DFS pass (defaults to the DFS timeout budget)",
-    )
-
-    # enable debug instrumentation flag
-    parser.add_argument(
-        "-I",
-        "--enable-debug-instrumentation",
-        action="store_true",
-        help="Enable debug instrumentation (for development purposes)",
-    )
-
-    return parser.parse_args()
 
 
 timers = [] # keep references to timers to prevent garbage collection

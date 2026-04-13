@@ -1,4 +1,5 @@
 #!/usr/bin/env -S uv run python3
+from collections.abc import Callable
 import sys
 import yaml
 import subprocess
@@ -7,30 +8,21 @@ import jsonschema
 import multiprocessing
 import traceback
 import re
-import argparse
 import report
 
 from dataclasses import dataclass, field
 import sash.main
+from sash.main import build_cli as build_sash_cli
 import sash.reporter
 
 
-def parse_args():
+def build_cli():
     # fmt: off
-    parser = argparse.ArgumentParser(epilog="Regardless of which flags are used to select which analyses to run, all detected benchmarks' info files will be validated against the schema")
+    parser = build_sash_cli(options_only=True)
+    parser.description = "Evaluate SaSh"
+    parser.epilog = "Regardless of which flags are used to select which analyses to run, all detected benchmarks' info files will be validated against the schema"
     parser.add_argument('-b', '--benchmarks', type=Path, default=ROOT_DIR / 'benchmarks', help='Path to the benchmarks directory, relative to the git toplevel (default: <git_toplevel>/benchmarks)')
     parser.add_argument('-O', '--only', type=str, default='.*', help='Regex to filter benchmarks to run (default: run all)')
-    parser.add_argument('-t', '--timeout', type=float, default=None, help='Timeout in seconds for symbolic execution in each benchmark (default: no timeout)')
-    parser.add_argument('-d', '--dfs-timeout', type=float, default=None, help='Timeout in seconds for depth-first symbolic execution passes in each benchmark (default: no timeout)')
-    parser.add_argument('--targeted-dfs-timeout', type=float, default=None, help='Timeout in seconds for only the targeted DFS pass (default: uses --dfs-timeout budget)')
-    parser.add_argument('-T', '--solver-timeout', type=float, default=None, help='Timeout in seconds for solving in each benchmark (default: no timeout)')
-    parser.add_argument('-D', '--disable-dfs', action='store_true', help='Disable depth-first symbolic execution passes (default: false)')
-    parser.add_argument('--disable-targeted-dfs', action='store_true', help='Disable only the targeted DFS pass while keeping the other DFS passes (default: false)')
-    parser.add_argument('--disable-unbound-empty-dfs', action='store_true', help='Disable only DFS passes that treat unbound variables as empty strings (default: false)')
-    parser.add_argument('--fork-everywhere', action='store_true', help='Force symbolic execution to fork outside checked positions and disable trace collapsing (default: false)')
-    parser.add_argument('--disable-solver-optimizations', action='store_true', help='Disable solver optimizations (default: false)')
-    parser.add_argument('-l', '--log-level', type=str, default='disabled', choices=['disabled', 'error', 'warning', 'info', 'debug'], help='Logging level for SaSh; recommended to only use along with -L (default: disabled)')
-    parser.add_argument('-L', '--error-log', type=Path, default=Path('/dev/null'), help='File to write error logs to (default: /dev/null)')
     parser.add_argument('-S', '--skip-buggy', action='store_true', help='Don\'t run the evaluation on the buggy versions of the benchmarks (default: false)')
     parser.add_argument('-f', '--fixed', action='store_true', help='Run the evaluation on the fixed versions of the benchmarks (default: false)')
     parser.add_argument('-v', '--variants', action='store_true', help='Run the evaluation on the variant versions of the benchmarks; given the values of \'-S\' and \'-f\', only the matching variants will run (default: false)')
@@ -41,24 +33,13 @@ def parse_args():
     parser.add_argument('-N', '--no-color', action='store_true', help='Disable colored output to stderr (default: false)')
     parser.add_argument('-j', '--jobs', type=int, default=multiprocessing.cpu_count(), help='Number of parallel jobs (default: all available CPU cores)')
     parser.add_argument('-V', '--verbose', action='store_true', help='Enable printing of error reports or exceptions that occur, and raw output when ground truth is missing (default: false)')
-    return parser.parse_args()
+    return parser
     # fmt: on
 
 
 def main(
     benchmarks_dir: Path,
     bench_filter: re.Pattern,
-    timeout: float | None,
-    dfs_timeout: float | None,
-    targeted_dfs_timeout: float | None,
-    solver_timeout: float | None,
-    enable_dfs: bool,
-    enable_targeted_dfs: bool,
-    enable_unbound_empty_dfs: bool,
-    fork_everywhere: bool,
-    disable_solver_optimizations: bool,
-    log_level: str,
-    log_file: Path,
     run_buggy: bool,
     run_fixed: bool,
     run_variants: bool,
@@ -114,24 +95,16 @@ def main(
     eprint(
         f"Running {len(jobs)} analyses (on {stats.benchmarks - stats.skipped} benchmarks) using {num_jobs} processes"
     )
+
+    global SASH_KWARGS
     with multiprocessing.Pool(processes=num_jobs) as pool:
         finished = pool.starmap(
             run_job,
             [
                 (
                     job,
-                    timeout,
-                    dfs_timeout,
-                    targeted_dfs_timeout,
-                    solver_timeout,
-                    enable_dfs,
-                    enable_targeted_dfs,
-                    enable_unbound_empty_dfs,
-                    fork_everywhere,
-                    disable_solver_optimizations,
-                    log_level,
-                    log_file,
                     verbose,
+                    SASH_KWARGS,
                 )
                 for job in jobs
             ],
@@ -169,12 +142,19 @@ def main(
             filename=html_file,
             stats=stats,
             jobs=finished,
-            timeout=timeout,
-            solver_timeout=solver_timeout,
         )
 
     if stats.crashed > 0:
         exit(1)
+
+
+# This is used to avoid changes when SaSh's main signature changes
+def make_sash_main(**kwargs) -> Callable[[Path], sash.reporter.Report]:
+
+    def sash_main(file: Path) -> sash.reporter.Report:
+        return sash.main.main(file=file, **{k: v for k, v in kwargs.items() if v is not None})
+
+    return sash_main
 
 
 @dataclass
@@ -420,18 +400,8 @@ def process_finished_job(stats: EvalStats, job: FinishedJob):
 
 def run_job(
     job: Job,
-    timeout: float | None,
-    dfs_timeout: float | None,
-    targeted_dfs_timeout: float | None,
-    solver_timeout: float | None,
-    enable_dfs: bool,
-    enable_targeted_dfs: bool,
-    enable_unbound_empty_dfs: bool,
-    fork_everywhere: bool,
-    disable_solver_optimizations: bool,
-    log_level: str,
-    log_file: Path | None,
     verbose: bool,
+    sash_kwargs: dict,
 ) -> FinishedJob:
     where = job.benchmark.relative_to(ROOT_DIR)
     eprint_info(where, "Running analysis")
@@ -440,20 +410,10 @@ def run_job(
         sash.reporter.Reporter.reset()  # I'm not sure this is needed, but just in case
 
         report = sash.main.main(
-            file=job.benchmark.absolute().as_posix(),
-            log_level=log_level,
-            log_file=log_file,
-            solver=True,
-            timeout=timeout,
-            dfs_timeout=dfs_timeout,
-            targeted_dfs_timeout=targeted_dfs_timeout,
-            solver_timeout=solver_timeout,
-            enable_dfs=enable_dfs,
-            enable_targeted_dfs=enable_targeted_dfs,
-            enable_unbound_empty_dfs=enable_unbound_empty_dfs,
-            fork_everywhere=fork_everywhere,
-            disable_solver_optimizations=disable_solver_optimizations,
-            debug_instrumentation=False,
+            job.benchmark,
+            **{k: v for k, v in sash_kwargs.items() if v is not None},
+            log_level="DISABLED",
+            collect_debug_info=False,
         )
 
         finished = FinishedJob(
@@ -745,8 +705,6 @@ def generate_html_report(
     filename: Path,
     stats: EvalStats,
     jobs: list[FinishedJob],
-    timeout: float | None,
-    solver_timeout: float | None,
 ):
     run_results = [job_to_run_result(job) for job in jobs]
     ran = stats.analyses
@@ -777,8 +735,6 @@ def generate_html_report(
         detected_issues_extra_unset_vars=detected_issues_extra_unset_vars,
         total_exec_time=total_exec_time,
         total_solver_time=total_solver_time,
-        SE_timeout=timeout,
-        solver_timeout=solver_timeout,
     )
 
 
@@ -888,22 +844,26 @@ RESET = "\033[0m"
 BOLD = "\033[1m"
 UNDERLINE = "\033[4m"
 
+
 if __name__ == "__main__":
-    args = parse_args()
+    args = build_cli().parse_args()
+
+    SASH_KWARGS = {
+        "timeout": args.timeout,
+        "exec_timeout_pct": args.exec_timeout_pct,
+        "dfs_timeout_pct": args.dfs_timeout_pct,
+        "targeted_dfs_timeout_pct": args.targeted_dfs_timeout_pct,
+        "disable_optimistic_forking": args.disable_optimistic_forking,
+        "disable_trace_collapsing": args.disable_trace_collapsing,
+        "disable_targeted_dfs": args.disable_targeted_dfs,
+        "disable_unbound_as_empty_dfs": args.disable_unbound_as_empty_dfs,
+        "disable_solver": args.disable_solver,
+        "disable_solver_optimizations": args.disable_solver_optimizations,
+    }
+
     main(
         benchmarks_dir=args.benchmarks,
         bench_filter=re.compile(args.only),
-        timeout=args.timeout,
-        dfs_timeout=args.dfs_timeout,
-        targeted_dfs_timeout=args.targeted_dfs_timeout,
-        solver_timeout=args.solver_timeout,
-        enable_dfs=not args.disable_dfs,
-        enable_targeted_dfs=not args.disable_targeted_dfs,
-        enable_unbound_empty_dfs=not args.disable_unbound_empty_dfs,
-        fork_everywhere=args.fork_everywhere,
-        disable_solver_optimizations=args.disable_solver_optimizations,
-        log_level=args.log_level,
-        log_file=args.error_log,
         run_buggy=not args.skip_buggy or args.all,
         run_fixed=args.fixed or args.all,
         run_variants=args.variants or args.all,
