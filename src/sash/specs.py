@@ -274,7 +274,7 @@ def cp_spec(cmd: CmdInvocation) -> CmdSpec:
     flags.discard("-i")
 
     if len(operands) < 2:
-        logging.error("cp command with less than 2 operands is invalid; treating as no-op")
+        logging.debug("cp command with less than 2 operands is invalid; treating as no-op")
         return CmdSpec(None, Empty(), Empty(), IOType.UNKNOWN)
 
     srcs, dst = operands[:-1], operands[-1]
@@ -485,7 +485,7 @@ def sudo_spec(cmd: CmdInvocation) -> CmdSpec | None:
     if isinstance(operands[0].content.parts[0], str):
         return get_spec(operands[0].content.parts[0], tuple(operands))
     else:
-        logging.critical("Got non-str command name in sudo:%s\n%s", cmd, cmd)
+        logging.debug("Got non-str command name in sudo:%s\n%s", cmd, cmd)
         return CmdSpec(None, Empty(), Empty())
 
 
@@ -607,7 +607,7 @@ def log_crit_unhandled_inv(cmd: CmdInvocation) -> None:
         }
     }
 
-    logging.critical("Unhandled invocation for command '%s':\n%s",
+    logging.debug("Unhandled invocation for command '%s':\n%s",
                      cmd.cmd_name, json.dumps(cmd_json, indent=2, default=str))
 
 
@@ -623,9 +623,8 @@ def handle_non_posix(cmd: CmdInvocation) -> CmdSpec:
         }
     }
 
-    logging.critical("Unsupported inv:\n%s", json.dumps(cmd_json, indent=2, default=str))
+    logging.debug("Unsupported inv:\n%s", json.dumps(cmd_json, indent=2, default=str))
 
-    #logging.warning("Non-POSIX '%s' handling is not supported; treating as no-op", cmd_name)
     return CmdSpec(None, Empty(), Empty(), IOType.UNKNOWN) # no-op spec
 
 
@@ -649,7 +648,7 @@ class Cmd(ABC):
 
     @classmethod
     def _handle_non_posix(cls, cmd: CmdInvocation) -> CmdSpec:
-        logging.warning("Non-POSIX handling for command '%s' is not supported; treating as no-op", cmd.cmd_name)
+        logging.debug("Non-POSIX handling for command '%s' is not supported; treating as no-op", cmd.cmd_name)
         return cls._handle_non_supported(cmd)
 
     @classmethod
@@ -774,7 +773,7 @@ class Mv(Cmd):
         assert name == SymStr((cls.name,)), f"Expected mv command, got: {name}"
 
         if len(operands) < (2 if "-t" not in options else 1):
-            logging.error("mv command with less than 2 operands is invalid; treating as no-op")
+            logging.debug("mv command with less than 2 operands is invalid; treating as no-op")
             return CmdSpec(None, Empty(), Empty(), IOType.UNKNOWN)
 
         if "-t" in options:
@@ -983,7 +982,8 @@ class Test(Cmd):
                         fail = Empty()
             case _:
                 # NOTE: According to POSIX, in this case "the results are unspecified"
-                logging.warning("%s invocation with more than 4 operands is unspecified: %s; treating as no-op", cls.name, cmd)
+                # What about \(, \), -a, -o?
+                logging.debug("%s invocation with more than 4 operands is unspecified: %s; treating as no-op", cls.name, cmd)
                 succ = Empty()
                 fail = Empty()
 

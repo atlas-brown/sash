@@ -167,7 +167,7 @@ def model_to_reports(core: list[z3.BoolRef],
     for tracked in core:
         assertion = tracked_assertions.get(tracked)
         if not assertion:
-            logging.warning("Unrecognized tracked var in core: %s", tracked)
+            logging.error("Unrecognized tracked var in core: %s", tracked)
             continue
 
         rc = assertion.constraint
@@ -306,7 +306,7 @@ def run_solver(traces: list[Trace], config: InterpConfig, stop: threading.Event 
 
             if stop and stop.is_set():
                 timed_out = True
-                logging.warning("Solver timed out")
+                logging.debug("Solver timed out")
                 Reporter.set_timed_out()
                 break
 

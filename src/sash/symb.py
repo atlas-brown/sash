@@ -1176,7 +1176,7 @@ def expand_to_word_simple(stuff: list[AST.ArgChar],
                     else:
                         self.add_word(arbitrary_word(barg, ArbitraryType.APPROXIMATION, self.state, quoted=self.quoted))
                 case _:
-                    logging.error(
+                    logging.debug(
                         "Unsupported argchar of type '%s': '%s'; treating as completely arbitrary",
                         argchar.NodeName,
                         argchar.pretty(),
@@ -1948,7 +1948,7 @@ def handle_function_call_or_unknown(func_name: str,
             assert isinstance(the_func, FrozenAst)
             return handle_function_call(func_name, the_func.ast, arg_fields, traces, config)
     else:
-        logging.error("Name %s is defined as different functions across traces, giving up on this call", func_name)
+        logging.debug("Name %s is defined as different functions across traces, giving up on this call", func_name)
         return traces
 
 
@@ -2244,7 +2244,7 @@ def handle_if(traces: Traces, node: AST.IfNode, config: InterpConfig) -> Traces:
     logging.debug("collected test_cmds: %s", test_cmds)
     logging.debug("Checking constant test cond")
     if len(test_cmds) == 0:
-        logging.warning("Failed to collect any test commands? Giving up on constant condition check.")
+        logging.debug("Failed to collect any test commands? Giving up on constant condition check.")
         test_result = None
     else:
         logging.debug("Checking if test command %s is constant true/false", test_cmds[-1])
@@ -2386,7 +2386,7 @@ def handle_xargs(traces: Traces, node: AST.CommandNode, expanded_args: list[Fiel
             t2 = handle_commandnode(t1, mangled_cmdnode, config)
             return t2
         case _:
-            logging.warning("Ignoring unsupported xargs invocation: %s", node.pretty())
+            logging.debug("Ignoring unsupported xargs invocation: %s", node.pretty())
             return traces
 
 
@@ -2589,7 +2589,7 @@ def handle_file_redir_node(traces: Traces, node: AST.FileRedirNode, config: Inte
             case [Field(CompletelyArbitrary(), _)]:
                 pass
             case _:
-                logging.warning("Found a redir to multiple words: %s - Ignoring.", trim_string_for_logging(str(redir_args)))
+                logging.debug("Found a redir to multiple words: %s - Ignoring.", trim_string_for_logging(str(redir_args)))
                 pass
     return res
 
