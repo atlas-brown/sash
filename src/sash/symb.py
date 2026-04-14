@@ -1021,6 +1021,36 @@ def expand_to_word_simple(stuff: list[AST.ArgChar],
                         elif var_node.fmt in {"Length", "TrimR", "TrimRMax", "TrimL", "TrimLMax"}:
                             definitely_empty = word_is_definitely_empty(value)
                             definitely_non_empty = word_is_definitely_non_empty(value)
+                            value_field = presplit_to_field(value) if isinstance(value, PreSplitWord) else value
+
+                            def add_symbolic_trim_result(partial: 'Partial', min_words: int) -> None:
+                                out_field = arbitrary_field(
+                                    var_node,
+                                    ArbitraryType.APPROXIMATION,
+                                    partial.state,
+                                    min_words=min_words,
+                                )
+                                pattern = _literal_argchars(var_node.arg)
+                                relation: Constraint | None = None
+                                slash_field = Field.create_constant("/")
+                                if pattern == "/" and var_node.fmt == "TrimR":
+                                    relation = Or(
+                                        StringEq(value_field, out_field),
+                                        StringEq(value_field, add_suffix(out_field, slash_field)),
+                                    )
+                                elif pattern == "/" and var_node.fmt == "TrimL":
+                                    relation = Or(
+                                        StringEq(value_field, out_field),
+                                        StringEq(value_field, add_prefix(out_field, slash_field)),
+                                    )
+                                if relation is not None:
+                                    partial.state = partial.state.add_pathcond(
+                                        relation,
+                                        source_str=f"trim relation for {var_node.pretty()}",
+                                        source_line=symb_module.context_line,
+                                    )
+                                partial.add_word(word_from_field(out_field, partial.quoted, partial.state))
+
                             if definitely_empty:
                                 if var_node.fmt == "Length":
                                     self.add_expanded("0", WordCount(1, 1))
@@ -1049,8 +1079,34 @@ def expand_to_word_simple(stuff: list[AST.ArgChar],
                                         else:
                                             self.add_expanded(trimmed, WordCount(1, 1))
                                     else:
+                                        supports_empty_refinement = (
+                                            pattern in {"/", "/*"}
+                                            and var_node.fmt in {"TrimR", "TrimL"}
+                                        )
+                                        if supports_empty_refinement and not definitely_non_empty:
+                                            empty_field = Field(SymStr(("",)), WordCount(0, 0))
+                                            empty_constraint = StringEq(value_field, empty_field)
+                                            empty_case = self.fork_state(
+                                                self.state.add_pathcond(
+                                                    empty_constraint,
+                                                    source_str=f"trim empty case for {var_node.pretty()}",
+                                                    source_line=symb_module.context_line,
+                                                )
+                                            )
+                                            empty_case.add_word(empty_word(empty_case.quoted))
+
+                                            non_empty_case = self.fork_state(
+                                                self.state.add_pathcond(
+                                                    Not(empty_constraint),
+                                                    source_str=f"trim non-empty case for {var_node.pretty()}",
+                                                    source_line=symb_module.context_line,
+                                                )
+                                            )
+                                            add_symbolic_trim_result(non_empty_case, 1)
+                                            return [non_empty_case, empty_case]
+
                                         min_words = 1 if definitely_non_empty else 0
-                                        self.add_word(arbitrary_word(var_node, ArbitraryType.APPROXIMATION, self.state, min_words=min_words, quoted=self.quoted))
+                                        add_symbolic_trim_result(self, min_words)
                         elif var_node.fmt == "Assign":
                             if not var_node.null:
                                 add_value_word(value)
@@ -1719,6 +1775,14 @@ def handle_rm(expanded_args: tuple[Field, ...], trace: Trace, node: AST.CommandN
             return None
         return len(target_parts) - len(base_parts)
 
+    def normalize_path_field(path_field: Field) -> Field:
+        normalized = path_field
+        while True:
+            next_path = normalized.try_without_trailing_slash()
+            if next_path == normalized:
+                return normalized
+            normalized = next_path
+
     def home_depth(pwd: Field, home: Field) -> int | None:
         pwd_str = pwd.try_to_str()
         home_str = home.try_to_str()
@@ -1772,8 +1836,10 @@ def handle_rm(expanded_args: tuple[Field, ...], trace: Trace, node: AST.CommandN
 
     if non_flag_args:
         if pwdval is not None: # Can be empty if the script unsets it
-            trace = trace.extend(lambda s: s.add_assertion(SimpleConstraint(And.from_field_iter(non_flag_args,
-                                                                                                lambda arg_field: Not(StringEq(arg_field, pwdval.as_field()))),
+            normalized_pwd = normalize_path_field(pwdval.as_field())
+            normalized_args = tuple(normalize_path_field(arg_field) for arg_field in non_flag_args)
+            trace = trace.extend(lambda s: s.add_assertion(SimpleConstraint(And.from_field_iter(normalized_args,
+                                                                                                lambda arg_field: Not(StringEq(arg_field, normalized_pwd))),
                                                                             lambda line: reporter.DeleteSystemFile("PWD", line)),
                                                         node.pretty(),
                                                         context_line, priority=10, include_fs=False))
