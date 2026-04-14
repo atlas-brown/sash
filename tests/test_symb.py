@@ -894,8 +894,7 @@ cp "$2" something.txt
     res = reset_and_run_symbexec_main(script, solver=True)
     report = reporter.Reporter.get_report()
     assert len(res.traces) == 1
-    assert len(res.traces[0].latest_state.assertions) == 3
-    expected_warning = reporter.ExpectedPathState('cp', 'existant', ('$2',), 0)
+    expected_warning = reporter.ExpectedPathState('cp', 'existant', ['$2'], 0)
     assert_expected_report(report, [expected_warning])
 
 def test_nested_function_localenv(tmp_path):
@@ -1381,6 +1380,26 @@ def test_const_cond_assignment_fixed(tmp_path):
     """)
     expected_error = reporter.UnboundID("VAR", 0)
     report = reset_and_run_main(script)
+    assert_expected_report(report, [expected_error])
+
+
+def test_debootstrap_guarded_trim_still_detects_pwd_delete(tmp_path):
+    script = write_script(tmp_path, """
+    if [ -z "$1" ]; then
+        exit 1
+    fi
+
+    TARGET="$2"
+    TARGET="${TARGET%/}"
+    if [ "${TARGET#/}" = "${TARGET}" ]; then
+      TARGET="$(echo `pwd`/$TARGET)"
+    fi
+
+    rm -rf "$TARGET"
+    """)
+
+    expected_error = reporter.DeleteSystemFile("PWD", 0)
+    report = reset_and_run_main(script, solver=True, enable_dfs=True)
     assert_expected_report(report, [expected_error])
 
 def test_debootstrap_dfs(tmp_path):

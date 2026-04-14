@@ -537,6 +537,24 @@ def test_expand_to_word_simple_trim_arbitrary_value(fmt, config):
     )
 
 
+@pytest.mark.parametrize(
+    "fmt,arg_text",
+    [
+        ("TrimR", "/"),
+        ("TrimL", "/"),
+        ("TrimR", "/*"),
+    ],
+)
+def test_expand_to_word_simple_trim_symbolic_slash_adds_path_constraints(
+    fmt, arg_text, config
+):
+    state = make_state(env={"A": stored_arbitrary("A", 0, math.inf)})
+    argchars = param("A", fmt=fmt, null=False, arg_text=arg_text)
+    expansions = expand_to_word_simple(argchars, state, config)
+    assert len(expansions) >= 1
+    assert any(len(next_state.pathcond) >= 1 for _, next_state in expansions)
+
+
 def test_expand_to_word_simple_minus_default_rhs_arbitrary(config):
     state = make_state(env={"B": stored_arbitrary("B", 0, math.inf)})
     argchars = var("A", fmt="Minus", null=True, arg=var("B"))
