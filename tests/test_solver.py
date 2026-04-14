@@ -3,7 +3,7 @@ Tests for SMT solver integration.
 """
 import z3
 from sash.fs import FSModel, FSModelSimple
-from sash.symbolic.strings import ArbitraryType, CompletelyArbitrary, Field, WordCount
+from sash.symbolic.strings import ArbitraryType, CompletelyArbitrary, Field, WordCount, presplit_from_field
 from util import *
 
 import sash.reporter as reporter
@@ -32,12 +32,16 @@ def assert_equiv_formulas(f1, f2):
 
 def make_env_constraints_z3(s, env_constraints):
     default_env_constraints = {
-        name: field_content_to_z3(shellvar.value.content)
+        name: field_content_to_z3(shellvar.as_field().content)
         for name, shellvar in s.env.items()
         if name in {"HOME", "PWD", "OLDPWD", "PATH", "PWD_INIT"}
     }
     parts = [z3var(name) == z3expr for name, z3expr in (env_constraints | default_env_constraints).items()]
     return z3.And(*parts)
+
+
+def shellvar_from_field(field: Field) -> ShellVar:
+    return ShellVar(presplit_from_field(field))
 
 def assert_equiv_fs_states(f1, f2, f1_starting_fs_id, f2_starting_fs_id):
     s = z3.Solver()
@@ -52,8 +56,8 @@ def test_state_to_z3():
 
     state = starting_state(FSModel())
     arb = Field(CompletelyArbitrary(None, ArbitraryType.ENVIRONMENT, state), WordCount(0, float('inf')))
-    s = state.set_env("A", ShellVar(Field.create_constant("value1")))\
-        .set_env("B", ShellVar(arb))\
+    s = state.set_env("A", shellvar_from_field(Field.create_constant("value1")))\
+        .set_env("B", shellvar_from_field(arb))\
         .add_pathcond(StringEq(arb, Field.create_constant("")))
 
     arbz3var = field_content_to_z3(arb.content)
@@ -76,9 +80,9 @@ def test_state_to_z3_more_stuff():
     state = starting_state(FSModel())
     arb = Field(CompletelyArbitrary(None, ArbitraryType.ENVIRONMENT, state), WordCount(0, float('inf')))
     arb2 = Field(CompletelyArbitrary(None, ArbitraryType.ENVIRONMENT, state), WordCount(0, float('inf')))
-    s = state.set_env("A", ShellVar(Field.create_constant("value1")))\
-        .set_env("B", ShellVar(arb))\
-        .set_env("1", ShellVar(arb2))\
+    s = state.set_env("A", shellvar_from_field(Field.create_constant("value1")))\
+        .set_env("B", shellvar_from_field(arb))\
+        .set_env("1", shellvar_from_field(arb2))\
         .add_pathcond(StringEq(arb, Field.create_constant("")))\
         .add_pathcond(StringEq(arb2, arb))
 
@@ -102,8 +106,8 @@ def test_state_to_z3_local_vars():
 
     state = starting_state(FSModel())
     arb = Field(CompletelyArbitrary(None, ArbitraryType.ENVIRONMENT, state), WordCount(0, float('inf')))
-    s = state.set_env("A", ShellVar(Field.create_constant("value1")))\
-        .extend_localenv({"A": ShellVar(arb)})\
+    s = state.set_env("A", shellvar_from_field(Field.create_constant("value1")))\
+        .extend_localenv({"A": shellvar_from_field(arb)})\
         .add_pathcond(StringEq(arb, Field.create_constant("")))
 
     arbz3var = field_content_to_z3(arb.content)
@@ -124,7 +128,7 @@ def test_state_to_z3_fs_simple():
     reset_z3cache()
 
     state = starting_state(FSModelSimple(lambda f: field_content_to_z3(f.content)))
-    s = state.set_env("A", ShellVar(Field.create_constant("value1")))\
+    s = state.set_env("A", shellvar_from_field(Field.create_constant("value1")))\
         .update_fs(IsDeleted(Field.create_constant("somefile.txt")))
 
     fs_formula = z3_fs_var(1) == z3.Store(z3_fs_var(0), z3.StringVal("somefile.txt"), FileInfo.mk_pair(Del, Unread))
@@ -143,7 +147,7 @@ def test_state_to_z3_fs_more():
     reset_z3cache()
 
     state = starting_state(FSModelSimple(lambda f: field_content_to_z3(f.content)))
-    s = state.set_env("A", ShellVar(Field.create_constant("value1")))\
+    s = state.set_env("A", shellvar_from_field(Field.create_constant("value1")))\
         .update_fs(IsDeleted(Field.create_constant("somefile.txt")))\
         .update_fs(IsFile(Field.create_constant("somefile.txt")))\
         .update_fs(IsRead(Field.create_constant("somefile.txt")))
@@ -170,7 +174,7 @@ def test_state_to_z3_intermediate_fs_state_pathcond():
     reset_z3cache()
 
     state = starting_state(FSModelSimple(lambda f: field_content_to_z3(f.content)))
-    s = state.set_env("A", ShellVar(Field.create_constant("value1")))\
+    s = state.set_env("A", shellvar_from_field(Field.create_constant("value1")))\
         .update_fs(IsDeleted(Field.create_constant("somefile.txt")))\
         .add_pathcond(IsDeleted(Field.create_constant("somefile.txt")))\
         .update_fs(IsFile(Field.create_constant("somefile.txt")))\

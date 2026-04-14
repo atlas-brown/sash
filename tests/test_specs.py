@@ -43,7 +43,7 @@ def sanity_check_spec_constraints(cmd_name: str, cmd_spec: specs.CmdSpec):
     fs_model.apply_postcondition(cmd_spec.failure_postcond.normalized())
 
     if cmd_spec.check:
-        _, state_formula, full_check_formula, refinements = assertion_to_z3(Assertion(
+        state_formula, full_check_formula, refinements = assertion_to_z3(Assertion(
             producing_state=State(fs_model=fs_model),
             constraint=cmd_spec.check,
             source_str="",
