@@ -73,11 +73,29 @@ def create_symstr(val: str) -> sash.symbolic.strings.SymStr:
 def reset_and_run_main(script: str, solver: bool = False, enable_dfs: bool = False) -> reporter.Report:
     """Helper to reset the reporter and run the main analysis on a script."""
     reporter.Reporter.reset()
-    report = main.main(script, solver=solver, enable_dfs=enable_dfs)
+    report = main.main(
+        file=Path(script),
+        disable_targeted_dfs=not enable_dfs,
+        disable_unbound_as_empty_dfs=not enable_dfs,
+        disable_solver=not solver,
+    )
     return report
 
 def reset_and_run_symbexec_main(script: str, solver: bool = False, enable_dfs: bool = False) -> symb.SymbexecResult:
     """Helper to reset the reporter and run only the symbolic execution on a script."""
     reporter.Reporter.reset()
-    symr = main.symbexec_main(script, solver=solver, enable_dfs=enable_dfs)
+    symr = main.symbexec_main(
+        file=script,
+        timeout=60.0,
+        exec_timeout_pct=1/2,
+        dfs_timeout_pct=2/3,
+        targeted_dfs_timeout_pct=1/1,
+        disable_optimistic_forking=False,
+        disable_trace_collapsing=False,
+        disable_targeted_dfs=not enable_dfs,
+        disable_unbound_as_empty_dfs=not enable_dfs,
+        disable_solver=not solver,
+        disable_solver_optimizations=False,
+        collect_debug_info=False,
+    )
     return symr

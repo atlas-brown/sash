@@ -810,7 +810,15 @@ rm -rf /usr
     reporter.Reporter.reset()
     reporter.Reporter.initialize(script)
     config = symb.InterpConfig(unbound_policy=symb.UnboundVariablePolicy.EMPTY, DFS_first=False)
-    res = symb.symbexec_file(script, config, stop=None)
+    res = symb.symbexec_file(
+        file=script,
+        exec_timeout=60.0,
+        dfs_timeout=0.0,
+        targeted_dfs_timeout=0.0,
+        enable_unbound_empty_dfs=False,
+        config=config,
+        stop=None,
+    )
     assert res.status == symb.SymbexecStatus.COMPLETED
     report = reporter.Reporter.get_report()
     expected_error = reporter.DeadCode(None, 0)

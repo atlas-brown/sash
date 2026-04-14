@@ -54,7 +54,7 @@ def test_quote():
     assert quoted.count == WordCount(1, 1)
     assert quoted.content.quoted is True
     quoted = Field(arb, WordCount(0, 0)).quote()
-    assert quoted.count == WordCount(0, 0)
+    assert quoted.count == WordCount(1, 1)
     assert quoted.content.quoted is True
 
 
