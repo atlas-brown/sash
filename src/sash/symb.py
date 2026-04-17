@@ -1030,25 +1030,6 @@ def expand_to_word_simple(stuff: list[AST.ArgChar],
                                     partial.state,
                                     min_words=min_words,
                                 )
-                                pattern = _literal_argchars(var_node.arg)
-                                relation: Constraint | None = None
-                                slash_field = Field.create_constant("/")
-                                if pattern == "/" and var_node.fmt == "TrimR":
-                                    relation = Or(
-                                        StringEq(value_field, out_field),
-                                        StringEq(value_field, add_suffix(out_field, slash_field)),
-                                    )
-                                elif pattern == "/" and var_node.fmt == "TrimL":
-                                    relation = Or(
-                                        StringEq(value_field, out_field),
-                                        StringEq(value_field, add_prefix(out_field, slash_field)),
-                                    )
-                                if relation is not None:
-                                    partial.state = partial.state.add_pathcond(
-                                        relation,
-                                        source_str=f"trim relation for {var_node.pretty()}",
-                                        source_line=symb_module.context_line,
-                                    )
                                 partial.add_word(word_from_field(out_field, partial.quoted, partial.state))
 
                             if definitely_empty:
@@ -3219,10 +3200,10 @@ def symbexec_file(file: str,
 
         traces = symb_engine(nodes, replace(config, branch_policy=branch_policy_half_n_half_if_too_many))
         print(f"Symbolic execution completed with {len(traces)} and {len(dfs_solver_traces)} DFS solver traces and {len(dfs_fallback_traces)} DFS fallback traces")
-        traces = traces + dfs_solver_traces
+        traces = dfs_solver_traces + traces
         if Reporter.get_timed_out():
             print("Using fallback DFS traces due to timeout in main symbolic execution")
-            traces = traces + dfs_fallback_traces
+            traces = dfs_fallback_traces + traces
         traces, _ = collapse_traces(traces)
         if Reporter.get_timed_out():
             return SymbexecResult(SymbexecStatus.INTERRUPTED, traces)
