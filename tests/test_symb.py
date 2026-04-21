@@ -433,6 +433,51 @@ myfunc /usr
     expected_error = reporter.DeleteSystemFile("/usr", 0)
     assert_expected_report(report, [expected_error])
 
+def test_ignored_function_call_matches_unknown_command_outside_checked_position(tmp_path):
+    script = write_script(tmp_path, """
+f() {
+    :
+}
+false
+f && rm /usr
+""")
+    reporter.Reporter.reset()
+    reporter.Reporter.initialize(script)
+    config = symb.InterpConfig(ignore_function_calls_for=frozenset({"f"}))
+    _ = symb.symbexec_file(
+        file=script,
+        exec_timeout=60.0,
+        dfs_timeout=0.0,
+        targeted_dfs_timeout=0.0,
+        enable_unbound_empty_dfs=False,
+        config=config,
+        stop=None,
+    )
+    report = reporter.Reporter.get_report()
+    expected_error = reporter.DeleteSystemFile("/usr", 0)
+    assert_expected_report(report, [expected_error])
+
+def test_if_branch_policy_pre_runs_selected_branch_without_filtering_condition_traces(tmp_path):
+    script = write_script(tmp_path, """
+if maybecmd; then
+    maybecmd
+fi
+""")
+    reporter.Reporter.reset()
+    reporter.Reporter.initialize(script)
+    config = symb.InterpConfig(branch_policy_pre=lambda _: symb.BranchSelection(symb.BranchDecision.FIRST))
+    res = symb.symbexec_file(
+        file=script,
+        exec_timeout=60.0,
+        dfs_timeout=0.0,
+        targeted_dfs_timeout=0.0,
+        enable_unbound_empty_dfs=False,
+        config=config,
+        stop=None,
+    )
+    exit_codes = {trace.latest_state.last_exit_code[0].try_to_str() for trace in res.traces}
+    assert exit_codes == {"0", "1"}
+
 def test_case(tmp_path):
     # A case statement should handle all branches correctly
     script = write_script(tmp_path, """
@@ -894,11 +939,11 @@ cp "$2" something.txt
     res = reset_and_run_symbexec_main(script, solver=True)
     report = reporter.Reporter.get_report()
     assert len(res.traces) == 1
-    expected_warning = reporter.ExpectedPathState('cp', 'existant', ['$2'], 0)
+    expected_warning = reporter.ExpectedPathState('cp', 'existant', ('$2',), 0)
     assert_expected_report(report, [expected_warning])
 
 def test_nested_function_localenv(tmp_path):
-    # A function that is called should not produce unbound variable errors for its parameters
+    # Nested function calls should restore positional parameters for the caller.
     script = write_script(tmp_path, """
 f1() {
     f2 ok
@@ -910,7 +955,21 @@ f2() {
 f1 /usr
 """)
     report = reset_and_run_main(script)
-    assert_expected_report(report, [])
+    expected_error = reporter.DeleteSystemFile("/usr", 0)
+    assert_expected_report(report, [expected_error])
+
+def test_function_call_pops_localenv_after_return(tmp_path):
+    script = write_script(tmp_path, """
+f() {
+    echo "$FOO"
+    echo "$1"
+}
+f hello
+echo "$FOO"
+""")
+    res = reset_and_run_symbexec_main(script)
+    assert all("1" not in trace.latest_state.localenv for trace in res.traces)
+    assert all("FOO" in trace.latest_state.localenv for trace in res.traces)
 
 def test_pathcond_and_precond(tmp_path):
     # Path conditions should be used to reason about preconditions

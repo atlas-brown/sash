@@ -35,7 +35,7 @@ import sash.util as util
 from sash.config import Config # TODO: refactor to delete sash.config, move all needed stuff to InterpConfig
 from sash.constraints import *
 from sash.frozen import FrozenAst, FrozenDict, freeze, freeze_thing
-from sash.interpreter_config import BranchDecision, InterpConfig, UnboundVariablePolicy
+from sash.interpreter_config import BranchDecision, BranchSelection, InterpConfig, UnboundVariablePolicy
 from sash.reporter import Reporter
 from sash.solver import field_to_z3
 from sash.specs import get_spec, CmdSpec
@@ -2074,13 +2074,13 @@ def handle_while(traces: Traces,
     t1 = guarded_interp_node(traces, node.test, temp_config)
     logging.debug("collected test_cmds: %s", test_cmds)
     if config.branch_policy_pre is not None:
-        decision = config.branch_policy_pre(node)
+        selection = config.branch_policy_pre(node)
         t_true = [t for t in t1 if t.latest_state.last_exit_code[0] == SymStr(("0",))]
         t_false = [t for t in t1 if t.latest_state.last_exit_code[0] == SymStr(("1",))]
         t_other = [t for t in t1 if t.latest_state.last_exit_code[0] not in {SymStr(("0",)), SymStr(("1",))}]
         t_true = t_true + trace_map(t_other, lambda s: s.set_last_exit_code(SymStr(("0",)), Confidence.SPECULATIVE))
         t_false = t_false + trace_map(t_other, lambda s: s.set_last_exit_code(SymStr(("1",)), Confidence.SPECULATIVE))
-        if decision == BranchDecision.FIRST:
+        if selection.decision == BranchDecision.FIRST:
             logging.debug("While loop single-path decision: take body once")
             t_body = guarded_interp_node(t_true, node.body, config)
             t_body, broken = consume_break_traces(t_body)
@@ -2323,11 +2323,11 @@ def handle_if(traces: Traces, node: AST.IfNode, config: InterpConfig) -> Traces:
             return t1
     else:
         if config.branch_policy_pre is not None:
-            decision = config.branch_policy_pre(node)
-            logging.debug("If statement single-path decision: %s", decision)
-            if decision == BranchDecision.FIRST:
+            selection = config.branch_policy_pre(node)
+            logging.debug("If statement single-path decision: %s", selection)
+            if selection.decision == BranchDecision.FIRST:
                 return guarded_interp_node(t1, node.then_b, config)
-            if decision == BranchDecision.SECOND:
+            if selection.decision == BranchDecision.SECOND:
                 if node.else_b is not None:
                     return guarded_interp_node(t1, node.else_b, config)
                 return t1
@@ -2481,8 +2481,22 @@ def handle_eval(traces: Traces,
 
 def handle_case(traces: Traces, node: AST.CaseNode, config: InterpConfig) -> Traces:
     t1, case_arg_fields = expand_args_dumb(traces, [node.argument], config)
+
+    cases_to_run = list(node.cases)
+    # if config.branch_policy_pre is not None:
+    #     selection = config.branch_policy_pre(node)
+    #     if selection.case_index is not None:
+    #         if 0 <= selection.case_index < len(node.cases):
+    #             cases_to_run = [node.cases[selection.case_index]]
+    #         else:
+    #             cases_to_run = []
+    #     elif selection.decision == BranchDecision.FIRST:
+    #         cases_to_run = node.cases[:1]
+    #     elif selection.decision == BranchDecision.SECOND:
+    #         cases_to_run = node.cases[1:2]
+
     res = []
-    for case in node.cases:
+    for case in cases_to_run:
         logging.debug("FORK: explicit case")
         # todo handle patterns; this is like a conditional, we could learn something about pathcond here
         res.extend(guarded_interp_node(trace_map(t1, lambda s: s.add_pathcond(Description(f"case_L{context_line}_pattern_{case['cpattern']}:matched"))),

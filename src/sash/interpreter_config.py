@@ -16,8 +16,30 @@ class BranchDecision(Enum):
     FIRST = 1
     SECOND = 2
 
+
+@dataclass(frozen=True)
+class BranchSelection:
+    decision: BranchDecision
+    case_index: int | None = None
+
+
+def select_all() -> BranchSelection:
+    return BranchSelection(BranchDecision.ALL)
+
+
+def select_first() -> BranchSelection:
+    return BranchSelection(BranchDecision.FIRST)
+
+
+def select_second() -> BranchSelection:
+    return BranchSelection(BranchDecision.SECOND)
+
+
+def select_case_index(index: int) -> BranchSelection:
+    return BranchSelection(BranchDecision.FIRST, case_index=index)
+
 BranchPolicy = Callable[[AST.AstNode, Traces, Traces], tuple[Traces, Traces]]
-BranchPolicyPre = Callable[[AST.AstNode], BranchDecision] # This decides which branches to take before evaluating them
+BranchPolicyPre = Callable[[AST.AstNode], BranchSelection] # This decides which branches to take before evaluating them
 
 class UnboundVariablePolicy(Enum):
     EMPTY = 0

@@ -7,7 +7,15 @@ import shasta.ast_node as AST
 from sash.frozen import FrozenDict
 from sash.parser import WrappedAst
 import sash.util as util
-from sash.interpreter_config import BranchDecision, InterpConfig, UnboundVariablePolicy
+from sash.interpreter_config import (
+    BranchSelection,
+    InterpConfig,
+    UnboundVariablePolicy,
+    select_all,
+    select_case_index,
+    select_first,
+    select_second,
+)
 from sash.specs import CMD_SPECS
 from sash.symbolic.state import Trace, Traces
 
@@ -116,42 +124,54 @@ def run_targeted_dfs(nodes: list[WrappedAst],
                         lines.add(cmd.line_number)
         return sorted(lines)
 
-    def branch_policy_pre_prefer_spec(node: AST.AstNode) -> BranchDecision:
+    def branch_policy_pre_prefer_spec(node: AST.AstNode) -> BranchSelection:
         logging.debug("Evaluating branch policy for node %s at line %d", node.pretty(), getattr(node, 'line_number', -1))
         if isinstance(node, AST.IfNode):
             then_score = count_spec_cmds(node.then_b)
             else_score = count_spec_cmds(node.else_b) if node.else_b is not None else 0
             logging.debug("IfNode at line %d: then_score=%d, else_score=%d", getattr(node, 'line_number', -1), then_score, else_score)
             if then_score == 0 and else_score == 0:
-                return BranchDecision.ALL
-            return BranchDecision.FIRST if then_score > else_score else BranchDecision.SECOND
+                return select_all()
+            return select_first() if then_score > else_score else select_second()
         if isinstance(node, AST.AndNode) or isinstance(node, AST.OrNode):
-            return BranchDecision.ALL
+            return select_all()
         if isinstance(node, AST.WhileNode):
             body_score = count_spec_cmds(node.body)
-            return BranchDecision.FIRST if body_score > 0 else BranchDecision.SECOND
-        return BranchDecision.FIRST
+            return select_first() if body_score > 0 else select_second()
+        if isinstance(node, AST.CaseNode):
+            case_scores = [count_spec_cmds(case["cbody"]) if case["cbody"] is not None else 0 for case in node.cases]
+            if not case_scores:
+                return select_all()
+            best_idx = max(range(len(case_scores)), key=lambda i: case_scores[i])
+            return select_case_index(best_idx)
+        return select_first()
 
     dangerous_lines = find_dangerous_lines()
     logging.info("Dangerous lines: %s", dangerous_lines)
     all_traces: list[Trace] = []
     for target_line in dangerous_lines:
-        def branch_policy_pre_for_target(node: AST.AstNode) -> BranchDecision | None:
+        def branch_policy_pre_for_target(node: AST.AstNode) -> BranchSelection | None:
             if isinstance(node, AST.IfNode):
                 then_score = count_spec_cmds(node.then_b)
                 else_score = count_spec_cmds(node.else_b) if node.else_b is not None else 0
                 logging.debug("IfNode at line %d: then_score=%d, else_score=%d", getattr(node, 'line_number', -1), then_score, else_score)
                 if then_score == 0 and else_score == 0:
                     return None
-                return BranchDecision.FIRST if then_score >= else_score else BranchDecision.SECOND
+                return select_first() if then_score >= else_score else select_second()
             if isinstance(node, AST.AndNode) or isinstance(node, AST.OrNode):
-                return BranchDecision.ALL
+                return select_all()
             if isinstance(node, AST.WhileNode):
                 body_score = count_spec_cmds(node.body)
-                return BranchDecision.FIRST if body_score > 0 else None
+                return select_first() if body_score > 0 else None
+            if isinstance(node, AST.CaseNode):
+                case_scores = [count_spec_cmds(case["cbody"]) if case["cbody"] is not None else 0 for case in node.cases]
+                if not case_scores:
+                    return None
+                best_idx = max(range(len(case_scores)), key=lambda i: case_scores[i])
+                return select_case_index(best_idx)
             return None
 
-        def branch_policy_pre_target(node: AST.AstNode) -> BranchDecision:
+        def branch_policy_pre_target(node: AST.AstNode) -> BranchSelection:
             decision = branch_policy_pre_for_target(node)
             logging.debug("Branch policy for node at line %d: %s", getattr(node, 'line_number', -1), decision)
             decision = decision if decision is not None else branch_policy_pre_prefer_spec(node)
