@@ -106,6 +106,7 @@ class State:
     pathcond:                    tuple[Condition, ...]       = field(default_factory=tuple)
     env:                         FrozenDict[str, ShellVar]   = field(default_factory=FrozenDict)
     localenv:                    FrozenDict[str, ShellVar]   = field(default_factory=FrozenDict)
+    localenv_stack:              tuple[FrozenDict[str, ShellVar], ...] = field(default_factory=tuple)
     call_stack:                  tuple[str, ...]             = field(default_factory=tuple)
     fundefs:                     FrozenDict[str, FrozenAst]  = field(default_factory=FrozenDict)
     last_exit_code:              tuple[SymStr, Confidence]   = (SymStr(("0",)), Confidence.DEFINITE)
@@ -255,8 +256,18 @@ class State:
 
         return updated_state
 
-    def enter_function(self, name: str) -> 'State':
-        return replace(self, call_stack=self.call_stack + (name,))
+    def enter_function(self, name: str, local_bindings: dict[str, ShellVar] | None = None) -> 'State':
+        # Function calls only shadow positional/special parameters. Keep all other
+        # localenv bindings live across calls because `local` variables are not modeled.
+        saved_special = FrozenDict({k: v for k, v in self.localenv.items() if is_special_var(k)})
+        retained_non_special = FrozenDict({k: v for k, v in self.localenv.items() if not is_special_var(k)})
+        updated_localenv = retained_non_special if local_bindings is None else (retained_non_special | local_bindings)
+        return replace(
+            self,
+            call_stack=self.call_stack + (name,),
+            localenv_stack=self.localenv_stack + (saved_special,),
+            localenv=updated_localenv,
+        )
 
     def is_in_function(self) -> bool:
         return len(self.call_stack) > 0
@@ -278,7 +289,15 @@ class State:
 
     def exit_function(self) -> 'State':
         assert len(self.call_stack) > 0, "Tried to exit function when not in function"
-        return replace(self, call_stack=self.call_stack[:-1])
+        assert len(self.localenv_stack) > 0, "Tried to restore localenv without a saved function frame"
+        saved_special = self.localenv_stack[-1]
+        current_non_special = FrozenDict({k: v for k, v in self.localenv.items() if not is_special_var(k)})
+        return replace(
+            self,
+            call_stack=self.call_stack[:-1],
+            localenv=(current_non_special | saved_special),
+            localenv_stack=self.localenv_stack[:-1],
+        )
 
 def is_special_var(name: str) -> bool:
     return name.isdecimal() or name in ["@", "#"]

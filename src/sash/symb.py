@@ -2050,9 +2050,8 @@ def handle_function_call(name: str,
         if name in t.latest_state.call_stack:
             logging.error("Found recursive function definition! %s via %s", name, t.latest_state.call_stack)
             return traces
-        t1.append(t.extend(lambda s: s.enter_function(name).extend_localenv(localenv)))
+        t1.append(t.extend(lambda s: s.enter_function(name, localenv)))
     call_result_traces = guarded_interp_node(t1, func_node.body, config)
-    # TODO: should actually pop the localenv as well! need a stack of localenvs...
     return [t.extend(lambda s: s.set_returning(False).exit_function()) for t in call_result_traces]
 
 
