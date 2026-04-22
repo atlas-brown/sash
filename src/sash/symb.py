@@ -1989,6 +1989,11 @@ def handle_function_call_or_unknown(func_name: str,
             return handle_unknown_command(func_name, arg_fields, traces, config)
         else:
             if config.ignore_function_calls or func_name in config.ignore_function_calls_for:
+                if config.in_checked_position or config.force_fork_all:
+                    t_success = trace_map(traces, lambda s: s.set_last_exit_code(SymStr(("0",)), Confidence.SPECULATIVE))
+                    t_failure = trace_map(traces, lambda s: s.set_last_exit_code(SymStr(("1",)), Confidence.SPECULATIVE))
+                    return t_success + t_failure
+
                 logging.debug("Ignoring function call to %s (configured as no-op)", func_name)
                 return traces
             the_func = func_defs.pop()
@@ -2028,6 +2033,11 @@ def handle_function_call(name: str,
                          traces: Traces,
                          config: InterpConfig) -> Traces:
     if config.ignore_function_calls or name in config.ignore_function_calls_for:
+        if config.in_checked_position or config.force_fork_all:
+            t_success = trace_map(traces, lambda s: s.set_last_exit_code(SymStr(("0",)), Confidence.SPECULATIVE))
+            t_failure = trace_map(traces, lambda s: s.set_last_exit_code(SymStr(("1",)), Confidence.SPECULATIVE))
+            return t_success + t_failure
+
         logging.debug("Ignoring function call to %s (configured as no-op)", name)
         return traces
     if logging.getLogger().isEnabledFor(logging.DEBUG):
