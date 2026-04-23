@@ -144,6 +144,8 @@ class Field:
         elif isinstance(self.content, CompletelyArbitrary) and self.content.suffix:
             new_suf = self.content.suffix.try_without_trailing_slash()
             if self.content.suffix != new_suf:
+                if new_suf.try_to_str() == "":
+                    new_suf = None
                 new_content = replace(self.content, suffix=new_suf)
                 return replace(self, content=new_content)
 
