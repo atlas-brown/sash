@@ -368,9 +368,7 @@ def _maybe_report_inconsistent_ifs(traces: Traces, config: InterpConfig) -> None
             concrete_values.append(ifs_value)
     unique_values = sorted(set(concrete_values))
     if len(unique_values) > 1:
-        from sash import symb as symb_module
-
-        Reporter.add_issue(reporter.InconsistentIFS(unique_values, symb_module.context_line), config)
+        Reporter.add_issue(reporter.InconsistentIFS(unique_values, context_line), config)
 
 
 # Symbolic expander design overview:
@@ -565,8 +563,6 @@ def expand_to_word_simple(stuff: list[AST.ArgChar],
     Walks the AST, resolves parameter/command expansions, and preserves quotes.
     Returns all possible expansions as intermediate PreSplitWords.
     """
-    from sash import symb as symb_module
-
     def field_core_key(field: Field) -> CompletelyArbitrary | None:
         match field.content:
             case CompletelyArbitrary() as content:
@@ -1071,7 +1067,7 @@ def expand_to_word_simple(stuff: list[AST.ArgChar],
                                                 self.state.add_pathcond(
                                                     empty_constraint,
                                                     source_str=f"trim empty case for {var_node.pretty()}",
-                                                    source_line=symb_module.context_line,
+                                                    source_line=context_line,
                                                 )
                                             )
                                             empty_case.add_word(empty_word(empty_case.quoted))
@@ -1080,7 +1076,7 @@ def expand_to_word_simple(stuff: list[AST.ArgChar],
                                                 self.state.add_pathcond(
                                                     Not(empty_constraint),
                                                     source_str=f"trim non-empty case for {var_node.pretty()}",
-                                                    source_line=symb_module.context_line,
+                                                    source_line=context_line,
                                                 )
                                             )
                                             add_symbolic_trim_result(non_empty_case, 1)
@@ -1169,7 +1165,7 @@ def expand_to_word_simple(stuff: list[AST.ArgChar],
                     else:
                         if not is_special_var(var_node.var):
                             error_code = reporter.UnboundIDSetU if self.state.opts.is_set(SetOptions.NOUNSET) else reporter.UnboundID
-                            Reporter.add_issue(error_code(var_node.pretty(), symb_module.context_line), config)
+                            Reporter.add_issue(error_code(var_node.pretty(), context_line), config)
                         if config.unbound_policy == UnboundVariablePolicy.EMPTY:
                             empty_word_value = empty_word(self.quoted)
                             self.add_word(empty_word_value)
@@ -1191,13 +1187,13 @@ def expand_to_word_simple(stuff: list[AST.ArgChar],
                 case AST.BArgChar() as barg:
                     inner_cmds = []
                     temp_config = config.add_expanded_command_callback(lambda expanded: inner_cmds.append(expanded))
-                    _ = symb_module.guarded_interp_node([Trace((self.state,))], barg.node, temp_config)
+                    _ = guarded_interp_node([Trace((self.state,))], barg.node, temp_config)
                     output_word: PreSplitWord | None = None
                     if len(inner_cmds) != 0 and isinstance(barg.node, AST.CommandNode):
                         expanded_args = inner_cmds[-1]
                         if expanded_args and (cmd_name := expanded_args[0].try_to_str()):
                             spec = get_spec(cmd_name, tuple(expanded_args))
-                            output_field, new_state = symb_module.command_substitution_output(
+                            output_field, new_state = command_substitution_output(
                                 cmd_name,
                                 expanded_args[1:],
                                 barg,
