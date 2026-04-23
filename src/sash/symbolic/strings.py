@@ -130,6 +130,11 @@ class Field:
             case _:
                 return None
 
+    def try_to_int(self) -> int | None:
+        if (s := self.try_to_str()) and s.isdecimal():
+            return int(s)
+        return None
+
     def try_without_trailing_slash(self) -> "Field":
         if isinstance(self.content, SymStr):
             new_content = self.content.try_without_trailing_slash()
