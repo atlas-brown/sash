@@ -251,8 +251,8 @@ def command_substitution_output(cmd_name: str,
             return None, state
 
 
-def is_test(s):
-    return s in ["test", "["]
+def is_test(f: Field):
+    return isinstance(f.content, SymStr) and f.content.parts and f.content.parts[0] in ["test", "["]
 
 
 def is_constant_test(cmd1: list[Field], cmd2: list[Field]) -> bool:
@@ -260,8 +260,8 @@ def is_constant_test(cmd1: list[Field], cmd2: list[Field]) -> bool:
 
     if len(cmd1) < 1 or len(cmd2) < 1 or len(cmd1) != len(cmd2):
         return False
-    match (cmd1[0].content, cmd2[0].content):
-        case (SymStr([t1]), SymStr([t2])) if is_test(t1) and is_test(t2):
+    match (cmd1[0], cmd2[0]):
+        case f1_0, f2_0 if is_test(f1_0) and is_test(f2_0):
             # see CompletelyArbitrary __eq__, which makes this work
             return all(f1 == f2 for f1, f2 in zip(cmd1[1:], cmd2[1:]))
         case _:
@@ -2156,95 +2156,72 @@ def handle_while(traces: Traces,
 
 def interpret_test(cmd: list[Field]) -> bool | None:
     """Return true or false if `cmd` is a test that always returns either of the two results. Return None if unknown."""
-    if len(cmd) < 1:
-        return None
 
-    if not isinstance(cmd[0].content, SymStr):
-        return None
+    def definitely_empty(field: Field) -> bool:
+        return field.try_to_str() == ""
 
-    if not is_test(cmd[0].content.parts[0]):
+    def definitely_non_empty(field: Field) -> bool:
+        return (s := field.try_to_str()) is not None and s != ""
+
+    def definitely_not_equal(f1: Field, f2: Field) -> bool:
+        return (s1 := f1.try_to_str()) is not None and (s2 := f2.try_to_str()) is not None and s1 != s2
+
+    if not cmd or not is_test(cmd[0]):
         return None
 
     args = cmd[1:]
-    if cmd[-1].content == SymStr(("]",)):
+    if (cmd[0].content, cmd[-1].content) == (SymStr(("[",)), SymStr(("]",))):
         args = args[:-1]
-    if not len(args) in {2, 3}:
-        return None
 
-    def definitely_empty(field: Field) -> bool:
-        field_str = field.try_to_str()
-        if field_str is not None:
-            return field_str == ""
-        return field.count.max == 0
+    negated: bool = False
+    while args and args[0] == SymStr(("!",)):
+        negated ^= True
+        args = args[1:]
 
-    def definitely_non_empty(field: Field) -> bool:
-        field_str = field.try_to_str()
-        if field_str is not None:
-            return field_str != ""
-        return False
+    result: bool | None = None
+    match args:
+        # Empty test has exit code 1
+        case []: result = False
+        case [s]:
+            if definitely_non_empty(s): result = True
+            elif definitely_empty(s): result = False
+        case [op, s]:
+            match op.content:
+                case SymStr(("-n",)):
+                    if definitely_non_empty(s): result = True
+                    elif definitely_empty(s): result = False
+                case SymStr(("-z",)):
+                    if definitely_non_empty(s): result = False
+                    elif definitely_empty(s): result = True
+                case SymStr((op,)) if op in ("-f", "-d", "-e"):
+                    if definitely_empty(s): result = False
+        case [s1, op, s2]:
+            num_ops = {
+                "-eq": lambda a, b: a == b,
+                "-ne": lambda a, b: a != b,
+                "-lt": lambda a, b: a < b,
+                "-gt": lambda a, b: a > b,
+                "-le": lambda a, b: a <= b,
+                "-ge": lambda a, b: a >= b,
+            }
+            match op.content:
+                case SymStr(("=",)):
+                    if s1 == s2: result = True
+                    elif definitely_not_equal(s1, s2): result = False
+                case SymStr(("!=",)):
+                    if s1 == s2: result = False
+                    elif definitely_not_equal(s1, s2): result = True
+                case SymStr((op,)) if op in num_ops.keys():
+                    if (n1 := s1.try_to_int()) is not None and (n2 := s2.try_to_int()) is not None:
+                        result = num_ops[op](n1, n2)
+        case _:
+            # At this point give up, the command likely contains && and || expressions
+            pass
 
-    if len(args) == 2:
-        if args[0].content == SymStr(("!",)):
-            res = interpret_test(args[1:])
-            return not res if res is not None else None
-        match (args[0].content, args[1].content):
-            case (SymStr([op]), SymStr([s])) if op == "-n":
-                return s != ""
-            case (SymStr([op]), SymStr([s])) if op == "-z":
-                return s == ""
-            case (SymStr([op]), _) if op == "-n":
-                if definitely_non_empty(args[1]):
-                    return True
-                if definitely_empty(args[1]):
-                    return False
-                return None
-            case (SymStr([op]), _) if op == "-z":
-                if definitely_empty(args[1]):
-                    return True
-                if definitely_non_empty(args[1]):
-                    return False
-                return None
-            case (SymStr([op]), SymStr([s1])) if op in {"-f", "-d", "-e"} and s1 == "":
-                return False
-            case _:
-                return None
+    if result is not None:
+        result ^= negated # xor
 
-    if len(args) == 3:
-        match (args[0].content, args[1].content, args[2].content):
-            case (SymStr([s1]), SymStr([op]), SymStr([s2])) if op == "=":
-                return s1 == s2
-            case (SymStr([s1]), SymStr([op]), SymStr([s2])) if op == "!=":
-                return s1 != s2
-            case (CompletelyArbitrary() as lhs, SymStr([op]), CompletelyArbitrary() as rhs) if op in ["=", "!="]:
-                # if the two are definitely the same, we can say something in this case
-                if lhs == rhs:
-                    return op == "="
-                else:
-                    return None
-            case (SymStr([s1]), SymStr([op]), SymStr([s2])) if op in ["-eq", "-ne", "-lt", "-le", "-gt", "-ge"]:
-                try:
-                    assert isinstance(s1, str) and isinstance(s2, str)
-                    n1 = int(s1)
-                    n2 = int(s2)
-                except ValueError:
-                    return None
-                match op:
-                    case "-eq":
-                        return n1 == n2
-                    case "-ne":
-                        return n1 != n2
-                    case "-lt":
-                        return n1 < n2
-                    case "-le":
-                        return n1 <= n2
-                    case "-gt":
-                        return n1 > n2
-                    case "-ge":
-                        return n1 >= n2
-            case _:
-                return None
-
-    return None
+    return result
 
 
 def handle_set(expanded_args: list[Field], traces: Traces) -> Traces:
