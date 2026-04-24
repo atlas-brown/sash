@@ -1409,7 +1409,7 @@ fi
 
 def test_const_cond_assignment(tmp_path):
     script = write_script(tmp_path, """
-    if [ unknown_cmd ]; then
+    if unknown_cmd; then
         do_something
         VAR="value1"
     else
@@ -1427,7 +1427,7 @@ def test_const_cond_assignment(tmp_path):
 
 def test_const_cond_assignment_fixed(tmp_path):
     script = write_script(tmp_path, """
-    if [ unknown_cmd ]; then
+    if unknown_cmd; then
         do_something
         VAR="value1"
     else
