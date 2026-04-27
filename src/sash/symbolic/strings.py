@@ -53,6 +53,27 @@ class SymStr:
                 return None
         return "".join(nls)
 
+    def try_without_leading_dot_slash(self, allow_returning_empty=False) -> 'SymStr':
+        first_part = self.parts[0]
+        if allow_returning_empty and first_part == "./" and len(self.parts) == 1:
+            # The entire SymStr is exactly "./", so we can remove it entirely and return an empty SymStr
+            return SymStr(())
+        if first_part == "./" and len(self.parts) > 1:
+            # The first part is exactly "./", so we can remove it entirely
+            new_first_part = self.parts[1]
+            new_parts = (new_first_part,) + self.parts[2:]
+        elif first_part.startswith("./") and len(first_part) > 2:
+            # The first part starts with "./", but has additional characters, so we can remove the leading "./" prefix
+            new_first_part = first_part[2:]
+            new_parts = (new_first_part,) + self.parts[1:]
+        else:
+            # The first part does not start with "./", or the entire SymStr is just "./", so we can't remove anything
+            return self
+        if new_first_part.startswith("/"):
+            # Removing a leading "./" would expose an absolute path, which is not equivalent, so we should not modify the SymStr in this case
+            return self
+        return replace(self, parts=new_parts)
+
     def try_without_trailing_slash(self) -> 'SymStr':
         if isinstance(self.parts[-1], str):
             # only remove trailing slash if it's part of a string literal at the end
@@ -134,6 +155,23 @@ class Field:
         if (s := self.try_to_str()) and s.isdecimal():
             return int(s)
         return None
+
+    def try_without_leading_dot_slash(self) -> "Field":
+        if isinstance(self.content, SymStr):
+            new_content = self.content.try_without_leading_dot_slash(False) # The entire field could be "./"
+            if self.content != new_content:
+                return replace(self, content=new_content)
+
+        elif isinstance(self.content, CompletelyArbitrary) and self.content.prefix:
+            new_pre = self.content.prefix.try_without_leading_dot_slash(True) # Here it's fine because we have arbitrary content
+            if self.content.prefix != new_pre:
+                if new_pre.try_to_str() in {"./", ""}:
+                    new_pre = None
+                new_content = replace(self.content, prefix=new_pre)
+                return replace(self, content=new_content)
+
+        # otherwise, do nothing
+        return self
 
     def try_without_trailing_slash(self) -> "Field":
         if isinstance(self.content, SymStr):
