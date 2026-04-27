@@ -3155,7 +3155,7 @@ def symbexec_file(file: str,
                                         current_pass_condition=Description("(DFS) unbound variables are empty"))),
                     )
                     dfs_phase_timed_out = dfs_phase_timed_out or unbound_timed_out
-                    Reporter.drop_issues({reporter.Code.DELETE_SYSTEM_FILE, reporter.Code.CONSTANT_CONDITION})
+                    Reporter.drop_issues({reporter.Code.DELETE_SYSTEM_FILE, reporter.Code.CONSTANT_CONDITION, reporter.Code.COMMAND_CAN_ONLY_FAIL})
                     for i in issues_so_far: # ensure that any del_sys_files found before the last run are kept
                         if i.code == reporter.Code.DELETE_SYSTEM_FILE:
                             Reporter.add_issue(i, config)
