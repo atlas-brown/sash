@@ -1755,7 +1755,7 @@ def handle_rm(expanded_args: tuple[Field, ...], trace: Trace, node: AST.CommandN
     def normalize_path_field(path_field: Field) -> Field:
         normalized = path_field
         while True:
-            next_path = normalized.try_without_trailing_slash()
+            next_path = normalized.try_without_leading_dot_slash().try_without_trailing_slash()
             if next_path == normalized:
                 return normalized
             normalized = next_path
