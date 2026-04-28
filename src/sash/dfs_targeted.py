@@ -149,45 +149,47 @@ def run_targeted_dfs(nodes: list[WrappedAst],
     dangerous_lines = find_dangerous_lines()
     logging.info("Dangerous lines: %s", dangerous_lines)
     all_traces: list[Trace] = []
+    logging.info("DFS run: targeting dangerous commands at lines %s", dangerous_lines)
+
+    def branch_policy_pre_for_target(node: AST.AstNode) -> BranchSelection | None:
+        if isinstance(node, AST.IfNode):
+            then_score = count_spec_cmds(node.then_b)
+            else_score = count_spec_cmds(node.else_b) if node.else_b is not None else 0
+            logging.debug("IfNode at line %d: then_score=%d, else_score=%d", getattr(node, 'line_number', -1), then_score, else_score)
+            if then_score == 0 and else_score == 0:
+                return None
+            return select_first() if then_score >= else_score else select_second()
+        if isinstance(node, AST.AndNode) or isinstance(node, AST.OrNode):
+            return select_all()
+        if isinstance(node, AST.WhileNode):
+            body_score = count_spec_cmds(node.body)
+            return select_first() if body_score > 0 else None
+        if isinstance(node, AST.CaseNode):
+            case_scores = [count_spec_cmds(case["cbody"]) if case["cbody"] is not None else 0 for case in node.cases]
+            if not case_scores:
+                return None
+            best_idx = max(range(len(case_scores)), key=lambda i: case_scores[i])
+            return select_case_index(best_idx)
+        return None
+
+    def branch_policy_pre_target(node: AST.AstNode) -> BranchSelection:
+        decision = branch_policy_pre_for_target(node)
+        logging.debug("Branch policy for node at line %d: %s", getattr(node, 'line_number', -1), decision)
+        decision = decision if decision is not None else branch_policy_pre_prefer_spec(node)
+        logging.debug("Final branch decision for node at line %d: %s", getattr(node, 'line_number', -1), decision)
+        return decision
+
+    target_traces = symb_engine(nodes, replace(
+        config,
+        branch_policy_pre=branch_policy_pre_target,
+        unbound_policy=UnboundVariablePolicy.SYMBOLIC,
+        trace_collapser=lambda ts: collapse_traces_with_spec_coverage(ts, trace_cap),
+        node_cbs=config.node_cbs + [spec_coverage_cb],
+        ignore_function_calls_for=ignore_function_calls_for,
+    ))
+    all_traces.extend(target_traces)
+
     for target_line in dangerous_lines:
-        def branch_policy_pre_for_target(node: AST.AstNode) -> BranchSelection | None:
-            if isinstance(node, AST.IfNode):
-                then_score = count_spec_cmds(node.then_b)
-                else_score = count_spec_cmds(node.else_b) if node.else_b is not None else 0
-                logging.debug("IfNode at line %d: then_score=%d, else_score=%d", getattr(node, 'line_number', -1), then_score, else_score)
-                if then_score == 0 and else_score == 0:
-                    return None
-                return select_first() if then_score >= else_score else select_second()
-            if isinstance(node, AST.AndNode) or isinstance(node, AST.OrNode):
-                return select_all()
-            if isinstance(node, AST.WhileNode):
-                body_score = count_spec_cmds(node.body)
-                return select_first() if body_score > 0 else None
-            if isinstance(node, AST.CaseNode):
-                case_scores = [count_spec_cmds(case["cbody"]) if case["cbody"] is not None else 0 for case in node.cases]
-                if not case_scores:
-                    return None
-                best_idx = max(range(len(case_scores)), key=lambda i: case_scores[i])
-                return select_case_index(best_idx)
-            return None
-
-        def branch_policy_pre_target(node: AST.AstNode) -> BranchSelection:
-            decision = branch_policy_pre_for_target(node)
-            logging.debug("Branch policy for node at line %d: %s", getattr(node, 'line_number', -1), decision)
-            decision = decision if decision is not None else branch_policy_pre_prefer_spec(node)
-            logging.debug("Final branch decision for node at line %d: %s", getattr(node, 'line_number', -1), decision)
-            return decision
-
-        logging.info("DFS run: targeting dangerous command at line %d", target_line)
-        target_traces = symb_engine(nodes, replace(
-            config,
-            branch_policy_pre=branch_policy_pre_target,
-            unbound_policy=UnboundVariablePolicy.SYMBOLIC,
-            trace_collapser=lambda ts: collapse_traces_with_spec_coverage(ts, trace_cap),
-            node_cbs=config.node_cbs + [spec_coverage_cb],
-            ignore_function_calls_for=ignore_function_calls_for,
-        ))
-        all_traces.extend(target_traces)
         if any(target_line in get_spec_coverage(t.latest_state) for t in target_traces):
             logging.info("DFS run: reached dangerous command at line %d", target_line)
         else:
