@@ -6,6 +6,7 @@ import shasta.ast_node as AST
 
 from sash.frozen import FrozenDict
 from sash.parser import WrappedAst
+from sash.symbolic.strings import ArbitraryType, CompletelyArbitrary
 import sash.util as util
 from sash.interpreter_config import (
     BranchSelection,
@@ -89,27 +90,59 @@ def run_targeted_dfs(nodes: list[WrappedAst],
         return None
 
     def collapse_traces_with_spec_coverage(traces: Traces, cap: int) -> tuple[Traces, Traces]:
+        def count_env_vars(trace: Trace) -> int:
+            cnt = 0
+            # Iterate over all variables
+            for var in trace.latest_state.env.values():
+                for c in var.value.chunks:
+                    # If the variable contains an ENVIRONMENT arbitrary, count it and move on to the next variable
+                    if isinstance(c.content, CompletelyArbitrary) and c.content.kind == ArbitraryType.ENVIRONMENT:
+                        cnt += 1
+                        break
+            return cnt
+
         if len(traces) <= cap:
             return traces, []
+
+        # Calculate coverage and number of env. variables only once
+        # Justification for environment variable count as a tie-breaker:
+        # Arbitraries of the ENVIRONMENT kind are derived by pre-existing environment variables
+        # such as PWD, HOME, etc. A common source of bugs is accidentally indirectly deleting such paths.
+        # So by prefering traces that correspond to edge cases with more environment variables
+        # we hopefully increase the chances of hitting such bugs.
+        cov_cache = {t: get_spec_coverage(t.latest_state) for t in traces}
+        env_vars_cache = {t: count_env_vars(t) for t in traces}
+
         remaining = list(traces)
-        remaining.sort(key=lambda t: len(get_spec_coverage(t.latest_state)), reverse=True)
+        # Pre-sort to establish a fallback tie-breaker. If traces tie on both
+        # NEW coverage and env vars in the greedy selection below, max() picks
+        # the first one it encounters. This sort ensures that the winner
+        # of such a tie is the trace with the highest TOTAL coverage.
+        remaining.sort(
+            key=lambda t: (len(cov_cache[t]), env_vars_cache[t]),
+            reverse=True
+        )
+
         selected: list[Trace] = []
         covered: set[int] = set()
-        unselected: list[Trace] = []
-        while remaining and len(selected) < cap:
+
+        # There will always exist more traces than cap at this point,
+        # so we will definitely select more than cap by the end of the loop
+        while len(selected) < cap:
             best_idx = max(
                 range(len(remaining)),
-                key=lambda i: len(get_spec_coverage(remaining[i].latest_state) - covered),
+                key=lambda i: (
+                    len(cov_cache[remaining[i]] - covered),
+                    env_vars_cache[remaining[i]]
+                ),
             )
+
             best = remaining.pop(best_idx)
             selected.append(best)
-            covered |= get_spec_coverage(best.latest_state)
-        if len(selected) < cap:
-            remaining.sort(key=lambda t: len(get_spec_coverage(t.latest_state)), reverse=True)
-            selected.extend(remaining[:cap - len(selected)])
-            unselected = remaining[cap - len(selected):]
-        else:
-            unselected = remaining
+            covered |= cov_cache[best]
+
+        unselected = remaining
+
         return (selected, unselected)
 
     def find_dangerous_lines() -> list[int]:
