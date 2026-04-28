@@ -1812,14 +1812,14 @@ def handle_rm(expanded_args: tuple[Field, ...], trace: Trace, node: AST.CommandN
         Reporter.add_issue(reporter.DeleteSystemFile(pwdval.try_to_str() or "PWD", context_line), config)
 
     if non_flag_args:
-        if pwdval is not None: # Can be empty if the script unsets it
-            normalized_pwd = normalize_path_field(pwdval.as_field())
-            normalized_args = tuple(normalize_path_field(arg_field) for arg_field in non_flag_args)
+        if start_pwdval is not None:
+            normalized_start_pwd = normalize_path_field(start_pwdval.as_field().quote())
+            normalized_args = tuple(normalize_path_field(arg_field.quote()) for arg_field in non_flag_args)
             trace = trace.extend(lambda s: s.add_assertion(SimpleConstraint(And.from_field_iter(normalized_args,
-                                                                                                lambda arg_field: Not(StringEq(arg_field, normalized_pwd))),
-                                                                            lambda line: reporter.DeleteSystemFile("PWD", line)),
+                                                                                                lambda arg_field: Not(StringEq(arg_field, normalized_start_pwd))),
+                                                                            lambda line: reporter.DeleteSystemFile("Init PWD", line)),
                                                         node.pretty(),
-                                                        context_line, priority=10, include_fs=False))
+                                                        context_line, priority=11, include_fs=False))
 
     protected_paths = Config.get("PROTECTED_PATHS")
     if protected_paths:
