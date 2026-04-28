@@ -276,39 +276,63 @@ def run_solver(traces: list[Trace], config: InterpConfig, stop: threading.Event 
     solver.set('timeout', 5000)
 
     logging.info("Checking %d total assertions from %d total traces", total_assertions, len(traces))
-    for i, trace in enumerate(traces):
-        if timed_out:
-            logging.info("Ignoring %d/%d assertions due to solver timeout", total_assertions - checked_assertions, total_assertions)
+    all_assertions = [a for t in traces for a in _solver_assertions_for_trace(t)]
+    if not config.disable_solver_optimizations:
+        all_assertions.sort(key=lambda a: a.priority, reverse=True)
+    for assertion in all_assertions:
+        if logging.getLogger().isEnabledFor(logging.DEBUG):
+            logging.debug("Checking assertion %d/%d id %s from line %s :: %s", checked_assertions + 1, total_assertions, id(assertion), assertion.source_line, assertion.source_str)
+
+        if stop and stop.is_set():
+            timed_out = True
+            logging.debug("Solver timed out")
+            Reporter.set_timed_out()
             break
 
-        assertions = _solver_assertions_for_trace(trace)
-        if not config.disable_solver_optimizations:
-            assertions = sorted(assertions, key=lambda a: a.priority, reverse=True)
-        logging.debug("Trace %d/%d: checking %d assertions", i + 1, len(traces), len(assertions))
-        for assertion in assertions:
-            if logging.getLogger().isEnabledFor(logging.DEBUG):
-                logging.debug("Checking assertion %d/%d id %s from line %s :: %s", checked_assertions + 1, total_assertions, id(assertion), assertion.source_line, assertion.source_str)
+        checked_assertions += 1
 
-            if stop and stop.is_set():
-                timed_out = True
-                logging.debug("Solver timed out")
-                Reporter.set_timed_out()
-                break
+        include_fs_override = True if config.disable_solver_optimizations else None
+        state_formula, assertion_formula, refinements = assertion_to_z3(
+            assertion,
+            include_fs_override=include_fs_override,
+        )
+        solver.push()
+        solver.add(state_formula)
 
-            checked_assertions += 1
+        if (
+            not config.disable_solver_optimizations
+            and solver.check() == z3.unsat
+        ):
+            logging.debug("Path condition is unsat, skipping assertion check")
+            if config.debug_instrumentation:
+                log_assertion_result(
+                    assertion=assertion,
+                    state_formula=state_formula,
+                    assertion_formula=assertion_formula,
+                    issue='/'.join({str(issue.code)[5:] for _, issue in refinements}),
+                    arb_z3_map=None,
+                    result_type="PATHCOND_UNSAT",
+                    solver_time=0.0,
+                    debugger=debugger,
+                )
+            solver.pop()
+            continue
 
-            include_fs_override = True if config.disable_solver_optimizations else None
-            state_formula, assertion_formula, refinements = assertion_to_z3(
-                assertion,
-                include_fs_override=include_fs_override,
-            )
-            solver.push()
-            solver.add(state_formula)
+        solver.push()
+        solver.add(assertion_formula)
 
-            if (
-                not config.disable_solver_optimizations
-                and solver.check() == z3.unsat
-            ):
+        if logging.getLogger().isEnabledFor(logging.DEBUG):
+            logging.debug("Arb z3 map: %s", pformat(arbitrary_to_z3_var))
+
+        result = solver.check()
+        if logging.getLogger().isEnabledFor(logging.DEBUG):
+            logging.debug("State:\n%s", state_formula)
+            logging.debug("Assertion\n:%s\n\n", assertion_formula)
+            logging.debug("Assertion must be violated?: %s (ie %s)", result == z3.unsat, result)
+
+        if result == z3.unsat:
+            solver.pop()
+            if config.disable_solver_optimizations and solver.check() == z3.unsat:
                 logging.debug("Path condition is unsat, skipping assertion check")
                 if config.debug_instrumentation:
                     log_assertion_result(
@@ -323,57 +347,27 @@ def run_solver(traces: list[Trace], config: InterpConfig, stop: threading.Event 
                     )
                 solver.pop()
                 continue
-
-            solver.push()
-            solver.add(assertion_formula)
-
+            model_to_reports(assertion, solver, config, assertion_formula, state_formula, refinements,
+                                debugger if config.debug_instrumentation else None)
+        else:
+            model = None
             if logging.getLogger().isEnabledFor(logging.DEBUG):
-                logging.debug("Arb z3 map: %s", pformat(arbitrary_to_z3_var))
-
-            result = solver.check()
-            if logging.getLogger().isEnabledFor(logging.DEBUG):
-                logging.debug("State:\n%s", state_formula)
-                logging.debug("Assertion\n:%s\n\n", assertion_formula)
-                logging.debug("Assertion must be violated?: %s (ie %s)", result == z3.unsat, result)
-
-            if result == z3.unsat:
-                solver.pop()
-                if config.disable_solver_optimizations and solver.check() == z3.unsat:
-                    logging.debug("Path condition is unsat, skipping assertion check")
-                    if config.debug_instrumentation:
-                        log_assertion_result(
-                            assertion=assertion,
-                            state_formula=state_formula,
-                            assertion_formula=assertion_formula,
-                            issue='/'.join({str(issue.code)[5:] for _, issue in refinements}),
-                            arb_z3_map=None,
-                            result_type="PATHCOND_UNSAT",
-                            solver_time=0.0,
-                            debugger=debugger,
-                        )
-                    solver.pop()
-                    continue
-                model_to_reports(assertion, solver, config, assertion_formula, state_formula, refinements,
-                                 debugger if config.debug_instrumentation else None)
-            else:
-                model = None
-                if logging.getLogger().isEnabledFor(logging.DEBUG):
-                    model = solver.model() if result == z3.sat else None
-                logging.debug("{z3.result}, model: %s", model)
-                if config.debug_instrumentation:
-                    log_assertion_result(
-                        assertion=assertion,
-                        assertion_formula=assertion_formula,
-                        state_formula=state_formula,
-                        issue='/'.join({str(issue.code)[5:] for _, issue in refinements}),
-                        arb_z3_map=arbitrary_to_z3_var,
-                        result_type="SAT",
-                        solver_time=-1,
-                        sat_model=model,
-                        debugger=debugger,
-                    )
-                solver.pop()
-
+                model = solver.model() if result == z3.sat else None
+            logging.debug("{z3.result}, model: %s", model)
+            if config.debug_instrumentation:
+                log_assertion_result(
+                    assertion=assertion,
+                    assertion_formula=assertion_formula,
+                    state_formula=state_formula,
+                    issue='/'.join({str(issue.code)[5:] for _, issue in refinements}),
+                    arb_z3_map=arbitrary_to_z3_var,
+                    result_type="SAT",
+                    solver_time=-1,
+                    sat_model=model,
+                    debugger=debugger,
+                )
             solver.pop()
+
+        solver.pop()
 
     logging.info("Solving produced %d new reports", len(Reporter._issues) - total_issues_before_solver)
