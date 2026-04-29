@@ -19,6 +19,7 @@ from sash.constraints import (
     NormalizedConstraint,
     Not,
     Or,
+    StringConcat,
     StringEq,
 )
 from sash.symbolic.strings import Field
@@ -138,7 +139,7 @@ class FSModelSimple(FSModel):
                 return self._create_file(path, Read)
             case Not(IsRead(path)):
                 return self._create_file(path, Unread) # treat Not(IsRead) as making the file unreadable
-            case StringEq() | Not(StringEq()) | CommandExists() | Description():
+            case StringEq() | Not(StringEq()) | StringConcat() | Not(StringConcat()) | CommandExists() | Description():
                 # These constraints do not affect the FS model
                 return self
             case Implies(premise, conclusion):
@@ -193,6 +194,8 @@ class FSModelSimple(FSModel):
                 return z3.BoolVal(True)
             case StringEq(lhs, rhs):
                 return self.field_to_z3(lhs) == self.field_to_z3(rhs)
+            case StringConcat(result, parts):
+                return self.field_to_z3(result) == z3.Concat(*[self.field_to_z3(p) for p in parts])
             case _:
                 assert False, f"all constraints should be handled (got {constraint})"
 

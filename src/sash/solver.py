@@ -92,6 +92,8 @@ def constraint_to_z3(constraint: Constraint, s: State) -> z3.ExprRef:
                 return z3.Or(norm_constraint_to_z3(lhs, s), norm_constraint_to_z3(rhs, s))
             case StringEq(lhs, rhs):
                 return field_content_to_z3(lhs.content) == field_content_to_z3(rhs.content)
+            case StringConcat(result, parts):
+                return field_content_to_z3(result.content) == z3.Concat(*[field_content_to_z3(p.content) for p in parts])
             case IsFile(path):
                 return s.fs_model.is_file_z3(field_content_to_z3(path.content))
             case IsDir(path):

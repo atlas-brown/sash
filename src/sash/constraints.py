@@ -83,6 +83,10 @@ class NormalizedConstraint(Constraint):
                     norm_c1 = c1.try_without_trailing_slash()
                     norm_c2 = c2.try_without_trailing_slash()
                     return StringEq(norm_c1, norm_c2)
+                case StringConcat(result, parts):
+                    norm_result = result.try_without_trailing_slash()
+                    norm_parts = parts[:-1] + (parts[-1].try_without_trailing_slash(),) if parts else parts
+                    return StringConcat(norm_result, norm_parts)
 
             assert False, f"all constraints should be handled (got {constraint})"
 
@@ -149,6 +153,15 @@ class Implies(Constraint):
 class StringEq(Constraint):
     lhs: Field
     rhs: Field
+
+
+@dataclass(frozen=True)
+class StringConcat(Constraint):
+    result: Field
+    parts: tuple[Field, ...]
+
+    def __post_init__(self):
+        assert self.parts and len(self.parts) >= 2, "must have at least two parts"
 
 
 @dataclass(frozen=True)
