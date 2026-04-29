@@ -236,6 +236,59 @@ def test_steamroot_fix(tmp_path):
     assert_expected_report(report, [])
 
 
+def test_trimmed_path_not_init_pwd_delete(tmp_path):
+    script = write_script(tmp_path, """#!/bin/sh
+FIRST="$2"
+SECOND="${FIRST%/}"
+if [ -z "$SECOND" ]; then
+    exit 1
+fi
+THIRD="$(pwd)/$SECOND"
+rm -rf "$THIRD"
+""")
+    report = reset_and_run_main(script, solver=True)
+    assert_expected_report(report, [])
+
+
+def test_trimmed_path_can_delete_init_pwd_without_guard(tmp_path):
+    script = write_script(tmp_path, """#!/bin/sh
+FIRST="$2"
+SECOND="${FIRST%/}"
+THIRD="$(pwd)/$SECOND"
+rm -rf "$THIRD"
+""")
+    report = reset_and_run_main(script, solver=True)
+    init_pwd_issues = [
+        issue
+        for issue in report.issues
+        if issue.code == reporter.Code.DELETE_SYSTEM_FILE and "Init PWD" in issue.message
+    ]
+    assert init_pwd_issues, f"Expected Init PWD deletion warning, got: {report.to_dict()}"
+
+
+def test_target_rewrite_can_delete_init_pwd(tmp_path):
+    script = write_script(tmp_path, """#!/bin/sh
+TARGET="$2"
+TARGET="${TARGET%/}"
+if [ "${TARGET#/}" = "${TARGET}" ]; then
+    if [ "${TARGET%/*}" = "$TARGET" ] ; then
+        TARGET="$(echo $(pwd)/$TARGET)"
+    else
+        TARGET="$(cd ${TARGET%/*}; echo `pwd`/${TARGET##*/})"
+    fi
+fi
+
+rm -rf "$TARGET"
+""")
+    report = reset_and_run_main(script, solver=True)
+    init_pwd_issues = [
+        issue
+        for issue in report.issues
+        if issue.code == reporter.Code.DELETE_SYSTEM_FILE and "Init PWD" in issue.message
+    ]
+    assert init_pwd_issues, f"Expected Init PWD deletion warning, got: {report.to_dict()}"
+
+
 def test_home_not_deleted_global_invariant(tmp_path):
     script = write_script(tmp_path, "mv \"$HOME\" /tmp/newhome\n")
     report = reset_and_run_main(script)
