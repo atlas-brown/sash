@@ -7,7 +7,7 @@ from typing import Any, Optional
 import shasta.ast_node as AST
 
 from sash.fs import FSModel, FSModelSimple
-from sash.symbolic.strings import Field, PreSplitWord, SymStr, presplit_to_field, presplit_try_to_str
+from sash.symbolic.strings import Field, PreSplitWord, SymStr
 import sash.util as util
 from sash.constraints import (
     CommandExists,
@@ -28,10 +28,10 @@ class ShellVar:
     ghost : bool = False # was this variable binding created implicitly by the engine, but has never actually been set?
 
     def as_field(self) -> Field:
-        return presplit_to_field(self.value)
+        return self.value.to_field()
 
     def try_to_str(self) -> str | None:
-        return presplit_try_to_str(self.value)
+        return self.value.try_to_str()
 
 @dataclass(frozen=True)
 class SetOptions:

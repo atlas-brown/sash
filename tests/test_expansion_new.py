@@ -57,7 +57,7 @@ def _field_texts(fields: list[Field]) -> list[str]:
 
 def _expand_word(word: PreSplitWord,
                  ifs_value: str = DEFAULT_IFS) -> list[Field]:
-    return word.split_into_fields(ifs_value)
+    return word.do_field_splitting(ifs_value)
 
 
 def _expand_command(words: list[PreSplitWord],

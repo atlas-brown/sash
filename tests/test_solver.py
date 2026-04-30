@@ -3,7 +3,7 @@ Tests for SMT solver integration.
 """
 import z3
 from sash.fs import FSModel, FSModelSimple
-from sash.symbolic.strings import ArbitraryType, CompletelyArbitrary, Field, WordCount, presplit_from_field
+from sash.symbolic.strings import ArbitraryType, CompletelyArbitrary, Field, WordCount, PreSplitWord
 from util import *
 
 import sash.reporter as reporter
@@ -41,7 +41,7 @@ def make_env_constraints_z3(s, env_constraints):
 
 
 def shellvar_from_field(field: Field) -> ShellVar:
-    return ShellVar(presplit_from_field(field))
+    return ShellVar(PreSplitWord.from_field(field))
 
 def assert_equiv_fs_states(f1, f2, f1_starting_fs_id, f2_starting_fs_id):
     s = z3.Solver()

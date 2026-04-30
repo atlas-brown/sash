@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field, replace
 from enum import Enum
+from math import inf
 from typing import TYPE_CHECKING
 import re
 
@@ -195,7 +196,7 @@ class Field:
         return Field(SymStr((s,)), WordCount(words, words))
 
 
-def _merge_counts(c1: WordCount, c2: WordCount, sep: int = 0) -> WordCount:
+def merge_counts(c1: WordCount, c2: WordCount, sep: int = 0) -> WordCount:
     """
     Calculates the resulting field count bounds when two shell words/chunks are concatenated.
 
@@ -226,93 +227,101 @@ def _merge_counts(c1: WordCount, c2: WordCount, sep: int = 0) -> WordCount:
     return WordCount(min_merge, max_merge)
 
 
-def _merge_symstrs(sym_fields: list[Field]) -> Field:
-    assert all(isinstance(field.content, SymStr) for field in sym_fields), "All fields must contain SymStr to be merged with _merge_symstrs"
-    if not sym_fields:
-        return Field(SymStr(()), WordCount(0, 0))
-    content = sym_fields[0].content.parts # type: ignore
-    count = sym_fields[0].count
-    for field in sym_fields[1:]:
-        content = content + field.content.parts # type: ignore
-        count = _merge_counts(count, field.count, 0)
-    return Field(SymStr(tuple(content)), count)
-
-
-def _collect_prefixes_suffixes(fields: list[Field]) -> tuple[Field | None, Field | None]:
-    prefixes = []
-    for field in fields:
-        if isinstance(field.content, SymStr):
-            prefixes.append(field)
-        else:
-            break
-    suffixes = []
-    for field in reversed(fields):
-        if isinstance(field.content, SymStr):
-            suffixes.append(field)
-        else:
-            break
-    suffixes.reverse()
-    return (
-        _merge_symstrs(prefixes) if prefixes else None,
-        _merge_symstrs(suffixes) if suffixes else None,
-    )
-
-
-def _add_prefix(arbitrary_field: Field, prefix_symstr: Field) -> Field:
+def add_prefix(arbitrary_field: Field, prefix_symstr: Field) -> Field:
     match (arbitrary_field, prefix_symstr):
         case (Field(CompletelyArbitrary(prefix=None) as a, acount),
               Field(SymStr() as s, scount)):
-            return Field(replace(a, prefix=s), _merge_counts(acount, scount))
+            return Field(replace(a, prefix=s), merge_counts(acount, scount))
         case (Field(CompletelyArbitrary(prefix=SymStr(pre_parts)) as a, acount),
               Field(SymStr(more_parts) as s, scount)):
-            return Field(replace(a, prefix=SymStr(more_parts + pre_parts)), _merge_counts(acount, scount))
+            return Field(replace(a, prefix=SymStr(more_parts + pre_parts)), merge_counts(acount, scount))
         case _:
             assert False, "unreachable"
 
 
-def _add_suffix(arbitrary_field: Field, suffix_symstr: Field) -> Field:
+def add_suffix(arbitrary_field: Field, suffix_symstr: Field) -> Field:
     match (arbitrary_field, suffix_symstr):
         case (Field(CompletelyArbitrary(suffix=None) as a, acount),
               Field(SymStr() as s, scount)):
-            return Field(replace(a, suffix=s), _merge_counts(acount, scount))
+            return Field(replace(a, suffix=s), merge_counts(acount, scount))
         case (Field(CompletelyArbitrary(suffix=SymStr(suf_parts)) as a, acount),
               Field(SymStr(more_parts) as s, scount)):
-            return Field(replace(a, suffix=SymStr(suf_parts + more_parts)), _merge_counts(acount, scount))
+            return Field(replace(a, suffix=SymStr(suf_parts + more_parts)), merge_counts(acount, scount))
         case _:
             assert False, "unreachable"
 
 
-def _merge_partial_fields(fields: list[Field]) -> Field:
+def merge_partial_fields(fields: list[Field], sep: str | None = " ", state: "State | None" = None) -> Field:
+    def merge_symstrs(symstrs: list[Field]) -> Field:
+        assert all(isinstance(f.content, SymStr) for f in symstrs), f"merge_symstrs should only be called on lists of Fields with SymStr content (got {symstrs})"
+        match symstrs:
+            case []:
+                return Field(SymStr(()), WordCount(0, 0))
+            case [one]:
+                return one
+            case [Field(SymStr(parts), c), *rest]:
+                content = parts
+                count = c
+                for field in rest:
+                    content = content + ((sep,) if sep else ()) + field.content.parts # type: ignore (field.content is SymStr due to assert above)
+                    count = merge_counts(count, field.count, 1 if sep else 0)
+                return Field(SymStr(tuple(content)), count)
+            case _:
+                assert False, "unreachable"
+
+    def collect_prefixes_suffixes(fields: list[Field]) -> tuple[Field | None, Field | None]:
+        prefixes = []
+        for field in fields:
+            if isinstance(field.content, SymStr):
+                prefixes.append(field)
+            else:
+                break
+        suffixes = []
+        for field in reversed(fields):
+            if isinstance(field.content, SymStr):
+                suffixes.append(field)
+            else:
+                break
+        return (merge_symstrs(prefixes) if prefixes else None,
+                merge_symstrs(suffixes) if suffixes else None)
+
     num_arbitraries = sum(1 for field in fields if isinstance(field.content, CompletelyArbitrary))
     if num_arbitraries == 0:
-        return _merge_symstrs(fields)
-    if num_arbitraries == 1:
-        arbitrary_field = next(field for field in fields if isinstance(field.content, CompletelyArbitrary))
-        prefix, suffix = _collect_prefixes_suffixes(fields)
+        # just join the symstrs
+        return merge_symstrs(fields)
+    elif num_arbitraries == 1:
+        arbitrary = [field for field in fields if isinstance(field.content, CompletelyArbitrary)][0]
+        prefix, suffix = collect_prefixes_suffixes(fields)
         if prefix is not None:
-            arbitrary_field = _add_prefix(arbitrary_field, prefix)
+            arbitrary = add_prefix(arbitrary, prefix)
         if suffix is not None:
-            arbitrary_field = _add_suffix(arbitrary_field, suffix)
-        return arbitrary_field
-
-    arbitrary_fields = [field for field in fields if isinstance(field.content, CompletelyArbitrary)]
-    base = arbitrary_fields[0].content
-    quoted = all(field.content.quoted for field in arbitrary_fields) # type: ignore
-    maybe_empty = any(field.content.maybe_empty for field in arbitrary_fields) # type: ignore
-    merged = CompletelyArbitrary(
-        source=base.source, # type: ignore
-        kind=ArbitraryType.APPROXIMATION,
-        producing_state=base.producing_state, # type: ignore
-        quoted=quoted,
-        maybe_empty=maybe_empty,
-    )
-    merged_field = Field(merged, WordCount(0, float("inf")))
-    prefix, suffix = _collect_prefixes_suffixes(fields)
-    if prefix is not None:
-        merged_field = _add_prefix(merged_field, prefix)
-    if suffix is not None:
-        merged_field = _add_suffix(merged_field, suffix)
-    return merged_field
+            arbitrary = add_suffix(arbitrary, suffix)
+        return arbitrary
+    else:
+        # multiple arbitraries -- give up and return a new arbitrary field
+        arbitraries = [field for field in fields if isinstance(field.content, CompletelyArbitrary)]
+        prefix, suffix = collect_prefixes_suffixes(fields)
+        quoted = all(a.content.quoted for a in arbitraries) # type: ignore
+        if state is not None:
+            arbitrary = Field(CompletelyArbitrary(freeze_thing([a.content.source for a in arbitraries]), # type: ignore
+                                                  ArbitraryType.APPROXIMATION,
+                                                  state,
+                                                  quoted=quoted),
+                                                  WordCount(0, inf))
+        else:
+            base = arbitraries[0].content
+            maybe_empty = any(a.content.maybe_empty for a in arbitraries) # type: ignore
+            arbitrary = Field(CompletelyArbitrary(base.source, # type: ignore
+                                                  ArbitraryType.APPROXIMATION,
+                                                  base.producing_state, # type: ignore
+                                                  quoted=quoted,
+                                                  maybe_empty=maybe_empty),
+                                                  WordCount(0, inf))
+        if prefix is not None:
+            arbitrary = add_prefix(arbitrary, prefix)
+        if suffix is not None:
+            arbitrary = add_suffix(arbitrary, suffix)
+        return arbitrary
 
 
 @dataclass(frozen=True)
@@ -400,7 +409,7 @@ class PreSplitWord:
             )
         return PreSplitWord(retrieved_chunks)
 
-    def split_into_fields(self, ifs_value: str) -> list[Field]:
+    def do_field_splitting(self, ifs_value: str) -> list[Field]:
         """
         CONTEXT: Command Execution (e.g., echo $VAR, ls *.txt).
 
@@ -444,7 +453,7 @@ class PreSplitWord:
                 if allow_empty:
                     resulting_fields.append(Field(SymStr(("",)), WordCount(1, 1)))
                 return
-            resulting_fields.append(_merge_partial_fields(current_parts))
+            resulting_fields.append(merge_partial_fields(current_parts))
             current_parts.clear()
 
         def split_by_ifs(text: str) -> tuple[list[str], bool]:
@@ -520,37 +529,35 @@ class PreSplitWord:
         commit_field()
         return resulting_fields
 
+    def to_field(self) -> Field:
+        if not self.chunks:
+            return Field(SymStr(()), WordCount(0, 0))
+        fields: list[Field] = []
+        for chunk in self.chunks:
+            if isinstance(chunk, LiteralChunk):
+                fields.append(Field(SymStr((chunk.content,)), WordCount(1, 1)))
+            elif isinstance(chunk.content, str):
+                fields.append(Field(SymStr((chunk.content,)), chunk.count))
+            else:
+                fields.append(Field(chunk.content, chunk.count))
+        return merge_partial_fields(fields)
 
-def presplit_from_field(field: Field) -> PreSplitWord:
-    content = field.content
-    if isinstance(content, SymStr):
-        text = content.try_to_str()
-        if text is not None:
+    def try_to_str(self) -> str | None:
+        return self.to_field().try_to_str()
+
+    @staticmethod
+    def from_field(field: Field) -> "PreSplitWord":
+        content = field.content
+        if isinstance(content, SymStr):
+            text = content.try_to_str()
+            if text is not None:
+                return PreSplitWord([
+                    ExpandedChunk(content=text, is_quoted=False, count=field.count),
+                ])
+            arbitrary = CompletelyArbitrary(freeze_thing(content), ArbitraryType.APPROXIMATION, None)  # type: ignore[arg-type]
             return PreSplitWord([
-                ExpandedChunk(content=text, is_quoted=False, count=field.count),
+                ExpandedChunk(content=arbitrary, is_quoted=False, count=field.count),
             ])
-        arbitrary = CompletelyArbitrary(freeze_thing(content), ArbitraryType.APPROXIMATION, None)
         return PreSplitWord([
-            ExpandedChunk(content=arbitrary, is_quoted=False, count=field.count),
+            ExpandedChunk(content=content, is_quoted=False, count=field.count),
         ])
-    return PreSplitWord([
-        ExpandedChunk(content=content, is_quoted=False, count=field.count),
-    ])
-
-
-def presplit_to_field(word: PreSplitWord) -> Field:
-    if not word.chunks:
-        return Field(SymStr(()), WordCount(0, 0))
-    fields: list[Field] = []
-    for chunk in word.chunks:
-        if isinstance(chunk, LiteralChunk):
-            fields.append(Field(SymStr((chunk.content,)), WordCount(1, 1)))
-        elif isinstance(chunk.content, str):
-            fields.append(Field(SymStr((chunk.content,)), chunk.count))
-        else:
-            fields.append(Field(chunk.content, chunk.count))
-    return _merge_partial_fields(fields)
-
-
-def presplit_try_to_str(word: PreSplitWord) -> str | None:
-    return presplit_to_field(word).try_to_str()

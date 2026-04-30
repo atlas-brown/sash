@@ -27,9 +27,7 @@ from sash.symbolic.strings import (
     PreSplitWord,
     SymStr,
     WordCount,
-    presplit_from_field,
-    presplit_to_field,
-    presplit_try_to_str,
+    merge_partial_fields,
 )
 import sash.util as util
 from sash.config import Config # TODO: refactor to delete sash.config, move all needed stuff to InterpConfig
@@ -45,7 +43,7 @@ from sash.debugtools.logger import DebugLogger
 
 
 def _set_env_like(state: State, name: str, value: Field | PreSplitWord) -> State:
-    stored_value = value if isinstance(value, PreSplitWord) else presplit_from_field(value)
+    stored_value = value if isinstance(value, PreSplitWord) else PreSplitWord.from_field(value)
     existing = state.lookup(name)
     if existing is None:
         return state.set_env(name, ShellVar(stored_value))
@@ -436,7 +434,7 @@ def expand_simple(stuff: list[AST.ArgChar],
             sep = ifs_value[:1]
             pieces: list[str] = []
             for param in params:
-                param_str = presplit_try_to_str(param)
+                param_str = param.try_to_str()
                 if param_str is None:
                     arbitrary = CompletelyArbitrary(freeze_thing(var_node), ArbitraryType.APPROXIMATION, state)
                     return [([Field(arbitrary, WordCount(0, inf))], state)]
@@ -445,7 +443,7 @@ def expand_simple(stuff: list[AST.ArgChar],
             return [([Field(SymStr((joined,)), WordCount(1, 1))], state)]
 
         if quoted:
-            fields = [presplit_to_field(param).quote() for param in params]
+            fields = [param.to_field().quote() for param in params]
             return [(fields, state)]
 
         ifs_value = _concrete_ifs_value(state)
@@ -454,7 +452,7 @@ def expand_simple(stuff: list[AST.ArgChar],
             return [([Field(arbitrary, WordCount(0, inf))], state)]
         expanded_fields: list[Field] = []
         for param in params:
-            expanded_fields.extend(param.expand_from_storage(False).split_into_fields(ifs_value))
+            expanded_fields.extend(param.expand_from_storage(False).do_field_splitting(ifs_value))
         return [(expanded_fields, state)]
 
     positional = positional_match(stuff)
@@ -474,7 +472,7 @@ def expand_simple(stuff: list[AST.ArgChar],
             res.append(([Field(arbitrary, WordCount(0, inf))], new_state))
             continue
         split_ifs = ifs_value if ifs_value is not None else DEFAULT_IFS
-        res.append((word.split_into_fields(split_ifs), new_state))
+        res.append((word.do_field_splitting(split_ifs), new_state))
     return res
 
 
@@ -1004,7 +1002,7 @@ def expand_to_word_simple(stuff: list[AST.ArgChar],
                             elif word_is_definitely_non_empty(value):
                                 add_value_word(value)
                             else:
-                                value_field = presplit_to_field(value) if isinstance(value, PreSplitWord) else value
+                                value_field = value.to_field() if isinstance(value, PreSplitWord) else value
                                 empty_field = Field(SymStr(("",)), WordCount(0, 0))
                                 empty_cond = StringEq(value_field, empty_field)
                                 non_default = self.fork_state(self.state.add_pathcond(Not(empty_cond)))
@@ -1017,7 +1015,7 @@ def expand_to_word_simple(stuff: list[AST.ArgChar],
                         elif var_node.fmt in {"Length", "TrimR", "TrimRMax", "TrimL", "TrimLMax"}:
                             definitely_empty = word_is_definitely_empty(value)
                             definitely_non_empty = word_is_definitely_non_empty(value)
-                            value_field = presplit_to_field(value) if isinstance(value, PreSplitWord) else value
+                            value_field = value.to_field() if isinstance(value, PreSplitWord) else value
 
                             def add_symbolic_trim_result(partial: 'Partial', min_words: int) -> None:
                                 out_field = arbitrary_field(
@@ -1038,7 +1036,7 @@ def expand_to_word_simple(stuff: list[AST.ArgChar],
                                     if isinstance(value, Field):
                                         value_str = value.try_to_str()
                                     else:
-                                        value_str = presplit_try_to_str(value)
+                                        value_str = value.try_to_str()
                                     if value_str is not None:
                                         self.add_expanded(str(len(value_str)), WordCount(1, 1))
                                     else:
@@ -1048,7 +1046,7 @@ def expand_to_word_simple(stuff: list[AST.ArgChar],
                                     if isinstance(value, Field):
                                         value_str = value.try_to_str()
                                     else:
-                                        value_str = presplit_try_to_str(value)
+                                        value_str = value.try_to_str()
                                     if pattern is not None and value_str is not None:
                                         trimmed = _trim_pattern(value_str, pattern, var_node.fmt)
                                         if trimmed == "":
@@ -1256,71 +1254,6 @@ def join_fields(fields: list[Field]) -> Field:
     return merge_partial_fields(fields, sep=" ", state=None)
 
 
-def merge_partial_fields(fields: list[Field], sep: str | None = " ", state: State | None = None) -> Field:
-    """Merge a list of partial fields into one field, merging SymStrs and folding them into CompletelyArbitrarys as prefixes or suffixes."""
-
-    def merge_symstrs(symstrs: list[Field]) -> Field:
-        assert all(isinstance(f.content, SymStr) for f in symstrs), f"merge_symstrs should only be called on lists of Fields with SymStr content (got {symstrs})"
-        match symstrs:
-            case []:
-                return Field(SymStr(()), WordCount(0, 0))
-            case [one]:
-                return one
-            case [Field(SymStr(parts), c), *rest]:
-                content = parts
-                count = c
-                for field in rest:
-                    content = content + ((sep,) if sep else ()) + field.content.parts # type: ignore (field.content is SymStr due to assert above)
-                    count = merge_counts(count, field.count, 1 if sep else 0)
-                return Field(SymStr(tuple(content)), count)
-            case _:
-                assert False, "unreachable"
-
-    def collect_prefixes_suffixes(fields: list[Field]) -> tuple[Field | None, Field | None]:
-        prefixes = []
-        for field in fields:
-            if isinstance(field.content, SymStr):
-                prefixes.append(field)
-            else:
-                break
-        suffixes = []
-        for field in reversed(fields):
-            if isinstance(field.content, SymStr):
-                suffixes.append(field)
-            else:
-                break
-        return (merge_symstrs(prefixes) if prefixes else None,
-                merge_symstrs(suffixes) if suffixes else None)
-
-    num_arbitraries = sum(1 for field in fields if isinstance(field.content, CompletelyArbitrary))
-    if num_arbitraries == 0:
-        # just join the symstrs
-        return merge_symstrs(fields)
-    elif num_arbitraries == 1:
-        arbitrary = [field for field in fields if isinstance(field.content, CompletelyArbitrary)][0]
-        prefix, suffix = collect_prefixes_suffixes(fields)
-        if prefix is not None:
-            arbitrary = add_prefix(arbitrary, prefix)
-        if suffix is not None:
-            arbitrary = add_suffix(arbitrary, suffix)
-        return arbitrary
-    else:
-        # multiple arbitraries -- give up and return a new arbitrary field
-        arbitraries = [field for field in fields if isinstance(field.content, CompletelyArbitrary)]
-        prefix, suffix = collect_prefixes_suffixes(fields)
-        quoted = all(a.content.quoted for a in arbitraries)
-        arbitrary = Field(CompletelyArbitrary(freeze_thing([a.content.source for a in arbitraries]), # type: ignore
-                                              ArbitraryType.APPROXIMATION,
-                                              state,
-                                              quoted=quoted),
-                          WordCount(0, inf))
-        if prefix is not None:
-            arbitrary = add_prefix(arbitrary, prefix)
-        if suffix is not None:
-            arbitrary = add_suffix(arbitrary, suffix)
-        return arbitrary
-
-
 def collapse_fields(fields: list[Field], source: AST.AstNode | None = None) -> Field:
     """Collapse alternative versions of a field into one field abstracting over all of them."""
     # if all alternatives are the same, return that
@@ -1334,35 +1267,6 @@ def collapse_fields(fields: list[Field], source: AST.AstNode | None = None) -> F
                                          ArbitraryType.APPROXIMATION,
                                          None),
                      WordCount(min_words, max_words))
-
-
-def add_prefix(arbitrary_field: Field, prefix_symstr: Field) -> Field:
-    match (arbitrary_field, prefix_symstr):
-        case (Field(CompletelyArbitrary(prefix=None) as a, acount),
-              Field(SymStr() as s, scount)):
-            return Field(replace(a, prefix=s), merge_counts(acount, scount))
-        case (Field(CompletelyArbitrary(prefix=SymStr(pre_parts)) as a, acount),
-              Field(SymStr(more_parts) as s, scount)):
-            return Field(replace(a, prefix=SymStr(more_parts + pre_parts)), merge_counts(acount, scount))
-        case _:
-            assert False, "unreachable"
-
-
-def add_suffix(arbitrary_field: Field, suffix_symstr: Field) -> Field:
-    match (arbitrary_field, suffix_symstr):
-        case (Field(CompletelyArbitrary(suffix=None) as a, acount),
-              Field(SymStr() as s, scount)):
-            return Field(replace(a, suffix=s), merge_counts(acount, scount))
-        case (Field(CompletelyArbitrary(suffix=SymStr(suf_parts)) as a, acount),
-              Field(SymStr(more_parts) as s, scount)):
-            return Field(replace(a, suffix=SymStr(suf_parts + more_parts)), merge_counts(acount, scount))
-        case _:
-            assert False, "unreachable"
-
-
-def merge_counts(c1: WordCount, c2: WordCount, sep: int = 0) -> WordCount:
-    return WordCount(c1.min + max(c2.min - 1, 0) + sep,
-                     c1.max + max(c2.max - 1, 0) + sep)
 
 
 def collapse_equiv_trace_expansions(expansions: list[tuple[Trace, list[Field]]]) -> dict[tuple[Field], list[Trace]]:
@@ -2046,7 +1950,7 @@ def handle_function_call(name: str,
     localenv: dict[str, ShellVar] = {}
     for i, arg in enumerate(arg_fields):
         if arg.count == WordCount(1, 1):
-            localenv[str(i + 1)] = ShellVar(presplit_from_field(arg))
+            localenv[str(i + 1)] = ShellVar(PreSplitWord.from_field(arg))
         else:
             logging.debug("Function argument %d is not guaranteed to be a single word, giving up on positional parameters (%s)", i, arg)
             break
@@ -2382,7 +2286,7 @@ def handle_read(expanded_args: list[Field], traces: Traces, node: AST.AstNode) -
             curr_trace = record_assignment(
                 curr_trace,
                 var_name,
-                presplit_from_field(arbitrary_field(node, ArbitraryType.ENVIRONMENT, curr_trace.latest_state)),
+                PreSplitWord.from_field(arbitrary_field(node, ArbitraryType.ENVIRONMENT, curr_trace.latest_state)),
             )
         new_traces.append(curr_trace)
     return new_traces
@@ -2533,7 +2437,7 @@ def handle_for_node(traces: Traces, node: AST.ForNode, config: InterpConfig) -> 
         t2 = t1
         exited: Traces = []
         for item_field in items:
-            t2 = [record_assignment(t, var_name, presplit_from_field(item_field)) for t in t2]
+            t2 = [record_assignment(t, var_name, PreSplitWord.from_field(item_field)) for t in t2]
             t2 = guarded_interp_node(t2, node.body, config)
             t2, break_exit = consume_break_traces(t2)
             t2, continue_next_iter, continue_exit = consume_continue_traces(t2)
@@ -2545,7 +2449,7 @@ def handle_for_node(traces: Traces, node: AST.ForNode, config: InterpConfig) -> 
         exited: Traces = []
         for i in range(config.max_loop_unroll):
             logging.debug("For loop unrolling iteration %d/%d", i+1, config.max_loop_unroll)
-            t2 = [record_assignment(t, var_name, presplit_from_field(arbitrary_field(node.variable,
+            t2 = [record_assignment(t, var_name, PreSplitWord.from_field(arbitrary_field(node.variable,
                                                                 ArbitraryType.APPROXIMATION,
                                                                 t.latest_state))) \
                 for t in t_current]
@@ -2884,10 +2788,10 @@ def starting_state(fs_model: FSModel | None = None, config: InterpConfig | None 
     root = State(fs_model = FSModelSimple(field_to_z3)) if fs_model is None else State(fs_model = fs_model)
     make_ast = lambda var: AST.VArgChar("Normal", False, var, [])
     starter_env = {
-        "HOME": ShellVar(presplit_from_field(arbitrary_field(make_ast("HOME"), ArbitraryType.ENVIRONMENT, root, min_words=1))),
-        "PWD": ShellVar(presplit_from_field(arbitrary_field(make_ast("PWD"), ArbitraryType.ENVIRONMENT, root, min_words=1))),
-        "OLDPWD": ShellVar(presplit_from_field(arbitrary_field(make_ast("OLDPWD"), ArbitraryType.ENVIRONMENT, root, min_words=1))),
-        "PATH": ShellVar(presplit_from_field(arbitrary_field(make_ast("PATH"), ArbitraryType.ENVIRONMENT, root, min_words=1)))
+        "HOME": ShellVar(PreSplitWord.from_field(arbitrary_field(make_ast("HOME"), ArbitraryType.ENVIRONMENT, root, min_words=1))),
+        "PWD": ShellVar(PreSplitWord.from_field(arbitrary_field(make_ast("PWD"), ArbitraryType.ENVIRONMENT, root, min_words=1))),
+        "OLDPWD": ShellVar(PreSplitWord.from_field(arbitrary_field(make_ast("OLDPWD"), ArbitraryType.ENVIRONMENT, root, min_words=1))),
+        "PATH": ShellVar(PreSplitWord.from_field(arbitrary_field(make_ast("PATH"), ArbitraryType.ENVIRONMENT, root, min_words=1)))
     }
     pwd_init_var = config.pwd_init_var if config is not None else InterpConfig().pwd_init_var
     starter_env[pwd_init_var] = ShellVar(starter_env["PWD"].value, readonly=True, ghost=True)
@@ -3090,6 +2994,7 @@ def symbexec_file(file: str,
                 )
                 dfs_phase_timed_out = dfs_phase_timed_out or targeted_timed_out
 
+                #return SymbexecResult(SymbexecStatus.COMPLETED, targeted_traces)
             dfs_remaining_timeout = dfs_timeout - (time.perf_counter() - dfs_phase_start)
             dfs_pass_count = 2 + (3 if enable_unbound_empty_dfs else 0)
             dfs_pass_timeout = 0.0
