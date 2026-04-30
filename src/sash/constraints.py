@@ -200,6 +200,7 @@ class IOType(Enum):
 
     @staticmethod
     def add_stdin(io: "IOType") -> "IOType":
+        assert io != IOType.STDOUT_FILE and io != IOType.STDOUT_DIR, "cannot add stdin to file/dir stdout"
         match io:
             case IOType.NONE | IOType.UNKNOWN:
                 return IOType.STDIN
@@ -210,6 +211,7 @@ class IOType(Enum):
 
     @staticmethod
     def add_stdout(io: "IOType") -> "IOType":
+        assert io != IOType.STDOUT_FILE and io != IOType.STDOUT_DIR, "cannot add stdout to file/dir stdout"
         match io:
             case IOType.NONE | IOType.UNKNOWN:
                 return IOType.STDOUT
@@ -220,6 +222,7 @@ class IOType(Enum):
 
     @staticmethod
     def remove_stdin(io: "IOType") -> "IOType":
+        assert io != IOType.STDOUT_FILE and io != IOType.STDOUT_DIR, "cannot remove stdin from file/dir stdout"
         match io:
             case IOType.STDIN:
                 return IOType.NONE
@@ -230,6 +233,7 @@ class IOType(Enum):
 
     @staticmethod
     def remove_stdout(io: "IOType") -> "IOType":
+        assert io != IOType.STDOUT_FILE and io != IOType.STDOUT_DIR, "cannot remove stdout from file/dir stdout"
         match io:
             case IOType.STDOUT:
                 return IOType.NONE
