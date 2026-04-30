@@ -10,8 +10,9 @@ from copy import deepcopy
 from dataclasses import dataclass, field, replace
 from enum import Enum
 from math import inf
+from collections.abc import Callable
 from threading import Event
-from typing import NamedTuple, Callable
+from typing import NamedTuple
 
 import shasta.ast_node as AST
 

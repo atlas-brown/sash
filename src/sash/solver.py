@@ -11,7 +11,7 @@ from sash.frozen import FrozenAst
 from sash.fs import FileInfo, File, Read, Unread
 from pprint import pformat
 import z3
-from sash.debugtools.solver_debug import get_debugger as solver_debugger, log_assertion_result
+from sash.debugtools.solver_debug import get_debugger as solver_debugger, log_assertion_result, SolverDebugger
 
 arbitrary_to_z3_var: dict[CompletelyArbitrary, z3.ExprRef] = {}
 command_exists_predicate = z3.Function('command_exists', z3.StringSort(), z3.BoolSort())
@@ -157,7 +157,7 @@ def model_to_reports(assertion: Assertion,
                      full_assertion: z3.ExprRef,
                      state_formula: z3.ExprRef,
                      refinements: list[tuple[z3.ExprRef, Issue]],
-                     debugger: 'Optional[SolverDebugger]' = None):
+                     debugger: SolverDebugger | None = None):
     """
     Convert an UNSAT assertion check to structured reporter errors.
     """

@@ -2,7 +2,7 @@ import logging
 from collections.abc import Callable
 from dataclasses import dataclass, field, fields, replace
 from enum import Enum
-from typing import Any, Optional
+from typing import Any
 
 import shasta.ast_node as AST
 
@@ -110,7 +110,7 @@ class State:
     call_stack:                  tuple[str, ...]             = field(default_factory=tuple)
     fundefs:                     FrozenDict[str, FrozenAst]  = field(default_factory=FrozenDict)
     last_exit_code:              tuple[SymStr, Confidence]   = (SymStr(("0",)), Confidence.DEFINITE)
-    last_cmd_failure_postcond:   Optional[Constraint]        = None
+    last_cmd_failure_postcond:   Constraint | None           = None
     opts:                        SetOptions                  = field(default_factory=SetOptions)
     known_nonexistent_commands:  frozenset[str]              = field(default_factory=frozenset)
     known_existing_commands:     frozenset[str]              = field(default_factory=frozenset)
@@ -202,7 +202,7 @@ class State:
     def update_fs(self, constraints: Constraint) -> 'State':
         return replace(self, fs_model=self.fs_model.apply_postcondition(constraints.normalized()))
 
-    def set_last_exit_code(self, code: SymStr, confidence: Confidence, failure_postcond: Optional[Constraint] = None) -> 'State':
+    def set_last_exit_code(self, code: SymStr, confidence: Confidence, failure_postcond: Constraint | None = None) -> 'State':
         return replace(self,
                        last_exit_code=(code, confidence),
                        last_cmd_failure_postcond=(failure_postcond if failure_postcond is not None else self.last_cmd_failure_postcond))

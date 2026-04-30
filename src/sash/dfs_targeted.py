@@ -1,6 +1,6 @@
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass, replace
-from typing import Callable
 
 import shasta.ast_node as AST
 

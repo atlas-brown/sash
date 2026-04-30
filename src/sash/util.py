@@ -1,4 +1,4 @@
-from collections.abc import Generator
+from collections.abc import Generator, Callable
 
 import shasta.ast_node as AST
 import z3
@@ -6,7 +6,6 @@ import z3
 from typing import TYPE_CHECKING
 
 from sash.constraints import And, Constraint, Implies, Not, Or, StringEq
-from typing import Callable
 from dataclasses import replace
 
 import logging
