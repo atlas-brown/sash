@@ -2,7 +2,7 @@ import logging
 from collections.abc import Callable
 from dataclasses import dataclass, field, fields, replace
 from enum import Enum
-from typing import Any
+from typing import Any, TYPE_CHECKING
 
 import shasta.ast_node as AST
 
@@ -19,7 +19,9 @@ from sash.constraints import (
 )
 from sash.frozen import FrozenAst, FrozenDict
 from sash.debugtools.logger import DebugLogger
-import sash.reporter as reporter
+
+if TYPE_CHECKING:
+    import sash.reporter as reporter
 
 @dataclass(frozen=True)
 class ShellVar:
