@@ -22,12 +22,8 @@ from sash.constraints import (
     StringConcat,
     StringEq,
 )
+from sash.util import _as_boolref
 from sash.symbolic.strings import Field
-
-
-def _as_boolref(expr: Any) -> z3.BoolRef:
-    assert isinstance(expr, z3.BoolRef)
-    return expr
 
 
 @dataclass(frozen=True)

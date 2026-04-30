@@ -1,4 +1,5 @@
 from collections.abc import Generator, Callable
+from typing import Any
 
 import shasta.ast_node as AST
 import z3
@@ -130,6 +131,11 @@ def iter_constraint(node: Constraint, skip: list[type[Constraint]]) -> Generator
 def create_fresh_varname(prefix: str | None = None) -> str:
     prefix = prefix if prefix is not None else "vr"
     return str(z3.FreshConst(z3.StringSort(),prefix))
+
+
+def _as_boolref(expr: Any) -> z3.BoolRef:
+    assert isinstance(expr, z3.BoolRef)
+    return expr
 
 def partition(l: list, predicate: Callable) -> tuple[list, list]:
     """Partition a sequence into two tuples based on a predicate."""

@@ -1,4 +1,5 @@
 import threading
+from collections.abc import Callable, Sequence
 from sash.constraints import *
 from sash.reporter import *
 from sash.interpreter_config import InterpConfig
@@ -7,8 +8,9 @@ from dataclasses import replace
 import logging
 from sash.symbolic.strings import ArbitraryType, CompletelyArbitrary, Field, SymStr
 from sash.util import shasta_pretty
+from sash.util import _as_boolref
 from sash.frozen import FrozenAst
-from sash.fs import FileInfo, File, Read, Unread
+from sash.fs import FSModelSimple, FileInfo, File, Read, Unread
 from pprint import pformat
 import z3
 from sash.debugtools.solver_debug import get_debugger as solver_debugger, log_assertion_result, SolverDebugger
@@ -61,7 +63,7 @@ def field_content_to_z3(field_content: SymStr | CompletelyArbitrary) -> z3.ExprR
             return z3_var
     assert False, f"Expected field content, got {field_content}"
 
-def _command_exists_to_z3(field: Field, s: State) -> z3.ExprRef:
+def _command_exists_to_z3(field: Field, s: State) -> z3.BoolRef:
     """
     Model command existence.
     - If we have concrete evidence that the command is missing, encode False.
@@ -69,13 +71,13 @@ def _command_exists_to_z3(field: Field, s: State) -> z3.ExprRef:
     """
     if (cmd_name := field.try_to_str()) and cmd_name in s.known_nonexistent_commands:
         return z3.BoolVal(False)
-    return command_exists_predicate(field_to_z3(field))
+    return _as_boolref(command_exists_predicate(field_to_z3(field)))
 
 
 z3True = z3.BoolVal(True)
 
-def constraint_to_z3(constraint: Constraint, s: State) -> z3.ExprRef:
-    def norm_constraint_to_z3(constraint: Constraint, s: State):
+def constraint_to_z3(constraint: Constraint, s: State) -> z3.BoolRef:
+    def norm_constraint_to_z3(constraint: Constraint, s: State) -> z3.BoolRef:
         match constraint:
             case Empty():
                 return z3True
@@ -85,15 +87,15 @@ def constraint_to_z3(constraint: Constraint, s: State) -> z3.ExprRef:
                 return s.fs_model.is_read_z3(field_content_to_z3(path.content))
             case Description(text):
                 # A no-op constraint with a message attached to it
-                return z3.FreshBool(f"description: {text}")
+                return _as_boolref(z3.FreshBool(f"description: {text}"))
             case And(lhs, rhs):
-                return z3.And(norm_constraint_to_z3(lhs, s), norm_constraint_to_z3(rhs, s))
+                return _as_boolref(z3.And(norm_constraint_to_z3(lhs, s), norm_constraint_to_z3(rhs, s)))
             case Or(lhs, rhs):
-                return z3.Or(norm_constraint_to_z3(lhs, s), norm_constraint_to_z3(rhs, s))
+                return _as_boolref(z3.Or(norm_constraint_to_z3(lhs, s), norm_constraint_to_z3(rhs, s)))
             case StringEq(lhs, rhs):
-                return field_content_to_z3(lhs.content) == field_content_to_z3(rhs.content)
+                return _as_boolref(field_content_to_z3(lhs.content) == field_content_to_z3(rhs.content))
             case StringConcat(result, parts):
-                return field_content_to_z3(result.content) == z3.Concat(*[field_content_to_z3(p.content) for p in parts])
+                return _as_boolref(field_content_to_z3(result.content) == z3.Concat(*[field_content_to_z3(p.content) for p in parts]))
             case IsFile(path):
                 return s.fs_model.is_file_z3(field_content_to_z3(path.content))
             case IsDir(path):
@@ -101,43 +103,43 @@ def constraint_to_z3(constraint: Constraint, s: State) -> z3.ExprRef:
             case IsDeleted(path):
                 return s.fs_model.is_deleted_z3(field_content_to_z3(path.content))
             case Not(c):
-                return z3.Not(norm_constraint_to_z3(c, s))
+                return _as_boolref(z3.Not(norm_constraint_to_z3(c, s)))
             case Implies(premise, conclusion):
-                return z3.Implies(norm_constraint_to_z3(premise, s), norm_constraint_to_z3(conclusion, s))
+                return _as_boolref(z3.Implies(norm_constraint_to_z3(premise, s), norm_constraint_to_z3(conclusion, s)))
             case _:
                 logging.error("Unrecognized constraint type in Z3 translation: %s (type %s)",
                               constraint, type(constraint))
                 return z3True
 
-    return norm_constraint_to_z3(constraint.normalized().constraint, s)
+    return _as_boolref(norm_constraint_to_z3(constraint.normalized().constraint, s))
 
-def state_to_z3(s: State, include_fs: bool = True) -> z3.ExprRef:
+def state_to_z3(s: State, include_fs: bool = True) -> z3.BoolRef:
     if logging.getLogger().isEnabledFor(logging.DEBUG):
         logging.debug("Path condition constraints: %s", pformat(s.pathcond))
-    pathcond_formula = z3.And([constraint_to_z3(pc.constraint, pc.producing_state) for pc in s.pathcond]) if s.pathcond else z3.BoolVal(True)
+    pathcond_formula = _as_boolref(z3.And([constraint_to_z3(pc.constraint, pc.producing_state) for pc in s.pathcond])) if s.pathcond else z3.BoolVal(True)
 
     if logging.getLogger().isEnabledFor(logging.DEBUG):
         logging.debug("Path condition formula: %s", pformat(pathcond_formula))
 
-    env_formula = []
+    env_formula: list[z3.BoolRef] = []
     for var, val in (s.env | s.localenv).items():
         var_z3 = z3.String(var)
         val_z3 = field_content_to_z3(val.as_field().content)
-        eq_formula = (var_z3 == val_z3)
+        eq_formula = _as_boolref(var_z3 == val_z3)
         env_formula.append(eq_formula)
-    env_formula = z3.And(env_formula)
+    env_formula_formula = _as_boolref(z3.And(env_formula))
 
     fs_state_formula = s.fs_model.state_to_z3() if include_fs else z3.BoolVal(True)
 
     if logging.getLogger().isEnabledFor(logging.DEBUG):
         logging.debug("FS state:\n%s", pformat(s.fs_model))
 
-    return z3.And(fs_state_formula, pathcond_formula, env_formula)
+    return _as_boolref(z3.And(fs_state_formula, pathcond_formula, env_formula_formula))
 
 def assertion_to_z3(assertion: Assertion,
-                    include_fs_override: bool | None = None) -> tuple[z3.ExprRef, # state formula
-                                                                      z3.ExprRef,
-                                                                      list[tuple[z3.ExprRef, Issue]]]: # assertion constraint formula
+                    include_fs_override: bool | None = None) -> tuple[z3.BoolRef, # state formula
+                                                                      z3.BoolRef,
+                                                                      list[tuple[z3.BoolRef, Issue]]]: # assertion constraint formula
     """
     Convert an assertion to a Z3 formula.
     Returns a tuple of (compatibility slot, state formula, assertion constraint formula).
@@ -152,18 +154,19 @@ def assertion_to_z3(assertion: Assertion,
 
 
 def model_to_reports(assertion: Assertion,
-                     solver: 'Z3Solver',
+                     solver: z3.Solver,
                      config: InterpConfig,
                      full_assertion: z3.ExprRef,
                      state_formula: z3.ExprRef,
-                     refinements: list[tuple[z3.ExprRef, Issue]],
+                     refinements: Sequence[tuple[z3.BoolRef, Issue]],
                      debugger: SolverDebugger | None = None):
     """
     Convert an UNSAT assertion check to structured reporter errors.
     """
+    to_log: tuple[z3.ExprRef, Issue] | None = None
     match refinements:
         case [(tt, issue)]:
-            assert tt == z3True, "Non-empty single refinement doesn't make sense"
+            assert z3.is_true(tt), "Non-empty single refinement doesn't make sense"
             logging.debug(f"Assertion has no refinements, reporting sole issue")
             Reporter.add_issue(issue, config)
             if debugger is not None:
@@ -185,21 +188,21 @@ def model_to_reports(assertion: Assertion,
                     reported = True
                     break
             assert reported, f"Bad assertion refinements: at least one refinement is not implied by overall assertion? In {assertion.constraint}"
-    if debugger is not None:
+    if debugger is not None and to_log is not None:
         assertion_formula, issue = to_log
         log_assertion_result(
-                    assertion=assertion,
-                    assertion_formula=assertion_formula,
-                    state_formula=state_formula,
-                    issue=str(issue.code)[5:],
-                    arb_z3_map=arbitrary_to_z3_var,
-                    result_type="UNSAT",
-                    solver_time=-1,
-                    debugger=debugger,
-                )
+            assertion=assertion,
+            assertion_formula=assertion_formula,
+            state_formula=state_formula,
+            issue=str(issue.code)[5:],
+            arb_z3_map=arbitrary_to_z3_var,
+            result_type="UNSAT",
+            solver_time=-1,
+            debugger=debugger,
+        )
 
 
-def assume_unknowns_are_files(assertions: list[Assertion]) -> tuple[Assertion, ...]:
+def assume_unknowns_are_files(assertions: Sequence[Assertion]) -> tuple[Assertion, ...]:
     def is_redirection_assertion(assertion: Assertion) -> bool:
         source = assertion.source_str
         return ">" in source or "<" in source
@@ -215,6 +218,7 @@ def assume_unknowns_are_files(assertions: list[Assertion]) -> tuple[Assertion, .
             continue
         state = assertion.producing_state
         fs_model = state.fs_model
+        assert isinstance(fs_model, FSModelSimple), "assume_unknowns_are_files requires FSModelSimple"
         new_fs_model = fs_model.set_default_path_state(FileInfo.mk_pair(File, Read))
         new_state = replace(state, fs_model=new_fs_model).add_pathcond(Description("Assume unknown paths are files"))
         conditional_constraint = with_file_constraint(assertion.constraint)
@@ -267,12 +271,10 @@ def _solver_assertions_for_trace(trace: Trace) -> tuple[Assertion, ...]:
 def run_solver(traces: list[Trace], config: InterpConfig, stop: threading.Event | None = None):
     total_issues_before_solver = len(Reporter._issues)
     timed_out = False
+    debugger: SolverDebugger | None = solver_debugger() if config.debug_instrumentation else None
 
     total_assertions = sum(len(_solver_assertions_for_trace(trace)) for trace in traces)
     checked_assertions = 0
-
-    if config.debug_instrumentation:
-        debugger = solver_debugger()
 
     solver = z3.Solver()
     solver.set('timeout', 5000)
