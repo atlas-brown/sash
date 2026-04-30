@@ -25,24 +25,29 @@ from sash.constraints import (
 from sash.symbolic.strings import Field
 
 
+def _as_boolref(expr: Any) -> z3.BoolRef:
+    assert isinstance(expr, z3.BoolRef)
+    return expr
+
+
 @dataclass(frozen=True)
 class FSModel():
     def apply_postcondition(self, norm_constraints: NormalizedConstraint) -> "FSModel":
         return self
 
-    def is_file_z3(self, path_z3) -> 'z3.ExprRef':
+    def is_file_z3(self, path_z3) -> z3.BoolRef:
         return z3.BoolVal(False)
 
-    def is_dir_z3(self, path_z3) -> 'z3.ExprRef':
+    def is_dir_z3(self, path_z3) -> z3.BoolRef:
         return z3.BoolVal(False)
 
-    def is_deleted_z3(self, path_z3) -> 'z3.ExprRef':
+    def is_deleted_z3(self, path_z3) -> z3.BoolRef:
         return z3.BoolVal(False)
 
-    def is_read_z3(self, path_z3) -> 'z3.ExprRef':
+    def is_read_z3(self, path_z3) -> z3.BoolRef:
         return z3.BoolVal(False)
 
-    def state_to_z3(self) -> 'z3.ExprRef':
+    def state_to_z3(self) -> z3.BoolRef:
         return z3.BoolVal(True)
 
 
@@ -81,7 +86,7 @@ class FSModelSimple(FSModel):
 
     id: int  = 0
     # history: (z3var for FS at time step `id`, z3 array representing FS at time step `id`)
-    history: tuple[tuple[z3.ArrayRef, z3.ExprRef | None]] = field(default_factory=lambda: ((z3.Array('fs0', z3.StringSort(), FileInfo), None),))
+    history: tuple[tuple[z3.ArrayRef, z3.ExprRef | None], ...] = field(default_factory=lambda: ((z3.Array('fs0', z3.StringSort(), FileInfo), None),))
 
     def _rename_fs_var_append(self, var: z3.ArrayRef, suffix: str) -> z3.ExprRef:
         var_name = var.decl().name()
@@ -110,7 +115,7 @@ class FSModelSimple(FSModel):
         """Return a new abstract file system after writing to the given path."""
         return self._set(path, Dir, status)
 
-    def _apply_postcondition(self, constraints: Constraint, reference_state: "FsModelSimple") -> "FSModelSimple":
+    def _apply_postcondition(self, constraints: Constraint, reference_state: "FSModelSimple") -> "FSModelSimple":
         logging.debug("Applying FS postcondition: %s", constraints)
         match constraints:
             case Empty():
@@ -160,21 +165,23 @@ class FSModelSimple(FSModel):
     def apply_postcondition(self, norm_constraints: NormalizedConstraint) -> FSModel:
         return self._apply_postcondition(norm_constraints.constraint, self)
 
-    def is_file_z3(self, path_z3) -> 'z3.ExprRef':
-        return FileInfo.state(z3.Select(self.history[-1][0], path_z3)) == File
+    def is_file_z3(self, path_z3) -> z3.BoolRef:
+        return _as_boolref(FileInfo.state(z3.Select(self.history[-1][0], path_z3)) == File)
 
-    def is_dir_z3(self, path_z3) -> 'z3.ExprRef':
-        return FileInfo.state(z3.Select(self.history[-1][0], path_z3)) == Dir
+    def is_dir_z3(self, path_z3) -> z3.BoolRef:
+        return _as_boolref(FileInfo.state(z3.Select(self.history[-1][0], path_z3)) == Dir)
 
-    def is_deleted_z3(self, path_z3) -> 'z3.ExprRef':
-        return FileInfo.state(z3.Select(self.history[-1][0], path_z3)) == Del
+    def is_deleted_z3(self, path_z3) -> z3.BoolRef:
+        return _as_boolref(FileInfo.state(z3.Select(self.history[-1][0], path_z3)) == Del)
 
-    def is_read_z3(self, path_z3) -> 'z3.ExprRef':
-        is_file_and_read = z3.And(FileInfo.state(z3.Select(self.history[-1][0], path_z3)) == File,
-                      FileInfo.status(z3.Select(self.history[-1][0], path_z3)) == Read)
-        return is_file_and_read
+    def is_read_z3(self, path_z3) -> z3.BoolRef:
+        is_file_and_read = z3.And(
+            FileInfo.state(z3.Select(self.history[-1][0], path_z3)) == File,
+            FileInfo.status(z3.Select(self.history[-1][0], path_z3)) == Read,
+        )
+        return _as_boolref(is_file_and_read)
 
-    def _fs_constraint_z3(self, constraint: Constraint) -> 'z3.ExprRef':
+    def _fs_constraint_z3(self, constraint: Constraint) -> z3.BoolRef:
         match constraint:
             case IsFile(path):
                 return self.is_file_z3(self.field_to_z3(path))
@@ -185,28 +192,28 @@ class FSModelSimple(FSModel):
             case IsDeleted(path):
                 return self.is_deleted_z3(self.field_to_z3(path))
             case And(lhs, rhs):
-                return z3.And(self._fs_constraint_z3(lhs), self._fs_constraint_z3(rhs))
+                return _as_boolref(z3.And(self._fs_constraint_z3(lhs), self._fs_constraint_z3(rhs)))
             case Or(lhs, rhs):
-                return z3.Or(self._fs_constraint_z3(lhs), self._fs_constraint_z3(rhs))
+                return _as_boolref(z3.Or(self._fs_constraint_z3(lhs), self._fs_constraint_z3(rhs)))
             case Not(c):
-                return z3.Not(self._fs_constraint_z3(c))
+                return _as_boolref(z3.Not(self._fs_constraint_z3(c)))
             case Empty():
                 return z3.BoolVal(True)
             case StringEq(lhs, rhs):
-                return self.field_to_z3(lhs) == self.field_to_z3(rhs)
+                return _as_boolref(self.field_to_z3(lhs) == self.field_to_z3(rhs))
             case StringConcat(result, parts):
-                return self.field_to_z3(result) == z3.Concat(*[self.field_to_z3(p) for p in parts])
+                return _as_boolref(self.field_to_z3(result) == z3.Concat(*[self.field_to_z3(p) for p in parts]))
             case _:
                 assert False, f"all constraints should be handled (got {constraint})"
 
-    def state_to_z3(self) -> 'z3.ExprRef':
-        exprs = []
+    def state_to_z3(self) -> z3.BoolRef:
+        exprs: list[z3.BoolRef] = []
         logging.debug("Converting FSModelSimple to z3")
         for fsvar, arr_expr in self.history:
             logging.debug(f"s2z3: fsvar={fsvar}, arr_expr={arr_expr}")
             if arr_expr is not None:
-                exprs.append(fsvar == arr_expr)
-        return z3.And(exprs)
+                exprs.append(_as_boolref(fsvar == arr_expr))
+        return _as_boolref(z3.And(*exprs))
 
     def set_default_path_state(self, default: z3.ExprRef) -> "FSModelSimple":
         """Return a new FSModelSimple where any unknown paths default to the given state."""
