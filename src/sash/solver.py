@@ -204,10 +204,10 @@ def assume_unknowns_are_files(assertions: list[Assertion]) -> tuple[Assertion, .
         source = assertion.source_str
         return ">" in source or "<" in source
 
-    def add_condition(im):
-        return lambda line: im(line).under_condition(Description("Assume unknown paths are files"))
-    def with_file_condition(rc: RefineableConstraint) -> RefineableConstraint:
-        return replace(rc, refinements=[(c, add_condition(im)) for c, im in rc.refinements])
+    def add_constraint(im: Callable[[int], Issue]) -> Callable[[int], Issue]:
+        return lambda line: im(line).under_constraint(Description("Assume unknown paths are files"))
+    def with_file_constraint(rc: RefineableConstraint) -> RefineableConstraint:
+        return replace(rc, refinements=[(c, add_constraint(im)) for c, im in rc.refinements])
 
     new_assertions: list[Assertion] = []
     for assertion in assertions:
@@ -217,7 +217,7 @@ def assume_unknowns_are_files(assertions: list[Assertion]) -> tuple[Assertion, .
         fs_model = state.fs_model
         new_fs_model = fs_model.set_default_path_state(FileInfo.mk_pair(File, Read))
         new_state = replace(state, fs_model=new_fs_model).add_pathcond(Description("Assume unknown paths are files"))
-        conditional_constraint = with_file_condition(assertion.constraint)
+        conditional_constraint = with_file_constraint(assertion.constraint)
         new_assertion = replace(assertion,
                                 producing_state=new_state,
                                 constraint=conditional_constraint)

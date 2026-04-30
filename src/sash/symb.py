@@ -3016,7 +3016,7 @@ def symbexec_file(file: str,
                     lambda: symb_engine(nodes, replace(config,
                                     branch_policy=branch_policy_only_then,
                                     current_pass="conds:then",
-                                    current_pass_condition=Description("(DFS) all then branches are taken"))),
+                                    current_pass_constraint=Description("(DFS) all then branches are taken"))),
                 )
                 dfs_phase_timed_out = dfs_phase_timed_out or only_then_timed_out
                 logging.info("Running DFS pass: only taking ELSE branches")
@@ -3025,7 +3025,7 @@ def symbexec_file(file: str,
                     lambda: symb_engine(nodes, replace(config,
                                     branch_policy=branch_policy_only_else,
                                     current_pass="conds:else",
-                                    current_pass_condition=Description("(DFS) all else branches are taken"))),
+                                    current_pass_constraint=Description("(DFS) all else branches are taken"))),
                 )
                 dfs_phase_timed_out = dfs_phase_timed_out or only_else_timed_out
                 if enable_unbound_empty_dfs:
@@ -3037,7 +3037,7 @@ def symbexec_file(file: str,
                                         branch_policy=branch_policy_only_then,
                                         unbound_policy=UnboundVariablePolicy.EMPTY,
                                         current_pass="unbound:empty+conds:then",
-                                        current_pass_condition=And(Description("(DFS) all then branches are taken"),
+                                        current_pass_constraint=And(Description("(DFS) all then branches are taken"),
                                                                     Description("(DFS) unbound variables are empty")))),
                     )
                     dfs_phase_timed_out = dfs_phase_timed_out or then_unbound_timed_out
@@ -3048,7 +3048,7 @@ def symbexec_file(file: str,
                                         branch_policy=branch_policy_only_else,
                                         unbound_policy=UnboundVariablePolicy.EMPTY,
                                         current_pass="unbound:empty+conds:else",
-                                        current_pass_condition=And(Description("(DFS) all else branches are taken"),
+                                        current_pass_constraint=And(Description("(DFS) all else branches are taken"),
                                                                     Description("(DFS) unbound variables are empty")))),
                     )
                     dfs_phase_timed_out = dfs_phase_timed_out or else_unbound_timed_out
@@ -3058,7 +3058,7 @@ def symbexec_file(file: str,
                         lambda: symb_engine(nodes, replace(config,
                                         unbound_policy=UnboundVariablePolicy.EMPTY,
                                         current_pass="unbound:empty",
-                                        current_pass_condition=Description("(DFS) unbound variables are empty"))),
+                                        current_pass_constraint=Description("(DFS) unbound variables are empty"))),
                     )
                     dfs_phase_timed_out = dfs_phase_timed_out or unbound_timed_out
                     Reporter.drop_issues({reporter.Code.DELETE_SYSTEM_FILE, reporter.Code.CONSTANT_CONDITION, reporter.Code.COMMAND_CAN_ONLY_FAIL})

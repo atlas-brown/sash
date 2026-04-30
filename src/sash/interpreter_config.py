@@ -61,7 +61,7 @@ class InterpConfig:
     ignore_function_calls: bool = False
     ignore_function_calls_for: frozenset[str] = field(default_factory=frozenset)
     current_pass: str = "default"
-    current_pass_condition: Constraint = Empty()
+    current_pass_constraint: Constraint = Empty()
     debug_instrumentation: bool = False
     disable_solver_optimizations: bool = False
     pwd_init_var: str = "PWD_INIT"

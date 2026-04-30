@@ -20,8 +20,8 @@ def write_script(tmp_path, content: str) -> str:
     return str(path)
 
 def is_under_allowable_condition(issue: reporter.Issue, allowable_strs: list[str]) -> bool:
-    cond_str = str(issue.condition)
-    return not issue.condition or any(s in cond_str for s in allowable_strs)
+    cond_str = str(issue.constraint)
+    return not issue.constraint or any(s in cond_str for s in allowable_strs)
 
 def assert_expected_report(report: reporter.Report, expected_errors: list[reporter.Issue], allowable_conditions: list[str] = []):
     """Helper to compare actual report with expected errors."""

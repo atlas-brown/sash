@@ -2,12 +2,13 @@ import logging
 import math
 import copy
 from abc import ABC
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from enum import Enum
 from typing import NamedTuple
 from sash.interpreter_config import InterpConfig
 from sash.constraints import Constraint, Description, Empty
 from sash.debugtools.logger import DebugLogger
+from sash.symbolic.strings import Field
 
 
 class Severity(Enum):
@@ -46,7 +47,7 @@ class Issue(ABC):
     message: str
     severity: Severity
     source_line: int | None
-    condition: Constraint | None = None
+    constraint: Constraint | None = None
 
     def is_error(self) -> bool:
         return self.severity == Severity.ERROR
@@ -55,7 +56,7 @@ class Issue(ABC):
         return self.severity == Severity.WARNING
 
     def __repr__(self) -> str:
-        qualification = f"IF {self.condition} then " if self.condition else ""
+        qualification = f"IF {self.constraint} then " if self.constraint else ""
         return f"L{self.source_line}:{self.code}: {qualification}{self.message}"
 
     def __eq__(self, other: object) -> bool:
@@ -75,15 +76,15 @@ class Issue(ABC):
             "line": self.source_line,
             "code": self.code.value,
             "severity": self.severity.value,
-            "condition": str(self.condition) if self.condition else None,
+            "condition": str(self.constraint) if self.constraint else None,
             "message": self.message
         }
 
-    def under_condition(self, cond: 'Condition') -> 'Issue':
-        if cond != Empty():
+    def under_constraint(self, cons: Constraint | None) -> 'Issue':
+        if cons is not None and cons != Empty():
             # Workaround that `replace` doesn't work with custom custructors
             cp = copy.copy(self)
-            object.__setattr__(cp, 'condition', cond)
+            object.__setattr__(cp, 'constraint', cons)
             return cp
         else:
             return self
@@ -253,22 +254,22 @@ class Reporter:
     @classmethod
     def add_issue(cls, issue: Issue, current_config: InterpConfig):
         # todo: improve condition handling (would need proper types instead of searching text)
-        new_cond = issue.condition or current_config.current_pass_condition
+        new_cons = issue.constraint or current_config.current_pass_constraint
         if issue in cls._issues:
-            existing_cond = cls._issues[issue]
+            existing_cons = cls._issues[issue]
             # If the most general condition (none) is in place, do nothing
-            if existing_cond is None:
+            if existing_cons is None:
                 pass
 
             # If the second most general condition (empty vars) is in place, only update to None
-            elif isinstance(existing_cond, Description) and ("empty" in existing_cond.text) and (new_cond in [None, Empty()]):
+            elif isinstance(existing_cons, Description) and ("empty" in existing_cons.text) and (new_cons in [None, Empty()]):
                 cls._issues[issue] = None
                 DebugLogger.log_issue(issue, current_config.current_pass)
 
             # All other conditions are just as general as each other; do nothing
             return
 
-        cls._issues[issue] = new_cond
+        cls._issues[issue] = new_cons
         DebugLogger.log_issue(issue, current_config.current_pass)
 
     @classmethod
@@ -311,7 +312,7 @@ class Reporter:
 
     @classmethod
     def drop_issues(cls, codes: set[Code]):
-        cls._issues = {issue: cond for issue, cond in cls._issues.items() if issue.code not in codes}
+        cls._issues = {issue: cons for issue, cons in cls._issues.items() if issue.code not in codes}
 
     @classmethod
     def get_report(cls) -> Report:
@@ -336,7 +337,7 @@ class Reporter:
         return Report(
             filename=cls._filename,
             # We only add the condition to the issue here to enable easy deduplication while accumulating issues
-            issues=sorted([i.under_condition(cond) for i, cond in cls._issues.items()], key = lambda i: i.source_line if i.source_line is not None else -1),
+            issues=sorted([i.under_constraint(cons) for i, cons in cls._issues.items()], key = lambda i: i.source_line if i.source_line is not None else -1),
             time=cls._exec_time,
             solver_time=cls._solver_time,
             timed_out=cls._timed_out,
