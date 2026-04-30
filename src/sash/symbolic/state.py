@@ -19,6 +19,7 @@ from sash.constraints import (
 )
 from sash.frozen import FrozenAst, FrozenDict
 from sash.debugtools.logger import DebugLogger
+import sash.reporter as reporter
 
 @dataclass(frozen=True)
 class ShellVar:
@@ -69,15 +70,18 @@ def SimpleConstraint(c: Constraint, issue_maker: Callable[[int], 'reporter.Issue
     else:
         return RefineableConstraint(c, ((Empty(), issue_maker),))
 
-# <assertion_constraint>: if true, then things are OK, if false then there's a bug
-@dataclass(frozen=True)
-class Assertion:
+@dataclass(frozen=True, kw_only=True)
+class AssertionBase:
     producing_state: "State"
-    constraint: RefineableConstraint
     source_str: str
     source_line: int
     priority: int = 0
     include_fs: bool = True
+
+# <assertion_constraint>: if true, then things are OK, if false then there's a bug
+@dataclass(frozen=True)
+class Assertion(AssertionBase):
+    constraint: RefineableConstraint
 
     def __post_init__(self):
         assert isinstance(self.constraint, RefineableConstraint), "Assertion constructed with non-RefineableConstraint"
@@ -87,15 +91,11 @@ class Assertion:
         return f"Assertion(state<{hash(self.producing_state)}>, constraint={repr(self.constraint)}, source_str={repr(self.source_str)}, source_line={self.source_line}, priority={self.priority}, include_fs={self.include_fs})"
 
 @dataclass(frozen=True)
-class Condition(Assertion):
+class Condition(AssertionBase):
     constraint: Constraint
 
     def __repr__(self):
         return f"Condition(state<{hash(self.producing_state)}>, constraint={repr(self.constraint)}, source_str={repr(self.source_str)}, source_line={self.source_line})"
-
-    def __post_init__(self):
-        pass # since constraint is just `Constraint`, no need for this
-
 
 class Confidence(Enum):
     DEFINITE = 0
@@ -123,7 +123,7 @@ class State:
 
     external_data: Any = None # ASSUMPTION: must be hashable
 
-    _hash: int = field(default=None, compare=False)
+    _hash: int | None = field(default=None, compare=False)
     def __post_init__(self):
         object.__setattr__(
             self,
@@ -138,6 +138,7 @@ class State:
         )
 
     def __hash__(self):
+        assert self._hash is not None, "hash should have been set in __post_init__"
         return self._hash
 
     def set_env(self, var: str, value: ShellVar) -> 'State':
@@ -158,7 +159,14 @@ class State:
         if cond == Empty():
             logging.debug("Skipping empty path condition from %s at line %s", source_str, source_line)
             return self
-        new_pathcond = self.pathcond + (Condition(self, cond, source_str, source_line),)
+        new_pathcond = self.pathcond + (
+            Condition(
+                producing_state=self,
+                source_str=source_str or "",
+                source_line=source_line or -1,
+                constraint=cond,
+            ),
+        )
         return replace(self, pathcond=new_pathcond)
 
     def add_assertion(self, assertion_constraint: RefineableConstraint, source_str: str | None = None, source_line: int | None = None, priority: int = 0, include_fs: bool = True) -> 'State':
@@ -168,8 +176,8 @@ class State:
             return self
         assertion = Assertion(producing_state=self,
                               constraint=assertion_constraint,
-                              source_str=source_str,
-                              source_line=source_line,
+                              source_str=source_str or "",
+                              source_line=source_line or -1,
                               priority=priority,
                               include_fs=include_fs)
         logging.debug(f"Added assertion id: {id(assertion)}")
