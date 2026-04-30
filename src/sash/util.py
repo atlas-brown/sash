@@ -87,7 +87,8 @@ def iter_ast_command(node: AST.Command, skip: list[type[AST.Command]] = []) -> G
                 yield from iter_ast_command(node.else_b, skip)
         case AST.CaseNode():
             for case in node.cases:
-                yield from iter_ast_command(case["cbody"], skip)
+                if case["cbody"] is not None:
+                    yield from iter_ast_command(case["cbody"], skip)
         case _:
             pass
 
