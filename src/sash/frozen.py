@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Any, Generic, TypeVar
+from typing import Any, Generic, TypeVar, overload
 
 import shasta.ast_node as AST
 
@@ -28,6 +28,17 @@ def freeze(ast: AST.AstNode) -> FrozenAst:
         type(ast).__name__,
         tuple((field_name, freeze_thing(value)) for field_name, value in ast.__dict__.items())
         )
+
+T = TypeVar('T')
+
+@overload
+def freeze_thing(v: AST.AstNode) -> FrozenAst: ...
+@overload
+def freeze_thing(v: list | tuple | set) -> tuple: ...
+@overload
+def freeze_thing(v: dict) -> tuple: ...
+@overload
+def freeze_thing(v: T) -> T: ...
 
 def freeze_thing(v):
     match v:

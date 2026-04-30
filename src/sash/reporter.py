@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 import logging
 import math
 import copy
@@ -185,11 +186,11 @@ class CapturingEmptyOutput(Issue):
         super().__init__(Code.CAPTURING_EMPTY_OUTPUT, f"command '{command}' captures empty output", Severity.WARNING, line)
 
 class ExpectedPathState(Issue):
-    def __init__(self, command: str, state: str, paths: 'list[Field]', line):
+    def __init__(self, command: str, state: str, paths: Sequence[Field], line):
         super().__init__(Code.CMD_ASSERTION_PATH_STATE, f"command '{command}' expects paths that are {state}, but one or more of {paths} are not", Severity.ERROR, line)
 
 class DataLoss(Issue):
-    def __init__(self, command: str, paths, line):
+    def __init__(self, command: str, paths: Sequence[Field], line):
         super().__init__(Code.DATA_LOSS, f"command '{command}' deletes {paths}, one of which has not been read, potentially causing loss of data", Severity.ERROR, line)
 
 
