@@ -1,17 +1,20 @@
 FROM ubuntu:latest
 
-
 # Update and install basic packages
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
-    build-essential \
-    curl \
-    git \
-    shfmt \
-    wget \
-    software-properties-common \
-    sudo \ 
-    libstdc++6  \
+        build-essential \
+        criu \
+        curl \
+        git \
+        shfmt \
+        wget \
+        software-properties-common \
+        libstdc++6 \
+        unzip \
+        libtool \
+        m4 \
+        automake \
     && rm -rf /var/lib/apt/lists/*
 
 # Add deadsnakes PPA and install Python 3.10
@@ -20,18 +23,8 @@ RUN add-apt-repository ppa:deadsnakes/ppa && \
     apt-get install -y python3.10 python3.10-venv && \
     rm -rf /var/lib/apt/lists/*
 
-RUN apt-get update
-RUN sudo apt-get install libtool m4 automake -y
-
-
-
 # Set the working directory in the container
 WORKDIR /home/sash
-CMD source /home/sash/.bashrc
-
-#Install unzip 
-RUN sudo apt-get update
-RUN apt-get install unzip
 
 #COPY z3 install script
 COPY install_z3.sh /home/sash/install_z3.sh

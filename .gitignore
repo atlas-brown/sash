@@ -29,3 +29,6 @@ trace_info.jsonl
 .cache/fontconfig
 
 *.pdf
+
+# Serialized state
+.resumable
