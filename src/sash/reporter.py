@@ -125,17 +125,17 @@ class UndefinedFunction(Issue):
 
 class InfiniteLoop(Issue):
     def __init__(self, loop, line):
-        super().__init__(Code.INFINITE_LOOP, f"condition for loop {_render_node(loop)} never changes, causing an infinite loop", Severity.ERROR, line)
+        super().__init__(Code.INFINITE_LOOP, f"condition for the following loop never changes, causing an infinite loop: {_render_node(loop)}", Severity.ERROR, line)
 
 
 class ConstantCondition(Issue):
     def __init__(self, cond, line):
-        super().__init__(Code.CONSTANT_CONDITION, f"condition {_render_node(cond)} is always true or false", Severity.WARNING, line)
+        super().__init__(Code.CONSTANT_CONDITION, f"condition is always true or false: {_render_node(cond)}", Severity.WARNING, line)
 
 
 class LoopRunsOnce(Issue):
     def __init__(self, loop, line):
-        super().__init__(Code.LOOP_RUNS_ONCE, f"loop {_render_node(loop)} runs only once", Severity.WARNING, line)
+        super().__init__(Code.LOOP_RUNS_ONCE, f"loop runs only once: {_render_node(loop)}", Severity.WARNING, line)
 
 
 class DeleteSystemFile(Issue):
@@ -150,7 +150,7 @@ class WordSplitCouldDeleteSystemFile(Issue):
 
 class DangerousWordSplit(Issue):
     def __init__(self, source, line):
-        super().__init__(Code.DANGEROUS_WORD_SPLIT, f"{_render_node(source)} could be split in a dangerous position, leading to unexpected arguments to dangerous commands", Severity.WARNING, line)
+        super().__init__(Code.DANGEROUS_WORD_SPLIT, f"code could be split in a dangerous position, leading to unexpected arguments to dangerous commands: {_render_node(source)}", Severity.WARNING, line)
 
 
 class RedirectToFunction(Issue):
@@ -160,7 +160,7 @@ class RedirectToFunction(Issue):
 
 class DeadCode(Issue):
     def __init__(self, code, line):
-        super().__init__(Code.DEAD_CODE, f"{_render_node(code)} is unreachable and will never be executed", Severity.WARNING, line)
+        super().__init__(Code.DEAD_CODE, f"code is unreachable and will never be executed: {_render_node(code)}", Severity.WARNING, line)
 
 
 class EmptyVar(Issue):
