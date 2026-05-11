@@ -42,8 +42,8 @@ class Code(Enum):
     INCONSISTENT_IFS = "inconsistent_ifs"
 
 
-def _render_node(node: object) -> str:
-    """Render AST-like nodes in user-facing diagnostics."""
+def _stringfy_object(node: object) -> str:
+    """Try to get a pretty string representation of the given object, falling back to the default str() if not available."""
     pretty = getattr(node, "pretty", None)
     return str(pretty()) if callable(pretty) else str(node)
 
@@ -125,17 +125,17 @@ class UndefinedFunction(Issue):
 
 class InfiniteLoop(Issue):
     def __init__(self, loop, line):
-        super().__init__(Code.INFINITE_LOOP, f"condition for the following loop never changes, causing an infinite loop: {_render_node(loop)}", Severity.ERROR, line)
+        super().__init__(Code.INFINITE_LOOP, f"condition for the following loop never changes, causing an infinite loop:\n{_stringfy_object(loop)}", Severity.ERROR, line)
 
 
 class ConstantCondition(Issue):
     def __init__(self, cond, line):
-        super().__init__(Code.CONSTANT_CONDITION, f"condition is always true or false: {_render_node(cond)}", Severity.WARNING, line)
+        super().__init__(Code.CONSTANT_CONDITION, f"condition is always true or false:\n{_stringfy_object(cond)}", Severity.WARNING, line)
 
 
 class LoopRunsOnce(Issue):
     def __init__(self, loop, line):
-        super().__init__(Code.LOOP_RUNS_ONCE, f"loop runs only once: {_render_node(loop)}", Severity.WARNING, line)
+        super().__init__(Code.LOOP_RUNS_ONCE, f"loop runs only once:\n{_stringfy_object(loop)}", Severity.WARNING, line)
 
 
 class DeleteSystemFile(Issue):
@@ -150,7 +150,7 @@ class WordSplitCouldDeleteSystemFile(Issue):
 
 class DangerousWordSplit(Issue):
     def __init__(self, source, line):
-        super().__init__(Code.DANGEROUS_WORD_SPLIT, f"code could be split in a dangerous position, leading to unexpected arguments to dangerous commands: {_render_node(source)}", Severity.WARNING, line)
+        super().__init__(Code.DANGEROUS_WORD_SPLIT, f"code could be split in a dangerous position, leading to unexpected arguments to dangerous commands:\n{_stringfy_object(source)}", Severity.WARNING, line)
 
 
 class RedirectToFunction(Issue):
@@ -160,7 +160,7 @@ class RedirectToFunction(Issue):
 
 class DeadCode(Issue):
     def __init__(self, code, line):
-        super().__init__(Code.DEAD_CODE, f"code is unreachable and will never be executed: {_render_node(code)}", Severity.WARNING, line)
+        super().__init__(Code.DEAD_CODE, f"code is unreachable and will never be executed:\n{_stringfy_object(code)}", Severity.WARNING, line)
 
 
 class EmptyVar(Issue):
@@ -231,6 +231,35 @@ class Report(NamedTuple):
             "ast_nodes_interpreted": self.ast_nodes_interpreted,
             "ast_coverage_pct": self.ast_coverage_pct,
         }
+
+    def to_plain_text(self) -> str:
+        """Render the report as user-facing, pretty plain text."""
+
+        lines = [f"Analysis report for file {self.filename}:"]
+
+        if self.issues:
+            lines.append(f"Issues ({len(self.issues)} in total):")
+            for idx, issue in enumerate(self.issues, start=1):
+                header = f"{idx}. {issue.severity.value.upper()} at line {issue.source_line if issue.source_line is not None else 'unknown'}:"
+                lines.append(f"\t{header}")
+                lines.append(f"\t\tError code: {issue.code.value}")
+                if issue.constraint:
+                    lines.append(f"\t\tCondition: {issue.constraint}")
+                lines.append(f"\t\tMessage: {issue.message}")
+        else:
+            lines.append("No issues found.")
+
+        lines.extend([
+            "Summary:",
+            f"\tSymbolic execution time: {self.time} seconds",
+            f"\tSolver time: {self.solver_time} seconds",
+            f"\tTimed out: {self.timed_out}",
+            f"\tAST nodes in total: {self.ast_nodes_total}",
+            f"\tAST nodes interpreted: {self.ast_nodes_interpreted}",
+            f"\tAST coverage: {self.ast_coverage_pct}%",
+        ])
+
+        return "\n".join(lines)
 
 
 class Reporter:

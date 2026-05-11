@@ -61,6 +61,11 @@ def build_cli(options_only=False) -> argparse.ArgumentParser:
         help=f"Timeout budget (in seconds); shared between the execution and solver phases; set to 'inf' for no timeout (default: %(default)s)",
     )
     parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Emit JSON-compliant output instead of the default user-facing, pretty plain-text output"
+    )
+    parser.add_argument(
         "-h",
         "--help",
         metavar="advanced",
@@ -226,7 +231,10 @@ def cli_main():
         collect_debug_info=args.collect_debug_info,
     )
 
-    print(json.dumps(report.to_dict(), indent=2))
+    if args.json:
+        print(json.dumps(report.to_dict(), indent=2))
+    else:
+        print(report.to_plain_text())
 
 
 def symbexec_main(file: str,
