@@ -42,10 +42,22 @@ class Code(Enum):
     INCONSISTENT_IFS = "inconsistent_ifs"
 
 
-def _stringfy_object(node: object) -> str:
+def _prettify_object(node: object) -> str:
     """Try to get a pretty string representation of the given object, falling back to the default str() if not available."""
     pretty = getattr(node, "pretty", None)
     return str(pretty()) if callable(pretty) else str(node)
+
+
+def _prettify_paths(paths: Sequence[Field]) -> str:
+    """Try to get a pretty string representation of the given paths, falling back to the default str() if not available."""
+    pretty_paths = []
+    for path in paths:
+        if isinstance(path, Field):
+            pretty_path = path.try_to_str() or _prettify_object(path.content)
+        else:
+            pretty_path = _prettify_object(path)
+        pretty_paths.append(pretty_path)
+    return f"({', '.join(pretty_paths)})"
 
 
 @dataclass(frozen=True)
@@ -125,17 +137,17 @@ class UndefinedFunction(Issue):
 
 class InfiniteLoop(Issue):
     def __init__(self, loop, line):
-        super().__init__(Code.INFINITE_LOOP, f"condition for the following loop never changes, causing an infinite loop:\n{_stringfy_object(loop)}", Severity.ERROR, line)
+        super().__init__(Code.INFINITE_LOOP, f"condition for the following loop never changes, causing an infinite loop:\n{_prettify_object(loop)}", Severity.ERROR, line)
 
 
 class ConstantCondition(Issue):
     def __init__(self, cond, line):
-        super().__init__(Code.CONSTANT_CONDITION, f"condition is always true or false:\n{_stringfy_object(cond)}", Severity.WARNING, line)
+        super().__init__(Code.CONSTANT_CONDITION, f"condition is always true or false:\n{_prettify_object(cond)}", Severity.WARNING, line)
 
 
 class LoopRunsOnce(Issue):
     def __init__(self, loop, line):
-        super().__init__(Code.LOOP_RUNS_ONCE, f"loop runs only once:\n{_stringfy_object(loop)}", Severity.WARNING, line)
+        super().__init__(Code.LOOP_RUNS_ONCE, f"loop runs only once:\n{_prettify_object(loop)}", Severity.WARNING, line)
 
 
 class DeleteSystemFile(Issue):
@@ -150,7 +162,7 @@ class WordSplitCouldDeleteSystemFile(Issue):
 
 class DangerousWordSplit(Issue):
     def __init__(self, source, line):
-        super().__init__(Code.DANGEROUS_WORD_SPLIT, f"code could be split in a dangerous position, leading to unexpected arguments to dangerous commands:\n{_stringfy_object(source)}", Severity.WARNING, line)
+        super().__init__(Code.DANGEROUS_WORD_SPLIT, f"code could be split in a dangerous position, leading to unexpected arguments to dangerous commands:\n{_prettify_object(source)}", Severity.WARNING, line)
 
 
 class RedirectToFunction(Issue):
@@ -160,7 +172,7 @@ class RedirectToFunction(Issue):
 
 class DeadCode(Issue):
     def __init__(self, code, line):
-        super().__init__(Code.DEAD_CODE, f"code is unreachable and will never be executed:\n{_stringfy_object(code)}", Severity.WARNING, line)
+        super().__init__(Code.DEAD_CODE, f"code is unreachable and will never be executed:\n{_prettify_object(code)}", Severity.WARNING, line)
 
 
 class EmptyVar(Issue):
@@ -193,11 +205,11 @@ class CapturingEmptyOutput(Issue):
 
 class ExpectedPathState(Issue):
     def __init__(self, command: str, state: str, paths: Sequence[Field], line):
-        super().__init__(Code.CMD_ASSERTION_PATH_STATE, f"command '{command}' expects paths that are {state}, but one or more of {paths} are not", Severity.ERROR, line)
+        super().__init__(Code.CMD_ASSERTION_PATH_STATE, f"command '{command}' expects paths that are {state}, but one or more of the following paths might not be: {_prettify_paths(paths)}", Severity.ERROR, line)
 
 class DataLoss(Issue):
     def __init__(self, command: str, paths: Sequence[Field], line):
-        super().__init__(Code.DATA_LOSS, f"command '{command}' deletes {paths}, one of which has not been read, potentially causing loss of data", Severity.ERROR, line)
+        super().__init__(Code.DATA_LOSS, f"command '{command}' deletes the following paths, one of which has not been read, potentially causing loss of data: {_prettify_paths(paths)}", Severity.ERROR, line)
 
 
 class DeleteUserDirectory(Issue):
