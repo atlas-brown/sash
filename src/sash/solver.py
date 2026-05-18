@@ -246,7 +246,7 @@ def home_not_deleted_assertion(trace: Trace) -> Assertion | None:
         source_str="global invariant: HOME is not deleted",
         # TODO: report the concrete source line that causes HOME deletion instead of using sentinel line 0.
         source_line=0,
-        priority=1000,
+        priority=11,
         include_fs=True,
     )
 
@@ -270,7 +270,6 @@ def _solver_assertions_for_trace(trace: Trace) -> tuple[Assertion, ...]:
 # --> if unsat, then there's no model where the assertion succeeds (ie it can only fail)
 def run_solver(traces: list[Trace], config: InterpConfig, stop: threading.Event | None = None):
     total_issues_before_solver = len(Reporter._issues)
-    timed_out = False
     debugger: SolverDebugger | None = solver_debugger() if config.debug_instrumentation else None
 
     total_assertions = sum(len(_solver_assertions_for_trace(trace)) for trace in traces)
@@ -282,13 +281,12 @@ def run_solver(traces: list[Trace], config: InterpConfig, stop: threading.Event 
     logging.info("Checking %d total assertions from %d total traces", total_assertions, len(traces))
     all_assertions = [a for t in traces for a in _solver_assertions_for_trace(t)]
     if not config.disable_solver_optimizations:
-        all_assertions.sort(key=lambda a: a.priority, reverse=True)
+        all_assertions.sort(key=lambda a: (a.priority, a.source_line), reverse=True)
     for assertion in all_assertions:
         if logging.getLogger().isEnabledFor(logging.DEBUG):
             logging.debug("Checking assertion %d/%d id %s from line %s :: %s", checked_assertions + 1, total_assertions, id(assertion), assertion.source_line, assertion.source_str)
 
         if stop and stop.is_set():
-            timed_out = True
             logging.debug("Solver timed out")
             Reporter.set_timed_out()
             break
