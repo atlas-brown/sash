@@ -2,6 +2,7 @@ import argparse
 import json
 import logging
 import pathlib
+import sys
 import threading
 import time
 from inspect import signature
@@ -235,6 +236,8 @@ def cli_main():
         print(json.dumps(report.to_dict(), indent=2))
     else:
         print(report.to_plain_text())
+
+    sys.exit(1 if report.issues else 0)
 
 
 def symbexec_main(file: str,
