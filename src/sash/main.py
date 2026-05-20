@@ -185,7 +185,7 @@ def main(file: pathlib.Path,
          disable_solver: bool = False,
          disable_solver_optimizations: bool = False,
          log_file: pathlib.Path | None = None,
-         log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL", "DISABLED"] = "INFO",
+         log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL", "DISABLED"] = "DISABLED",
          collect_debug_info: bool = False) -> Report:
 
     logging.basicConfig(
@@ -234,8 +234,12 @@ def cli_main():
 
     if args.json:
         print(json.dumps(report.to_dict(), indent=2))
-    else:
+    elif args.log_level != "DISABLED":
         print(report.to_plain_text())
+    else:
+        compact_output = report.to_compact_text()
+        if compact_output:
+            print(compact_output)
 
     sys.exit(1 if report.issues else 0)
 

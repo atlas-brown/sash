@@ -273,6 +273,18 @@ class Report(NamedTuple):
 
         return "\n".join(lines)
 
+    def to_compact_text(self) -> str:
+        """Render only issues, in a compact shellcheck-like format."""
+        lines: list[str] = []
+        for issue in self.issues:
+            line = issue.source_line if issue.source_line is not None else 0
+            lines.append(
+                f"{self.filename}:{line}: {issue.severity.value}: {issue.message} [{issue.code.value}]"
+            )
+            if issue.constraint:
+                lines.append(f"    condition: {issue.constraint}")
+        return "\n".join(lines)
+
 
 class Reporter:
     _filename: str

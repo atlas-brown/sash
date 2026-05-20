@@ -3101,10 +3101,15 @@ def symbexec_file(file: str,
             stop_event = main_stop if main_stop is not None else stop_event
 
         traces = symb_engine(nodes, replace(config, branch_policy=branch_policy_half_n_half_if_too_many))
-        print(f"Symbolic execution completed with {len(traces)} and {len(dfs_solver_traces)} DFS solver traces and {len(dfs_fallback_traces)} DFS fallback traces")
+        logging.info(
+            "Symbolic execution completed with %d traces, %d DFS solver traces, and %d DFS fallback traces",
+            len(traces),
+            len(dfs_solver_traces),
+            len(dfs_fallback_traces),
+        )
         traces = dfs_solver_traces + traces
         if Reporter.get_timed_out():
-            print("Using fallback DFS traces due to timeout in main symbolic execution")
+            logging.warning("Using fallback DFS traces due to timeout in main symbolic execution")
             traces = dfs_fallback_traces + traces
         traces, _ = collapse_traces(traces)
         if Reporter.get_timed_out():
