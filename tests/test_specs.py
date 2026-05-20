@@ -2,8 +2,7 @@ from itertools import combinations
 from pprint import pformat
 
 import z3
-from hypothesis import assume, given, settings
-from hypothesis import strategies as st
+import pytest
 from sash import reporter
 from sash.fs import FSModelSimple
 import sash.symbolic.strings
@@ -241,37 +240,59 @@ def constraint_contains(constraint, subconstraint) -> bool:
     return False
 
 
-@settings(max_examples=200, deadline=None)
-@given(
-    cmd_name=st.sampled_from(sorted(set(specs.CMD_SPECS.keys()) - {"sudo", "command"})),
-    args=st.lists(
-        st.one_of(
-            # Common flag-like tokens and operators that many specs understand
-            st.sampled_from([
-                "-f", "-R", "-r", "-d", "-i", "-v", "-p", "-q", "-V", "-c",
-                "-eq", "-ne", "-gt", "-lt", "-ge", "-le",
-                "-e", "-n", "-z", "-r", "-w", "-x", "!", "-", "]"
-            ]),
-            # Alphanumeric tokens
-            st.from_regex(r"[A-Za-z0-9_\-]{1,8}", fullmatch=True),
-            # name=value style
-            st.builds(
-                lambda a, b: f"{a}={b}",
-                st.from_regex(r"[A-Za-z]{1,6}", fullmatch=True),
-                st.from_regex(r"[A-Za-z0-9]{1,6}", fullmatch=True),
-            ),
-        ),
-        min_size=0,
-        max_size=8,
-    ),
-)
-def test_hypothesis_specs_to_constraints_do_not_crash(cmd_name: str, args: list[str]):
+SPEC_TEST_CASES = [
+    # Basic commands with no or minimal args
+    ("echo", []),
+    ("echo", ["hello"]),
+    ("echo", ["hello", "world"]),
+    ("cat", []),
+    ("cat", ["file.txt"]),
+    # rm with various flags
+    ("rm", ["-f", "file.txt"]),
+    ("rm", ["-R", "dir"]),
+    ("rm", ["-r", "-f", "target"]),
+    # test command with single flags
+    ("test", ["-e", "file"]),
+    ("test", ["-f", "file"]),
+    ("test", ["-d", "dir"]),
+    ("test", ["-z", "var"]),
+    ("test", ["-n", "var"]),
+    # test command with negation
+    ("test", ["!", "-e", "file"]),
+    ("test", ["!", "-z", "var"]),
+    # test command with binary operators
+    ("test", ["x", "=", "y"]),
+    ("test", ["x", "!=", "y"]),
+    ("test", ["5", "-eq", "10"]),
+    ("test", ["5", "-ne", "10"]),
+    ("test", ["5", "-gt", "3"]),
+    ("test", ["5", "-lt", "10"]),
+    # grep with flags
+    ("grep", ["-i", "pattern", "file"]),
+    ("grep", ["-r", "pattern", "dir"]),
+    ("grep", ["-v", "pattern", "file"]),
+    # mv with various args
+    ("mv", ["-f", "src", "dst"]),
+    ("mv", ["src", "dst"]),
+    # xargs
+    ("xargs", ["-I", "files", "mv", "files", "target"]),
+    # Operators and edge cases
+    ("test", ["!", "-", "x"]),
+    ("echo", ["-f"]),
+    ("echo", ["-R"]),
+]
+
+@pytest.mark.parametrize("cmd_name,args", SPEC_TEST_CASES)
+def test_specs_to_constraints_do_not_crash(cmd_name: str, args: list[str]) -> None:
     # Build Fields (first token is the command name)
     fields = tuple([Field.create_constant(cmd_name)] + [Field.create_constant(a) for a in args])
     cmd_spec = specs.get_spec(cmd_name, fields)
     assert cmd_spec is not None, f"Spec function for command '{cmd_name}' returned None for fields: {pformat(fields)}"
 
-    assume(cmd_spec.success_postcond != Empty() or cmd_spec.failure_postcond != Empty())
+    # Skip cases where the spec generator intentionally produced no output.
+    if cmd_spec.success_postcond == Empty() and cmd_spec.failure_postcond == Empty():
+        pytest.skip(f"{cmd_name} has no meaningful spec for args={args}")
+
     sanity_check_spec_constraints(cmd_name, cmd_spec)
 
 

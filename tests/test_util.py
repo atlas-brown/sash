@@ -1,50 +1,70 @@
-from typing import TypeVar
+from collections.abc import Iterable
 
-from hypothesis import given, settings
-from hypothesis import strategies as st
+import pytest
 
-from sash.util import split_at
-
-settings.register_profile("default", max_examples=5)
-settings.load_profile("default")
-
-T = TypeVar("T")
-
-def join_with_element(sublists: list[list[T]], element: T) -> list[T]:
-    """Reverse of `split_at` for reconstruction: intersperse `element`s between sublists and flatten them."""
-    if not sublists:
-        return []
-    output: list[T] = []
-    for i, sublist in enumerate(sublists):
-        if i > 0:
-            output.append(element)
-        output.extend(sublist)
-    return output
+from sash.symbolic.strings import SymStr
+from sash.util import create_fresh_varname
 
 
-@given(l=st.lists(st.integers()), element=st.integers())
-def test_split_at_reconstructs_integers(l: list[int], element: int) -> None:
-    """Property-based test for `split_at` with integers."""
-    sublists = split_at(l, element)
-    # Inserting the separator between sublists yields the original list.
-    assert join_with_element(sublists, element) == l
+@pytest.mark.parametrize(
+    "parts",
+    [
+        [],
+        ["a"],
+        ["a", "b", "c"],
+        ["hello", " ", "world"],
+    ],
+)
+def test_symbstr_to_str_with_strings(parts: list[str]) -> None:
+    symbstr = SymStr(tuple(parts))
 
-    # None of the sublists contain the separator element.
-    assert all(element not in sublist for sublist in sublists)
-
-    # Number of sublists equals number of separators + 1.
-    assert len(sublists) == l.count(element) + 1
+    # If all components are strings, the result should be their concatenation.
+    assert symbstr.try_to_str() == "".join(parts)
 
 
-@given(l=st.lists(st.text()), element=st.text())
-def test_split_at_reconstructs_text(l: list[str], element: str) -> None:
-    """Property-based test for `split_at` with strings."""
-    sublists = split_at(l, element)
-    # Inserting the separator between sublists yields the original list.
-    assert join_with_element(sublists, element) == l
+def test_symbstr_to_str_empty_iterable() -> None:
+    symbstr: Iterable[str] = []
 
-    # None of the sublists contain the separator element.
-    assert all(element not in sublist for sublist in sublists)
+    # The result should be an empty string.
+    assert SymStr(tuple(symbstr)).try_to_str() == ""
 
-    # Number of sublists equals number of separators + 1.
-    assert len(sublists) == l.count(element) + 1
+
+PREFIX_CASES: list[str | None] = [None, "", "x", "prefix", "_tmp", "Alpha1"]
+
+
+def test_create_fresh_varname_default_prefix() -> None:
+    name = create_fresh_varname()
+
+    # The generated name should start with "vr".
+    assert name.startswith("vr")
+
+
+@pytest.mark.parametrize("prefix", PREFIX_CASES)
+def test_create_fresh_varname_with_prefix(prefix: str | None) -> None:
+    name = create_fresh_varname(prefix)
+    expected_prefix = "vr" if prefix is None else prefix
+
+    # The generated name should start with the expected prefix.
+    assert name.startswith(expected_prefix)
+
+
+@pytest.mark.parametrize("prefix", PREFIX_CASES)
+def test_create_fresh_varname_is_unique(prefix: str | None) -> None:
+    names = [create_fresh_varname(prefix) for _ in range(10)]
+
+    # All generated names should be unique.
+    assert len(set(names)) == len(names)
+
+
+@pytest.mark.parametrize("prefix", PREFIX_CASES)
+def test_create_fresh_var_shape_and_uniqueness(prefix: str | None) -> None:
+    v1 = create_fresh_varname(prefix)
+    v2 = create_fresh_varname(prefix)
+    expected_prefix = "vr" if prefix is None else prefix
+
+    # Both variable names should start with the expected prefix.
+    assert v1.startswith(expected_prefix)
+    assert v2.startswith(expected_prefix)
+
+    # The two created variables should be distinct.
+    assert v1 != v2

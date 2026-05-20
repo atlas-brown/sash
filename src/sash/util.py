@@ -17,29 +17,6 @@ if TYPE_CHECKING:
     from sash.symbolic.state import Trace
 
 
-def split_at(l: list, element) -> list[list]:
-    """
-    Split a list at each occurrence of element, returning a list of lists, none of which contain `element`.
-    Examples:
-    >>> split_at([1, 2, None, 3, None, 4], None)
-    [[1, 2], [3], [4]]
-    >>> split_at([1, 2, 3], None)
-    [[1, 2, 3]]
-    >>> split_at([1, 2, None, None, 3, None, 4], None)
-    [[1, 2], [], [3], [4]]
-    """
-    result = []
-    current = []
-    for item in l:
-        if item == element:
-            result.append(current)
-            current = []
-        else:
-            current.append(item)
-    result.append(current)
-    return result
-
-
 def shasta_pretty(ast_node) -> str:
     return ast_node.pretty() if hasattr(ast_node, 'pretty') else str(ast_node)
 
