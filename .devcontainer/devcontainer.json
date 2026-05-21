@@ -1,28 +1,25 @@
 {
-    "name": "resash",
-    "build": {
-        "dockerfile": "../Dockerfile",
-        "context": ".."
-    },
-    "workspaceFolder": "/home/sash",
-    "customizations": {
-        "vscode": {
-            "settings": {
-                "python.defaultInterpreterPath": "/usr/bin/python3",
-                "python.terminal.activateEnvInCurrentTerminal": true
-            },
-            "extensions": [
-                "ms-python.debugpy",
-                "ms-python.python",
-                "ms-python.vscode-pylance",
-                "ms-python.vscode-python-envs",
-                "GitHub.copilot",
-                "GitHub.copilot-chat"
-                // Add any other VS Code extensions you need inside the container
-            ]
-        }
-    },
-    "postCreateCommand": "echo done",
-    "remoteUser": "root",
-    "initializeCommand": "systemctl --user enable podman.socket --now" // For rootless Podman and socket activation
+  "name": "sash",
+  "build": {
+    "dockerfile": "../Dockerfile",
+    "context": "..",
+    "target": "dev"
+  },
+  "workspaceMount": "source=${localWorkspaceFolder},target=/app,type=bind",
+  "workspaceFolder": "/app",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.vscode-pylance",
+        "ms-python.debugpy"
+      ],
+      "settings": {
+        "python.defaultInterpreterPath": "/app/.venv/bin/python",
+        "python.terminal.activateEnvInCurrentTerminal": true
+      }
+    }
+  },
+  "remoteUser": "root",
+  // Ensure the virtual environment is always up to date with the lock file
+  "postCreateCommand": "uv sync --locked"
 }

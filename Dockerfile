@@ -1,49 +1,56 @@
-FROM ubuntu:latest
+# Target 1: Containerized development of the system
+FROM python:3.10-slim-trixie AS dev
 
-# Update and install basic packages
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends \
-        build-essential \
-        criu \
-        curl \
+# Copy the uv binaries from the official Astral image
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+
+# See https://github.com/binpash/libdash?tab=readme-ov-file#what-are-the-dependencies
+# Certificates are needed for uv to be able to clone libdash over HTTPS
+RUN apt-get update && \
+    apt-get install --yes --no-install-recommends \
         git \
-        shfmt \
-        wget \
-        software-properties-common \
-        libstdc++6 \
-        unzip \
-        libtool \
-        m4 \
+        autoconf \
         automake \
-    && rm -rf /var/lib/apt/lists/*
-
-# Add deadsnakes PPA and install Python 3.10
-RUN add-apt-repository ppa:deadsnakes/ppa && \
-    apt-get update && \
-    apt-get install -y python3.10 python3.10-venv && \
+        libtool \
+        make \
+        ca-certificates && \
+    update-ca-certificates && \
     rm -rf /var/lib/apt/lists/*
 
-# Set the working directory in the container
-WORKDIR /home/sash
+# Change working directory
+WORKDIR /app
 
-#COPY z3 install script
-COPY install_z3.sh /home/sash/install_z3.sh
-RUN chmod +x /home/sash/install_z3.sh
-RUN /home/sash/install_z3.sh
+# Copy from the cache instead of linking since it's a mounted volume
+# See https://docs.astral.sh/uv/guides/integration/docker/#caching
+ENV UV_LINK_MODE=copy
 
+# Install dependencies
+# See https://docs.astral.sh/uv/guides/integration/docker/#intermediate-layers
+RUN --mount=type=cache,target=/root/.cache/uv \
+    --mount=type=bind,source=uv.lock,target=uv.lock \
+    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
+    uv sync --locked --no-install-project
 
-# Set Python 3.10 as the default python3
-RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.10 1
-
-# Install pip for Python 3.10
-RUN python3 -m ensurepip --upgrade
-
-RUN pip3 install uv
-
-SHELL ["/bin/bash", "-c"]
-
-ADD . /home/sash
-WORKDIR /home/sash
-RUN uv pip install -e . --system
-WORKDIR /home/sash
+# Easily overwritable entry for development
 CMD ["/bin/bash"]
+
+# ----------------------------------------
+
+# Target 2: Containerized usage of the system
+FROM dev AS sys
+
+# Setup a non-root user
+RUN groupadd --system --gid 999 nonroot && \
+    useradd --system --gid 999 --uid 999 --create-home nonroot
+
+# Copy the necessary project files and install
+COPY pyproject.toml uv.lock README.md ./
+COPY src ./src
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --locked --no-dev
+
+# Change into the non root user
+USER nonroot
+
+# Entry for system usage
+ENTRYPOINT ["/app/.venv/bin/sash"]
