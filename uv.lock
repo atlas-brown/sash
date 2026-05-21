@@ -1208,7 +1208,7 @@ dev = [
 requires-dist = [
     { name = "libdash", git = "https://github.com/binpash/libdash" },
     { name = "pash-annotations", specifier = ">=0.2.4" },
-    { name = "shasta", git = "https://github.com/binpash/shasta?branch=main" },
+    { name = "shasta", git = "https://github.com/binpash/shasta" },
     { name = "z3-solver", specifier = ">=4.14.1.0" },
 ]
 
@@ -1434,7 +1434,7 @@ wheels = [
 [[package]]
 name = "shasta"
 version = "0.5"
-source = { git = "https://github.com/binpash/shasta?branch=main#3ec173d6dc96e9007f5b582634f9315eafcac867" }
+source = { git = "https://github.com/binpash/shasta#3ec173d6dc96e9007f5b582634f9315eafcac867" }
 
 [[package]]
 name = "six"
