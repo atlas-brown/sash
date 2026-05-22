@@ -1,83 +1,76 @@
-# (Re)SaSh
+# SaSh
 
-A static analysis tool for the shell, based on symbolic execution.
+A static analysis tool for the Unix shell, based on symbolic execution.
 
-## Getting Started
+## Installation
 
-### Development Using Docker Containers (*Recommended*)
+### Native (Linux)
 
-#### Prerequisites
+Make sure you have the following installed:
+* `git`
+* `make`
+* `automake`
+* `autoconf`
+* `libtool`
+* `g++-13` or `clang-17` (or newer)
+* [`uv`](https://github.com/astral-sh/uv) (recommended) or `pipx`
 
-* [`Docker`](https://docs.docker.com/get-docker/)
+You already have `g++-13` or `clang-17` if you are on Debian 13, Ubuntu 23, or newer.
 
-#### Installation
+Then, run:
+```bash
+uv tool install git+https://github.com/atlas-brown/resash.git
+uv tool update-shell  # If PATH needs to be updated
+```
+
+Or:
+
+```bash
+pipx install git+https://github.com/atlas-brown/resash.git
+pipx ensurepath  # If PATH needs to be updated
+```
+
+### Containerized (Linux, MacOS)
+
+Unfortunately some of the dependencies don't build on MacOS, so the best option for now is using a Docker image.
+
+To install:
 
 ```bash
 git clone https://github.com/atlas-brown/resash.git
-cd resash
-docker build -t resash . # This might take a while, but only ever needs to be executed once
-docker run --rm --privileged -itv $(pwd):/home/sash resash /bin/bash
-# You are now inside the container!
-# All changes you make locally will be immediately reflected in the container!
-# See https://docs.docker.com/get-started/ if you've never used Docker before
+docker build --target sys -t sash ./resash
+docker run --rm sash --help  # Should output a help message
+rm -rf ./resash
 ```
 
-Note: The `--privileged` flag is required for CRIU to work.
-
-#### Verifying Installation
+**(IMPORTANT)** To run:
 
 ```bash
-# Run these inside the container!
-uv run verify_installation # Verify you can run the project
-uv run pytest # Verify you can run the tests
-# Both commands should terminate without errors!
+# SaSh needs to be able to read files on the host machine, so it must be run as:
+docker run --rm -v "$(pwd)":/ws -w /ws sash file.sh
+# Thus, it's recommended to create an alias or a function:
+echo "alias sash='docker run --rm -v \"\$(pwd)\":/ws -w /ws sash'" >> ~/.bashrc  # Or equivalent rc file
+# If you want to pause/resume execution using CRIU, you also need to add '--privileged' to the aliased invocation
 ```
 
-### Development Using Your Local Environment
+## Contributing
 
-#### Prerequisites
+### Containerized Development (Linux, MacOS)
 
-* [`uv`](https://github.com/astral-sh/uv)
-* `automake`, `autoconf`, `libtool` (required by the [`libdash`](https://github.com/binpash/libdash) module)
-    * **Linux**: `apt install automake autoconf libtool`
-    * **macOS** (with `Homebrew`): `brew install automake autoconf libtool`
-
-#### Installation
+The project provides a devcontainer file for containerized development (found in `/.devcontainer`).
+Additionally the Dockerfile provides an additional target for development (`dev`), which does not copy the project files into the container to allow for mounting.
 
 ```bash
-git clone https://github.com/atlas-brown/resash.git
-cd resash
-uv sync
+docker build --target dev -t sash-dev .
+docker run --rm -it -v $(pwd):/app sash-dev /bin/bash
+# Again, remember to add '--privileged' if you need to use CRIU
 ```
-
-#### Verifying the Installation
-
-```bash
-uv run pytest # Verify you can run the tests (also verifies a correct installation)
-# The command should terminate without errors!
-```
-
-## Guidelines
-
-### Code Style
-
-* This project uses [`Black`](https://black.readthedocs.io/) for code formatting.
-  ```bash
-  uv run black .
-  ```
-* This project uses [`EditorConfig`](https://editorconfig.org/) to help enforce consistent coding styles across editors and IDEs.
-* **It’s recommended to integrate `Black` and `EditorConfig` into your development environment** for automatic formatting and style consistency.
-  * `VSCode`: configurations can be found in the `.vscode` folder. Remove the `.default` suffix to use them.
 
 ### Testing
 
-* This project uses [`pytest`](https://docs.pytest.org/).
-* To run all tests, use `uv run pytest`
-* To ensure [test discovery](https://docs.pytest.org/en/7.1.x/explanation/goodpractices.html#conventions-for-python-test-discovery) works correctly:
-  * Test files should be named with the prefix `test_` (e.g., `test_example.py`).
-  * Test functions should also start with `test_`.
+This project uses [`pytest`](https://docs.pytest.org/).
+To run all tests, use `uv run pytest`
 
-### Contributing
-
-1. Create a new branch (`git checkout -b branch-name`), **do NOT push directly onto the main branch**
-2. Open a pull request when you think your changes are ready to be merged
+To ensure correct [test discovery](https://docs.pytest.org/en/7.1.x/explanation/goodpractices.html#conventions-for-python-test-discovery) when writing new tests:
+* Test files should be named with the prefix `test_` (e.g., `test_example.py`).
+* Test functions should also start with `test_` (e.g., `def test_example(): ...`).
