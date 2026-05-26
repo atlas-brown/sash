@@ -1044,10 +1044,7 @@ def expand_to_word_simple(stuff: list[AST.ArgChar],
                                         self.add_word(arbitrary_word(var_node, ArbitraryType.APPROXIMATION, self.state, min_words=1, quoted=self.quoted))
                                 else:
                                     pattern = _literal_argchars(var_node.arg)
-                                    if isinstance(value, Field):
-                                        value_str = value.try_to_str()
-                                    else:
-                                        value_str = value.try_to_str()
+                                    value_str = value.try_to_str()
                                     if pattern is not None and value_str is not None:
                                         trimmed = _trim_pattern(value_str, pattern, var_node.fmt)
                                         if trimmed == "":
