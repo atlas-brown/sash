@@ -123,6 +123,14 @@ class State:
     break_level:                 int                         = 0
     continue_level:              int                         = 0
 
+    # Remembers how many times positional arguments have shifted at the current call stack level
+    # On positional argument reference this offset is added to the variable name (except for $0)
+    # Example:
+    # $1     -> resolves to $1
+    # shift  -> adds one to the shift offset
+    # $1     -> resolves to $2, because the offset is added to '1'
+    shift_offset_stack:          tuple[int]                  = field(default_factory=lambda: (0,))
+
     external_data: Any = None # ASSUMPTION: must be hashable
 
     _hash: int | None = field(default=None, compare=False)
@@ -217,6 +225,14 @@ class State:
                        last_exit_code=(code, confidence),
                        last_cmd_failure_postcond=(failure_postcond if failure_postcond is not None else self.last_cmd_failure_postcond))
 
+    def curr_shift_offset(self) -> int:
+        return self.shift_offset_stack[-1]
+
+    def incr_shift_offset(self, amount: int) -> 'State':
+        curr = self.shift_offset_stack[-1]
+        return replace(self,
+                       shift_offset_stack=self.shift_offset_stack[:-1] + (curr + amount,))
+
     def terminate(self) -> 'State':
         return replace(self, terminated=True)
 
@@ -277,6 +293,7 @@ class State:
             call_stack=self.call_stack + (name,),
             localenv_stack=self.localenv_stack + (saved_special,),
             localenv=updated_localenv,
+            shift_offset_stack=self.shift_offset_stack + (0,)
         )
 
     def is_in_function(self) -> bool:
@@ -307,6 +324,7 @@ class State:
             call_stack=self.call_stack[:-1],
             localenv=(current_non_special | saved_special),
             localenv_stack=self.localenv_stack[:-1],
+            shift_offset_stack=self.shift_offset_stack[:-1]
         )
 
 def is_special_var(name: str) -> bool:

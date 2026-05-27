@@ -963,6 +963,10 @@ def expand_to_word_simple(stuff: list[AST.ArgChar],
                         res.append(continuing)
                     return res
                 case AST.VArgChar() as var_node:
+                    name = var_node.var
+                    if name.isdecimal() and name != "0":
+                        name = str(int(name) + self.state.curr_shift_offset())
+
                     def expand_default_value(partial: 'Partial') -> tuple[PreSplitWord, State]:
                         default_expansions = expand_inner(var_node.arg, Partial(partial.quoted, partial.state))
                         if len(default_expansions) != 1:
@@ -972,13 +976,13 @@ def expand_to_word_simple(stuff: list[AST.ArgChar],
                         return default_expansions[0].finish()
 
                     def assign_default_value(partial: 'Partial', default_word: PreSplitWord, default_state: State) -> None:
-                        partial.state = default_state.set_env(var_node.var, ShellVar(default_word.prepare_for_storage()))
+                        partial.state = default_state.set_env(name, ShellVar(default_word.prepare_for_storage()))
                         partial.add_word(as_expansion_word(default_word))
 
                     def add_value_word(value: PreSplitWord | Field) -> None:
                         self.add_word(word_from_value(value, self.quoted, self.state))
 
-                    if var_node.var == "?":
+                    if name == "?":
                         if self.state.last_exit_code[1] == Confidence.DEFINITE:
                             code_str = self.state.last_exit_code[0].try_to_str()
                             if code_str is not None:
@@ -989,7 +993,8 @@ def expand_to_word_simple(stuff: list[AST.ArgChar],
                             self.add_word(arbitrary_word(var_node, ArbitraryType.APPROXIMATION, self.state, min_words=1, quoted=self.quoted))
                         return [self]
 
-                    if (v := self.state.lookup(var_node.var)):
+
+                    if (v := self.state.lookup(name)):
                         value = v.value
                         if var_node.fmt == "Normal" \
                             or (var_node.fmt == "Minus" and not var_node.null and not v.ghost) \
@@ -1090,7 +1095,7 @@ def expand_to_word_simple(stuff: list[AST.ArgChar],
                                 elif word_is_definitely_non_empty(value):
                                     add_value_word(value)
                                 else:
-                                    empty_case, non_empty = self.fork(Description(f"{var_node.var} is non-empty for := expansion"))
+                                    empty_case, non_empty = self.fork(Description(f"{name} is non-empty for := expansion"))
                                     default_word, default_state = expand_default_value(empty_case)
                                     assign_default_value(empty_case, default_word, default_state)
                                     non_empty.add_word(ensure_non_empty_word(value, non_empty.quoted, non_empty.state))
@@ -1118,7 +1123,7 @@ def expand_to_word_simple(stuff: list[AST.ArgChar],
                                 self.state = default_state
                                 self.add_word(as_expansion_word(default_word))
                             else:
-                                empty_case, word_case = self.fork(Description(f"{var_node.var} is non-empty for :+ expansion"))
+                                empty_case, word_case = self.fork(Description(f"{name} is non-empty for :+ expansion"))
                                 empty_case.add_word(empty_word(self.quoted))
                                 default_word, default_state = expand_default_value(word_case)
                                 word_case.state = default_state
@@ -1135,13 +1140,13 @@ def expand_to_word_simple(stuff: list[AST.ArgChar],
                             self.state = default_state
                             self.add_word(as_expansion_word(default_word))
                         else:
-                            non_default, default = self.fork(Description(f"{var_node.var} takes the default value {Field.create_constant(util.shasta_pretty(var_node.arg))}"))
+                            non_default, default = self.fork(Description(f"{name} takes the default value {Field.create_constant(util.shasta_pretty(var_node.arg))}"))
                             default_word, default_state = expand_default_value(default)
                             default.state = default_state
                             default.add_word(as_expansion_word(default_word))
                             arbitrary_for_this_var = arbitrary_word(var_node, ArbitraryType.ENVIRONMENT, non_default.state, quoted=non_default.quoted)
                             non_default.state = non_default.state.extend_localenv({
-                                var_node.var: ShellVar(arbitrary_for_this_var.prepare_for_storage(), ghost=True)
+                                name: ShellVar(arbitrary_for_this_var.prepare_for_storage(), ghost=True)
                             })
                             non_default.add_word(arbitrary_for_this_var)
                             return [non_default, default]
@@ -1159,24 +1164,24 @@ def expand_to_word_simple(stuff: list[AST.ArgChar],
                         default_word, default_state = expand_default_value(self)
                         assign_default_value(self, default_word, default_state)
                     else:
-                        if not is_special_var(var_node.var):
+                        if not is_special_var(name):
                             error_code = reporter.UnboundIDSetU if self.state.opts.is_set(SetOptions.NOUNSET) else reporter.UnboundID
                             Reporter.add_issue(error_code(var_node.pretty(), context_line), config)
                         if config.unbound_policy == UnboundVariablePolicy.EMPTY:
                             empty_word_value = empty_word(self.quoted)
                             self.add_word(empty_word_value)
                             self.state = self.state.extend_localenv({
-                                var_node.var: ShellVar(empty_word_value.prepare_for_storage(), ghost=True)
+                                name: ShellVar(empty_word_value.prepare_for_storage(), ghost=True)
                             })
                         else:
                             arbitrary_for_this_var = arbitrary_word(
                                 var_node,
-                                ArbitraryType.APPROXIMATION if is_special_var(var_node.var) else ArbitraryType.ENVIRONMENT,
+                                ArbitraryType.APPROXIMATION if is_special_var(name) else ArbitraryType.ENVIRONMENT,
                                 self.state,
                                 quoted=self.quoted,
                             )
                             self.state = self.state.extend_localenv({
-                                var_node.var: ShellVar(arbitrary_for_this_var.prepare_for_storage(), ghost=True)
+                                name: ShellVar(arbitrary_for_this_var.prepare_for_storage(), ghost=True)
                             })
                             self.add_word(arbitrary_for_this_var)
                     return [self]
@@ -1504,6 +1509,8 @@ def handle_commandnode(traces: Traces,
                 t1 = handle_eval(t1, node, expanded_args, config)
             case "find":
                 t1 = handle_find(t1, node, expanded_args, config)
+            case "shift":
+                t1 = handle_shift(t1, node, expanded_args, config)
             # TODO: Unify rm with other commands
             case cmd_name if spec := get_spec(cmd_name, tuple(expanded_args)):
                 logging.debug("Adding %s precondition: %s", cmd_name, spec.check)
@@ -1874,6 +1881,22 @@ def handle_find(traces: Traces,
     if generated_cmd_traces:
         return generated_cmd_traces
     return handle_unknown_command("find", expanded_args[1:], traces, config)
+
+
+def handle_shift(traces: Traces,
+                node: AST.CommandNode,
+                expanded_args: list[Field],
+                config: InterpConfig) -> Traces:
+    assert expanded_args, "the first argument should be 'shift'"
+    if len(expanded_args) == 1:
+        t = trace_map(traces, lambda s: s.incr_shift_offset(1))
+    else:
+        if (off := expanded_args[1].try_to_int()) is not None:
+            t = trace_map(traces, lambda s: s.incr_shift_offset(off))
+        else:
+            # Give up
+            t = traces
+    return t
 
 
 def handle_function_call_or_unknown(func_name: str,
