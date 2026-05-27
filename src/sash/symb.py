@@ -3161,7 +3161,10 @@ def symbexec_file(file: str,
         if Reporter.get_timed_out():
             logging.warning("Using fallback DFS traces due to timeout in main symbolic execution")
             traces = dfs_fallback_traces + traces
-        traces, _ = collapse_traces(traces)
+        # At this point most traces are already unique,
+        # so the collapse function ends up taking way too much time for little benefit
+        if len(traces) <= 500:
+            traces, _ = collapse_traces(traces)
         if Reporter.get_timed_out():
             return SymbexecResult(SymbexecStatus.INTERRUPTED, traces)
         return SymbexecResult(SymbexecStatus.COMPLETED, traces)
