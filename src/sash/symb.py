@@ -2164,59 +2164,89 @@ def handle_unset(expanded_args: list[Field], traces: Traces) -> Traces:
 
 def handle_if(traces: Traces, node: AST.IfNode, config: InterpConfig) -> Traces:
     test_line_number = context_line
-    test_cmds = []
-    def get_the_test(cmd_fields):
+    test_cmds: list[list[Field]] = []
+    def get_the_test(cmd_fields: list[Field]):
         nonlocal test_line_number
         test_line_number = context_line
         test_cmds.append(cmd_fields)
     temp_config = config.add_expanded_command_callback(get_the_test)
     temp_config = replace(temp_config, in_checked_position=True)
-    t1 = guarded_interp_node(traces, node.cond, temp_config)
-    logging.debug("collected test_cmds: %s", test_cmds)
-    logging.debug("Checking constant test cond")
-    if len(test_cmds) == 0:
-        logging.debug("Failed to collect any test commands? Giving up on constant condition check.")
-        test_result = None
-    else:
-        logging.debug("Checking if test command %s is constant true/false", test_cmds[-1])
-        test_result = interpret_test(test_cmds[-1])
-        logging.debug("Test command result: %s", test_result)
-    if test_result is not None:
-        Reporter.add_issue(reporter.ConstantCondition(test_cmds, test_line_number), config)
-        if test_result == True and (node.else_b is not None and node.else_b.pretty()):
-                                                             # Hack because libdash sometimes gives empty else bodies
-            t1 = trace_map(t1, lambda s: s.set_last_exit_code(SymStr(("0",)), Confidence.DEFINITE))
-            logging.debug("Reporting dead code in else branch.")
-            Reporter.add_issue(reporter.DeadCode(node.else_b, test_line_number), config)
-        elif test_result == False:
-            t1 = trace_map(t1, lambda s: s.set_last_exit_code(SymStr(("1",)), Confidence.DEFINITE))
+
+    # Execute the test commands individually for each trace
+    res: list[tuple[Traces, list[Field]]] = []
+    for i, t in enumerate(traces):
+        logging.debug("If handler: interpreting test commands for trace %i/%d", i, len(traces))
+        logging.debug("collected test_cmds: %s", test_cmds)
+        t = guarded_interp_node([t], node.cond, temp_config)
+        if len(test_cmds) > 0:
+            res.append((t, test_cmds[-1]))
+            test_cmds = []
+
+    test_results = set()
+    then_traces, else_traces, both_traces = [], [], []
+    for i, (ts1, test_cmd) in enumerate(res):
+        logging.debug("If handler: checking for const cond for traces %i/%d", i, len(traces))
+        if len(test_cmd) == 0:
+            logging.debug("Failed to collect any test commands? Giving up on constant condition check.")
+            test_result = None
+        else:
+            logging.debug("Checking if test command %s is constant true/false", test_cmd)
+            test_result = interpret_test(test_cmd)
+            logging.debug("Test command result: %s", test_result)
+
+        test_results.add(test_result)
+        if test_result is not None:
+            #Reporter.add_issue(reporter.ConstantCondition(test_cmd, test_line_number), config)
+            if test_result == True:
+                ts2 = trace_map(ts1, lambda s: s.set_last_exit_code(SymStr(("0",)), Confidence.DEFINITE))
+                then_traces.extend(ts2)
+            elif test_result == False:
+                ts2 = trace_map(ts1, lambda s: s.set_last_exit_code(SymStr(("1",)), Confidence.DEFINITE))
+                else_traces.extend(ts2)
+        else:
+            # Test result is None
+            logging.debug("FORK: explicit if")
+            ts2 = trace_map
+            both_traces.extend(ts1)
+
+    if len(test_results) == 1 and any(b in test_results for b in (True, False)):
+        Reporter.add_issue(reporter.ConstantCondition(res[0][1], test_line_number), config)
+        if then_traces:
+            assert not both_traces, "test was constant across all traces"
+            if node.else_b is not None and node.else_b.pretty():
+                                           # Hack because libdash sometimes gives empty else bodies
+                logging.debug("Reporting dead code in else branch.")
+                Reporter.add_issue(reporter.DeadCode(node.else_b, test_line_number), config)
+        elif else_traces:
+            assert not both_traces, "test was constant across all traces"
             logging.debug("Reporting dead code in then branch")
             Reporter.add_issue(reporter.DeadCode(node.then_b, test_line_number), config)
-    else:
-        logging.debug("FORK: explicit if")
+        else:
+            raise AssertionError("unreachable")
+
     # Several possibilities here:
     # 1. Constant test true -- interpret then_b and return that
     # 2. Constant test false with no else -- just return t1
     # 3. Constant test false with else -- interpret else_b and return that
     # 4. Non-constant test -- interpret both branches and combine results
-    if test_result is True:
-        return guarded_interp_node(t1, node.then_b, config)
-    elif test_result is False:
+    if len(test_results) == 1 and True in test_results:
+        return guarded_interp_node(then_traces, node.then_b, config)
+    elif len(test_results) == 1 and False in test_results:
         if node.else_b is not None:
-            return guarded_interp_node(t1, node.else_b, config)
+            return guarded_interp_node(else_traces, node.else_b, config)
         else:
-            return t1
+            return else_traces
     else:
         if config.branch_policy_pre is not None:
             selection = config.branch_policy_pre(node)
             logging.debug("If statement single-path decision: %s", selection)
             if selection.decision == BranchDecision.FIRST:
-                return guarded_interp_node(t1, node.then_b, config)
+                return guarded_interp_node(then_traces + both_traces, node.then_b, config)
             if selection.decision == BranchDecision.SECOND:
                 if node.else_b is not None:
-                    return guarded_interp_node(t1, node.else_b, config)
-                return t1
-        return handle_branch(t1,
+                    return guarded_interp_node(else_traces + both_traces, node.else_b, config)
+                return else_traces + both_traces
+        return handle_branch(then_traces + else_traces + both_traces,
                             lambda ts: guarded_interp_node(ts, node.then_b, config),
                             lambda fs: guarded_interp_node(fs, node.else_b, config) if node.else_b is not None else fs,
                             node,
