@@ -8,10 +8,6 @@ bugs:
     description: For loop only iterates once because its argument expands to one word
     code: loop_once
     shellcheck: null
-  bug01:
-    description: The output of a test command is unused
-    code: ignored_cmd_result
-    shellcheck: null
 
 ground_truths:
   # Base versions
@@ -19,16 +15,13 @@ ground_truths:
     kind: original
     bugs:
       bug00: { lines: [4] }
-      bug01: { lines: [8] }
 
   - path: posix.sh
     kind: buggy
     bugs:
       bug00: { lines: [6] }
-      bug01: { lines: [10] }
 
   - path: fixed.sh
     kind: fixed
     bugs:
       bug00: { regression_lines: [6], shellcheck: null }
-      bug01: { regression_lines: [10], shellcheck: null }

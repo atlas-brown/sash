@@ -31,7 +31,6 @@ class Code(Enum):
     REDIRECT_TO_FUNCTION = "redir_func"
     DEAD_CODE = "dead_code"
     EMPTY_VAR = "empty_var"
-    IGNORED_COMMAND_RESULT = "ignored_cmd_result"
     NOT_A_COMMAND = "not_a_command"
     UNEXPECTED_STDIN = "unexpected_stdin"
     COMMAND_CAN_ONLY_FAIL = "command_can_only_fail"
@@ -178,11 +177,6 @@ class DeadCode(Issue):
 class EmptyVar(Issue):
     def __init__(self, varname: str, line):
         super().__init__(Code.EMPTY_VAR, f"variable {varname} might be empty", Severity.WARNING, line)
-
-
-class IgnoredCommandResult(Issue):
-    def __init__(self, command: str, line):
-        super().__init__(Code.IGNORED_COMMAND_RESULT, f"the result of command '{command}' is ignored.", Severity.WARNING, line)
 
 
 class NotACommand(Issue):

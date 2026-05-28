@@ -5,12 +5,6 @@ sources:
 
 bugs:
   bug00:
-    description: Variable in for loop is never used/For loop body is constant
-    code: unused_loop_var
-    shellcheck: SC2034
-    notes:
-      - Unclear if we should try to catch this (for now it's out-of-scope)
-  bug01:
     description: An invocation of the script deletes the process working directory
     code: del_sys_file
     shellcheck: null
@@ -20,30 +14,23 @@ ground_truths:
   - path: original.sh
     kind: original
     bugs:
-      bug00: { lines: [47] }
-      bug01: { lines: [488] }
+      bug00: { lines: [488] }
 
   - path: posix.sh
     kind: buggy
     bugs:
-      bug00: { lines: [67] }
-      bug01: { lines: [510] }
+      bug00: { lines: [510] }
 
   - path: fixed.sh
     kind: fixed
     bugs:
-      bug01: { regression_lines: [504], shellcheck: null }
+      bug00: { regression_lines: [504], shellcheck: null }
 
   # Variants
-  # - path: variants/bug-unused_loop_var.sh
-  #   kind: buggy_variant
-  #   bugs:
-  #     bug00: { lines: [66], shellcheck: null }
-
   - path: variants/fix-assign_first.sh
     kind: fixed_variant
     bugs:
-      bug01:
+      bug00:
         {
           regression_lines: [505],
           shellcheck: SC2115,
