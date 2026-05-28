@@ -1,9 +1,0 @@
-bugs:
-- line: tbd
-  description: Unquoted variable passed to read -i word splits and causes multiple inputs to be read
-
-note:
-- read -i is not POSIX, so this is definitely oos for now
-
-sources:
-- https://stackoverflow.com/questions/21005323/shell-script-issue-in-prompting-for-user-input
