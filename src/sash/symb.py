@@ -2664,35 +2664,31 @@ def handle_not_node(traces: Traces, node: AST.NotNode, config: InterpConfig) -> 
 
 
 def handle_subshell_node(traces: Traces, node: AST.SubshellNode, config: InterpConfig) -> Traces:
-    # TODO: Re-enable subshells
     # # A subshell executes its body but does not persist shell-local state
     # # changes (variables, function definitions, options, etc.) back to the
     # # parent shell. Keep side effects like fs/assertions/path conditions.
-    # res: Traces = []
-    # for parent_trace in traces:
-    #     parent_state = parent_trace.latest_state
-    #     sub_traces = guarded_interp_node([parent_trace], node.body, config)
-    #     for sub_trace in sub_traces:
-    #         res.append(
-    #             sub_trace.extend(
-    #                 lambda s, p=parent_state: replace(
-    #                     s,
-    #                     env=p.env,
-    #                     localenv=p.localenv,
-    #                     call_stack=p.call_stack,
-    #                     fundefs=p.fundefs,
-    #                     opts=p.opts,
-    #                     known_nonexistent_commands=p.known_nonexistent_commands,
-    #                     known_existing_commands=p.known_existing_commands,
-    #                     terminated=p.terminated,
-    #                 )
-    #             )
-    #         )
-    # return res
-    # Keep subshell nodes as analysis no-ops.
-    # Coverage is still tracked by guarded_interp_node via mark_interpreted_ast_node(node).
+    res: Traces = []
+    for parent_trace in traces:
+        parent_state = parent_trace.latest_state
+        sub_traces = guarded_interp_node([parent_trace], node.body, config)
+        for sub_trace in sub_traces:
+            res.append(
+                sub_trace.extend(
+                    lambda s, p=parent_state: replace(
+                        s,
+                        env=p.env,
+                        localenv=p.localenv,
+                        call_stack=p.call_stack,
+                        fundefs=p.fundefs,
+                        opts=p.opts,
+                        known_nonexistent_commands=p.known_nonexistent_commands,
+                        known_existing_commands=p.known_existing_commands,
+                        terminated=p.terminated,
+                    )
+                )
+            )
     mark_subtree_as_interpreted_for_coverage(node.body)
-    return traces
+    return res
 
 
 def handle_pipe_node(traces: Traces, node: AST.PipeNode, config: InterpConfig) -> Traces:
