@@ -25,14 +25,3 @@ ground_truths:
     kind: fixed
     bugs:
       bug00: { regression_lines: [11], shellcheck: null }
-
-  # Variants
-  - path: variants/fix-const_test.sh
-    kind: fixed_variant
-    bugs:
-      bug00:
-        {
-          regression_lines: [11],
-          shellcheck: SC2050,
-          notes: [Kind of a stretch to call this a ShellCheck false positive],
-        }

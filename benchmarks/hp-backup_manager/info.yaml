@@ -38,8 +38,3 @@ ground_truths:
     kind: buggy_variant
     bugs:
       bug00: { lines: [180], shellcheck: null }
-
-  - path: variants/fix-test_eq_first.sh
-    kind: fixed_variant
-    bugs:
-      bug00: { regression_lines: [184] }
