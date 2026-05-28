@@ -1,15 +1,21 @@
+from __future__ import annotations
+
 from dataclasses import dataclass, field, replace
 from collections.abc import Callable
 import shasta.ast_node as AST
 from enum import Enum
 
-from sash.symbolic.strings import Field
-from sash.symbolic.state import Trace, Traces
+from typing import TYPE_CHECKING, TypeAlias
+
 from sash.constraints import Constraint, Empty
 
-NodeCB = Callable[[Traces, AST.AstNode], list | None]
-ExpandedCmdCB = Callable[[list[Field]], None]
-TraceCollapser = Callable[[Traces], tuple[Traces, Traces]]
+if TYPE_CHECKING:
+    from sash.symbolic.strings import Field
+    from sash.symbolic.state import Traces
+
+    NodeCB: TypeAlias = Callable[[Traces, AST.AstNode], list | None]
+    ExpandedCmdCB: TypeAlias = Callable[[list[Field]], None]
+    TraceCollapser: TypeAlias = Callable[[Traces], tuple[Traces, Traces]]
 
 class BranchDecision(Enum):
     ALL = 0
@@ -38,8 +44,9 @@ def select_second() -> BranchSelection:
 def select_case_index(index: int) -> BranchSelection:
     return BranchSelection(BranchDecision.FIRST, case_index=index)
 
-BranchPolicy = Callable[[AST.AstNode, Traces, Traces], tuple[Traces, Traces]]
-BranchPolicyPre = Callable[[AST.AstNode], BranchSelection] # This decides which branches to take before evaluating them
+if TYPE_CHECKING:
+    BranchPolicy: TypeAlias = Callable[[AST.AstNode, Traces, Traces], tuple[Traces, Traces]]
+    BranchPolicyPre: TypeAlias = Callable[[AST.AstNode], BranchSelection] # This decides which branches to take before evaluating them
 
 class UnboundVariablePolicy(Enum):
     EMPTY = 0
@@ -87,3 +94,26 @@ class InterpConfig:
     def apply_expanded_command_cbs(self, args: list[Field]) -> None:
         for cb in self.expanded_command_cbs:
             cb(args)
+
+
+PROTECTED_PATHS = [
+    "/",
+    "/*",
+    "/bin",
+    "/etc",
+    "/sbin",
+    "/var",
+    "/lib",
+    "/lib64",
+    "/home"
+] + [
+    usr_path + thing
+    for usr_path in ["/usr", "/usr/local"]
+    for thing in ["", "/bin","/sbin","/lib","/share", "/include"]
+]
+
+SAFE_OVERWRITE_PATHS = [
+    "/dev/null",
+    "/dev/stdout",
+    "/dev/stderr"
+]

@@ -11,8 +11,8 @@ from dataclasses import replace
 
 import logging
 
+from sash.interpreter_config import PROTECTED_PATHS
 from sash.symbolic.strings import CompletelyArbitrary, Field
-from sash.config import Config
 if TYPE_CHECKING:
     from sash.symbolic.state import Trace
 
@@ -174,7 +174,7 @@ def is_definitely_non_empty(field: Field, trace: "Trace") -> bool:
     return any(constraint_implies_non_empty(core, cond.constraint) for cond in trace.latest_state.pathcond)
 
 def is_protected(path):
-    return any(path in [p, p + "/", p + "/*"] for p in Config.get("PROTECTED_PATHS"))
+    return any(path in [p, p + "/", p + "/*"] for p in PROTECTED_PATHS)
 
 def is_flag(field: Field) -> bool:
     field_str = field.try_to_str()

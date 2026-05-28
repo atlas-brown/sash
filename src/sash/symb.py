@@ -31,10 +31,9 @@ from sash.symbolic.strings import (
     merge_partial_fields,
 )
 import sash.util as util
-from sash.config import Config # TODO: refactor to delete sash.config, move all needed stuff to InterpConfig
 from sash.constraints import *
 from sash.frozen import FrozenAst, FrozenDict, freeze, freeze_thing
-from sash.interpreter_config import BranchDecision, BranchSelection, InterpConfig, UnboundVariablePolicy
+from sash.interpreter_config import PROTECTED_PATHS, SAFE_OVERWRITE_PATHS, BranchDecision, BranchSelection, InterpConfig, UnboundVariablePolicy
 from sash.reporter import Reporter
 from sash.solver import field_to_z3
 from sash.specs import get_spec, CmdSpec
@@ -1740,7 +1739,7 @@ def handle_rm(expanded_args: tuple[Field, ...], trace: Trace, node: AST.CommandN
                                                         node.pretty(),
                                                         context_line, priority=11, include_fs=False))
 
-    protected_paths = Config.get("PROTECTED_PATHS")
+    protected_paths = PROTECTED_PATHS
     if protected_paths:
         protected_checks = tuple(
             (
@@ -2527,14 +2526,14 @@ def handle_file_redir_node(traces: Traces, node: AST.FileRedirNode, config: Inte
     for t, redir_args in expand(traces, node.arg, config):
         # If the redir_arg is already known to be a safe path to overwrite, we don't need to add any assertions
         if all(redir_arg.is_constant() and \
-            redir_arg.content.try_to_str() in Config.get("SAFE_OVERWRITE_PATHS") \
+            redir_arg.content.try_to_str() in SAFE_OVERWRITE_PATHS \
             for redir_arg in redir_args):
             res.append(t)
             continue
 
         t_precond = t
         if node.redir_type in ["To", "Clobber"]: # >, >|
-            safe_paths = Config.get("SAFE_OVERWRITE_PATHS")
+            safe_paths = SAFE_OVERWRITE_PATHS
             def not_safe_path(op: Field) -> Constraint:
                 return And.from_iter(Not(StringEq(op, Field.create_constant(p, 1))) for p in safe_paths)
 
@@ -2860,7 +2859,6 @@ def trim_string_for_logging(s: str, max_len: int = 300) -> str:
 
 
 def find_func_defs(traces: Traces, nodes: list[parser.WrappedAst], config: InterpConfig) -> FrozenDict[str, AST.Command]:
-    # TODO: Write unit tests for function definitions being recorded correctly (low priority)
     funcs: FrozenDict[str, AST.Command] = FrozenDict({})
     for node in nodes:
         if not isinstance(node.ast_node, AST.Command):
