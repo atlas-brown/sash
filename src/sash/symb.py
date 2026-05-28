@@ -1455,6 +1455,16 @@ def handle_commandnode(traces: Traces,
                 Reporter.add_issue(reporter.NotACommand(sudo_cmd_name, context_line), config)
 
     if expanded_args:
+        # TODO: Improve the structure of this function and move this code block elsewhere
+        match expanded_args[0].try_to_str():
+            case "test" | "[":
+                # Warn about field splitting in test commands
+                for arg in expanded_args[1:]:
+                    match arg:
+                        case Field(CompletelyArbitrary() as content, WordCount(_, max_words)):
+                            if not content.quoted and max_words > 1:
+                                Reporter.add_issue(reporter.DangerousWordSplit(content.source, context_line), config)
+
         match expanded_args[0].try_to_str():
             case "rm":
                 logging.debug("Exploring all possible expansions of rm args")
