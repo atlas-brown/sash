@@ -1,3 +1,5 @@
+description: Claude build cleanup
+
 sources:
   - https://github.com/anthropics/claude-code/issues/17410
 

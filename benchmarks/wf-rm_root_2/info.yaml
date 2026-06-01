@@ -1,4 +1,6 @@
-name: AIX server data gather
+description: AIX server data gather
+
+
 
 sources:
   - https://www.shellscript.sh/examples/rm-rf/

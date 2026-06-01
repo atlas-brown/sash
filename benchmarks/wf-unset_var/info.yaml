@@ -1,3 +1,5 @@
+description: File check
+
 sources:
   - https://stackoverflow.com/questions/26526776/bash-variable-defaulting-doesnt-work-if-followed-by-pipe-bash-bug
 

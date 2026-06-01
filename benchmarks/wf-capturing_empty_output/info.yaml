@@ -1,3 +1,5 @@
+description: Domain folder creator
+
 sources:
   - https://stackoverflow.com/questions/73501167/issue-in-mkdir-output-to-variable
 

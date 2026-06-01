@@ -1,3 +1,5 @@
+description: Claude Next.js cleanup
+
 sources:
   - https://github.com/anthropics/claude-code/issues/24319
 

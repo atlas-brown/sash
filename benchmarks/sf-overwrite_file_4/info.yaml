@@ -1,3 +1,5 @@
+description: SAS script generator
+
 sources:
   - https://stackoverflow.com/questions/49138117/not-able-to-overwrite-the-file-properly-through-unix-script
 

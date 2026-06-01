@@ -1,3 +1,5 @@
+description: Log redirection helper
+
 sources:
   - https://stackoverflow.com/questions/49043790/customized-function-for-error-logs-scripting
 

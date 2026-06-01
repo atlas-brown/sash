@@ -1,3 +1,5 @@
+description: Obfuscated \sh{rm /}
+
 sources:
   - https://www.reddit.com/r/linuxquestions/comments/161v8aj/i_fell_for_a_troll_and_deleted_my_home_directory/
 

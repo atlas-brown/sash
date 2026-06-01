@@ -1,3 +1,5 @@
+description: System restoration script
+
 sources:
   - https://stackoverflow.com/questions/42844610/restoring-deleted-file-using-bash-in-unix
 

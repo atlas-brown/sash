@@ -1,3 +1,5 @@
+description: Glob test mismatch
+
 sources:
   - https://stackoverflow.com/questions/48854121/check-if-files-of-a-given-type-exist-in-bash-shell
 

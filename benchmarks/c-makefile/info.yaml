@@ -1,3 +1,5 @@
+description: Camlp5 install wrapper
+
 sources:
   - https://github.com/ocaml/opam/issues/3316
   - https://github.com/camlp5/camlp5/commit/d5616932193a05d4cffeb46deda7c003f9e38aca#diff-b67911656ef5d18c4ae36cb6741b7965

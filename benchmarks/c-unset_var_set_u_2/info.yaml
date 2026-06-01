@@ -1,3 +1,5 @@
+description: Audio watermark build
+
 sources:
   - https://code.uplex.de/stefan/audiowmark/commit/95db9c5f0b7788aff65f2d85eaedd0c01ba960ac
 

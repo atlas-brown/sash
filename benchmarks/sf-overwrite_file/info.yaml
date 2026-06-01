@@ -1,4 +1,6 @@
-name: HPC cluster file movement
+description: SLURM cluster overwrite
+
+
 
 bugs:
   bug00:

@@ -1,3 +1,5 @@
+description: Vim config backup script
+
 sources:
   - https://github.com/spf13/spf13-vim/commit/52355abace2a055ba41cf905f9e7f78d14f33398
 

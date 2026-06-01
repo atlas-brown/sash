@@ -1,4 +1,6 @@
-name: iTunes updater
+description: iTunes updater
+
+
 
 sources:
   - https://apple.slashdot.org/comments.pl?sid=23365&cid=2518563

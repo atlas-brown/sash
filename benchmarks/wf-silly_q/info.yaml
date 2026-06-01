@@ -1,3 +1,5 @@
+description: Broken multi-file rename
+
 sources:
   - https://www.reddit.com/r/linuxquestions/comments/1dldolx/how_do_i_use_mv_and_cp_commands_within_a_bash/
 

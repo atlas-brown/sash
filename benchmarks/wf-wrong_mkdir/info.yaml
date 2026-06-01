@@ -1,3 +1,5 @@
+description: mkdir output as path
+
 sources:
   - https://community.unix.com/t/move-file-in-current-date-folder-through-shell-script/384145
 

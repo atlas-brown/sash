@@ -1,3 +1,5 @@
+description: Debian debootstrap
+
 sources:
   - https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=337230
   - https://snapshot.debian.org/archive/debian/20051030T000000Z/pool/main/d/debootstrap/debootstrap_0.3.2.2.tar.gz

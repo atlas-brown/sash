@@ -1,3 +1,5 @@
+description: ActualBudget updater
+
 sources:
   - https://github.com/community-scripts/ProxmoxVE/commit/695802152856a8bd011ad060a70082dd1cf91ead
 

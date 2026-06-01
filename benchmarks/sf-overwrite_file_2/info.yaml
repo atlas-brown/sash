@@ -1,3 +1,5 @@
+description: Contest winner mover
+
 sources:
   - https://stackoverflow.com/questions/65666474/how-can-i-stop-my-script-to-overwrite-existing-files
 

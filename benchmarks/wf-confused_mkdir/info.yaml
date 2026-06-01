@@ -1,3 +1,5 @@
+description: Confused mkdir output
+
 sources:
   - https://serverfault.com/questions/702207/why-doesnt-mkdir-p-tmp-one-two-tree-print-anything-when-directories-exist
 

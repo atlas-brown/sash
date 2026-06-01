@@ -1,4 +1,6 @@
-name: AutoTest config rename
+description: AutoTest config rename
+
+
 
 sources:
   - https://stackoverflow.com/questions/48195715/sh-script-to-replace-text-in-multiple-files

@@ -1,4 +1,4 @@
-name: Rsync directory copy script
+description: Rsync directory copy script
 
 sources:
   - https://stackoverflow.com/questions/48706718/error-with-bash-script-using-rsync-to-copy-directory-with-space-in-directory-nam

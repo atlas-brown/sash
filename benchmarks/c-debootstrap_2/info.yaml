@@ -1,3 +1,5 @@
+description: Debian debootstrap 2
+
 bugs:
   bug00:
     description: Deletion of user-supplied directory without warning

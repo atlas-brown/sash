@@ -1,4 +1,6 @@
-name: MongoDB backup script
+description: MongoDB backup script
+
+
 
 sources:
   - https://stackoverflow.com/questions/55323391/deleted-database-accidentally-by-a-bash-script-rescue-please

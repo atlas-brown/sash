@@ -1,3 +1,5 @@
+description: ShellCheck author example
+
 sources:
   - https://github.com/koalaman/shellcheck/issues/910
 

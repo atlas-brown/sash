@@ -1,4 +1,6 @@
-name: Squid init script
+description: Squid init script
+
+
 
 sources:
   - https://github.com/mozilla-services/squid-rpm/blob/47880414f17affdbb634b6f0a19a342995fb60f6/SOURCES/squid.init
