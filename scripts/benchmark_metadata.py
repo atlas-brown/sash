@@ -2,70 +2,68 @@ from pathlib import Path
 import re
 
 
-BENCHMARK_NAMES = {
-    "high_profile/c00-steam": "Steam updater",
-    "high_profile/c01-bumblebee": "NVIDIA driver installer",
-    "high_profile/w00-itunes": "iTunes updater",
-    "high_profile/w01-squid": "Squid init script",
-    "high_profile/c02-n": "Node.js version manager",
-    "high_profile/c03-backup_manager": "Ubuntu backup manager",
-    "milestone_1/const_loop": "DigitalOcean snapshot",
-    "milestone_1/loop_once-useless_test": "AutoTest config rename",
-    "milestone_1/unset_var_1": "OhMyZsh update script",
-    "milestone_2/rm_root": "MongoDB backup script",
-    "web_forums/rm_root_2": "AIX server data gather",
-    "commits/debootstrap": "Debian debootstrap",
-    "simple_fs/overwrite_file": "SLURM cluster overwrite",
-
-    # TODO: Please review wording.
-    "commits/const_cond": "Git config check",
-    "commits/debootstrap_2": "Debian debootstrap 2",
-    "commits/ignored_command_v": "Zsh installer check",
-    "commits/makefile": "Camlp5 install wrapper",
-    "commits/cp_nonexistent": "TIB deploy script",
-    "commits/unset_func": "Git version check",
-    "commits/unset_var_2": "VSCode patch helper",
-    "commits/unset_var_3": "Vim config backup script",
-    "commits/unset_var_5": "NVM install downloader",
-    "commits/unset_var_set_u_1": "OpenStack log collector",
-    "commits/unset_var_set_u_2": "Audio watermark build",
-    "milestone_1/redir_to_func-redir_to_func": "Log redirection helper",
-    "milestone_2/loop_once": "Two-file cleanup",
-    "milestone_2/loop_once-loop_once": "Directory chmod loop",
-    "milestone_2/unset_var-const_if-dead_code": "Backup rsync script",
-    "simple_fs/access_after_mv": "ActualBudget updater",
-    "simple_fs/access_del_resource": "TV transcode move loop",
-    "simple_fs/cd_into_file": "Repo archiver",
-    "simple_fs/overwrite_file_2": "Contest winner mover",
-    "simple_fs/overwrite_file_3": "Hive DROP log monitor",
-    "simple_fs/overwrite_file_4": "SAS script generator",
-    "web_forums/accident": "Accidental recursive delete",
-    "web_forums/capturing_empty_output": "Domain folder creator",
-    "web_forums/claude2": "Claude home wipe",
-    "web_forums/claude3": "Claude temp-file cleanup",
-    "web_forums/claude4": "Claude null-output redirect",
-    "web_forums/claude5": "Claude build cleanup",
-    "web_forums/claude6": "Claude Next.js cleanup",
-    "web_forums/claude_wipe": "Claude cleanup output",
-    "web_forums/confused_mkdir": "Confused mkdir output",
-    "web_forums/delete_home_user": "Deleted home directory",
-    "web_forums/delete_slash": "No-preserve-root delete",
-    "web_forums/empty_path": "Unset PATH startup",
-    "web_forums/find_rm": "Directory clear accident",
-    "web_forums/for_mv": "Archive extract move",
-    "web_forums/move_home": "Move home directory",
-    "web_forums/posix2": "Glob test mismatch",
-    "web_forums/replacement": "Broken file replacement",
-    "web_forums/sc_author": "ShellCheck author example",
-    "web_forums/silly_q": "Broken multi-file rename",
-    "web_forums/troll": r"Obfuscated \sh{rm /}",
-    "web_forums/unexpected_stdin": "System restoration script",
-    "web_forums/unset_var":  "File check",
-    "web_forums/unset_var-cmd_always_fails": "Filesystem preparation",
-    "web_forums/wrong_mkdir": "mkdir output as path",
-    "web_forums/wrong_mv": "Case-only bulk rename",
-    "web_forums/xargs_accident_rm": "Media file conversion",
-    "web_forums/xargs_del_files": "Backup wipe",
+BENCHMARK_DESCRIPTIONS = {
+    "bugs_and_variants/hp-steam": "Steam updater",
+    "bugs_and_variants/hp-bumblebee": "NVIDIA driver installer",
+    "bugs_and_variants/hp-itunes": "iTunes updater",
+    "bugs_and_variants/hp-squid": "Squid init script",
+    "bugs_and_variants/hp-n": "Node.js version manager",
+    "bugs_and_variants/hp-backup_manager": "Ubuntu backup manager",
+    "bugs_and_variants/m1-const_loop": "DigitalOcean snapshot",
+    "bugs_and_variants/m1-loop_once-useless_test": "AutoTest config rename",
+    "bugs_and_variants/m1-unset_var_1": "OhMyZsh update script",
+    "bugs_and_variants/m2-rm_root": "MongoDB backup script",
+    "bugs_and_variants/wf-rm_root_2": "AIX server data gather",
+    "bugs_and_variants/c-debootstrap": "Debian debootstrap",
+    "bugs_and_variants/sf-overwrite_file": "SLURM cluster overwrite",
+    "bugs_and_variants/c-const_cond": "Git config check",
+    "bugs_and_variants/c-debootstrap_2": "Debian debootstrap 2",
+    "bugs_and_variants/c-ignored_command_v": "Zsh installer check",
+    "bugs_and_variants/c-makefile": "Camlp5 install wrapper",
+    "bugs_and_variants/c-cp_nonexistent": "TIB deploy script",
+    "bugs_and_variants/c-unset_func": "Git version check",
+    "bugs_and_variants/c-unset_var_2": "VSCode patch helper",
+    "bugs_and_variants/c-unset_var_3": "Vim config backup script",
+    "bugs_and_variants/c-unset_var_5": "NVM install downloader",
+    "bugs_and_variants/c-unset_var_set_u_1": "OpenStack log collector",
+    "bugs_and_variants/c-unset_var_set_u_2": "Audio watermark build",
+    "bugs_and_variants/m1-redir_to_func-redir_to_func": "Log redirection helper",
+    "bugs_and_variants/m2-loop_once": "Two-file cleanup",
+    "bugs_and_variants/m2-loop_once-loop_once": "Directory chmod loop",
+    "bugs_and_variants/m2-unset_var-const_if-dead_code": "Backup rsync script",
+    "bugs_and_variants/sf-access_after_mv": "ActualBudget updater",
+    "bugs_and_variants/sf-access_del_resource": "TV transcode move loop",
+    "bugs_and_variants/sf-cd_into_file": "Repo archiver",
+    "bugs_and_variants/sf-overwrite_file_2": "Contest winner mover",
+    "bugs_and_variants/sf-overwrite_file_3": "Hive DROP log monitor",
+    "bugs_and_variants/sf-overwrite_file_4": "SAS script generator",
+    "bugs_and_variants/wf-accident": "Accidental recursive delete",
+    "bugs_and_variants/wf-capturing_empty_output": "Domain folder creator",
+    "bugs_and_variants/wf-claude2": "Claude home wipe",
+    "bugs_and_variants/wf-claude3": "Claude temp-file cleanup",
+    "bugs_and_variants/wf-claude4": "Claude null-output redirect",
+    "bugs_and_variants/wf-claude5": "Claude build cleanup",
+    "bugs_and_variants/wf-claude6": "Claude Next.js cleanup",
+    "bugs_and_variants/wf-claude_wipe": "Claude cleanup output",
+    "bugs_and_variants/wf-confused_mkdir": "Confused mkdir output",
+    "bugs_and_variants/wf-delete_home_user": "Deleted home directory",
+    "bugs_and_variants/wf-delete_slash": "No-preserve-root delete",
+    "bugs_and_variants/wf-empty_path": "Unset PATH startup",
+    "bugs_and_variants/wf-find_rm": "Directory clear accident",
+    "bugs_and_variants/wf-for_mv": "Archive extract move",
+    "bugs_and_variants/wf-move_home": "Move home directory",
+    "bugs_and_variants/wf-posix2": "Glob test mismatch",
+    "bugs_and_variants/wf-replacement": "Broken file replacement",
+    "bugs_and_variants/wf-sc_author": "ShellCheck author example",
+    "bugs_and_variants/wf-silly_q": "Broken multi-file rename",
+    "bugs_and_variants/wf-troll": r"Obfuscated \sh{rm /}",
+    "bugs_and_variants/wf-unexpected_stdin": "System restoration script",
+    "bugs_and_variants/wf-unset_var":  "File check",
+    "bugs_and_variants/wf-unset_var-cmd_always_fails": "Filesystem preparation",
+    "bugs_and_variants/wf-wrong_mkdir": "mkdir output as path",
+    "bugs_and_variants/wf-wrong_mv": "Case-only bulk rename",
+    "bugs_and_variants/wf-xargs_accident_rm": "Media file conversion",
+    "bugs_and_variants/wf-xargs_del_files": "Backup wipe",
 }
 
 WILD_BENCHMARK_DESCRIPTIONS = {
@@ -156,8 +154,8 @@ def _build_short_name_cache():
     handles = {}
     used = set()
 
-    for key in sorted(BENCHMARK_NAMES):
-        words = _tokenize(BENCHMARK_NAMES[key])
+    for key in sorted(BENCHMARK_DESCRIPTIONS):
+        words = _tokenize(BENCHMARK_DESCRIPTIONS[key])
         roots = _candidate_roots(words)
 
         handle = None
@@ -199,7 +197,7 @@ def benchmark_display_name(path, default=None):
     key = benchmark_key(path)
     if default is None:
         default = key
-    return BENCHMARK_NAMES.get(key, default)
+    return BENCHMARK_DESCRIPTIONS.get(key, default)
 
 
 def short_name(path, default=None):

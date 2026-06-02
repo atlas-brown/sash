@@ -13,7 +13,7 @@ from pathlib import Path
 import yaml
 import sash.parser
 import shasta.ast_node as AST
-import bugdepth
+from . import bugdepth
 
 
 def git_toplevel() -> Path:

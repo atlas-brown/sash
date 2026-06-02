@@ -8,7 +8,7 @@ from collections import Counter
 import yaml
 import bugdepth
 from benchmark_metadata import (
-    BENCHMARK_NAMES,
+    BENCHMARK_DESCRIPTIONS,
     WILD_BENCHMARK_DESCRIPTIONS,
     benchmark_key,
     short_name,
@@ -193,7 +193,7 @@ def table_time_cell(row):
     time = float(timing["time"])
     return f"{time:.2f}s" if time > EPSILON else "<1ms"
 
-names = BENCHMARK_NAMES
+names = BENCHMARK_DESCRIPTIONS
 
 sources = {
     "high_profile/c00-steam": r"\cite{steambugissue}",

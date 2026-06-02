@@ -111,23 +111,25 @@ for raw_t in "${TIMEOUTS[@]}"; do
   for raw_mode in "${CONFIGS[@]}"; do
     mode="$(echo "${raw_mode}" | xargs)"
     csv_path="${out_dir}/results_t${t}_${mode}.csv"
+    # SaSh now uses a single total timeout (-t) for both execution and solver phases.
+    total_timeout=$(awk "BEGIN{printf \"%g\", ${t} + ${t}}")
     cmd=(
       uv run "${top}/scripts/run_on_dir.py" "${koala_dir}"
-      -t "${t}"
-      -T "${t}"
+      -t "${total_timeout}"
       -c "${csv_path}"
     )
     case "${mode}" in
       no_opts)
-        cmd+=(--fork-everywhere --disable-solver-optimizations)
+        cmd+=(--fork-everywhere --disable-solver-optimizations --disable-dfs)
         ;;
       smart_forking)
-        cmd+=(--disable-solver-optimizations)
+        cmd+=(--disable-solver-optimizations --disable-dfs)
         ;;
       solver_opts)
+        cmd+=(--disable-dfs)
         ;;
       dfs_on)
-        cmd+=(-D)
+        # default/full SaSh
         ;;
     esac
 

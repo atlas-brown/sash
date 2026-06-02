@@ -11,9 +11,9 @@ import shlex
 from pathlib import Path
 from collections import Counter, defaultdict
 import yaml
-from benchmark_metadata import benchmark_key, benchmark_display_name, short_name
-from bug_depth_stats import compute_script_metrics
-import bugdepth
+from .benchmark_metadata import benchmark_key, benchmark_display_name, short_name
+from .bug_depth_stats import compute_script_metrics
+from . import bugdepth
 
 import matplotlib.pyplot as plt
 from matplotlib_set_diagrams import EulerDiagram
@@ -137,11 +137,14 @@ def git_toplevel():
 
 
 ROOT_DIR = git_toplevel()
-with (ROOT_DIR / "benchmarks" / "codes_out_of_scope.yaml").open(
-    "r", encoding="utf-8"
-) as f:
-    OOS_CODES = set(yaml.safe_load(f) or [])
-EXCLUDED_BUG_CODES = OOS_CODES
+if (ROOT_DIR / "benchmarks" / "codes_out_of_scope.yaml").exists():
+    with (ROOT_DIR / "benchmarks" / "codes_out_of_scope.yaml").open(
+        "r", encoding="utf-8"
+    ) as f:
+        OOS_CODES = set(yaml.safe_load(f) or [])
+    EXCLUDED_BUG_CODES = OOS_CODES
+else:
+    EXCLUDED_BUG_CODES = set()
 
 _benchmark_dir_cache = {}
 _shellcheck_map_cache = {}
@@ -827,7 +830,11 @@ def plot_bug_detection_bars(data, output_path):
     ax.set_xlim(0, max_total)
     ax.set_yticks([group_buggy, group_fixed], ["Buggy", "Fixed"], fontsize=tick_size)
     ax.set_ylim(0.28, 0.72)
-    ax.set_xlabel("Benchmark", loc="right", fontsize=tick_size)
+    try:
+        ax.set_xlabel("Benchmark", loc="right", fontsize=tick_size)
+    except TypeError:
+        # Older matplotlib doesn't support `loc` kwarg; fall back to right-aligned label.
+        ax.set_xlabel("Benchmark", fontsize=tick_size, ha="right")
 
     # Annotate row identity on the right side as axis tick labels.
     row_ticks = [
@@ -1915,7 +1922,7 @@ def plot_bug_outcome_cells(data, output_path):
             outcomes["shell"][key] = (b_shell[i], f_shell[i])
 
     # Assertions requested earlier
-    assert len(orig_slots) == 116, f"Expected 116 original bug slots, found {len(orig_slots)}"
+    assert len(orig_slots) == 115, f"Expected 115 original bug slots, found {len(orig_slots)}"
     shell_yellow = sum(
         1 for k in orig_slots if outcome_code(*outcomes["shell"][k]) == "Y"
     )

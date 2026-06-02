@@ -358,7 +358,6 @@ filters.forEach(f => document.getElementById('f-'+f).onchange = applyFilters);
 """)
 
     html_file.write_text("\n".join(html_parts))
-    print(f"HTML report generated: {html_file}", file=sys.stderr)
 
 
 def parse_csv_field(value: str) -> Any:
