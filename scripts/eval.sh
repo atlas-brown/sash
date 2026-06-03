@@ -1,11 +1,252 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-top="$(git rev-parse --show-toplevel)"
-cd "${top}"
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+cd "${REPO_ROOT}" || exit 1
 
-mkdir -p results
-t=60
+# Select which portions of the evaluation to run
+RUN_ALL=1
+RUN_MAIN=0
+RUN_SWEEP=0
+RUN_KOALA=0
 
-# Run full benchmark evaluation on regular (buggy) + fixed scripts.
-python scripts/evaluation.py -j 4 -t $t -f -v -c results/results.csv -H results/results.html
+# Parameters
+MAIN_TIMEOUT="${MAIN_TIMEOUT:-60}"
+MAIN_JOBS=${MAIN_JOBS:-1}
+KOALA_TIMEOUT="${KOALA_TIMEOUT:-$((15 * 60))}" # 15 minutes
+SWEEP_TIMEOUTS_CSV="${SWEEP_TIMEOUTS_CSV:-1,10,20,30,40,50,60,70,80,90,100}"
+SWEEP_JOBS="${SWEEP_JOBS:-4}"
+FORCE=0  # Ignore cached results when nonzero
+DRY_RUN=0
+
+# Input and output paths
+MAIN_RESULTS_DIR="results/main-eval"
+SWEEP_RESULTS_DIR="results/timeout-sweep"
+KOALA_RESULTS_DIR="results/koala-eval"
+FIGURES_DIR="results/figures"
+KOALA_DIR="${REPO_ROOT}/benchmarks/koala"
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+    --main)
+        RUN_MAIN=1
+        RUN_ALL=0
+        shift 1
+        ;;
+    --sweep)
+        RUN_SWEEP=1
+        RUN_ALL=0
+        shift 1
+        ;;
+    --koala)
+        RUN_KOALA=1
+        RUN_ALL=0
+        shift 1
+        ;;
+    --main-timeout)
+        MAIN_TIMEOUT="${2:-}"
+        shift 2
+        ;;
+    --koala-timeout)
+        KOALA_TIMEOUT="${2:-}"
+        shift 2
+        ;;
+    --sweep-timeouts)
+        SWEEP_TIMEOUTS_CSV="${2:-}"
+        shift 2
+        ;;
+    --jobs)
+        SWEEP_JOBS="${2:-}"
+        shift 2
+        ;;
+    --force)
+        FORCE=1
+        shift
+        ;;
+    --dry-run)
+        DRY_RUN=1
+        shift
+        ;;
+    *)
+        echo "Unknown argument: $1" >&2
+        exit 2
+        ;;
+    esac
+done
+
+if [[ ${RUN_ALL} -eq 1 ]]; then
+    RUN_MAIN=1
+    RUN_SWEEP=1
+    RUN_KOALA=1
+fi
+
+# Verify cloc is installed
+if ! command -v cloc >/dev/null 2>&1; then
+    echo "Error: 'cloc' is not installed. Install it (e.g., apt install cloc) and retry." >&2
+    exit 1
+fi
+
+# Parse the sweep timeouts
+IFS=',' read -r -a SWEEP_TIMEOUTS <<<"${SWEEP_TIMEOUTS_CSV}"
+if [[ ${#SWEEP_TIMEOUTS[@]} -eq 0 ]]; then
+    echo "No sweep timeouts specified" >&2
+    exit 2
+fi
+unset SWEEP_TIMEOUTS_CSV
+
+mkdir -p "${MAIN_RESULTS_DIR}" "${SWEEP_RESULTS_DIR}" "${KOALA_RESULTS_DIR}" "${FIGURES_DIR}"
+
+run_cmd() {
+    echo "$*"
+    if [[ ${DRY_RUN} -eq 0 ]]; then
+        "$@"
+    fi
+}
+
+run_main() {
+    echo "> Running main evaluation"
+    main_eval_csv="${MAIN_RESULTS_DIR}/results_t${MAIN_TIMEOUT}.csv"
+    if [[ ${FORCE} -eq 0 && -f "${main_eval_csv}" ]]; then
+        echo "Skipping existing: ${main_eval_csv}"
+    else
+        run_cmd uv run scripts/evaluation.py -f -v -j "${MAIN_JOBS}" -t "${MAIN_TIMEOUT}" -c "${main_eval_csv}"
+    fi
+}
+
+run_sweep() {
+    echo "> Running evaluation timeout sweep"
+    for t in "${SWEEP_TIMEOUTS[@]}"; do
+        opts=""
+        # Plotting script relies on output names to end with "_no_opts", "_smart_forking" or "_dfs_on"
+        for mode in "no_opts" "smart_forking" "dfs_on"; do
+            case "${mode}" in
+            "no_opts")
+                opts="--disable-dfs --disable-optimistic-forking"
+                ;;
+            "smart_forking")
+                opts="--disable-dfs"
+                ;;
+            "dfs_on")
+                opts=""
+                ;;
+            *)
+                exit 1  # Unreachable
+                ;;
+            esac
+            sweep_csv="${SWEEP_RESULTS_DIR}/results_t${t}_${mode}.csv"
+            if [[ ${FORCE} -eq 0 && -f "${sweep_csv}" ]]; then
+                echo "Skipping existing: ${sweep_csv}"
+            else
+                run_cmd uv run scripts/evaluation.py -j "${SWEEP_JOBS}" -t "${t}" ${opts} -c "${sweep_csv}"
+            fi
+        done
+    done
+}
+
+run_koala() {
+    echo "> Running Koala"
+    if [[ -d "${KOALA_DIR}" ]]; then
+        koala_csv="${KOALA_RESULTS_DIR}/results_t${KOALA_TIMEOUT}.csv"
+        if [[ ${FORCE} -eq 0 && -f "${koala_csv}" ]]; then
+            echo "Skipping existing: ${koala_csv}"
+        else
+            run_cmd uv run scripts/run_on_dir.py "${KOALA_DIR}" -t "${KOALA_TIMEOUT}" -c "${koala_csv}"
+        fi
+    else
+        echo "Koala directory missing; skipping Koala: ${KOALA_DIR}"
+    fi
+}
+
+compute_loc() {
+    echo "> Computing LoC"
+    if [[ ${FORCE} -eq 0 && -f results/benchmark_loc.csv ]]; then
+        echo "Skipping existing: results/benchmark_loc.csv"
+    else
+        run_cmd uv run scripts/precompute_loc_cache.py --results_csv "${main_eval_csv}" --output_csv results/benchmark_loc.csv
+    fi
+}
+
+generate_plots() {
+    echo "> Generating plots"
+    run_cmd uv run python - <<PY
+from pathlib import Path
+from scripts import plots
+
+figures_dir = Path("${FIGURES_DIR}")
+timeout_sweep_dir = Path("${SWEEP_RESULTS_DIR}")
+koala_sweep_dir = Path("${KOALA_RESULTS_DIR}")
+
+if "${RUN_MAIN}" == "1":
+    results_csv = Path("${main_eval_csv:-}")
+    all_results = plots.load_csv(str(results_csv))
+    plots.plot_bug_detection_bars_split_versions(
+        all_results,
+        str(figures_dir / "main-eval.pdf"),
+    )
+if "${RUN_SWEEP}" == "1":
+    plots.plot_timeout_sweep_bug_catch(
+        str(timeout_sweep_dir),
+        str(figures_dir / "timeout-sweep.pdf"),
+    )
+if "${RUN_KOALA}" == "1":
+    plots.plot_koala_timeout_cdf(
+        str(koala_sweep_dir),
+        str(figures_dir / "koala.pdf"),
+    )
+PY
+}
+
+generate_appendix() {
+    echo "> Generating LaTeX table"
+    run_cmd uv run scripts/table.py --appendix --results_csv "${main_eval_csv}" >results/table.tex
+}
+
+if [[ ${RUN_MAIN} -eq 1 ]]; then
+    run_main
+    echo
+    compute_loc
+    echo
+    generate_appendix
+    echo
+fi
+
+if [[ ${RUN_SWEEP} -eq 1 ]]; then
+    run_sweep
+    echo
+fi
+
+if [[ ${RUN_KOALA} -eq 1 ]]; then
+    run_koala
+    echo
+fi
+
+if [[ ${RUN_MAIN} -eq 1 ]] || [[ ${RUN_SWEEP} -eq 1 ]] || [[ ${RUN_KOALA} -eq 1 ]]; then
+    generate_plots
+    echo
+fi
+
+echo "Done"
+
+if [[ ${RUN_MAIN} -eq 1 ]] || [[ ${RUN_SWEEP} -eq 1 ]] || [[ ${RUN_KOALA} -eq 1 ]]; then
+    echo "Outputs:"
+fi
+
+if [[ ${RUN_MAIN} -eq 1 ]]; then
+    echo
+    echo "  ${main_eval_csv} (evaluation of buggy programs, fixed programs, and variants)"
+    echo "  results/benchmark_loc.csv (LoC information for all benchmarks)"
+    echo "  results/table.tex (appendix)"
+    echo "  results/figures/main-eval.pdf (bar plot)"
+fi
+
+if [[ ${RUN_SWEEP} -eq 1 ]]; then
+    echo
+    echo "  ${SWEEP_RESULTS_DIR}/results_t*.csv (evaluation of buggy programs under different timeouts and SaSh features)"
+    echo "  results/figures/timeout-sweep.pdf (line plot)"
+fi
+
+if [[ ${RUN_KOALA} -eq 1 ]]; then
+    echo
+    echo "  ${KOALA_RESULTS_DIR}/results_t*.csv (evaluation of SaSh on the Koala benchmarks)"
+    echo "  results/figures/koala.pdf (CDF plot)"
+fi
