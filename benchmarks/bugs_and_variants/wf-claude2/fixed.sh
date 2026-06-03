@@ -1,5 +1,6 @@
 #!/bin/sh
-
-mkdir -p ~/project/files
-cd ~/project/files || exit 1
-rm -rf *
+if [ ! -f ~/project/files ]; then
+    mkdir -p ~/project/files
+    cd ~/project/files || exit 1
+    rm -rf *
+fi
