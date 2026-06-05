@@ -31,6 +31,9 @@ SaSh can be installed natively or via Docker on Linux and MacOS. Instructions ca
 
 **Evaluation-specific dependencies**: The evaluation script ([`scripts/eval.sh`](scripts/eval.sh)) additionally requires [`cloc`](https://github.com/AlDanial/cloc) (e.g., `apt install cloc`).
 
+> [!TIP]
+> If you want to evaluate SaSh through Docker, there's of course no need to install `cloc` locally.
+
 ## Completeness
 
 The artifact contains all code and data relevant to the paper:
@@ -59,14 +62,23 @@ The expected output should include a warning about the deletion of `/*` due to a
 
 This corresponds to the bug described in Figure 1 of the paper, where a failed `cd` causes `STEAMROOT` to be empty, leading `rm -rf "$STEAMROOT/"*` to expand to `rm -rf /*`.
 
-# Results Reproduced (6 hours)
+# Results Reproduced (8 hours)
 
-## Fast Path: Full Evaluation
+> [!IMPORTANT]
+> If you want to run the evaluation through Docker, run the following before reading the rest of the section:
+> ```bash
+> docker build --target dev -t sash-dev .
+> ```
 
-To reproduce all results and figures in a single command:
+## Fast Path: Full Evaluation (8 hours)
+
+To reproduce **all** results and figures in a single command:
 
 ```bash
+# Native
 ./scripts/eval.sh
+# Docker
+docker run --rm -v "$(pwd)":/app sash-dev ./scripts/eval.sh
 ```
 
 > [!TIP]
@@ -89,10 +101,13 @@ Precomputed results from our run are available in [`results/precomputed/`](resul
 
 The following sections describe each phase individually.
 
-## (§7.1) Bug Detection Effectiveness
+## (§7.1) Bug Detection Effectiveness (1 hour)
 
 ```bash
+# Native
 ./scripts/eval.sh --main
+# Docker
+docker run --rm -v "$(pwd)":/app sash-dev ./scripts/eval.sh --main
 ```
 
 **Output**: `results/figures/main-eval.pdf` (corresponds to Fig. 8)
@@ -105,10 +120,13 @@ This runs SaSh on all 61 buggy programs, their fixed versions, and their variant
 ![Bug detection effectiveness](results/precomputed/main-eval.pdf)
 </details>
 
-## (§7.3) Performance Analysis — Timeout Sweep
+## (§7.3) Performance Analysis — Timeout Sweep (3.5 hours)
 
 ```bash
+# Native
 ./scripts/eval.sh --sweep
+# Docker
+docker run --rm -v "$(pwd)":/app sash-dev ./scripts/eval.sh --sweep
 ```
 
 **Output**: `results/figures/timeout-sweep.pdf` (corresponds to Fig. 9)
@@ -121,10 +139,13 @@ This runs SaSh on all buggy programs under multiple time budgets (1s–100s) and
 ![Timeout sweep](results/precomputed/timeout-sweep.pdf)
 </details>
 
-## (§7.3) Performance Analysis — Koala
+## (§7.3) Performance Analysis — Koala (3.5 hours)
 
 ```bash
+# Native
 ./scripts/eval.sh --koala
+# Docker
+docker run --rm -v "$(pwd)":/app sash-dev ./scripts/eval.sh --koala
 ```
 
 **Output**: `results/figures/koala.pdf` (corresponds to the CDF wrapfigure in §7.3)
@@ -139,9 +160,7 @@ This runs SaSh on all 119 programs from the Koala benchmark suite to measure the
 
 ## Appendix Table
 
-```bash
-./scripts/eval.sh --main
-```
+The appendix table is generated when running the [bug detection effectiveness evaluation](#71-bug-detection-effectiveness-1-hour).
 
 **Output**: `results/table.tex`
 
