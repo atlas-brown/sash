@@ -1,10 +1,13 @@
-# SaSh
+# SaSh: Ahead-of-time Analysis of Shell Program Effects
 
 A static analysis tool for the Unix shell, based on symbolic execution.
 
+> [!NOTE]
+> If you're interested in evaluating the SaSh artifact, read [INSTRUCTIONS.md](INSTRUCTIONS.md) first.
+
 ## Installation
 
-### Native (Linux)
+### Native (Linux, MacOS)
 
 Make sure you have the following installed:
 * `git`
@@ -16,23 +19,24 @@ Make sure you have the following installed:
 * [`uv`](https://github.com/astral-sh/uv) (recommended) or `pipx`
 
 You already have `g++-13` or `clang-17` if you are on Debian 13, Ubuntu 23, or newer.
+You probably already have `clang-17` if you've installed the [`xcode` command line tools](https://developer.apple.com/documentation/xcode/command-line-tools).
 
 Then, run:
 ```bash
-uv tool install git+https://github.com/atlas-brown/resash.git
+CFLAGS="-std=gnu17" uv tool install git+https://github.com/atlas-brown/resash.git
 uv tool update-shell  # If PATH needs to be updated
 ```
 
 Or:
 
 ```bash
-pipx install git+https://github.com/atlas-brown/resash.git
+CFLAGS="-std=gnu17" pipx install git+https://github.com/atlas-brown/resash.git
 pipx ensurepath  # If PATH needs to be updated
 ```
 
 ### Containerized (Linux, MacOS)
 
-Unfortunately some of the dependencies don't build on MacOS, so the best option for now is using a Docker image.
+If you want to avoid installing a bunch of dependencies, you can use SaSh through Docker.
 
 To install:
 
@@ -43,22 +47,23 @@ docker run --rm sash --help  # Should output a help message
 rm -rf ./resash
 ```
 
-**(IMPORTANT)** To run:
-
-```bash
-# SaSh needs to be able to read files on the host machine, so it must be run as:
-docker run --rm -v "$(pwd)":/ws -w /ws sash file.sh
-# Thus, it's recommended to create an alias or a function:
-echo "alias sash='docker run --rm -v \"\$(pwd)\":/ws -w /ws sash'" >> ~/.bashrc  # Or equivalent rc file
-# If you want to pause/resume execution using CRIU, you also need to add '--privileged' to the aliased invocation
-```
+> [!IMPORTANT]
+> To run:
+>
+> ```bash
+> # SaSh needs to be able to read files on the host machine, so it must be run as:
+> docker run --rm -v "$(pwd)":/ws -w /ws sash file.sh
+> # Thus, it's recommended to create an alias or a function:
+> echo "alias sash='docker run --rm -v \"\$(pwd)\":/ws -w /ws sash'" >> ~/.bashrc  # Or equivalent rc file
+> # If you want to pause/resume execution using CRIU, you also need to add '--privileged' to the aliased invocation
+> ```
 
 ## Contributing
 
 ### Containerized Development (Linux, MacOS)
 
-The project provides a devcontainer file for containerized development (found in `/.devcontainer`).
-Additionally the Dockerfile provides an additional target for development (`dev`), which does not copy the project files into the container to allow for mounting.
+The project provides [a configuration file for containerized development](.devcontainer/devcontainer.json).
+Additionally, the Dockerfile provides an additional target for development (`dev`), which does not copy the project files into the container, to allow for mounting.
 
 ```bash
 docker build --target dev -t sash-dev .
@@ -69,7 +74,7 @@ docker run --rm -it -v $(pwd):/app sash-dev /bin/bash
 ### Testing
 
 This project uses [`pytest`](https://docs.pytest.org/).
-To run all tests, use `uv run pytest`
+To run all tests, use `uv run pytest`.
 
 To ensure correct [test discovery](https://docs.pytest.org/en/7.1.x/explanation/goodpractices.html#conventions-for-python-test-discovery) when writing new tests:
 * Test files should be named with the prefix `test_` (e.g., `test_example.py`).

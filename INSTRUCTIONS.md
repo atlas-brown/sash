@@ -69,6 +69,10 @@ To reproduce all results and figures in a single command:
 ./scripts/eval.sh
 ```
 
+> [!TIP]
+> Running `./scripts/eval.sh --main-jobs <num. of CPU cores> --sweep-jobs <num. of CPU cores>` will significantly reduce the time of the evaluation but might lead to some bugs not being detected due to resource contention.
+> This tip will be removed from the artifact and is here just for people giving feedback.
+
 This runs all three evaluation phases (main evaluation, timeout sweep, Koala), computes line-of-code statistics, and generates all figures and tables. Outputs are written to `results/`:
 
 | Output | Paper Reference | Description |
@@ -79,6 +83,9 @@ This runs all three evaluation phases (main evaluation, timeout sweep, Koala), c
 | `results/table.tex` | Appendix table | Per-benchmark results |
 
 Precomputed results from our run are available in `results/precomputed/` for comparison.
+
+> [!IMPORTANT]
+> Precomputed results are not available at this time, but will be included in the full artifact.
 
 The following sections describe each phase individually.
 

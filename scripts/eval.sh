@@ -55,7 +55,11 @@ while [[ $# -gt 0 ]]; do
         SWEEP_TIMEOUTS_CSV="${2:-}"
         shift 2
         ;;
-    --jobs)
+    --main-jobs)
+        MAIN_JOBS="${2:-}"
+        shift 2
+        ;;
+    --sweep-jobs)
         SWEEP_JOBS="${2:-}"
         shift 2
         ;;
