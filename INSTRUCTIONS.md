@@ -29,7 +29,7 @@ Reviewers should confirm the following:
 
 SaSh can be installed natively or via Docker on Linux and MacOS. Instructions can be found in [README.md](README.md).
 
-**Evaluation-specific dependencies**: The evaluation script (`scripts/eval.sh`) additionally requires [`cloc`](https://github.com/AlDanial/cloc) (e.g., `apt install cloc`).
+**Evaluation-specific dependencies**: The evaluation script ([`scripts/eval.sh`](scripts/eval.sh)) additionally requires [`cloc`](https://github.com/AlDanial/cloc) (e.g., `apt install cloc`).
 
 ## Completeness
 
@@ -37,11 +37,11 @@ The artifact contains all code and data relevant to the paper:
 
 | Component | Location | Paper Reference |
 |-----------|----------|-----------------|
-| Symbolic execution engine (including symbolic word expansion), command specifications, filesystem model | `src/sash/symb.py`, `src/sash/specs.py`, `src/sash/fs.py`, respectively | §3–§6 |
-| 61 real buggy programs (116 bugs) and 42 synthetic variants | `benchmarks/bugs_and_variants/` | §7.1, §7.2 |
-| 119 Koala benchmark programs | `benchmarks/koala/` | §7.3 |
-| Evaluation script | `scripts/eval.sh` | §7 |
-| Bug reports filed in open-source projects | `benchmarks/bug_reports.md` | §7.4 |
+| Symbolic execution engine (including symbolic word expansion), command specifications, filesystem model | [`src/sash/symb.py`](src/sash/symb.py), [`src/sash/specs.py`](src/sash/specs.py), [`src/sash/fs.py`](src/sash/fs.py), respectively | §3–§6 |
+| 61 real buggy programs (116 bugs) and 42 synthetic variants | [`benchmarks/bugs_and_variants/`](benchmarks/bugs_and_variants/) | §7.1, §7.2 |
+| 119 Koala benchmark programs | [`benchmarks/koala/`](benchmarks/koala/) | §7.3 |
+| Evaluation scripts | [`scripts/eval.sh`](scripts/eval.sh) and other scripts in the same directory | §7 |
+| Bug reports filed in open-source projects | [`benchmarks/bug_reports.md`](benchmarks/bug_reports.md) | §7.4 |
 
 ## Minimal Working Example
 
@@ -73,7 +73,7 @@ To reproduce all results and figures in a single command:
 > Running `./scripts/eval.sh --main-jobs <num. of CPU cores> --sweep-jobs <num. of CPU cores>` will significantly reduce the time of the evaluation but might lead to some bugs not being detected due to resource contention.
 > This tip will be removed from the artifact and is here just for people giving feedback.
 
-This runs all three evaluation phases (main evaluation, timeout sweep, Koala), computes line-of-code statistics, and generates all figures and tables. Outputs are written to `results/`:
+This runs all three evaluation phases (main evaluation, timeout sweep, Koala), computes line-of-code statistics, and generates all figures and tables. Outputs are written to [`results/`](results/):
 
 | Output | Paper Reference | Description |
 |--------|----------------|-------------|
@@ -82,7 +82,7 @@ This runs all three evaluation phases (main evaluation, timeout sweep, Koala), c
 | `results/figures/koala.pdf` | §7.3 (wrapfigure) | CDF of Koala analysis completion time |
 | `results/table.tex` | Appendix table | Per-benchmark results |
 
-Precomputed results from our run are available in `results/precomputed/` for comparison.
+Precomputed results from our run are available in [`results/precomputed/`](results/precomputed/) for comparison.
 
 > [!IMPORTANT]
 > Precomputed results are not available at this time, but will be included in the full artifact.
