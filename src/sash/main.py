@@ -14,7 +14,7 @@ from sash.solver import reset_z3cache, run_solver
 import sash.specs as specs
 from sash.debugtools.logger import DebugLogger
 from typing import Literal
-from sash.formatters import JSONFormatter
+from sash.formatters import CompactFormatter, DefaultFormatter, Formatter, JSONFormatter
 
 def build_cli(options_only=False) -> argparse.ArgumentParser:
     SHOW_ADVANCED_HELP_STRS = {"a", "advanced"}
@@ -66,6 +66,11 @@ def build_cli(options_only=False) -> argparse.ArgumentParser:
         "--json",
         action="store_true",
         help="Emit JSON-compliant output instead of the default user-facing, pretty plain-text output"
+    )
+    parser.add_argument(
+        "--compact",
+        action="store_true",
+        help="Emit compact output, exactly one line per error"
     )
     parser.add_argument(
         "-h",
@@ -233,15 +238,14 @@ def cli_main():
         collect_debug_info=args.collect_debug_info,
     )
 
+    fmt: Formatter
     if args.json:
-        print(JSONFormatter().format(report))
-        #print(json.dumps(report.to_dict(), indent=2))
-    elif args.log_level != "DISABLED":
-        print(report.to_plain_text())
+        fmt = JSONFormatter()
+    elif args.compact:
+        fmt = CompactFormatter()
     else:
-        compact_output = report.to_compact_text()
-        if compact_output:
-            print(compact_output)
+        fmt = DefaultFormatter()
+    print(fmt.format(report))
 
     sys.exit(1 if report.issues else 0)
 

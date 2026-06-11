@@ -138,7 +138,8 @@ class DangerousWordSplit(Issue):
     severity = Severity.WARNING
 
     def __init__(self, source: AST.CommandNode, line: int | None):
-        super().__init__(f"Word splitting could leading to unexpected arguments to dangerous commands:\n{source.pretty()}", line)
+        # TODO: Figure out why source is a tuple sometimes and fix it
+        super().__init__(f"Word splitting could leading to unexpected arguments to dangerous commands:\n{source.pretty() if not isinstance(source, tuple) else source[0].pretty()}", line)
 
 
 class RedirectToFunction(Issue):

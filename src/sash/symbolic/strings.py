@@ -200,6 +200,9 @@ class Field:
             case SymStr():
                 return "".join(self.content.parts)
             case CompletelyArbitrary():
+                if isinstance(self.content.source, tuple):
+                    # Happens when an arbitrary has two parent states
+                    return self.content.source[0].pretty()
                 return self.content.source.pretty()
 
 
@@ -310,7 +313,8 @@ def merge_partial_fields(fields: list[Field], sep: str | None = " ", state: "Sta
         prefix, suffix = collect_prefixes_suffixes(fields)
         quoted = all(a.content.quoted for a in arbitraries) # type: ignore
         if state is not None:
-            arbitrary = Field(CompletelyArbitrary(freeze_thing([a.content.source for a in arbitraries]), # type: ignore
+            # TODO: Some sources (which are useful for diagnostics) are lost; fix that
+            arbitrary = Field(CompletelyArbitrary(freeze_thing(arbitraries[0].content.source), # type: ignore
                                                   ArbitraryType.APPROXIMATION,
                                                   state,
                                                   quoted=quoted),
