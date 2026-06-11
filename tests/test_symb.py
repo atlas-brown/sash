@@ -2,6 +2,8 @@
 Tests for static analysis of shell scripts using sash.symb.main.
 These tests run sample shell scripts and verify that expected errors or warnings are reported.
 """
+from unittest.mock import Mock
+
 import pytest
 import shasta.ast_node as AST
 from util import *
@@ -66,7 +68,7 @@ def test_unbound_from_local_assignment_does_not_bind_later_use(tmp_path):
     date_unbound_lines = sorted(
         issue.line
         for issue in report.issues
-        if issue.code == reporter.Code.UNBOUND_ID and "${DATE}" in issue.message
+        if isinstance(issue, reporter.UnboundID) and "${DATE}" in issue.message
     )
     assert 4 in date_unbound_lines
 
@@ -113,7 +115,7 @@ def test_delete_system_file(tmp_path):
     report = reset_and_run_main(script)
     expected_error1 = reporter.WordSplitCouldDeleteSystemFile("/usr", 0)
     expected_error2 = reporter.UnboundID(foo_var.pretty(), 0)
-    expected_error3 = reporter.DangerousWordSplit("$FOO", 0)
+    expected_error3 = reporter.DangerousWordSplit(mock_node("$FOO"), 0)
     assert_expected_report(report, [expected_error1, expected_error2, expected_error3])
 
 
@@ -121,7 +123,7 @@ def test_delete_system_file(tmp_path):
     report = reset_and_run_main(script)
     expected_error1 = reporter.WordSplitCouldDeleteSystemFile("/*", 0)
     expected_error2 = reporter.UnboundID(foo_var.pretty(), 0)
-    expected_error3 = reporter.DangerousWordSplit("$STEAMROOT", 0)
+    expected_error3 = reporter.DangerousWordSplit(mock_node("$STEAMROOT"), 0)
     assert_expected_report(report, [expected_error1, expected_error2, expected_error3])
 
     script = write_script(tmp_path, "rm -rf /*\n")
@@ -261,7 +263,7 @@ rm -rf "$THIRD"
     init_pwd_issues = [
         issue
         for issue in report.issues
-        if issue.code == reporter.Code.DELETE_SYSTEM_FILE and "Init PWD" in issue.message
+        if isinstance(issue, reporter.DeleteSystemFile) and "Init PWD" in issue.message
     ]
     assert init_pwd_issues, f"Expected Init PWD deletion warning, got: {report.to_dict()}"
 
@@ -284,7 +286,7 @@ rm -rf "$TARGET"
     init_pwd_issues = [
         issue
         for issue in report.issues
-        if issue.code == reporter.Code.DELETE_SYSTEM_FILE and "Init PWD" in issue.message
+        if isinstance(issue, reporter.DeleteSystemFile) and "Init PWD" in issue.message
     ]
     assert init_pwd_issues, f"Expected Init PWD deletion warning, got: {report.to_dict()}"
 
@@ -313,7 +315,7 @@ def test_delete_system_file_with_escaped_cmd_name(tmp_path):
 def test_delete_splitting(tmp_path):
     script = write_script(tmp_path, "rm $UNQUOTED\n")
     report = reset_and_run_main(script)
-    expected_error1 = reporter.DangerousWordSplit("$UNQUOTED", 0)
+    expected_error1 = reporter.DangerousWordSplit(mock_node("$UNQUOTED"), 0)
     expected_error2 = reporter.UnboundID(foo_var.pretty(), 0)
     assert_expected_report(report, [expected_error1, expected_error2])
 
@@ -339,7 +341,7 @@ def test_loop_runs_once__const(tmp_path):
     # A loop over a single constant should produce a LoopRunsOnce warning
     script = write_script(tmp_path, "for i in one; do echo $i; done\n")
     report = reset_and_run_main(script)
-    expected_warning = reporter.LoopRunsOnce(None, 0)
+    expected_warning = reporter.LoopRunsOnce(mock_node(), 0)
     assert_expected_report(report, [expected_warning])
 
 # for i in 'one two'; do echo $i; done\n
@@ -347,7 +349,7 @@ def test_loop_runs_once__const_multiple_quoted(tmp_path):
     # A loop over multiple quoted constants should produce a LoopRunsOnce warning
     script = write_script(tmp_path, 'for i in "one two"; do echo $i; done\n')
     report = reset_and_run_main(script)
-    expected_warning = reporter.LoopRunsOnce(None, 0)
+    expected_warning = reporter.LoopRunsOnce(mock_node(), 0)
     assert_expected_report(report, [expected_warning])
 
 # foo=one\n for i in $foo; do echo $i; done\n
@@ -355,7 +357,7 @@ def test_loop_runs_once__var(tmp_path):
     # A loop over a variable assigned a single constant should produce a LoopRunsOnce warning
     script = write_script(tmp_path, "foo=one\n for i in $foo; do echo $i; done\n")
     report = reset_and_run_main(script)
-    expected_warning = reporter.LoopRunsOnce(None, 0)
+    expected_warning = reporter.LoopRunsOnce(mock_node(), 0)
     assert_expected_report(report, [expected_warning])
 
 # foo="one two"\n for i in "$foo"; do echo $i; done\n
@@ -363,7 +365,7 @@ def test_loop_runs_once__var_multiple_const_quoted(tmp_path):
     # A loop over a quoted variable assigned multiple quoted constants should produce a LoopRunsOnce warning
     script = write_script(tmp_path, 'foo="one two"\n for i in "$foo"; do echo $i; done\n')
     report = reset_and_run_main(script)
-    expected_warning = reporter.LoopRunsOnce(None, 0)
+    expected_warning = reporter.LoopRunsOnce(mock_node(), 0)
     assert_expected_report(report, [expected_warning])
 
 # for i in $(echo one); do echo $i; done\n
@@ -372,7 +374,7 @@ def test_loop_runs_once__cmdsubst(tmp_path):
     # A loop over a command substitution that produces a single constant should produce a LoopRunsOnce warning
     script = write_script(tmp_path, "for i in $(echo one); do echo $i; done\n")
     report = reset_and_run_main(script)
-    expected_warning = reporter.LoopRunsOnce(None, 0)
+    expected_warning = reporter.LoopRunsOnce(mock_node(), 0)
     assert_expected_report(report, [expected_warning])
 
 # for i in "$(echo one two)"; do echo $i; done\n
@@ -380,7 +382,7 @@ def test_loop_runs_once__cmdsubst_quoted_multiple_const(tmp_path):
     # A loop over a quoted command substitution that produces multiple quoted constants should produce a LoopRunsOnce warning
     script = write_script(tmp_path, 'for i in "$(echo one two)"; do echo $i; done\n')
     report = reset_and_run_main(script)
-    expected_warning = reporter.LoopRunsOnce(None, 0)
+    expected_warning = reporter.LoopRunsOnce(mock_node(), 0)
     assert_expected_report(report, [expected_warning])
 
 # for i in one two; do echo $i; done\n
@@ -421,7 +423,7 @@ def test_constant_while_condition(tmp_path):
     # A while loop with a constant true condition should produce an InfiniteLoop error
     script = write_script(tmp_path, "A=a\nB=b\nwhile [ $A != $B ]; do echo hi; done\n")
     report = reset_and_run_main(script)
-    expected_error = reporter.InfiniteLoop(None, 0) # Mock the location
+    expected_error = reporter.InfiniteLoop(mock_node(), 0) # Mock the location
     assert_expected_report(report, [expected_error])
 
 def test_constant_while_condition2(tmp_path):
@@ -434,7 +436,7 @@ while [ "$RETAIN" -le "$NUMSNAPS" ]; do
 done
 """)
     report = reset_and_run_main(script)
-    expected_error = reporter.InfiniteLoop(None, 0) # Mock the location
+    expected_error = reporter.InfiniteLoop(mock_node(), 0) # Mock the location
     assert_expected_report(report, [expected_error])
 
 def test_changing_while_condition_no_error(tmp_path):
@@ -447,32 +449,32 @@ def test_changing_while_condition_error(tmp_path):
     # A while loop where the condition never changes after the first iteration should error
     script = write_script(tmp_path, "A=a\nB=b\nwhile [ $A != $B ]; do A=hello; done\n")
     report = reset_and_run_main(script)
-    expected_error = reporter.InfiniteLoop(None, 0) # Mock the location
+    expected_error = reporter.InfiniteLoop(mock_node(), 0) # Mock the location
     assert_expected_report(report, [expected_error])
 
 
 def test_break_exits_while_loop(tmp_path):
     script = write_script(tmp_path, "A=a\nB=b\nwhile [ $A != $B ]; do break; A=hello; done\n")
     report = reset_and_run_main(script)
-    assert not any(issue.code == reporter.Code.INFINITE_LOOP for issue in report.issues)
+    assert not any(isinstance(issue, reporter.InfiniteLoop) for issue in report.issues)
 
 
 def test_continue_skips_rest_of_while_body(tmp_path):
     script = write_script(tmp_path, "A=a\nB=b\nwhile [ $A != $B ]; do A=$B; continue; A=hello; done\n")
     report = reset_and_run_main(script)
-    assert not any(issue.code == reporter.Code.INFINITE_LOOP for issue in report.issues)
+    assert not any(isinstance(issue, reporter.InfiniteLoop) for issue in report.issues)
 
 
 def test_break_exits_for_loop(tmp_path):
     script = write_script(tmp_path, "for i in one two; do break; rm /usr; done\n")
     report = reset_and_run_main(script)
-    assert not any(issue.code == reporter.Code.DELETE_SYSTEM_FILE for issue in report.issues)
+    assert not any(isinstance(issue, reporter.DeleteSystemFile) for issue in report.issues)
 
 
 def test_continue_skips_rest_of_for_body(tmp_path):
     script = write_script(tmp_path, "for i in one two; do continue; rm /usr; done\n")
     report = reset_and_run_main(script)
-    assert not any(issue.code == reporter.Code.DELETE_SYSTEM_FILE for issue in report.issues)
+    assert not any(isinstance(issue, reporter.DeleteSystemFile) for issue in report.issues)
 
 def test_function_call(tmp_path):
     # A function that is called should not produce unbound variable errors for its parameters
@@ -565,8 +567,8 @@ if [ "a" = "b" ]; then
 fi
 """)
     report = reset_and_run_main(script)
-    expected_error1 = reporter.ConstantCondition(None, 0) # Mock the location
-    expected_error2 = reporter.DeadCode("rm -rf /*", 0)
+    expected_error1 = reporter.ConstantCondition(mock_node(), 0) # Mock the location
+    expected_error2 = reporter.DeadCode(mock_node("rm -rf /*"), 0)
     assert_expected_report(report, [expected_error1, expected_error2]) # Notice: no DeleteSystemFile error
 
     script = write_script(tmp_path, """
@@ -577,8 +579,8 @@ else
 fi
 """)
     report = reset_and_run_main(script)
-    expected_error1 = reporter.ConstantCondition(None, 0) # Mock the location
-    expected_error2 = reporter.DeadCode("rm -rf /*", 0)
+    expected_error1 = reporter.ConstantCondition(mock_node(), 0) # Mock the location
+    expected_error2 = reporter.DeadCode(mock_node("rm -rf /*"), 0)
     expected_error3 = reporter.UnboundID(foo_var.pretty(), 0)
     assert_expected_report(report, [expected_error1, expected_error2, expected_error3])
 
@@ -592,8 +594,8 @@ def test_set_e_const_cond_last_exit(tmp_path):
     fi
     """)
     report = reset_and_run_main(script)
-    expected_error1 = reporter.ConstantCondition(None, 0)
-    expected_error2 = reporter.DeadCode('git config --global "key" "value"', 0)
+    expected_error1 = reporter.ConstantCondition(mock_node(), 0)
+    expected_error2 = reporter.DeadCode(mock_node('git config --global "key" "value"'), 0)
     assert_expected_report(report, [expected_error1, expected_error2])
 
 def test_set_e_const_cond_fix(tmp_path):
@@ -620,8 +622,8 @@ def test_set_e_const_cond_use_var(tmp_path):
     fi
     """)
     report = reset_and_run_main(script)
-    expected_error1 = reporter.ConstantCondition(None, 0)
-    expected_error2 = reporter.DeadCode('echo "This will never run"', 0)
+    expected_error1 = reporter.ConstantCondition(mock_node(), 0)
+    expected_error2 = reporter.DeadCode(mock_node('echo "This will never run"'), 0)
     assert_expected_report(report, [expected_error1, expected_error2])
 
 def test_set_e_const_cond_use_var_fix(tmp_path):
@@ -647,7 +649,7 @@ rm -rf /usr
 """)
     report = reset_and_run_main(script)
     expected_error1 = reporter.UnboundID(foo_var.pretty(), 0)
-    expected_error2 = reporter.DeadCode("rm -rf /usr", 0)
+    expected_error2 = reporter.DeadCode(mock_node("rm -rf /usr"), 0)
     assert_expected_report(report, [expected_error1, expected_error2]) # Notice: no DeleteSystemFile error
 
     script = write_script(tmp_path, """
@@ -753,7 +755,7 @@ f() {
 f
 """)
     report = reset_and_run_main(script)
-    expected_error = reporter.DeadCode("rm -rf /usr", 0)
+    expected_error = reporter.DeadCode(mock_node("rm -rf /usr"), 0)
     assert_expected_report(report, [expected_error])
 
 def test_return_does_not_exit_caller(tmp_path):
@@ -835,8 +837,8 @@ fi
     report = reset_and_run_main(script)
     expected_error1 = reporter.UnboundID("non-existent-command", 0)
     expected_error2 = reporter.UnboundID("logfile", 0)
-    expected_error3 = reporter.ConstantCondition(None, 0)
-    expected_error4 = reporter.DeadCode('echo "This is unreachable"', 0)
+    expected_error3 = reporter.ConstantCondition(mock_node(), 0)
+    expected_error4 = reporter.DeadCode(mock_node('echo "This is unreachable"'), 0)
     assert_expected_report(report, [expected_error1, expected_error2, expected_error3, expected_error4])
 
 
@@ -857,8 +859,8 @@ fi
 """)
     report = reset_and_run_main(script)
     expected_error1 = reporter.CommandCanOnlyFail("mkdir", 0)
-    expected_error2 = reporter.ConstantCondition(None, 0)
-    expected_error3 = reporter.DeadCode('echo "This is unreachable"', 0)
+    expected_error2 = reporter.ConstantCondition(mock_node(), 0)
+    expected_error3 = reporter.DeadCode(mock_node('echo "This is unreachable"'), 0)
     assert_expected_report(report, [expected_error1, expected_error2, expected_error3])
 
 def test_const_cond_arg_eq(tmp_path):
@@ -871,7 +873,7 @@ if [ "$A" = "$1" ]; then
 fi
 """)
     report = reset_and_run_main(script)
-    expected_error1 = reporter.ConstantCondition(None, 0)
+    expected_error1 = reporter.ConstantCondition(mock_node(), 0)
     assert_expected_report(report, [expected_error1])
 
 def test_const_cond_arg_eq_not_in_functions(tmp_path):
@@ -896,7 +898,7 @@ rm -rf ${SQUID_PIDFILE_DIR:?}/*
 """)
     report = reset_and_run_main(script)
     expected_error1 = reporter.WordSplitCouldDeleteSystemFile("/*", 0)
-    expected_error2 = reporter.DangerousWordSplit(None, 0)
+    expected_error2 = reporter.DangerousWordSplit(mock_node(), 0)
     assert_expected_report(report, [expected_error1, expected_error2])
 
 def test_param_expansion_question_empty_policy_exits(tmp_path):
@@ -919,7 +921,7 @@ rm -rf /usr
     )
     assert res.status == symb.SymbexecStatus.COMPLETED
     report = reporter.Reporter.get_report()
-    expected_error = reporter.DeadCode(None, 0)
+    expected_error = reporter.DeadCode(mock_node(), 0)
     assert_expected_report(report, [expected_error])
 
 def test_param_expansion_question_terminates_empty(tmp_path):
@@ -930,7 +932,7 @@ rm -rf ${FOO:?}/*
 rm -rf /usr
 """)
     report = reset_and_run_main(script)
-    expected_error1 = reporter.DeadCode(None, 0)
+    expected_error1 = reporter.DeadCode(mock_node(), 0)
     assert_expected_report(report, [expected_error1])
 
 def test_question_nonempty(tmp_path):
@@ -954,7 +956,7 @@ rm somefile.txt
     report = reporter.Reporter.get_report()
     assert len(res.traces) == 1
     assert len(res.traces[0].latest_state.assertions) == 4
-    expected_warning = reporter.ExpectedPathState('rm', 'existant', ('somefile.txt',), 0)
+    expected_warning = reporter.ExpectedPathState('rm', 'existant', [create_field('somefile.txt')], 0)
     assert_expected_report(report, [expected_warning])
 
 def test_double_mv(tmp_path):
@@ -967,7 +969,7 @@ mv somefile.txt otherfile2.txt
     report = reporter.Reporter.get_report()
     assert len(res.traces) == 1
     assert len(res.traces[0].latest_state.assertions) == 2
-    expected_warning = reporter.ExpectedPathState('mv', 'existant', ('somefile.txt',), 0)
+    expected_warning = reporter.ExpectedPathState('mv', 'existant', [create_field('somefile.txt')], 0)
     assert_expected_report(report, [expected_warning])
 
     script = write_script(tmp_path, """
@@ -979,7 +981,7 @@ mv somefile2.txt otherfile.txt
     report = reporter.Reporter.get_report()
     assert len(res.traces) == 1
     assert len(res.traces[0].latest_state.assertions) == 2
-    expected_warning = reporter.DataLoss('mv', ('otherfile.txt',), 0)
+    expected_warning = reporter.DataLoss('mv', [create_field('otherfile.txt')], 0)
     assert_expected_report(report, [expected_warning])
 
 
@@ -992,7 +994,7 @@ cp "$2" something.txt
     res = reset_and_run_symbexec_main(script, solver=True)
     report = reporter.Reporter.get_report()
     assert len(res.traces) == 1
-    expected_warning = reporter.ExpectedPathState('cp', 'existant', ('$2',), 0)
+    expected_warning = reporter.ExpectedPathState('cp', 'existant', [create_field('$2')], 0)
     assert_expected_report(report, [expected_warning])
 
 def test_nested_function_localenv(tmp_path):
@@ -1033,7 +1035,7 @@ if [ "$2" = "$1" ]; then
 fi
 """)
     report = reset_and_run_main(script, solver=True)
-    expected_warning = reporter.ExpectedPathState('cat', 'existant', ('$2',), 0)
+    expected_warning = reporter.ExpectedPathState('cat', 'existant', [create_field('$2')], 0)
     assert_expected_report(report, [expected_warning])
 
 def test_read_binds_single_variable(tmp_path):
@@ -1069,7 +1071,7 @@ def test_redirection_to_unread_file(tmp_path):
     echo "bug" > $x.txt
     """)
     report = reset_and_run_main(script, solver=True)
-    expected_error = reporter.DataLoss('echo', ('$x.txt',), 0)
+    expected_error = reporter.DataLoss('echo', [create_field('$x.txt')], 0)
     assert_expected_report(report, [expected_error])
 
 def test_redirection_to_read_file(tmp_path):
@@ -1099,8 +1101,9 @@ def test_redirection_to_normal_path_still_checked(tmp_path):
     echo "bug" > /tmp/output.txt
     """)
     report = reset_and_run_main(script, solver=True)
-    expected_error = reporter.DataLoss('echo', ('/tmp/output.txt',), 0)
+    expected_error = reporter.DataLoss('echo', [create_field('/tmp/output.txt')], 0)
     assert_expected_report(report, [expected_error])
+
 
 def test_mv_unread_file(tmp_path):
     """Test that moving a file that was not read produces an error."""
@@ -1113,8 +1116,9 @@ def test_mv_unread_file(tmp_path):
     mv $x.txt $y.txt
     """)
     report = reset_and_run_main(script, solver=True)
-    expected_error = reporter.DataLoss('mv', ('$y.txt',), 0)
+    expected_error = reporter.DataLoss('mv', [create_field('$y.txt')], 0)
     assert_expected_report(report, [expected_error])
+
 
 def test_mv_read_file(tmp_path):
     """Test that moving a file that was read does not produce an error."""
@@ -1137,8 +1141,8 @@ xargs -I thing rm somefile.txt thing
     res = reset_and_run_symbexec_main(script, solver=True)
     report = reporter.Reporter.get_report()
     assert len(res.traces) == 1
-    expected_warning = reporter.ExpectedPathState('rm', 'existant', ('somefile.txt',), 0)
-    expected_warning2 = reporter.DangerousWordSplit(None, 0)
+    expected_warning = reporter.ExpectedPathState('rm', 'existant', [create_field('somefile.txt')], 0)
+    expected_warning2 = reporter.DangerousWordSplit(mock_node(), 0)
     assert_expected_report(report, [expected_warning, expected_warning2])
 
 
@@ -1354,7 +1358,7 @@ def test_debootstrap_minimal(tmp_path):
     rm -rf "$TARGET"
     """)
     expected_error1 = reporter.DeleteSystemFile("PWD", 0)
-    expected_error2 = reporter.ConstantCondition(None, 0)
+    expected_error2 = reporter.ConstantCondition(mock_node(), 0)
     report = reset_and_run_main(script, solver=True)
     assert_expected_report(report, [expected_error1, expected_error2])
 
@@ -1429,8 +1433,8 @@ def test_deboostrap_more(tmp_path):
     rm -rf "$TARGET"
     """)
     report = reset_and_run_main(script)
-    expected_error1 = reporter.DeadCode('am_doing_phase dldebs first_stage second_stage', 0)
-    expected_error2 = reporter.DeadCode('exit 1 # This becomes dead code', 0)
+    expected_error1 = reporter.DeadCode(mock_node('am_doing_phase dldebs first_stage second_stage'), 0)
+    expected_error2 = reporter.DeadCode(mock_node('exit 1 # This becomes dead code'), 0)
     assert_expected_report(report, [expected_error1, expected_error2])
 
 def test_or_unreachable(tmp_path):
@@ -1444,7 +1448,7 @@ if [ -z "$2" ]; then
 fi
 """)
     report = reset_and_run_main(script)
-    expected_error = reporter.DeadCode('echo unreachable', 0)
+    expected_error = reporter.DeadCode(mock_node('echo unreachable'), 0)
     assert_expected_report(report, [expected_error])
 
 def test_or_reachable(tmp_path):
@@ -1474,8 +1478,8 @@ def test_const_cond_assignment(tmp_path):
     fi
     """)
     report = reset_and_run_main(script)
-    expected_error1 = reporter.ConstantCondition(None, 0)
-    expected_error2 = reporter.DeadCode('echo $VAR', 0)
+    expected_error1 = reporter.ConstantCondition(mock_node(), 0)
+    expected_error2 = reporter.DeadCode(mock_node('echo $VAR'), 0)
     assert_expected_report(report, [expected_error1, expected_error2])
 
 def test_const_cond_assignment_fixed(tmp_path):

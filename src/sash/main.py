@@ -14,6 +14,7 @@ from sash.solver import reset_z3cache, run_solver
 import sash.specs as specs
 from sash.debugtools.logger import DebugLogger
 from typing import Literal
+from sash.formatters import JSONFormatter
 
 def build_cli(options_only=False) -> argparse.ArgumentParser:
     SHOW_ADVANCED_HELP_STRS = {"a", "advanced"}
@@ -233,7 +234,8 @@ def cli_main():
     )
 
     if args.json:
-        print(json.dumps(report.to_dict(), indent=2))
+        print(JSONFormatter().format(report))
+        #print(json.dumps(report.to_dict(), indent=2))
     elif args.log_level != "DISABLED":
         print(report.to_plain_text())
     else:

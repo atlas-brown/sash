@@ -303,7 +303,7 @@ def test_access_after_mv_core(tmp_path):
     """)
 
     report = reset_and_run_main(script, solver=True)
-    expected_report = reporter.ExpectedPathState('mv', 'directory', ('/opt/actualbudget/',), 2)
+    expected_report = reporter.ExpectedPathState('mv', 'directory', [create_field('/opt/actualbudget/')], 2)
     assert_expected_report(report, [expected_report])
 
 
@@ -327,7 +327,7 @@ def test_access_del_resource_core(tmp_path):
     """)
 
     report = reset_and_run_main(script, solver=True)
-    expected_report = reporter.ExpectedPathState('mv', 'existant', ('workingfolder',), 4)
+    expected_report = reporter.ExpectedPathState('mv', 'existant', [create_field('workingfolder')], 4)
     assert_expected_report(report, [expected_report])
 
 
@@ -353,8 +353,8 @@ def test_overwrite_file_4_core(tmp_path):
 
     report = reset_and_run_main(script, solver=True)
     expected_reports: list[reporter.Issue] = [
-        reporter.DataLoss('echo', ('$x/chk.sas',), 3),
-        reporter.DataLoss('echo', ('$x/chk.sas',), 4),
+        reporter.DataLoss('echo', [create_field('$x/chk.sas')], 3),
+        reporter.DataLoss('echo', [create_field('$x/chk.sas')], 4),
     ]
     assert_expected_report(report, expected_reports)
 
@@ -381,8 +381,8 @@ def test_overwrite_file_xargs_core(tmp_path):
     report = reset_and_run_main(script, solver=True)
     expected_reports: list[reporter.Issue] = [
         # For each line, we get two unsat: one for overwriting target (before reading it) and one for moving file (after moving it)
-        reporter.DataLoss('mv', ('target',), 2),
-        reporter.DataLoss('mv', ('target',), 3),
+        reporter.DataLoss('mv', [create_field('target')], 2),
+        reporter.DataLoss('mv', [create_field('target')], 3),
     ]
     assert_expected_report(report, expected_reports)
 
