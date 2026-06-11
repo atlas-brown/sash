@@ -227,7 +227,7 @@ class DeleteUserDirectory(Issue):
     severity = Severity.WARNING
 
     def __init__(self, directory: str, line: int | None):
-        super().__init__(f"Celetes user directory '{directory}'", line)
+        super().__init__(f"Deletes user directory '{directory}'", line)
 
 
 class InconsistentIFS(Issue):
