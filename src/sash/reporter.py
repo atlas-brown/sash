@@ -65,7 +65,7 @@ class Issue(ABC):
     code: Code
     message: str
     severity: Severity
-    source_line: int | None
+    line: int | None
     constraint: Constraint | None = None
 
     def is_error(self) -> bool:
@@ -76,7 +76,7 @@ class Issue(ABC):
 
     def __repr__(self) -> str:
         qualification = f"IF {self.constraint} then " if self.constraint else ""
-        return f"L{self.source_line}:{self.code}: {qualification}{self.message}"
+        return f"L{self.line}:{self.code}: {qualification}{self.message}"
 
     def __eq__(self, other: object) -> bool:
         return (
@@ -84,15 +84,15 @@ class Issue(ABC):
             and self.code == other.code
             and self.message == other.message
             and self.severity == other.severity
-            and self.source_line == other.source_line
+            and self.line == other.line
         )
 
     def __hash__(self) -> int:
-        return hash((self.code, self.message, self.severity, self.source_line))
+        return hash((self.code, self.message, self.severity, self.line))
 
     def to_dict(self) -> dict:
         return {
-            "line": self.source_line,
+            "line": self.line,
             "code": self.code.value,
             "severity": self.severity.value,
             "condition": str(self.constraint) if self.constraint else None,
@@ -199,13 +199,16 @@ class CommandCanOnlyFail(Issue):
     def __init__(self, command: str, line):
         super().__init__(Code.COMMAND_CAN_ONLY_FAIL, f"command '{command}' can only fail", Severity.WARNING, line)
 
+
 class CapturingEmptyOutput(Issue):
     def __init__(self, command: str, line):
         super().__init__(Code.CAPTURING_EMPTY_OUTPUT, f"command '{command}' captures empty output", Severity.WARNING, line)
 
+
 class ExpectedPathState(Issue):
     def __init__(self, command: str, state: str, paths: Sequence[Field], line):
         super().__init__(Code.CMD_ASSERTION_PATH_STATE, f"command '{command}' expects paths that are {state}, but one or more of the following paths might not be: {_prettify_paths(paths)}", Severity.ERROR, line)
+
 
 class DataLoss(Issue):
     def __init__(self, command: str, paths: Sequence[Field], line):
@@ -254,7 +257,7 @@ class Report:
         if self.issues:
             lines.append(f"Issues ({len(self.issues)} in total):")
             for idx, issue in enumerate(self.issues, start=1):
-                header = f"{idx}. {issue.severity.value.upper()} at line {issue.source_line if issue.source_line is not None else 'unknown'}:"
+                header = f"{idx}. {issue.severity.value.upper()} at line {issue.line if issue.line is not None else 'unknown'}:"
                 lines.append(f"\t{header}")
                 lines.append(f"\t\tError code: {issue.code.value}")
                 if issue.constraint:
@@ -279,7 +282,7 @@ class Report:
         """Render only issues, in a compact shellcheck-like format."""
         lines: list[str] = []
         for issue in self.issues:
-            line = issue.source_line if issue.source_line is not None else 0
+            line = issue.line if issue.line is not None else 0
             lines.append(
                 f"{self.filename}:{line}: {issue.severity.value}: {issue.message} [{issue.code.value}]"
             )
@@ -399,7 +402,7 @@ class Reporter:
         return Report(
             filename=cls._filename,
             # We only add the condition to the issue here to enable easy deduplication while accumulating issues
-            issues=sorted([i.under_constraint(cons) for i, cons in cls._issues.items()], key = lambda i: i.source_line if i.source_line is not None else -1),
+            issues=sorted([i.under_constraint(cons) for i, cons in cls._issues.items()], key = lambda i: i.line if i.line is not None else -1),
             time=cls._exec_time,
             solver_time=cls._solver_time,
             timed_out=cls._timed_out,

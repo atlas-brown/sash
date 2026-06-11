@@ -64,7 +64,7 @@ def test_unbound_from_local_assignment_does_not_bind_later_use(tmp_path):
     )
     report = reset_and_run_main(script)
     date_unbound_lines = sorted(
-        issue.source_line
+        issue.line
         for issue in report.issues
         if issue.code == reporter.Code.UNBOUND_ID and "${DATE}" in issue.message
     )
