@@ -244,7 +244,7 @@ def process_finished_job(stats: EvalStats, job: FinishedJob):
         # (2) Bugs that were expected to be detected but were not detected (calculated from the first two)
         # (3) Bugs that were not expected to be detected but were detected anyway
 
-        all_reports = [ReportEntry(i.code.value, i.source_line, None) for i in job.report.issues]  # type: ignore
+        all_reports = [ReportEntry(i.code.value, i.line, None) for i in job.report.issues]  # type: ignore
 
         all_gt = [
             ReportEntry(bug_info["code"], l, bug_info.get("shellcheck"))
@@ -302,7 +302,7 @@ def process_finished_job(stats: EvalStats, job: FinishedJob):
         # For html report generation
         job.additional_info = {
             "expected": all_gt,
-            "actual": [ReportEntry(i.code.value, i.source_line, None) for i in job.report.issues],  # type: ignore
+            "actual": [ReportEntry(i.code.value, i.line, None) for i in job.report.issues],  # type: ignore
             "detected_all": len(all_expected_undetected) == 0,
             "kind": job.ground_truth["kind"],
         }
@@ -312,7 +312,7 @@ def process_finished_job(stats: EvalStats, job: FinishedJob):
         # (1) Bugs that were expected to not be detected but were actually detected
         # (2) Bugs that were detected but we had no expectation about them
 
-        all_reports = [ReportEntry(i.code.value, i.source_line, None) for i in job.report.issues]  # type: ignore
+        all_reports = [ReportEntry(i.code.value, i.line, None) for i in job.report.issues]  # type: ignore
 
         all_gt = [
             ReportEntry(bug_info["code"], l, bug_info.get("shellcheck"))
@@ -358,7 +358,7 @@ def process_finished_job(stats: EvalStats, job: FinishedJob):
         # For html report generation
         job.additional_info = {
             "expected": all_gt,
-            "actual": [ReportEntry(i.code.value, i.source_line, None) for i in job.report.issues],  # type: ignore
+            "actual": [ReportEntry(i.code.value, i.line, None) for i in job.report.issues],  # type: ignore
             "detected_all": len(all_unexpected_detected) == 0,
             "kind": job.ground_truth["kind"],
         }
