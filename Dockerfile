@@ -13,6 +13,7 @@ RUN apt-get update && \
         automake \
         libtool \
         make \
+        shfmt \
         ca-certificates && \
     update-ca-certificates && \
     rm -rf /var/lib/apt/lists/*
