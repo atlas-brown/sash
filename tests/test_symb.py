@@ -70,7 +70,7 @@ def test_unbound_from_local_assignment_does_not_bind_later_use(tmp_path):
         for issue in report.issues
         if isinstance(issue, reporter.UnboundID) and "${DATE}" in issue.message
     )
-    assert 4 in date_unbound_lines
+    assert 3 in date_unbound_lines
 
 def test_unbound_variable_setu(tmp_path):
     # Using an unset variable with 'set -u' should produce an unbound error

@@ -23,7 +23,7 @@ class Issue(ABC):
     severity: ClassVar[Severity]
 
     message: str
-    line: int | None = None
+    line: int | None
     constraint: Constraint | None = field(default=None, compare=False, hash=False)
 
 
@@ -61,30 +61,41 @@ class Issue(ABC):
         return {subclass.code for subclass in cls.__subclasses__()}
 
 
+@dataclass(frozen=True)
 class ParseError(Issue):
     code = "parse"
     severity = Severity.ERROR
 
     def __init__(self, msg: str) -> None:
-        super().__init__(f"Parse error: {msg}")
+        super().__init__(f"Parse error: {msg}", None)
 
 
+@dataclass(frozen=True)
 class UnboundID(Issue):
     code = "unbound"
     severity = Severity.ERROR
+
+    # Do not include the line when hashing in order to prevent duplicate errors about the same variable
+    line: int | None = field(compare=False, hash=False)
 
     def __init__(self, var: str, line: int | None):
         super().__init__(f"No definition found for '{var}'", line)
 
 
+
+@dataclass(frozen=True)
 class UnboundIDSetU(Issue):
     code = "unbound_setu"
     severity = Severity.ERROR
+
+    # Do not include the line when hashing in order to prevent duplicate errors about the same variable
+    line: int | None = field(compare=False, hash=False)
 
     def __init__(self, var: str, line: int | None):
         super().__init__(f"No definition found for '{var}' in `set -u` mode", line)
 
 
+@dataclass(frozen=True)
 class UndefinedFunction(Issue):
     code = "function_use_before_def"
     severity = Severity.ERROR
@@ -93,6 +104,7 @@ class UndefinedFunction(Issue):
         super().__init__(f"Function '{name}' is used before its definition", line)
 
 
+@dataclass(frozen=True)
 class InfiniteLoop(Issue):
     code = "infinite_loop"
     severity = Severity.ERROR
@@ -101,6 +113,7 @@ class InfiniteLoop(Issue):
         super().__init__(f"Condition for the following loop never changes, causing an infinite loop:\n{loop.pretty()}", line)
 
 
+@dataclass(frozen=True)
 class ConstantCondition(Issue):
     code = "const_cond"
     severity = Severity.WARNING
@@ -109,6 +122,7 @@ class ConstantCondition(Issue):
         super().__init__(f"Condition is always true or false:\n{cond.pretty()}", line)
 
 
+@dataclass(frozen=True)
 class LoopRunsOnce(Issue):
     code = "loop_once"
     severity = Severity.WARNING
@@ -117,6 +131,7 @@ class LoopRunsOnce(Issue):
         super().__init__(f"Loop runs only once:\n{loop.pretty()}", line)
 
 
+@dataclass(frozen=True)
 class DeleteSystemFile(Issue):
     code = "del_sys_file"
     severity = Severity.ERROR
@@ -125,6 +140,7 @@ class DeleteSystemFile(Issue):
         super().__init__(f"Will delete system file '{filename}'", line)
 
 
+@dataclass(frozen=True)
 class WordSplitCouldDeleteSystemFile(Issue):
     code = "word_split_del_sys_file"
     severity = Severity.ERROR
@@ -133,6 +149,7 @@ class WordSplitCouldDeleteSystemFile(Issue):
         super().__init__(f"Word splitting or empty variable could lead to deletion of system file {filename}", line)
 
 
+@dataclass(frozen=True)
 class DangerousWordSplit(Issue):
     code = "word_split"
     severity = Severity.WARNING
@@ -142,6 +159,7 @@ class DangerousWordSplit(Issue):
         super().__init__(f"Word splitting could leading to unexpected arguments to dangerous commands:\n{source.pretty() if not isinstance(source, tuple) else source[0].pretty()}", line)
 
 
+@dataclass(frozen=True)
 class RedirectToFunction(Issue):
     code = "redir_func"
     severity = Severity.WARNING
@@ -150,6 +168,7 @@ class RedirectToFunction(Issue):
         super().__init__(f"Redirecting output to '{function_name}', which is a function, actually writes to a file with that name", line)
 
 
+@dataclass(frozen=True)
 class DeadCode(Issue):
     code = "dead_code"
     severity = Severity.WARNING
@@ -158,6 +177,7 @@ class DeadCode(Issue):
         super().__init__(f"Unreachable code:\n{code.pretty()}", line)
 
 
+@dataclass(frozen=True)
 class EmptyVar(Issue):
     code = "empty_var"
     severity = Severity.WARNING
@@ -166,6 +186,7 @@ class EmptyVar(Issue):
         super().__init__(f"Variable '{varname}' might be empty", line)
 
 
+@dataclass(frozen=True)
 class IgnoredCommandResult(Issue):
     code = "ignored_cmd_result"
     severity = Severity.WARNING
@@ -174,6 +195,7 @@ class IgnoredCommandResult(Issue):
         super().__init__(f"The output of command '{command}' is ignored.", line)
 
 
+@dataclass(frozen=True)
 class NotACommand(Issue):
     code = "not_a_command"
     severity = Severity.ERROR
@@ -183,6 +205,7 @@ class NotACommand(Issue):
 
 
 # TODO: Improve error message and detection
+@dataclass(frozen=True)
 class UnexpectedStdin(Issue):
     code = "unexpected_stdin"
     severity = Severity.ERROR
@@ -191,6 +214,7 @@ class UnexpectedStdin(Issue):
         super().__init__(f"Command '{command}' expects input from stdin if the first argument is empty", line)
 
 
+@dataclass(frozen=True)
 class CommandCanOnlyFail(Issue):
     code = "command_can_only_fail"
     severity = Severity.WARNING
@@ -199,6 +223,7 @@ class CommandCanOnlyFail(Issue):
         super().__init__(f"Command '{command}' can only fail", line)
 
 
+@dataclass(frozen=True)
 class CapturingEmptyOutput(Issue):
     code = "capturing_empty_output"
     severity = Severity.WARNING
@@ -207,6 +232,7 @@ class CapturingEmptyOutput(Issue):
         super().__init__(f"Command '{command}' captures empty output", line)
 
 
+@dataclass(frozen=True)
 class ExpectedPathState(Issue):
     code = "cmd_expected_path_state"
     severity = Severity.ERROR
@@ -215,6 +241,7 @@ class ExpectedPathState(Issue):
         super().__init__(f"Command '{command}' expects paths that are {state}, but one or more of the following paths might not be: {', '.join(p.pretty() for p in paths).rstrip()}", line)
 
 
+@dataclass(frozen=True)
 class DataLoss(Issue):
     code = "data_loss"
     severity = Severity.ERROR
@@ -223,6 +250,7 @@ class DataLoss(Issue):
         super().__init__(f"Command '{command}' deletes the following paths, one of which has not been read, potentially causing loss of data: {', '.join(p.pretty() for p in paths).rstrip()}", line)
 
 
+@dataclass(frozen=True)
 class DeleteUserDirectory(Issue):
     code = "del_user_dir"
     severity = Severity.WARNING
@@ -231,6 +259,7 @@ class DeleteUserDirectory(Issue):
         super().__init__(f"Deletes user directory '{directory}'", line)
 
 
+@dataclass(frozen=True)
 class InconsistentIFS(Issue):
     code = "inconsistent_ifs"
     severity = Severity.WARNING
