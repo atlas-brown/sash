@@ -195,6 +195,13 @@ class Field:
     def create_constant(s: str, words: int = 1) -> "Field":
         return Field(SymStr((s,)), WordCount(words, words))
 
+    def pretty(self) -> str:
+        match self.content:
+            case SymStr():
+                return "".join(self.content.parts)
+            case CompletelyArbitrary():
+                return self.content.source.pretty()
+
 
 def merge_counts(c1: WordCount, c2: WordCount, sep: int = 0) -> WordCount:
     """

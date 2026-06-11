@@ -34,7 +34,7 @@ import sash.util as util
 from sash.constraints import *
 from sash.frozen import FrozenAst, FrozenDict, freeze, freeze_thing
 from sash.interpreter_config import PROTECTED_PATHS, SAFE_OVERWRITE_PATHS, BranchDecision, BranchSelection, InterpConfig, UnboundVariablePolicy
-from sash.reporter import Reporter
+from sash.reporter import CommandCanOnlyFail, ConstantCondition, DeadCode, DeleteSystemFile, Reporter
 from sash.solver import field_to_z3
 from sash.specs import get_spec, CmdSpec
 from sash.dfs_targeted import *
@@ -2242,7 +2242,7 @@ def handle_if(traces: Traces, node: AST.IfNode, config: InterpConfig) -> Traces:
             both_traces.extend(ts1)
 
     if len(test_results) == 1 and any(b in test_results for b in (True, False)):
-        Reporter.add_issue(reporter.ConstantCondition(res[0][1], test_line_number), config)
+        Reporter.add_issue(reporter.ConstantCondition(node.cond, test_line_number), config)
         if then_traces:
             assert not both_traces, "test was constant across all traces"
             if node.else_b is not None and node.else_b.pretty():
@@ -3115,9 +3115,9 @@ def symbexec_file(file: str,
                                         current_pass_constraint=Description("(DFS) unbound variables are empty"))),
                     )
                     dfs_phase_timed_out = dfs_phase_timed_out or unbound_timed_out
-                    Reporter.drop_issues({reporter.Code.DELETE_SYSTEM_FILE, reporter.Code.CONSTANT_CONDITION, reporter.Code.COMMAND_CAN_ONLY_FAIL})
+                    Reporter.drop_issues({DeleteSystemFile, ConstantCondition, CommandCanOnlyFail})
                     for i in issues_so_far: # ensure that any del_sys_files found before the last run are kept
-                        if i.code == reporter.Code.DELETE_SYSTEM_FILE:
+                        if isinstance(i, DeleteSystemFile):
                             Reporter.add_issue(i, config)
 
             # logging.info("DFS run: exploring the first trace only")
@@ -3127,7 +3127,7 @@ def symbexec_file(file: str,
             dfs_fallback_traces = targeted_traces + \
                                   only_then_traces + only_else_traces + \
                                   only_then_unbound_empty + only_else_unbound_empty
-            Reporter.drop_issues({reporter.Code.DEAD_CODE}) # wholly unreliable with branch policies
+            Reporter.drop_issues({DeadCode}) # wholly unreliable with branch policies
             if dfs_phase_timed_out:
                 Reporter.clear_timed_out()
             if stop is not None and exec_timeout > 0.0:

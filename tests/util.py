@@ -2,6 +2,7 @@ import math
 import tempfile
 from pathlib import Path
 from pprint import pformat
+from unittest.mock import Mock
 
 import pytest
 import shasta.ast_node as AST
@@ -12,6 +13,11 @@ import sash.symb as symb
 import sash.main as main
 import sash.symbolic.strings
 
+
+def mock_node(pretty_return: str = "<mock>") -> Mock:
+    node = Mock()
+    node.pretty.return_value = pretty_return
+    return node
 
 def write_script(tmp_path, content: str) -> str:
     """Helper to write a shell script to a temporary file."""
@@ -25,8 +31,8 @@ def is_under_allowable_condition(issue: reporter.Issue, allowable_strs: list[str
 
 def assert_expected_report(report: reporter.Report, expected_errors: list[reporter.Issue], allowable_conditions: list[str] = []):
     """Helper to compare actual report with expected errors."""
-    actual = [rep.code.value for rep in report.issues if is_under_allowable_condition(rep, allowable_conditions)]
-    expected = [err.code.value for err in expected_errors]
+    actual = [rep.code for rep in report.issues if is_under_allowable_condition(rep, allowable_conditions)]
+    expected = [err.code for err in expected_errors]
     if sorted(actual) != sorted(expected):
         pytest.fail(
             f"\nExpected errors:\n{pformat(sorted(expected))}\n"
