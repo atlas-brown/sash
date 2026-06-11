@@ -222,7 +222,9 @@ class InconsistentIFS(Issue):
         values = ", ".join(repr(value) for value in ifs_values)
         super().__init__(Code.INCONSISTENT_IFS, f"IFS differs across traces: {values}", Severity.WARNING, line)
 
-class Report(NamedTuple):
+
+@dataclass(frozen=True)
+class Report:
     filename: str
     issues: list[Issue]
     time: float
