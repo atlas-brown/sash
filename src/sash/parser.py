@@ -1,4 +1,3 @@
-import collections.abc
 import dataclasses
 import logging
 
@@ -46,7 +45,19 @@ def parse_with_libdash(script_path: str) -> list[WrappedAst]:
     global LIBDASH_INITIALIZED
 
     logging.debug("Parsing %s", script_path)
-    parsed_data: collections.abc.Iterator = libdash.parse(script_path, init=not LIBDASH_INITIALIZED)
+    try:
+        parsed_data = [l for l in libdash.parse(script_path, init=not LIBDASH_INITIALIZED)]
+    except libdash.parser.ParsingException as e:
+        with pathlib.Path(script_path).open() as f:
+            _ = f.readline()
+            nl = f.newlines
+
+        if nl == "\r\n":
+            print("Parsing error most likely caused by CRLF line endings")
+            print("Are you using Windows? Convert your script to LF line endings and try again")
+            sys.exit(1)
+        else:
+            raise e
 
     LIBDASH_INITIALIZED = True
 
