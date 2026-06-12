@@ -137,7 +137,7 @@ class DeleteSystemFile(Issue):
     severity = Severity.ERROR
 
     def __init__(self, filename: str, line: int | None):
-        super().__init__(f"Will delete system file '{filename}'", line)
+        super().__init__(f"May delete system file '{filename}'", line)
 
 
 @dataclass(frozen=True)
