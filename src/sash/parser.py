@@ -1,8 +1,8 @@
 import collections.abc
 import dataclasses
 import logging
-import os
 import pathlib
+import sys
 
 import libdash
 import shasta.ast_node as AST
@@ -99,6 +99,12 @@ def parse_shebang_interpreter(shebang_line: str) -> str | None:
 
 
 def parse_with_shasta_shfmt_bridge(script_path: str) -> list[WrappedAst]:
+    print("Bash scripts are not suported yet")
+    print("Change your shebang to 'sh' and make sure you only use POSIX-compatible constructs")
+    sys.exit(1)
+
+    # TODO: Fix shfmt bridge
+
     logging.debug("Parsing %s using shasta shfmt bridge", script_path)
     shasta_nodes = shasta_shfmt_to_ast.parse(script_path)
     wrapped_nodes = []
