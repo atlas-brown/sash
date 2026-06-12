@@ -27,16 +27,19 @@ class Formatter(ABC):
 class DefaultFormatter(Formatter):
     def format(self, report: Report) -> str:
         msg = f"File: {COLORS['UNDERLINE']}{report.filename}{COLORS['RESET']}\n"
-        for i in report.issues:
-            msg += "\n"
-            msg += f"Line {COLORS['BOLD']}{'<unknown>' if i.line is None else str(i.line)}{COLORS['RESET']} "
-            msg += f"({COLORS[SEVERITY_COLORS[i.severity]]}{i.severity.value.lower()}{COLORS['RESET']}): "
-            msg += i.message.replace("\n", "\n    ")
-            msg += "\n"
-            if i.constraint is not None:
-                assert isinstance(i.constraint, Description)
-                msg += f"  {COLORS['BOLD']}but only if {i.constraint.text}{COLORS['RESET']}"
+        if not report.issues:
+            msg += "No issues detected"
+        else:
+            for i in report.issues:
                 msg += "\n"
+                msg += f"Line {COLORS['BOLD']}{'<unknown>' if i.line is None else str(i.line)}{COLORS['RESET']} "
+                msg += f"({COLORS[SEVERITY_COLORS[i.severity]]}{i.severity.value.lower()}{COLORS['RESET']}): "
+                msg += i.message.replace("\n", "\n    ")
+                msg += "\n"
+                if i.constraint is not None:
+                    assert isinstance(i.constraint, Description)
+                    msg += f"  {COLORS['BOLD']}but only if {i.constraint.text}{COLORS['RESET']}"
+                    msg += "\n"
         return msg.rstrip("\n")
 
 
