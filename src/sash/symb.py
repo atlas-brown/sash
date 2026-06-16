@@ -1187,7 +1187,15 @@ def expand_to_word_simple(stuff: list[AST.ArgChar],
                 case AST.BArgChar() as barg:
                     inner_cmds = []
                     temp_config = config.add_expanded_command_callback(lambda expanded: inner_cmds.append(expanded))
-                    _ = guarded_interp_node([Trace((self.state,))], barg.node, temp_config)
+                    t = guarded_interp_node([Trace((self.state,))], barg.node, temp_config)
+
+                    # We need to keep the assertions created inside the subshell but ignore the state itself
+                    # For the simple case where the subshell has no forks:
+                    assertions = set(self.state.assertions)
+                    for trace in t:
+                        assertions = assertions.union(trace.latest_state.assertions)
+                    self.state = replace(self.state, assertions=tuple(assertions))
+
                     output_word: PreSplitWord | None = None
                     if len(inner_cmds) != 0 and isinstance(barg.node, AST.CommandNode):
                         expanded_args = inner_cmds[-1]
