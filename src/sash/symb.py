@@ -987,9 +987,9 @@ def expand_to_word_simple(stuff: list[AST.ArgChar],
                             if code_str is not None:
                                 self.add_expanded(code_str, WordCount(1, 1))
                             else:
-                                self.add_word(arbitrary_word(var_node, ArbitraryType.APPROXIMATION, self.state, min_words=1, quoted=self.quoted))
+                                self.add_word(arbitrary_word(var_node, ArbitraryType.APPROXIMATION, self.state, min_words=1, max_words=1, quoted=self.quoted))
                         else:
-                            self.add_word(arbitrary_word(var_node, ArbitraryType.APPROXIMATION, self.state, min_words=1, quoted=self.quoted))
+                            self.add_word(arbitrary_word(var_node, ArbitraryType.APPROXIMATION, self.state, min_words=1, max_words=1, quoted=self.quoted))
                         return [self]
 
 
