@@ -229,7 +229,7 @@ class CapturingEmptyOutput(Issue):
     severity = Severity.WARNING
 
     def __init__(self, command: str, line: int | None):
-        super().__init__(f"Command '{command}' captures empty output", line)
+        super().__init__(f"Substitution captures output of '{command}', which doesn't produce any", line)
 
 
 @dataclass(frozen=True)
