@@ -718,12 +718,12 @@ def expand_to_word_simple(stuff: list[AST.ArgChar],
                 converted.append(chunk)
         return PreSplitWord(converted)
 
-    def arbitrary_word(source: AST.AstNode, kind: ArbitraryType, producing_state: State, min_words: int = 0, quoted: bool = False) -> PreSplitWord:
+    def arbitrary_word(source: AST.AstNode, kind: ArbitraryType, producing_state: State, min_words: int = 0, quoted: bool = False, max_words: int | None = None) -> PreSplitWord:
         return PreSplitWord([
             ExpandedChunk(
                 content=CompletelyArbitrary(freeze_thing(source), kind, producing_state),
                 is_quoted=quoted,
-                count=WordCount(min_words, inf),
+                count=WordCount(min_words, max_words if max_words is not None else inf),
             )
         ])
 
