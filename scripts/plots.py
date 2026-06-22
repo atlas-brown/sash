@@ -3297,7 +3297,7 @@ def plot_koala_timeout_cdf(koala_sweep_dir, output_path):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "results_csv", type=str, help="Path to the input CSV file (e.g., results.csv)."
+        "results-csv", type=str, help="Path to the input CSV file (e.g., results.csv)."
     )
     parser.add_argument(
         "--output_dir",

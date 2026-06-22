@@ -20,28 +20,32 @@ FORCE=0  # Ignore cached results when nonzero
 DRY_RUN=0
 
 # Input and output paths
-MAIN_RESULTS_DIR="results/main-eval"
-SWEEP_RESULTS_DIR="results/timeout-sweep"
-KOALA_RESULTS_DIR="results/koala-eval"
-FIGURES_DIR="results/figures"
+RESULTS_DIR="${RESULTS_DIR:-"results"}"
+MAIN_RESULTS_DIR="${RESULTS_DIR}/main-eval"
+SWEEP_RESULTS_DIR="${RESULTS_DIR}/timeout-sweep"
+KOALA_RESULTS_DIR="${RESULTS_DIR}/koala-eval"
+FIGURES_DIR="${RESULTS_DIR}/figures"
 KOALA_DIR="${REPO_ROOT}/benchmarks/koala"
+
+# Options
+NO_COLOR=""
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
     --main)
         RUN_MAIN=1
         RUN_ALL=0
-        shift 1
+        shift
         ;;
     --sweep)
         RUN_SWEEP=1
         RUN_ALL=0
-        shift 1
+        shift
         ;;
     --koala)
         RUN_KOALA=1
         RUN_ALL=0
-        shift 1
+        shift
         ;;
     --main-timeout)
         MAIN_TIMEOUT="${2:-}"
@@ -69,6 +73,10 @@ while [[ $# -gt 0 ]]; do
         ;;
     --dry-run)
         DRY_RUN=1
+        shift
+        ;;
+    --no-color)
+        NO_COLOR="--no-color"
         shift
         ;;
     *)
@@ -113,7 +121,7 @@ run_main() {
     if [[ ${FORCE} -eq 0 && -f "${main_eval_csv}" ]]; then
         echo "Skipping existing: ${main_eval_csv}"
     else
-        run_cmd uv run scripts/evaluation.py -f -v -j "${MAIN_JOBS}" -t "${MAIN_TIMEOUT}" -c "${main_eval_csv}"
+        run_cmd uv run scripts/evaluation.py ${NO_COLOR} -f -v -j "${MAIN_JOBS}" -t "${MAIN_TIMEOUT}" -c "${main_eval_csv}"
     fi
 }
 
@@ -141,7 +149,7 @@ run_sweep() {
             if [[ ${FORCE} -eq 0 && -f "${sweep_csv}" ]]; then
                 echo "Skipping existing: ${sweep_csv}"
             else
-                run_cmd uv run scripts/evaluation.py -j "${SWEEP_JOBS}" -t "${t}" ${opts} -c "${sweep_csv}"
+                run_cmd uv run scripts/evaluation.py ${NO_COLOR} -j "${SWEEP_JOBS}" -t "${t}" ${opts} -c "${sweep_csv}"
             fi
         done
     done
@@ -163,10 +171,10 @@ run_koala() {
 
 compute_loc() {
     echo "> Computing LoC"
-    if [[ ${FORCE} -eq 0 && -f results/benchmark_loc.csv ]]; then
-        echo "Skipping existing: results/benchmark_loc.csv"
+    if [[ ${FORCE} -eq 0 && -f ${RESULTS_DIR}/benchmark_loc.csv ]]; then
+        echo "Skipping existing: ${RESULTS_DIR}/benchmark_loc.csv"
     else
-        run_cmd uv run scripts/precompute_loc_cache.py --results_csv "${main_eval_csv}" --output_csv results/benchmark_loc.csv
+        run_cmd uv run scripts/precompute_loc_cache.py --results-csv "${main_eval_csv}" --output-csv "${RESULTS_DIR}/benchmark_loc.csv"
     fi
 }
 
@@ -202,7 +210,11 @@ PY
 
 generate_appendix() {
     echo "> Generating LaTeX table"
-    run_cmd uv run scripts/table.py --appendix --results_csv "${main_eval_csv}" >results/table.tex
+    if [[ ${FORCE} -eq 0 && -f ${RESULTS_DIR}/table.tex ]]; then
+        echo "Skipping existing: ${RESULTS_DIR}/table.tex"
+    else
+        run_cmd uv run scripts/table.py --appendix --loc-cache-path "${RESULTS_DIR}/benchmark_loc.csv" --results-csv "${main_eval_csv}" >"${RESULTS_DIR}/table.tex"
+    fi
 }
 
 if [[ ${RUN_MAIN} -eq 1 ]]; then
@@ -238,19 +250,19 @@ fi
 if [[ ${RUN_MAIN} -eq 1 ]]; then
     echo
     echo "  ${main_eval_csv} (evaluation of buggy programs, fixed programs, and variants)"
-    echo "  results/benchmark_loc.csv (LoC information for all benchmarks)"
-    echo "  results/table.tex (appendix)"
-    echo "  results/figures/main-eval.pdf (bar plot)"
+    echo "  ${RESULTS_DIR}/benchmark_loc.csv (LoC information for all benchmarks)"
+    echo "  ${RESULTS_DIR}/table.tex (appendix)"
+    echo "  ${RESULTS_DIR}/figures/main-eval.pdf (bar plot)"
 fi
 
 if [[ ${RUN_SWEEP} -eq 1 ]]; then
     echo
     echo "  ${SWEEP_RESULTS_DIR}/results_t*.csv (evaluation of buggy programs under different timeouts and SaSh features)"
-    echo "  results/figures/timeout-sweep.pdf (line plot)"
+    echo "  ${RESULTS_DIR}/figures/timeout-sweep.pdf (line plot)"
 fi
 
 if [[ ${RUN_KOALA} -eq 1 ]]; then
     echo
     echo "  ${KOALA_RESULTS_DIR}/results_t*.csv (evaluation of SaSh on the Koala benchmarks)"
-    echo "  results/figures/koala.pdf (CDF plot)"
+    echo "  ${RESULTS_DIR}/figures/koala.pdf (CDF plot)"
 fi

@@ -46,13 +46,13 @@ def main() -> None:
         description="Precompute LoC cache for benchmarks used by table.py."
     )
     parser.add_argument(
-        "--results_csv",
+        "--results-csv",
         type=Path,
         default=Path("results/results.csv"),
         help="Results CSV containing benchmark paths (default: results/results.csv).",
     )
     parser.add_argument(
-        "--output_csv",
+        "--output-csv",
         type=Path,
         default=Path("results/benchmark_loc.csv"),
         help="Output cache CSV path (default: results/benchmark_loc.csv).",
@@ -65,7 +65,7 @@ def main() -> None:
 
     data = pd.read_csv(args.results_csv)
     if "benchmark" not in data.columns:
-        print("results_csv is missing 'benchmark' column", file=sys.stderr)
+        print("results-csv is missing 'benchmark' column", file=sys.stderr)
         sys.exit(1)
 
     benchmarks = sorted({str(p) for p in data["benchmark"].dropna().tolist()})
