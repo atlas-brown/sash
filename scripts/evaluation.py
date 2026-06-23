@@ -871,8 +871,8 @@ if __name__ == "__main__":
         "targeted_dfs_timeout_pct": args.targeted_dfs_timeout_pct,
         "disable_optimistic_forking": args.disable_optimistic_forking,
         "disable_trace_collapsing": args.disable_trace_collapsing,
-        "disable_targeted_dfs": args.disable_targeted_dfs,
-        "disable_unbound_as_empty_dfs": args.disable_unbound_as_empty_dfs,
+        "disable_targeted_dfs": args.disable_dfs or args.disable_targeted_dfs,
+        "disable_unbound_as_empty_dfs": args.disable_dfs or args.disable_unbound_as_empty_dfs,
         "disable_solver": args.disable_solver,
         "disable_solver_optimizations": args.disable_solver_optimizations,
     }
