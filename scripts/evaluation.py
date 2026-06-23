@@ -11,9 +11,12 @@ import re
 import report
 
 from dataclasses import dataclass, field
+import sash.llm_main
 import sash.main
 from sash.main import build_cli as build_sash_cli
 import sash.reporter
+
+USE_LLM_ANALYZER = False
 
 
 def build_cli():
@@ -33,6 +36,7 @@ def build_cli():
     parser.add_argument('-N', '--no-color', action='store_true', help='Disable colored output to stderr (default: false)')
     parser.add_argument('-j', '--jobs', type=int, default=multiprocessing.cpu_count(), help='Number of parallel jobs (default: all available CPU cores)')
     parser.add_argument('-V', '--verbose', action='store_true', help='Enable printing of error reports or exceptions that occur, and raw output when ground truth is missing (default: false)')
+    parser.add_argument('--llm', action='store_true', help='Run the LLM-backed analyzer instead of symbolic SaSh (default: false)')
     return parser
     # fmt: on
 
@@ -371,8 +375,7 @@ def process_finished_job(stats: EvalStats, job: FinishedJob):
         job.report is not None
     ), "How was a report not generated if the job didn't crash?"
 
-    et = job.report.time
-    st = job.report.solver_time
+    et, st = split_report_times(job.report)
     stats.exec_time += et
     stats.solver_time += st
     if job.timed_out:
@@ -409,12 +412,15 @@ def run_job(
     try:
         sash.reporter.Reporter.reset()  # I'm not sure this is needed, but just in case
 
-        report = sash.main.main(
-            job.benchmark,
-            **{k: v for k, v in sash_kwargs.items() if v is not None},
-            log_level="DISABLED",
-            collect_debug_info=False,
-        )
+        if USE_LLM_ANALYZER:
+            report = sash.llm_main.main(file=job.benchmark)
+        else:
+            report = sash.main.main(
+                job.benchmark,
+                **{k: v for k, v in sash_kwargs.items() if v is not None},
+                log_level="DISABLED",
+                collect_debug_info=False,
+            )
 
         finished = FinishedJob(
             benchmark=job.benchmark,
@@ -652,15 +658,17 @@ def job_to_run_result(job: FinishedJob) -> report.RunResult:
     shellcheck_codes = [j.shellcheck_code for j in job.additional_info["expected"]]
     line_numbers = [j.line for j in job.additional_info["actual"]]
 
+    exec_time, solver_time = split_report_times(job.report)
+
     return report.RunResult(
         benchmark=job.benchmark.as_posix(),
         kind=job.additional_info["kind"],
         missing_gt=False,
         crashed=job.crashed,
         timed_out=job.timed_out,
-        time=job.report.time,
-        exec_time=job.report.time,
-        solver_time=job.report.solver_time,
+        time=exec_time + solver_time,
+        exec_time=exec_time,
+        solver_time=solver_time,
         detected_all=job.additional_info["detected_all"],
         expected_results=expected_results,
         actual_results=actual_results,
@@ -736,6 +744,14 @@ def generate_html_report(
         total_exec_time=total_exec_time,
         total_solver_time=total_solver_time,
     )
+
+
+def split_report_times(job_report: sash.reporter.Report) -> tuple[float, float]:
+    if USE_LLM_ANALYZER:
+        solver_time = job_report.solver_time
+        exec_time = max(job_report.time - solver_time, 0.0)
+        return exec_time, solver_time
+    return job_report.time, job_report.solver_time
 
 
 ROOT_DIR = git_toplevel()
@@ -847,6 +863,7 @@ UNDERLINE = "\033[4m"
 
 if __name__ == "__main__":
     args = build_cli().parse_args()
+    USE_LLM_ANALYZER = args.llm
 
     SASH_KWARGS = {
         "timeout": args.timeout,

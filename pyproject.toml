@@ -16,6 +16,7 @@ dependencies = [
 
 [project.scripts]
 sash = "sash:main.cli_main"
+sash-llm = "sash.llm_main:cli_main"
 
 [build-system]
 requires = ["uv_build>=0.8.15,<0.9.0"]
