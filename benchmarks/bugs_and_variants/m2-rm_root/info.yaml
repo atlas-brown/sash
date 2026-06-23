@@ -33,7 +33,7 @@ ground_truths:
     kind: original
     bugs:
       bug00: { lines: [3, 4, 5, 6, 7, 8, 9] }
-      bug01: { lines: [10, 12, 13, 13, 14, 14, 15] }
+      bug01: { lines: [9, 10, 13, 13, 14, 14, 15] }
       bug02: { lines: [11] }
       bug03: { lines: [11, 11] }
       bug04: { lines: [11] }
@@ -42,7 +42,7 @@ ground_truths:
     kind: buggy
     bugs:
       bug00: { lines: [3, 4, 5, 6, 7, 8, 9] }
-      bug01: { lines: [10, 12, 13, 13, 14, 14, 15] }
+      bug01: { lines: [9, 10, 13, 13, 14, 14, 15] }
       bug02: { lines: [11] }
       bug03: { lines: [11, 11] }
       bug04: { lines: [11] }
@@ -52,7 +52,7 @@ ground_truths:
     bugs:
       bug00: { regression_lines: [3, 4, 5, 6, 7, 8, 9], shellcheck: null }
       bug01:
-        { regression_lines: [10, 12, 13, 13, 14, 14, 15], shellcheck: null }
+        { regression_lines: [9, 10, 13, 13, 14, 14, 15], shellcheck: null }
       bug02: { regression_lines: [11], shellcheck: null }
       bug03: { regression_lines: [11, 11] }
       bug04: { regression_lines: [11] }
@@ -62,7 +62,7 @@ ground_truths:
     kind: buggy_variant
     bugs:
       bug00: { lines: [4, 5, 6, 7, 8, 9, 10], shellcheck: null }
-      bug01: { lines: [11, 13, 14, 14, 15, 15, 16], shellcheck: null }
+      bug01: { lines: [10, 11, 14, 14, 15, 15, 16], shellcheck: null }
       bug02: { lines: [12] }
       bug03: { lines: [12] }
       bug03: { lines: [12], shellcheck: null } # Same bug ID on purpose
