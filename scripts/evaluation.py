@@ -670,7 +670,7 @@ def job_to_run_result(job: FinishedJob) -> report.RunResult:
         missing_gt=False,
         crashed=job.crashed,
         timed_out=job.timed_out,
-        time=job.report.time,
+        time=job.report.time + job.report.solver_time,
         exec_time=job.report.time,
         solver_time=job.report.solver_time,
         detected_all=job.additional_info["detected_all"],

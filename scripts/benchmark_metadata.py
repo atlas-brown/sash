@@ -30,7 +30,7 @@ BENCHMARK_DESCRIPTIONS = {
     "bugs_and_variants/m1-redir_to_func-redir_to_func": "Log redirection helper",
     "bugs_and_variants/m2-loop_once": "Two-file cleanup",
     "bugs_and_variants/m2-loop_once-loop_once": "Directory chmod loop",
-    "bugs_and_variants/m2-unset_var-const_if-dead_code": "Backup rsync script",
+    "bugs_and_variants/m2-unset_var": "Backup rsync script",
     "bugs_and_variants/sf-access_after_mv": "ActualBudget updater",
     "bugs_and_variants/sf-access_del_resource": "TV transcode move loop",
     "bugs_and_variants/sf-cd_into_file": "Repo archiver",
