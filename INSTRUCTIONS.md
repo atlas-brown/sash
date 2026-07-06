@@ -1,5 +1,7 @@
 # SaSh: Ahead-of-time Analysis of Shell Program Effects
 
+[Artifact Available](#artifact-available-10-minutes) | [Artifact Functional](#artifact-functional-20-minutes) | [Results Reproduced](#results-reproduced-6-hours) | [Bug Reports](#optional-bugs-found-in-the-wild) | [Contact](#contact)
+
 The paper makes the following contributions:
 
 1. **Optimistic symbolic execution engine (§3)**: A system, SaSh, that simulates shell program execution over symbolic variables, incorporating domain-specific failure modes to prune the state space.
@@ -15,6 +17,7 @@ This artifact targets the following badges:
 * [Artifact Functional](#artifact-functional): Reviewers install SaSh, verify key components, and run a minimal example (~20 min).
 * [Results Reproduced](#results-reproduced): Reviewers reproduce the paper's main evaluation figures and tables (~6 h).
 
+
 # Artifact Available (10 minutes)
 
 Reviewers should confirm the following:
@@ -23,16 +26,19 @@ Reviewers should confirm the following:
 * **License**: MIT license, allowing comparison and extension.
 * **README**: The top-level [README](README.md) references the paper and provides installation instructions.
 
+
 # Artifact Functional (20 minutes)
+
 
 ## Installation
 
-SaSh can be installed natively or via Docker on Linux and MacOS. Instructions can be found in [README.md](README.md).
+SaSh can be installed natively or via Docker on Linux and MacOS. Instructions can be found in [README.md](README.md#installation).
 
-**Evaluation-specific dependencies**: The evaluation script ([`scripts/eval.sh`](scripts/eval.sh)) additionally requires [`cloc`](https://github.com/AlDanial/cloc) (e.g., `apt install cloc`).
+**Evaluation-specific dependencies**: The evaluation script ([`scripts/eval.sh`](scripts/eval.sh)) additionally requires [`cloc`](https://github.com/AlDanial/cloc) (e.g., `apt install cloc`, `brew install cloc`).
 
 > [!TIP]
-> If you want to evaluate SaSh through Docker, there's of course no need to install `cloc` locally.
+> If you plan to evaluate SaSh through Docker, there's no need to install `cloc` locally.
+
 
 ## Completeness
 
@@ -46,6 +52,7 @@ The artifact contains all code and data relevant to the paper:
 | Evaluation scripts | [`scripts/eval.sh`](scripts/eval.sh) and other scripts in the same directory | §7 |
 | Bug reports filed in open-source projects | [`benchmarks/bug_reports.md`](benchmarks/bug_reports.md) | §7.4 |
 
+
 ## Minimal Working Example
 
 To verify basic functionality, run SaSh on the Steam updater bug from §2:
@@ -57,52 +64,38 @@ sash -t 5 benchmarks/bugs_and_variants/hp-steam/posix.sh
 The expected output should include a warning about the deletion of `/*` due to an empty `$STEAMROOT` variable, similar to:
 
 ```
-> posix.sh:359: error: word splitting or empty variable could lead to deletion of system file /*
+> Line 359 (error): Word splitting or empty variable could lead to deletion of system file /*
 ```
 
 This corresponds to the bug described in Figure 1 of the paper, where a failed `cd` causes `STEAMROOT` to be empty, leading `rm -rf "$STEAMROOT/"*` to expand to `rm -rf /*`.
 
-# Results Reproduced (8 hours)
+
+# Results Reproduced (6 hours)
 
 > [!IMPORTANT]
-> If you want to run the evaluation through Docker, run the following before reading the rest of the section:
+> If you want to run the evaluation through Docker, run the following command before reading the rest of the section:
 > ```bash
 > docker build --target dev -t sash-dev .
 > ```
 
-## Fast Path: Full Evaluation (8 hours)
-
-To reproduce **all** results and figures in a single command:
-
-```bash
-# Native
-./scripts/eval.sh
-# Docker
-docker run --rm -v "$(pwd)":/app sash-dev ./scripts/eval.sh
-```
+> [!TIP]
+> To reproduce **all** results and figures in a single command:
+> ```bash
+> # Native
+> ./scripts/eval.sh
+> # Docker
+> docker run --rm -v "$(pwd)":/app sash-dev ./scripts/eval.sh
+> ```
 
 > [!TIP]
-> Running `./scripts/eval.sh --main-jobs <num. of CPU cores> --sweep-jobs <num. of CPU cores>` will significantly reduce the time of the evaluation but might lead to some bugs not being detected due to resource contention.
-> This tip will be removed from the artifact and is here just for people giving feedback.
+> Precomputed results and figures can be found in `results/precomputed`, along with the exact commands used to produce them in `results/precomputed/_metadata`.
 
-This runs all three evaluation phases (main evaluation, timeout sweep, Koala), computes line-of-code statistics, and generates all figures and tables. Outputs are written to [`results/`](results/):
 
-| Output | Paper Reference | Description |
-|--------|----------------|-------------|
-| `results/figures/main-eval.pdf` | Fig. 8 (§7.1, §7.2) | Bug detection effectiveness and fix recognition |
-| `results/figures/timeout-sweep.pdf` | Fig. 9 (§7.3) | Bugs detected vs. time budget across configurations |
-| `results/figures/koala.pdf` | §7.3 (wrapfigure) | CDF of Koala analysis completion time |
-| `results/table.tex` | Appendix table | Per-benchmark results |
+## Key Results: Bug Detection Effectiveness (§7.1, §7.2) (1 hour)
 
-Precomputed results from our run are available in [`results/precomputed/`](results/precomputed/) for comparison.
+This experiment runs SaSh on all 61 buggy programs, their fixed versions, and all buggy variants mentioned in the paper. It then compares the output to the programs' ground truths. The programs, along with the ground truths, can be found in `benchmarks/bugs_and_variants`.
 
-> [!IMPORTANT]
-> Precomputed results are not available at this time, but will be included in the full artifact.
-
-The following sections describe each phase individually.
-
-## (§7.1) Bug Detection Effectiveness (1 hour)
-
+To run the experiment:
 ```bash
 # Native
 ./scripts/eval.sh --main
@@ -110,18 +103,21 @@ The following sections describe each phase individually.
 docker run --rm -v "$(pwd)":/app sash-dev ./scripts/eval.sh --main
 ```
 
-**Output**: `results/figures/main-eval.pdf` (corresponds to Fig. 8)
+**Outputs**:
+- `results/figures/main-eval.svg` (corresponds to Fig. 8)
+- `results/main-eval/results_t60.csv` (CSV with all results, used to create the aforementioned figure)
+- `results/table.tex` (the table in appendix A)
 
-This runs SaSh on all 61 buggy programs, their fixed versions, and their variants, and compares against ShellCheck.
+Precomputed figure, found in `results/precomputed/figures/main-eval.svg`:
 
-<details>
- <summary>Precomputed results</summary>
+![Figure 8](results/precomputed/figures/main-eval.svg)
 
-![Bug detection effectiveness](results/precomputed/main-eval.pdf)
-</details>
 
-## (§7.3) Performance Analysis — Timeout Sweep (3.5 hours)
+## Performance Analysis — Timeout Sweep (§7.3) (3.5 hours)
 
+This experiment runs SaSh on all 61 buggy programs and their fixed versions with different timeouts (1s-100s) and three configurations: base symbolic execution, optimistic execution without risk-directed exploration, and full SaSh. The goal is to see the effect of the timeout choice and the optimizations on the bug-finding effectiveness of the system.
+
+To run the experiment:
 ```bash
 # Native
 ./scripts/eval.sh --sweep
@@ -129,17 +125,18 @@ This runs SaSh on all 61 buggy programs, their fixed versions, and their variant
 docker run --rm -v "$(pwd)":/app sash-dev ./scripts/eval.sh --sweep
 ```
 
-**Output**: `results/figures/timeout-sweep.pdf` (corresponds to Fig. 9)
+**Outputs**:
+- `results/figures/timeout-sweep.svg` (corresponds to Fig. 9)
+- `results/timeout-sweep/results_t*_*.csv` (CSV with all results, used to create the aforementioned figure)
 
-This runs SaSh on all buggy programs under multiple time budgets (1s–100s) and three configurations: base symbolic execution, optimistic execution without risk-directed exploration, and full SaSh.
+Precomputed figure, found in `results/precomputed/figures/timeout-sweep.svg`:
 
-<details>
- <summary>Precomputed results</summary>
+![Figure 9](results/precomputed/figures/timeout-sweep.svg)
 
-![Timeout sweep](results/precomputed/timeout-sweep.pdf)
-</details>
 
-## (§7.3) Performance Analysis — Koala (3.5 hours)
+## Performance Analysis — Koala (§7.3) (1.5 hours)
+
+This experiment runs SaSh on all 119 programs from the Koala benchmark suite to measure the time required for complete analysis (full exploration of each program), with a cap at 15 minutes.
 
 ```bash
 # Native
@@ -148,24 +145,30 @@ This runs SaSh on all buggy programs under multiple time budgets (1s–100s) and
 docker run --rm -v "$(pwd)":/app sash-dev ./scripts/eval.sh --koala
 ```
 
-**Output**: `results/figures/koala.pdf` (corresponds to the CDF wrapfigure in §7.3)
+**Outputs**:
+- `results/figures/koala.svg` (corresponds to the inline CDF in §7.3)
+- `results/koala-eval/results_t900.csv` (CSV with all results, used to create the aforementioned figure)
 
-This runs SaSh on all 119 programs from the Koala benchmark suite to measure the time required for complete analysis.
+Precomputed figure, found in `results/precomputed/figures/koala.svg`:
 
-<details>
- <summary>Precomputed results</summary>
+![Koala CDF](results/precomputed/figures/koala.svg)
 
-![Koala CDF](results/precomputed/koala.pdf)
-</details>
 
-## Appendix Table
+## Appendix A Table
 
 The appendix table is generated when running the [bug detection effectiveness evaluation](#71-bug-detection-effectiveness-1-hour).
 
-**Output**: `results/table.tex`
+**Output**:
+- `results/table.tex`
 
 This LaTeX table contains per-benchmark results including bug counts, false positives, runtime, and features used for detection. It corresponds to the full evaluation table in the appendix.
+
 
 # Optional: Bugs Found in the Wild
 
 The file [`benchmarks/bug_reports.md`](benchmarks/bug_reports.md) contains links to all 70 bugs SaSh identified in open-source projects, including PyTorch, Kubernetes, Next.js, vLLM, the P4 Compiler, and others. Reviewers may inspect the linked issues and pull requests to verify that the bugs were reported and, in many cases, confirmed and fixed by maintainers.
+
+
+# Contact
+
+For questions please contact <email>, or open an issue on GitHub.

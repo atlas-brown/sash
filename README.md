@@ -1,13 +1,30 @@
 # SaSh: Ahead-of-time Analysis of Shell Program Effects
 
-A static analysis tool for the Unix shell, based on symbolic execution.
-
+[Examples](#examples) | [Installation](#installation) | [Contributing](#contributing)
 > [!NOTE]
 > If you're interested in evaluating the SaSh artifact, read [INSTRUCTIONS.md](INSTRUCTIONS.md) first.
 
+SaSh is a static analysis tool for the Unix shell, using symbolic execution to find bugs in shell programs.
+It currently supports the set of features and syntax defined by the POSIX standard.
+After installation, running SaSh is as simple as:
+```bash
+sash program.sh
+> ...
+> Line 359 (error): Word splitting or empty variable could lead to deletion of system file /*
+> ...
+```
+
+
+## Examples
+
+TBA
+
+
 ## Installation
 
-### Native (Linux, MacOS)
+SaSh can be installed natively on Linux and MacOS, or used through Docker.
+
+### Native
 
 Make sure you have the following installed:
 * `git`
@@ -34,7 +51,8 @@ CFLAGS="-std=gnu17" pipx install git+https://github.com/atlas-brown/resash.git
 pipx ensurepath  # If PATH needs to be updated
 ```
 
-### Containerized (Linux, MacOS)
+
+### Containerized
 
 If you want to avoid installing a bunch of dependencies, you can use SaSh through Docker.
 
@@ -42,7 +60,7 @@ To install:
 
 ```bash
 git clone https://github.com/atlas-brown/resash.git
-docker build --target sys -t sash ./resash
+docker build -t sash ./resash
 docker run --rm sash --help  # Should output a help message
 # Install the wrapper script (see below) onto your PATH, then clean up:
 mkdir -p ~/.local/bin
@@ -69,9 +87,8 @@ rm -rf ./resash
 > docker run --rm -v "$(pwd)":/ws -w /ws sash file.sh
 > ```
 
-## Contributing
 
-### Containerized Development (Linux, MacOS)
+## Contributing
 
 The project provides [a configuration file for containerized development](.devcontainer/devcontainer.json).
 Additionally, the Dockerfile provides an additional target for development (`dev`), which does not copy the project files into the container, to allow for mounting.
@@ -81,6 +98,7 @@ docker build --target dev -t sash-dev .
 docker run --rm -it -v $(pwd):/app sash-dev /bin/bash
 # Again, remember to add '--privileged' if you need to use CRIU
 ```
+
 
 ### Testing
 
