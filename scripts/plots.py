@@ -723,7 +723,7 @@ def plot_bug_detection_euler(data, output_path):
     )
     plt.title(None)
     plt.tight_layout()
-    plt.savefig(output_path, format="pdf")
+    plt.savefig(output_path, format="svg")
     plt.close()
 
 
@@ -935,7 +935,7 @@ def plot_bug_detection_bars(data, output_path):
     )
 
     plt.tight_layout(rect=[0.0, 0.08, 1.0, 0.92])
-    plt.savefig(output_path, format="pdf")
+    plt.savefig(output_path, format="svg")
     plt.close()
 
 
@@ -1269,7 +1269,7 @@ def plot_bug_detection_bars_split_versions(data, output_path):
         columnspacing=2.0,
     )
     fig.subplots_adjust(left=0.18, right=0.90, bottom=0.36, top=0.92, wspace=0.84)
-    plt.savefig(output_path, format="pdf")
+    plt.savefig(output_path, format="svg")
     plt.close()
 
 
@@ -1754,7 +1754,7 @@ def plot_bug_detection_heatmap(data, output_path):
     )
 
     plt.tight_layout()
-    plt.savefig(output_path, format="pdf")
+    plt.savefig(output_path, format="svg")
     plt.close()
 
 
@@ -2124,7 +2124,7 @@ def plot_bug_outcome_cells(data, output_path):
         ax1.set_xlabel("Bug Variant", fontsize=fontsize)
 
     plt.tight_layout()
-    plt.savefig(output_path, format="pdf")
+    plt.savefig(output_path, format="svg")
     plt.close()
 
 
@@ -2220,7 +2220,7 @@ def plot_runtime(data, output_path):
     )
     plt.subplots_adjust(bottom=0.30)
     plt.tight_layout()
-    plt.savefig(output_path, format="pdf")
+    plt.savefig(output_path, format="svg")
     plt.close()
 
 
@@ -2318,7 +2318,7 @@ def plot_coverage(data, output_path):
     )
     plt.subplots_adjust(left=0.11, right=0.98, bottom=0.43)
     plt.tight_layout(rect=(0, 0.08, 1, 1))
-    plt.savefig(output_path, format="pdf")
+    plt.savefig(output_path, format="svg")
     plt.close()
 
 
@@ -2757,7 +2757,7 @@ def plot_coverage_by_config(timeout_sweep_dir, base_buggy_data, output_path):
     fig.add_artist(connector_fill)
     fig.add_artist(connector_left)
     fig.add_artist(connector_right)
-    plt.savefig(output_path, format="pdf")
+    plt.savefig(output_path, format="svg")
     plt.close()
     return True
 
@@ -3001,7 +3001,7 @@ def plot_timeout_sweep_bug_catch(timeout_sweep_dir, output_path):
         ncol=2,
     )
     plt.subplots_adjust(bottom=0.42)
-    plt.savefig(output_path, format="pdf")
+    plt.savefig(output_path, format="svg")
     plt.close()
 
 
@@ -3290,7 +3290,7 @@ def plot_koala_timeout_cdf(koala_sweep_dir, output_path):
     #     columnspacing=2.0,
     # )
     fig.subplots_adjust(left=0.24, right=0.92, bottom=0.40, top=0.94)
-    fig.savefig(output_path, format="pdf")
+    fig.savefig(output_path, format="svg")
     plt.close(fig)
 
 
@@ -3322,28 +3322,28 @@ def main():
     buggy_results = all_results[all_results["kind"] == "buggy"].copy()
     buggy_results["loc"] = buggy_results["benchmark"].apply(get_loc)
     plot_bug_detection_euler(
-        buggy_results, os.path.join(args.output_dir, "bug-detection-euler.pdf")
+        buggy_results, os.path.join(args.output_dir, "bug-detection-euler.svg")
     )
     plot_bug_detection_bars(
-        all_results, os.path.join(args.output_dir, "bug-detection-bars.pdf")
+        all_results, os.path.join(args.output_dir, "bug-detection-bars.svg")
     )
     plot_bug_detection_bars_split_versions(
         all_results,
-        os.path.join(args.output_dir, "bug-detection-bars-split-versions.pdf"),
+        os.path.join(args.output_dir, "bug-detection-bars-split-versions.svg"),
     )
     plot_bug_detection_heatmap(
-        all_results, os.path.join(args.output_dir, "bug-detection-heatmap.pdf")
+        all_results, os.path.join(args.output_dir, "bug-detection-heatmap.svg")
     )
     plot_bug_outcome_cells(
-        all_results, os.path.join(args.output_dir, "bug-detection-fingerprints.pdf")
+        all_results, os.path.join(args.output_dir, "bug-detection-fingerprints.svg")
     )
-    plot_runtime(buggy_results, os.path.join(args.output_dir, "runtime.pdf"))
+    plot_runtime(buggy_results, os.path.join(args.output_dir, "runtime.svg"))
     # Sweep inputs live next to the main results CSV, not in the figure output dir.
     timeout_sweep_dir = os.path.join(
         os.path.dirname(os.path.abspath(args.results_csv)),
         "timeout-sweep",
     )
-    coverage_output = os.path.join(args.output_dir, "coverage.pdf")
+    coverage_output = os.path.join(args.output_dir, "coverage.svg")
     plotted_multi_config_coverage = plot_coverage_by_config(
         timeout_sweep_dir, buggy_results, coverage_output
     )
@@ -3356,7 +3356,7 @@ def main():
         plot_coverage(coverage_results, coverage_output)
     plot_timeout_sweep_bug_catch(
         timeout_sweep_dir,
-        os.path.join(args.output_dir, "timeout-sweep-bugs-caught.pdf"),
+        os.path.join(args.output_dir, "timeout-sweep-bugs-caught.svg"),
     )
     koala_timeout_sweep_dir = os.path.join(
         os.path.dirname(os.path.abspath(args.results_csv)),
@@ -3364,7 +3364,7 @@ def main():
     )
     plot_koala_timeout_cdf(
         koala_timeout_sweep_dir,
-        os.path.join(args.output_dir, "koala-timeout-sweep-cdf.pdf"),
+        os.path.join(args.output_dir, "koala-timeout-sweep-cdf.svg"),
     )
     full_coverage_stats = coverage_full_across_timeout_sweep(timeout_sweep_dir)
     bug_sweep_stats = bugs_caught_across_timeout_sweep(timeout_sweep_dir)

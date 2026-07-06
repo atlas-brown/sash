@@ -193,17 +193,17 @@ if "${RUN_MAIN}" == "1":
     all_results = plots.load_csv(str(results_csv))
     plots.plot_bug_detection_bars_split_versions(
         all_results,
-        str(figures_dir / "main-eval.pdf"),
+        str(figures_dir / "main-eval.svg"),
     )
 if "${RUN_SWEEP}" == "1":
     plots.plot_timeout_sweep_bug_catch(
         str(timeout_sweep_dir),
-        str(figures_dir / "timeout-sweep.pdf"),
+        str(figures_dir / "timeout-sweep.svg"),
     )
 if "${RUN_KOALA}" == "1":
     plots.plot_koala_timeout_cdf(
         str(koala_sweep_dir),
-        str(figures_dir / "koala.pdf"),
+        str(figures_dir / "koala.svg"),
     )
 PY
 }
