@@ -88,12 +88,12 @@ This corresponds to the bug described in Figure 1 of the paper, where a failed `
 > ```
 
 > [!TIP]
-> Precomputed results and figures can be found in `results/precomputed`, along with the exact commands used to produce them in `results/precomputed/_metadata`.
+> Precomputed results and figures can be found in [`results/precomputed`](results/precomputed/), along with the exact commands used to produce them in [`results/precomputed/_metadata`](results/precomputed/_metadata/).
 
 
 ## Key Results: Bug Detection Effectiveness (§7.1, §7.2) (1 hour)
 
-This experiment runs SaSh on all 61 buggy programs, their fixed versions, and all buggy variants mentioned in the paper. It then compares the output to the programs' ground truths. The programs, along with the ground truths, can be found in `benchmarks/bugs_and_variants`.
+This experiment runs SaSh on all 61 buggy programs, their fixed versions, and all buggy variants mentioned in the paper. It then compares the output to the programs' ground truths. The programs, along with the ground truths, can be found in [`benchmarks/bugs_and_variants`](benchmarks/bugs_and_variants/).
 
 To run the experiment:
 ```bash
@@ -108,7 +108,7 @@ docker run --rm -v "$(pwd)":/app sash-dev ./scripts/eval.sh --main
 - `results/main-eval/results_t60.csv` (CSV with all results, used to create the aforementioned figure)
 - `results/table.tex` (the table in appendix A)
 
-Precomputed figure, found in `results/precomputed/figures/main-eval.svg`:
+Precomputed figure, found in [`results/precomputed/figures/main-eval.svg`](results/precomputed/figures/main-eval.svg):
 
 ![Figure 8](results/precomputed/figures/main-eval.svg)
 
@@ -129,7 +129,7 @@ docker run --rm -v "$(pwd)":/app sash-dev ./scripts/eval.sh --sweep
 - `results/figures/timeout-sweep.svg` (corresponds to Fig. 9)
 - `results/timeout-sweep/results_t*_*.csv` (CSV with all results, used to create the aforementioned figure)
 
-Precomputed figure, found in `results/precomputed/figures/timeout-sweep.svg`:
+Precomputed figure, found in [`results/precomputed/figures/timeout-sweep.svg`](results/precomputed/figures/timeout-sweep.svg):
 
 ![Figure 9](results/precomputed/figures/timeout-sweep.svg)
 
@@ -149,7 +149,7 @@ docker run --rm -v "$(pwd)":/app sash-dev ./scripts/eval.sh --koala
 - `results/figures/koala.svg` (corresponds to the inline CDF in §7.3)
 - `results/koala-eval/results_t900.csv` (CSV with all results, used to create the aforementioned figure)
 
-Precomputed figure, found in `results/precomputed/figures/koala.svg`:
+Precomputed figure, found in [`results/precomputed/figures/koala.svg`](results/precomputed/figures/koala.svg):
 
 ![Koala CDF](results/precomputed/figures/koala.svg)
 
