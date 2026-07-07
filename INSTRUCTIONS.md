@@ -1,6 +1,6 @@
 # SaSh: Ahead-of-time Analysis of Shell Program Effects
 
-[Artifact Available](#artifact-available-10-minutes) | [Artifact Functional](#artifact-functional-20-minutes) | [Results Reproduced](#results-reproduced-6-hours) | [Bug Reports](#optional-bugs-found-in-the-wild) | [Contact](#contact)
+[Artifact Available](#artifact-available-10-minutes) | [Artifact Functional](#artifact-functional-20-minutes) | [Results Reproduced](#results-reproduced-6-hours) | [Bugs in the Wild](#optional-bugs-found-in-the-wild) | [Contact Us](#contact-us)
 
 The paper makes the following contributions:
 
@@ -14,30 +14,51 @@ SaSh is evaluated on 61 real-world shell programs containing 116 documented bugs
 This artifact targets the following badges:
 
 * [Artifact Available](#artifact-available): Reviewers confirm the artifact is publicly archived with an appropriate license (~10 min).
-* [Artifact Functional](#artifact-functional): Reviewers install SaSh, verify key components, and run a minimal example (~20 min).
+* [Artifact Functional](#artifact-functional): Reviewers install SaSh, verify key components, and run a minimal example (~10 min).
 * [Results Reproduced](#results-reproduced): Reviewers reproduce the paper's main evaluation figures and tables (~6 h).
 
 
 # Artifact Available (10 minutes)
 
+> Reviewers confirm the artifact is publicly archived with an appropriate license
+
 Reviewers should confirm the following:
 
 * **Repository**: The artifact is available at [https://github.com/atlas-brown/sash](https://github.com/atlas-brown/sash) (branch `sosp26-ae` will be frozen) and archived at [Zenodo](https://zenodo.org/) (DOI TBD).
-* **License**: MIT license, allowing comparison and extension.
-* **README**: The top-level [README](README.md) references the paper and provides installation instructions.
+* **License**: The artifact contains an MIT license ([LICENSE](LICENSE)), allowing comparison and extension.
+* **"read me" file**: The top-level [INSTRUCTIONS.md](INSTRUCTIONS.md) references the paper and provides installation instructions. The top-level [README.md](README.md) does so as well.
 
 
-# Artifact Functional (20 minutes)
+# Artifact Functional (10 minutes)
+
+> Reviewers install SaSh, verify key components, and run a minimal example
+
+> [!CAUTION] Shell programs (files with a `.sh` suffix) inside `benchmarks/bugs_and_variants` are buggy and should never be executed. Many of them perform unsafe operations that can lead to permanent data loss.
 
 
 ## Installation
 
-SaSh can be installed natively or via Docker on Linux and MacOS. Instructions can be found in [README.md](README.md#installation).
+SaSh can be installed natively or via Docker on Linux and MacOS.
 
-**Evaluation-specific dependencies**: The evaluation script ([`scripts/eval.sh`](scripts/eval.sh)) additionally requires [`cloc`](https://github.com/AlDanial/cloc) (e.g., `apt install cloc`, `brew install cloc`).
 
-> [!TIP]
-> If you plan to evaluate SaSh through Docker, there's no need to install `cloc` locally.
+### Docker Installation (recommended)
+
+```bash
+git clone https://github.com/atlas-brown/sash.git
+cd sash
+git checkout sosp26-ae
+docker build --target dev -t sash .
+docker run --rm -it -v $(pwd):/app sash /bin/bash  # You are now inside the container!
+uv tool install . && uv tool update-shell; source /root/.bashrc  # Install sash as an executable command inside the container
+sash --help  # Verify sash is runnable
+```
+
+For the rest of this file, instructions assume you are inside the `sash` container, and specifically the `/app` directory.
+
+
+### Manual Installation
+
+Follow the instructions in [README.md#manual-installation](README.md#manual-installation).
 
 
 ## Completeness
@@ -46,7 +67,10 @@ The artifact contains all code and data relevant to the paper:
 
 | Component | Location | Paper Reference |
 |-----------|----------|-----------------|
-| Symbolic execution engine (including symbolic word expansion), command specifications, filesystem model | [`src/sash/symb.py`](src/sash/symb.py), [`src/sash/specs.py`](src/sash/specs.py), [`src/sash/fs.py`](src/sash/fs.py), respectively | §3–§6 |
+| Symbolic execution engine | [`src/sash/symb.py:1290–3200`](src/sash/symb.py) | §3 |
+| Filesystem model, command specifications | [`src/sash/fs.py`](src/sash/fs.py), [`src/sash/specs.py`](src/sash/specs.py) | §4 |
+| Symbolic word expansion | [`src/sash/symb.py:281–1289`](src/sash/symb.py) | §5 |
+| Risk-directed exploration | [`src/sash/dfs_targeted.py`](src/sash/dfs_targeted.py), [`src/sash/symb.py:2968–3185`](src/sash/symb.py) | §6 |
 | 61 real buggy programs (116 bugs) and 42 synthetic variants | [`benchmarks/bugs_and_variants/`](benchmarks/bugs_and_variants/) | §7.1, §7.2 |
 | 119 Koala benchmark programs | [`benchmarks/koala/`](benchmarks/koala/) | §7.3 |
 | Evaluation scripts | [`scripts/eval.sh`](scripts/eval.sh) and other scripts in the same directory | §7 |
@@ -55,74 +79,62 @@ The artifact contains all code and data relevant to the paper:
 
 ## Minimal Working Example
 
-To verify basic functionality, run SaSh on the Steam updater bug from §2:
+To verify basic functionality, run SaSh on one of its benchmarks:
 
 ```bash
-sash -t 5 benchmarks/bugs_and_variants/hp-steam/posix.sh
+sash benchmarks/bugs_and_variants/sf-access_del_resource/posix.sh
 ```
 
-The expected output should include a warning about the deletion of `/*` due to an empty `$STEAMROOT` variable, similar to:
+The expected output should include a warning about an attempt to move a path that has been deleted:
 
 ```
-> Line 359 (error): Word splitting or empty variable could lead to deletion of system file /*
+> Line 9 (error): Command 'mv' expects paths that are directories, but one or more of the following paths might not be: /storage/sort_tv, workingfolder/
 ```
 
-This corresponds to the bug described in Figure 2 of the paper, where a failed `cd` causes `STEAMROOT` to be empty, leading `rm -rf "$STEAMROOT/"*` to expand to `rm -rf /*`.
+The script loops twice, on the first iteration deleting a directory (`workingfolder/`), and on the second iteration attempting to move it.
+
+Running the fixed version of the script, the warning should disappear:
+
+```
+sash benchmarks/bugs_and_variants/sf-access_del_resource/fixed.sh
+```
+
+The ground truth, which includes the source of the script as well as information about ShellCheck's output on it can be found in: [`benchmarks/bugs_and_variants/sf-access_del_resource/info.yaml`](benchmarks/bugs_and_variants/sf-access_del_resource/info.yaml).
 
 
-# Results Reproduced (6 hours)
+# Results Reproduced (6h, optionally 10h)
 
-> [!IMPORTANT]
-> If you want to run the evaluation through Docker, run the following command before reading the rest of the section:
-> ```bash
-> docker build --target dev -t sash-dev .
-> ```
-
-> [!TIP]
-> To reproduce **all** results and figures in a single command:
-> ```bash
-> # Native
-> ./scripts/eval.sh
-> # Docker
-> docker run --rm -v "$(pwd)":/app sash-dev ./scripts/eval.sh
-> ```
+> Reviewers reproduce the paper's main evaluation figures and tables
 
 > [!TIP]
 > Precomputed results and figures can be found in [`results/precomputed`](results/precomputed/), along with the exact commands used to produce them in [`results/precomputed/_metadata`](results/precomputed/_metadata/). These results were produced by running the full evaluation on a [CloudLab c6525-25g node](www.utah.cloudlab.us/portal/show-nodetype.php?type=c6525-25g), on Ubuntu 22.04.2 LTS.
 
 
-## Key Results: Bug Detection Effectiveness (§7.1, §7.2) (1 hour)
+## Key Result: Bug Detection Effectiveness (§7.1, §7.2) (1 hour)
 
 This experiment runs SaSh on all 61 buggy programs, their fixed versions, and all buggy variants mentioned in the paper. It then compares the output to the programs' ground truths. The programs, along with the ground truths, can be found in [`benchmarks/bugs_and_variants`](benchmarks/bugs_and_variants/).
 
 To run the experiment:
 ```bash
-# Native
 ./scripts/eval.sh --main
-# Docker
-docker run --rm -v "$(pwd)":/app sash-dev ./scripts/eval.sh --main
 ```
 
 **Outputs**:
 - `results/figures/main-eval.svg` (corresponds to Fig. 10)
 - `results/main-eval/results_t60.csv` (CSV with all results, used to create the aforementioned figure)
-- `results/table.tex` (the table in appendix A)
 
 Precomputed figure, found in [`results/precomputed/figures/main-eval.svg`](results/precomputed/figures/main-eval.svg):
 
-![Figure 8](results/precomputed/figures/main-eval.svg)
+![Figure 10](results/precomputed/figures/main-eval.svg)
 
 
-## Performance Analysis — Timeout Sweep (§7.3) (3.5 hours)
+## Additional Results: Performance Analysis — Timeout Sweep (§7.3) (3.5 hours)
 
 This experiment runs SaSh on all 61 buggy programs and their fixed versions with different timeouts (1s-100s) and three configurations: base symbolic execution, optimistic execution without risk-directed exploration, and full SaSh. The goal is to see the effect of the timeout choice and the optimizations on the bug-finding effectiveness of the system.
 
 To run the experiment:
 ```bash
-# Native
 ./scripts/eval.sh --sweep
-# Docker
-docker run --rm -v "$(pwd)":/app sash-dev ./scripts/eval.sh --sweep
 ```
 
 **Outputs**:
@@ -131,18 +143,15 @@ docker run --rm -v "$(pwd)":/app sash-dev ./scripts/eval.sh --sweep
 
 Precomputed figure, found in [`results/precomputed/figures/timeout-sweep.svg`](results/precomputed/figures/timeout-sweep.svg):
 
-![Figure 9](results/precomputed/figures/timeout-sweep.svg)
+![Figure 11](results/precomputed/figures/timeout-sweep.svg)
 
 
-## Performance Analysis — Koala (§7.3) (1.5 hours)
+## Additional Results: Performance Analysis — Koala (§7.3) (1.5 hours)
 
 This experiment runs SaSh on all 119 programs from the Koala benchmark suite to measure the time required for complete analysis (full exploration of each program), with a cap at 15 minutes.
 
 ```bash
-# Native
 ./scripts/eval.sh --koala
-# Docker
-docker run --rm -v "$(pwd)":/app sash-dev ./scripts/eval.sh --koala
 ```
 
 **Outputs**:
@@ -154,21 +163,11 @@ Precomputed figure, found in [`results/precomputed/figures/koala.svg`](results/p
 ![Koala CDF](results/precomputed/figures/koala.svg)
 
 
-## Appendix A Table
-
-The appendix table is generated when running the [bug detection effectiveness evaluation](#key-results-bug-detection-effectiveness-71-72-1-hour).
-
-**Output**:
-- `results/table.tex`
-
-This LaTeX table contains per-benchmark results including bug counts, false positives, runtime, and features used for detection. It corresponds to the full evaluation table in the appendix.
-
-
-# Optional: Bugs Found in the Wild
+# Optional: Bugs Found in the Wild (4 hours)
 
 The file [`benchmarks/bug_reports.md`](benchmarks/bug_reports.md) contains links to all 70 bugs SaSh identified in open-source projects, including PyTorch, Kubernetes, Next.js, vLLM, the P4 Compiler, and others. Reviewers may inspect the linked issues and pull requests to verify that the bugs were reported and, in many cases, confirmed and fixed by maintainers.
 
 
-# Contact
+# Contact Us
 
 For questions please contact <email>, or open an issue on GitHub.

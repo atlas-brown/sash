@@ -7,6 +7,6 @@ for f in $DIR # bug here: should be $DIR/* (loops once)
 do
     cp $f $f.bak
    sed 's+$OLD+$NEW+g' $f.bak &gt; $f
-   [ -f "$f" ] # bug here: result of test command is unused
+   [ -f "$f" ]
    rm -f $f.bak
 done

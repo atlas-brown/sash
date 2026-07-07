@@ -2,7 +2,8 @@
 
 [Examples](#examples) | [Installation](#installation) | [Contributing](#contributing)
 > [!NOTE]
-> If you're interested in evaluating the SaSh artifact, read [INSTRUCTIONS.md](INSTRUCTIONS.md) first.
+> **Artifact evaluation:**
+> To evaluate the system of our SOSP'26 paper titled *"Ahead-of-time Analysis of Shell Program Effects"*, jump straight into [INSTRUCTIONS.md](INSTRUCTIONS.md).
 
 SaSh is a static analysis tool for the Unix shell, using symbolic execution to find bugs in shell programs.
 It currently supports the set of features and syntax defined by the POSIX standard.
@@ -68,7 +69,7 @@ The qualification is important: SaSh distinguishes between bugs that will occur 
 SaSh can be installed natively on Linux and MacOS, or used through Docker.
 
 
-### Native
+### Manual Installation
 
 Make sure you have the following installed:
 * `git`
@@ -84,19 +85,19 @@ You probably already have `clang-17` if you've installed the [`xcode` command li
 
 Then, run:
 ```bash
-CFLAGS="-std=gnu17" uv tool install git+https://github.com/atlas-brown/sash.git
+CFLAGS="-std=gnu17" uv tool install git+https://github.com/atlas-brown/sash.git@sosp26-ae
 uv tool update-shell  # If PATH needs to be updated
 ```
 
 Or:
 
 ```bash
-CFLAGS="-std=gnu17" pipx install git+https://github.com/atlas-brown/sash.git
+CFLAGS="-std=gnu17" pipx install git+https://github.com/atlas-brown/sash.git@sosp26-ae
 pipx ensurepath  # If PATH needs to be updated
 ```
 
 
-### Containerized
+### Docker Installation
 
 If you want to avoid installing a bunch of dependencies, you can use SaSh through Docker.
 
@@ -104,11 +105,14 @@ To install:
 
 ```bash
 git clone https://github.com/atlas-brown/sash.git
-docker build -t sash ./sash
+cd sash
+git checkout sosp26-ae
+docker build -t sash .
 docker run --rm sash --help  # Should output a help message
 # Install the wrapper script (see below) onto your PATH, then clean up:
 mkdir -p ~/.local/bin
 install -m 0755 ./sash/scripts/sash-docker.sh ~/.local/bin/sash
+cd ..
 rm -rf ./sash
 ```
 

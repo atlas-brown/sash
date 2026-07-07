@@ -170,11 +170,17 @@ run_koala() {
 }
 
 compute_loc() {
-    echo "> Computing LoC"
+    #echo "> Computing LoC"
     if [[ ${FORCE} -eq 0 && -f ${RESULTS_DIR}/benchmark_loc.csv ]]; then
-        echo "Skipping existing: ${RESULTS_DIR}/benchmark_loc.csv"
+        : #echo "Skipping existing: ${RESULTS_DIR}/benchmark_loc.csv"
     else
         run_cmd uv run scripts/precompute_loc_cache.py --results-csv "${main_eval_csv}" --output-csv "${RESULTS_DIR}/benchmark_loc.csv"
+    fi
+}
+
+delete_loc() {
+    if [[ -f ${RESULTS_DIR}/benchmark_loc.csv ]]; then
+        rm "${RESULTS_DIR}/benchmark_loc.csv"
     fi
 }
 
@@ -209,20 +215,22 @@ PY
 }
 
 generate_appendix() {
-    echo "> Generating LaTeX table"
+    #echo "> Generating LaTeX table"
     if [[ ${FORCE} -eq 0 && -f ${RESULTS_DIR}/table.tex ]]; then
-        echo "Skipping existing: ${RESULTS_DIR}/table.tex"
+        : #echo "Skipping existing: ${RESULTS_DIR}/table.tex"
     else
         run_cmd uv run scripts/table.py --appendix --loc-cache-path "${RESULTS_DIR}/benchmark_loc.csv" --results-csv "${main_eval_csv}" >"${RESULTS_DIR}/table.tex"
     fi
 }
 
+delete_appendix() {
+    if [[ -f ${RESULTS_DIR}/table.tex ]]; then
+        rm "${RESULTS_DIR}/table.tex"
+    fi
+}
+
 if [[ ${RUN_MAIN} -eq 1 ]]; then
     run_main
-    echo
-    compute_loc
-    echo
-    generate_appendix
     echo
 fi
 
@@ -250,8 +258,6 @@ fi
 if [[ ${RUN_MAIN} -eq 1 ]]; then
     echo
     echo "  ${main_eval_csv} (evaluation of buggy programs, fixed programs, and variants)"
-    echo "  ${RESULTS_DIR}/benchmark_loc.csv (LoC information for all benchmarks)"
-    echo "  ${RESULTS_DIR}/table.tex (appendix)"
     echo "  ${RESULTS_DIR}/figures/main-eval.pdf (bar plot)"
 fi
 
