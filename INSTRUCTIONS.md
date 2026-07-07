@@ -120,12 +120,12 @@ To run the experiment:
 ```
 
 **Outputs**:
-- `results/figures/main-eval.svg` (corresponds to Fig. 10)
+- `results/figures/main-eval.png` (corresponds to Fig. 10)
 - `results/main-eval/results_t60.csv` (CSV with all results, used to create the aforementioned figure)
 
-Precomputed figure, found in [`results/precomputed/figures/main-eval.svg`](results/precomputed/figures/main-eval.svg):
+Precomputed figure, found in [`results/precomputed/figures/main-eval.png`](results/precomputed/figures/main-eval.png):
 
-![Figure 10](results/precomputed/figures/main-eval.svg)
+![Figure 10](results/precomputed/figures/main-eval.png)
 
 
 ## Additional Results: Performance Analysis — Timeout Sweep (§7.3) (3.5 hours)
@@ -138,12 +138,12 @@ To run the experiment:
 ```
 
 **Outputs**:
-- `results/figures/timeout-sweep.svg` (corresponds to Fig. 11)
+- `results/figures/timeout-sweep.png` (corresponds to Fig. 11)
 - `results/timeout-sweep/results_t*_*.csv` (CSV with all results, used to create the aforementioned figure)
 
-Precomputed figure, found in [`results/precomputed/figures/timeout-sweep.svg`](results/precomputed/figures/timeout-sweep.svg):
+Precomputed figure, found in [`results/precomputed/figures/timeout-sweep.png`](results/precomputed/figures/timeout-sweep.png):
 
-![Figure 11](results/precomputed/figures/timeout-sweep.svg)
+![Figure 11](results/precomputed/figures/timeout-sweep.png)
 
 
 ## Additional Results: Performance Analysis — Koala (§7.3) (1.5 hours)
@@ -155,12 +155,12 @@ This experiment runs SaSh on all 119 programs from the Koala benchmark suite to 
 ```
 
 **Outputs**:
-- `results/figures/koala.svg` (corresponds to the inline CDF in §7.3)
+- `results/figures/koala.png` (corresponds to the inline CDF in §7.3)
 - `results/koala-eval/results_t900.csv` (CSV with all results, used to create the aforementioned figure)
 
-Precomputed figure, found in [`results/precomputed/figures/koala.svg`](results/precomputed/figures/koala.svg):
+Precomputed figure, found in [`results/precomputed/figures/koala.png`](results/precomputed/figures/koala.png):
 
-![Koala CDF](results/precomputed/figures/koala.svg)
+![Koala CDF](results/precomputed/figures/koala.png)
 
 
 # Optional: Bugs Found in the Wild (4 hours)

@@ -199,17 +199,17 @@ if "${RUN_MAIN}" == "1":
     all_results = plots.load_csv(str(results_csv))
     plots.plot_bug_detection_bars_split_versions(
         all_results,
-        str(figures_dir / "main-eval.svg"),
+        str(figures_dir / "main-eval.png"),
     )
 if "${RUN_SWEEP}" == "1":
     plots.plot_timeout_sweep_bug_catch(
         str(timeout_sweep_dir),
-        str(figures_dir / "timeout-sweep.svg"),
+        str(figures_dir / "timeout-sweep.png"),
     )
 if "${RUN_KOALA}" == "1":
     plots.plot_koala_timeout_cdf(
         str(koala_sweep_dir),
-        str(figures_dir / "koala.svg"),
+        str(figures_dir / "koala.png"),
     )
 PY
 }
@@ -258,17 +258,17 @@ fi
 if [[ ${RUN_MAIN} -eq 1 ]]; then
     echo
     echo "  ${main_eval_csv} (evaluation of buggy programs, fixed programs, and variants)"
-    echo "  ${RESULTS_DIR}/figures/main-eval.pdf (bar plot)"
+    echo "  ${RESULTS_DIR}/figures/main-eval.png (bar plot)"
 fi
 
 if [[ ${RUN_SWEEP} -eq 1 ]]; then
     echo
     echo "  ${SWEEP_RESULTS_DIR}/results_t*.csv (evaluation of buggy programs under different timeouts and SaSh features)"
-    echo "  ${RESULTS_DIR}/figures/timeout-sweep.pdf (line plot)"
+    echo "  ${RESULTS_DIR}/figures/timeout-sweep.png (line plot)"
 fi
 
 if [[ ${RUN_KOALA} -eq 1 ]]; then
     echo
     echo "  ${KOALA_RESULTS_DIR}/results_t*.csv (evaluation of SaSh on the Koala benchmarks)"
-    echo "  ${RESULTS_DIR}/figures/koala.pdf (CDF plot)"
+    echo "  ${RESULTS_DIR}/figures/koala.png (CDF plot)"
 fi
