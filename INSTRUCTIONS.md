@@ -125,7 +125,9 @@ To run the experiment:
 
 Precomputed figure, found in [`results/precomputed/figures/main-eval.png`](results/precomputed/figures/main-eval.png):
 
-![Figure 10](results/precomputed/figures/main-eval.png)
+<p align="center">
+  <img src="results/precomputed/figures/main-eval.png" alt="Figure 10" width="80%">
+</p>
 
 
 ## Additional Results: Performance Analysis — Timeout Sweep (§7.3) (3.5 hours)
@@ -143,7 +145,9 @@ To run the experiment:
 
 Precomputed figure, found in [`results/precomputed/figures/timeout-sweep.png`](results/precomputed/figures/timeout-sweep.png):
 
-![Figure 11](results/precomputed/figures/timeout-sweep.png)
+<p align="center">
+  <img src="results/precomputed/figures/timeout-sweep.png" alt="Figure 11" width="80%">
+</p>
 
 
 ## Additional Results: Performance Analysis — Koala (§7.3) (1.5 hours)
@@ -160,7 +164,9 @@ This experiment runs SaSh on all 119 programs from the Koala benchmark suite to 
 
 Precomputed figure, found in [`results/precomputed/figures/koala.png`](results/precomputed/figures/koala.png):
 
-![Koala CDF](results/precomputed/figures/koala.png)
+<p align="center">
+  <img src="results/precomputed/figures/koala.png" alt="Koala CDF" width="40%">
+</p>
 
 
 # Optional: Bugs Found in the Wild (4 hours)

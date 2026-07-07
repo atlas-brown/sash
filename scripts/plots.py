@@ -3290,7 +3290,7 @@ def plot_koala_timeout_cdf(koala_sweep_dir, output_path):
     #     columnspacing=2.0,
     # )
     fig.subplots_adjust(left=0.24, right=0.92, bottom=0.40, top=0.94)
-    fig.savefig(output_path, format="png")
+    fig.savefig(output_path, format="png", dpi=300)
     plt.close(fig)
 
 
