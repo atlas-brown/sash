@@ -67,7 +67,7 @@ The expected output should include a warning about the deletion of `/*` due to a
 > Line 359 (error): Word splitting or empty variable could lead to deletion of system file /*
 ```
 
-This corresponds to the bug described in Figure 1 of the paper, where a failed `cd` causes `STEAMROOT` to be empty, leading `rm -rf "$STEAMROOT/"*` to expand to `rm -rf /*`.
+This corresponds to the bug described in Figure 2 of the paper, where a failed `cd` causes `STEAMROOT` to be empty, leading `rm -rf "$STEAMROOT/"*` to expand to `rm -rf /*`.
 
 
 # Results Reproduced (6 hours)
@@ -88,7 +88,7 @@ This corresponds to the bug described in Figure 1 of the paper, where a failed `
 > ```
 
 > [!TIP]
-> Precomputed results and figures can be found in [`results/precomputed`](results/precomputed/), along with the exact commands used to produce them in [`results/precomputed/_metadata`](results/precomputed/_metadata/).
+> Precomputed results and figures can be found in [`results/precomputed`](results/precomputed/), along with the exact commands used to produce them in [`results/precomputed/_metadata`](results/precomputed/_metadata/). These results were produced by running the full evaluation on a [CloudLab c6525-25g node](www.utah.cloudlab.us/portal/show-nodetype.php?type=c6525-25g), on Ubuntu 22.04.2 LTS.
 
 
 ## Key Results: Bug Detection Effectiveness (§7.1, §7.2) (1 hour)
@@ -104,7 +104,7 @@ docker run --rm -v "$(pwd)":/app sash-dev ./scripts/eval.sh --main
 ```
 
 **Outputs**:
-- `results/figures/main-eval.svg` (corresponds to Fig. 8)
+- `results/figures/main-eval.svg` (corresponds to Fig. 10)
 - `results/main-eval/results_t60.csv` (CSV with all results, used to create the aforementioned figure)
 - `results/table.tex` (the table in appendix A)
 
@@ -126,7 +126,7 @@ docker run --rm -v "$(pwd)":/app sash-dev ./scripts/eval.sh --sweep
 ```
 
 **Outputs**:
-- `results/figures/timeout-sweep.svg` (corresponds to Fig. 9)
+- `results/figures/timeout-sweep.svg` (corresponds to Fig. 11)
 - `results/timeout-sweep/results_t*_*.csv` (CSV with all results, used to create the aforementioned figure)
 
 Precomputed figure, found in [`results/precomputed/figures/timeout-sweep.svg`](results/precomputed/figures/timeout-sweep.svg):
@@ -156,7 +156,7 @@ Precomputed figure, found in [`results/precomputed/figures/koala.svg`](results/p
 
 ## Appendix A Table
 
-The appendix table is generated when running the [bug detection effectiveness evaluation](#71-bug-detection-effectiveness-1-hour).
+The appendix table is generated when running the [bug detection effectiveness evaluation](#key-results-bug-detection-effectiveness-71-72-1-hour).
 
 **Output**:
 - `results/table.tex`
