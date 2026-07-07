@@ -17,12 +17,56 @@ sash program.sh
 
 ## Examples
 
-TBA
+
+### Empty variable leading to deletion of critical paths
+
+Consider a script that captures the output of a command and later uses that value to clean up a directory:
+
+```bash
+#!/bin/sh
+ROOT="$(some-command)"
+rm -rf "$ROOT/"*
+```
+
+If `some-command` fails or produces no output, `$ROOT` is empty. The shell then expands `"$ROOT/"*` to `/*`, and `rm -rf` deletes every user-writable file on the system.
+
+SaSh detects this ahead of time:
+
+```
+> Line 3 (error): Word splitting or empty variable could lead to deletion of system file /*
+```
+
+This is the same class of bug responsible for the 2015 Steam updater incident[^steam]. Detection requires reasoning about whether a variable can be empty and tracing that value to a destructive command.
+
+[^steam]: [https://github.com/ValveSoftware/steam-for-linux/issues/3671](https://github.com/ValveSoftware/steam-for-linux/issues/3671)
+
+
+### Conditional data loss from moving files
+
+This script moves two files to the same destination:
+
+```bash
+#!/bin/sh
+mv a target
+mv b target
+```
+
+If `target` is a directory, both files end up inside it and the operation is safe. If `target` is a regular file, the first `mv` renames `a` to `target`, and the second `mv` renames `b` to `target`, silently overwriting `a`.
+
+SaSh warns about the risk, but notes the condition under which it applies:
+
+```
+> Line 3 (error): Command 'mv' deletes the following paths, one of which has not been read, potentially causing loss of data: target
+    but only if unknown paths are assumed to be files
+```
+
+The qualification is important: SaSh distinguishes between bugs that will occur in all environments and those that depend on the state of the filesystem.
 
 
 ## Installation
 
 SaSh can be installed natively on Linux and MacOS, or used through Docker.
+
 
 ### Native
 
