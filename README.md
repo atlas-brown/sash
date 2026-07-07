@@ -84,14 +84,14 @@ You probably already have `clang-17` if you've installed the [`xcode` command li
 
 Then, run:
 ```bash
-CFLAGS="-std=gnu17" uv tool install git+https://github.com/atlas-brown/resash.git
+CFLAGS="-std=gnu17" uv tool install git+https://github.com/atlas-brown/sash.git
 uv tool update-shell  # If PATH needs to be updated
 ```
 
 Or:
 
 ```bash
-CFLAGS="-std=gnu17" pipx install git+https://github.com/atlas-brown/resash.git
+CFLAGS="-std=gnu17" pipx install git+https://github.com/atlas-brown/sash.git
 pipx ensurepath  # If PATH needs to be updated
 ```
 
@@ -103,13 +103,13 @@ If you want to avoid installing a bunch of dependencies, you can use SaSh throug
 To install:
 
 ```bash
-git clone https://github.com/atlas-brown/resash.git
-docker build -t sash ./resash
+git clone https://github.com/atlas-brown/sash.git
+docker build -t sash ./sash
 docker run --rm sash --help  # Should output a help message
 # Install the wrapper script (see below) onto your PATH, then clean up:
 mkdir -p ~/.local/bin
-install -m 0755 ./resash/scripts/sash-docker.sh ~/.local/bin/sash
-rm -rf ./resash
+install -m 0755 ./sash/scripts/sash-docker.sh ~/.local/bin/sash
+rm -rf ./sash
 ```
 
 > [!IMPORTANT]
