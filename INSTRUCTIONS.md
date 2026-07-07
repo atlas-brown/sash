@@ -1,6 +1,6 @@
 # SaSh: Ahead-of-time Analysis of Shell Program Effects
 
-[Artifact Available](#artifact-available-10-minutes) | [Artifact Functional](#artifact-functional-20-minutes) | [Results Reproduced](#results-reproduced-6-hours) | [Bugs in the Wild](#optional-bugs-found-in-the-wild) | [Contact Us](#contact-us)
+[Artifact Available](#artifact-available-10-minutes) | [Artifact Functional](#artifact-functional-20-minutes) | [Results Reproduced](#results-reproduced-6-hours) | [Bugs in the Wild](#optional-bugs-found-in-the-wild) | [Contact](#contact-us)
 
 The paper makes the following contributions:
 
@@ -13,9 +13,9 @@ SaSh is evaluated on 61 real-world shell programs containing 116 documented bugs
 
 This artifact targets the following badges:
 
-* [Artifact Available](#artifact-available): Reviewers confirm the artifact is publicly archived with an appropriate license (~10 min).
-* [Artifact Functional](#artifact-functional): Reviewers install SaSh, verify key components, and run a minimal example (~10 min).
-* [Results Reproduced](#results-reproduced): Reviewers reproduce the paper's main evaluation figures and tables (~6 h).
+- [ ] [Artifact Available](#artifact-available): Reviewers confirm the artifact is publicly archived with an appropriate license (~10 min).
+- [ ] [Artifact Functional](#artifact-functional): Reviewers install SaSh, verify key components, and run a minimal example (~10 min).
+- [ ] [Results Reproduced](#results-reproduced): Reviewers reproduce the paper's main evaluation figures and tables (~6 h).
 
 
 # Artifact Available (10 minutes)
@@ -33,13 +33,9 @@ Reviewers should confirm the following:
 
 > Reviewers install SaSh, verify key components, and run a minimal example
 
-> [!CAUTION] Shell programs (files with a `.sh` suffix) inside `benchmarks/bugs_and_variants` are buggy and should never be executed. Many of them perform unsafe operations that can lead to permanent data loss.
-
-
-## Installation
+[!CAUTION] Shell programs (files with a `.sh` suffix) inside `benchmarks/bugs_and_variants` are buggy and should never be executed. Many of them perform unsafe operations that can lead to permanent data loss.
 
 SaSh can be installed natively or via Docker on Linux and MacOS.
-
 
 ### Docker Installation (recommended)
 
@@ -55,10 +51,9 @@ sash --help  # Verify sash is runnable
 
 For the rest of this file, instructions assume you are inside the `sash` container, and specifically the `/app` directory.
 
-
 ### Manual Installation
 
-Follow the instructions in [README.md#manual-installation](README.md#manual-installation).
+Follow the instructions in [README.md](README.md#manual-installation).
 
 
 ## Completeness
@@ -126,7 +121,7 @@ To run the experiment:
 Precomputed figure, found in [`results/precomputed/figures/main-eval.png`](results/precomputed/figures/main-eval.png):
 
 <p align="center">
-  <img src="results/precomputed/figures/main-eval.png" alt="Figure 10" width="80%">
+  <img src="results/precomputed/figures/main-eval.png" alt="Bug detection comparison" height="200">
 </p>
 
 
@@ -146,7 +141,7 @@ To run the experiment:
 Precomputed figure, found in [`results/precomputed/figures/timeout-sweep.png`](results/precomputed/figures/timeout-sweep.png):
 
 <p align="center">
-  <img src="results/precomputed/figures/timeout-sweep.png" alt="Figure 11" width="80%">
+  <img src="results/precomputed/figures/timeout-sweep.png" alt="Timeout sweep results" height="200">
 </p>
 
 
@@ -165,7 +160,7 @@ This experiment runs SaSh on all 119 programs from the Koala benchmark suite to 
 Precomputed figure, found in [`results/precomputed/figures/koala.png`](results/precomputed/figures/koala.png):
 
 <p align="center">
-  <img src="results/precomputed/figures/koala.png" alt="Koala CDF" width="40%">
+  <img src="results/precomputed/figures/koala.png" alt="Koala runtime CDF" height="200">
 </p>
 
 
@@ -176,4 +171,4 @@ The file [`benchmarks/bug_reports.md`](benchmarks/bug_reports.md) contains links
 
 # Contact Us
 
-For questions please contact <email>, or open an issue on GitHub.
+For questions please contact `lukas_lazarek@brown.edu`, or open an issue on GitHub.
