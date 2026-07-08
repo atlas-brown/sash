@@ -28,14 +28,15 @@ This artifact targets the following badges:
 Reviewers should confirm the following:
 
 1. **Repository**: The artifact is available at [https://github.com/atlas-brown/sash](https://github.com/atlas-brown/sash) (branch `sosp26-ae` will be frozen) and archived at [Zenodo](https://zenodo.org/) (DOI TBD).
-2. **License**: The artifact contains an MIT license ([LICENSE](LICENSE)), allowing comparison and extension.
+2. **License**: The artifact contains an MIT license ([LICENSE](./LICENSE)), allowing comparison and extension.
 3. **Documentation**: The top-level [INSTRUCTIONS.md](INSTRUCTIONS.md) and [README.md](README.md) reference the paper and provide installation instructions.
 
 # Artifact Functional (10 minutes)
 
 > Reviewers install SaSh, verify key components, and run a minimal example
 
-[!CAUTION] Shell programs (files with a `.sh` suffix) inside `benchmarks/bugs_and_variants` are buggy and should _not_ be executed. Many of them perform unsafe operations that can lead to permanent data loss.
+> [!CAUTION]
+> Shell programs (files with a `.sh` suffix) inside `benchmarks/bugs_and_variants` are buggy and should _not_ be executed. Many of them perform unsafe operations that can lead to permanent data loss.
 
 SaSh can be installed natively or via Docker on Linux and MacOS.
 

@@ -68,4 +68,4 @@ Koala can be obtained using the following ways:
 
 # License
 
-The Koala Benchmarks are licensed under the MIT License. See the LICENSE file for more information.
+The Koala Benchmarks are licensed under the MIT License. See the [LICENSE](./LICENSE) file for more information.
