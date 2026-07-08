@@ -1,15 +1,15 @@
 # SaSh: Ahead-of-time Analysis of Shell Program Effects
 
-Quick jump: [Artifact Available](#artifact-available-10-minutes) | [Artifact Functional](#artifact-functional-20-minutes) | [Results Reproduced](#results-reproduced-6-hours) | [Bugs in the Wild](#optional-bugs-found-in-the-wild) | [Contact](#contact-us)
+Quick jump: [Artifact Available](#artifact-available-10-minutes) | [Artifact Functional](#artifact-functional-20-minutes) | [Results Reproduced](#results-reproduced-6-hours) | [Bugs in the Wild](#optional-bugs-found-in-the-wild) | [Contact](#contact)
 
 This is the artifact for paper #133 Ahead-of-time Analysis of Shell Program Effects. It contains all code, data, and experiment scripts to support the paper's contributions.
 
 The paper makes the following contributions:
 
-1. **Optimistic symbolic execution engine (§3)**: A system, SaSh, that simulates shell program execution over symbolic variables, incorporating domain-specific failure modes to prune the state space.
-2. **Effect and environment modeling (§4)**: A non-hierarchical filesystem model and compositional command specifications for reasoning about program-environment interactions.
-3. **Abstract expansion domain (§5)**: An abstract domain capturing coarse constraints on shell expansion outcomes, enabling tractable reasoning about field splitting and related bugs.
-4. **Risk-directed path prioritization (§6)**: Domain-specific optimizations that steer analysis toward program fragments likely to exhibit dangerous behavior.
+1. **An optimistic symbolic execution engine (§3)**: This is a system implemented in python, able to analyze shell programs and report potential bugs.
+2. **Effect and environment modeling (§4)**: These are submodules of the symbolic execution engine, enabling coarse reasoning about file system effects of shell commands using a non-hierarchical file system model.
+3. **Abstract expansion domain (§5)**: This is a submodule of the symbolic execution engine, enabling tractable reasoning about shell expansion outcomes for finding field-splitting and other related bugs.
+4. **Risk-directed path prioritization (§6)**: This is a submodule of the symbolic execution engine, implementing domain-specific optimizations that steer analysis toward program fragments likely to exhibit dangerous behavior.
 
 SaSh is evaluated on 61 real-world shell programs containing 116 documented bugs (§7.1), compared against ShellCheck (§7.2), and characterized for performance across time budgets and 119 programs from [the Koala benchmark suite](https://kben.sh/) (§7.3). It has also uncovered 70 previously unknown bugs in open-source projects including PyTorch, Kubernetes, Next.js, and vLLM.
 
@@ -39,23 +39,50 @@ Reviewers should confirm the following:
 
 SaSh can be installed natively or via Docker on Linux and MacOS.
 
-### Docker Installation (recommended)
+
+### Docker Installation (recommended, ~1.4gb required)
+
+Run the following:
 
 ```bash
 git clone https://github.com/atlas-brown/sash.git
 cd sash
 git checkout sosp26-ae
 docker build --target dev -t sash .
-docker run --rm -it -v $(pwd):/app sash /bin/bash  # You are now inside the container!
+docker run --rm -it -v $(pwd):/app -v /app/.venv sash  # You are now inside the container!
 uv tool install . && uv tool update-shell; source /root/.bashrc  # Install sash as an executable command inside the container
 sash --help  # Verify sash is runnable
 ```
 
 For the rest of this file, instructions assume you are inside the `sash` container, and specifically the `/app` directory.
 
-### Manual Installation
 
-Follow the instructions in [README.md](README.md#manual-installation).
+### Manual Installation (~0.4gb required)
+
+First, install the following dependencies:
+* `cloc`
+* `make`
+* `automake`
+* `autoconf`
+* `libtool`
+* `g++-13` or `clang-17` (or newer)
+* [`uv`](https://github.com/astral-sh/uv) (recommended) or `pipx`
+
+You already have `g++-13` or `clang-17` if you are on Debian 13, Ubuntu 23, or newer.
+You probably already have `clang-17` if you've installed the [`xcode` command line tools](https://developer.apple.com/documentation/xcode/command-line-tools).
+
+After all dependencies are installed, run:
+
+```bash
+git clone https://github.com/atlas-brown/sash.git
+cd sash
+git checkout sosp26-ae
+uv sync  # Install python dependencies (needed for running the evaluation)
+uv tool install .  # Install sash as an executable command
+uv tool update-shell  # Update your shell profile (.bashrc, .zshrc, etc.)
+source ~/.zshrc # Or whatever rc file you use
+sash --help  # Verify sash is runnable
+```
 
 
 ## Completeness
@@ -75,7 +102,9 @@ The artifact contains all code and data relevant to the paper:
 
 
 ### Dependencies
+
 All dependencies of SaSh are listed in the [Dockerfile](Dockerfile) and [pyproject.toml](pyproject.toml).
+
 
 ## Minimal Working Example
 
@@ -95,7 +124,7 @@ The script loops twice, on the first iteration deleting a directory (`workingfol
 
 Running the fixed version of the script, the warning should disappear:
 
-```
+```bash
 sash benchmarks/bugs_and_variants/sf-access_del_resource/fixed.sh
 ```
 
@@ -110,7 +139,7 @@ The ground truth, which includes the source of the script as well as information
 > Precomputed results and figures can be found in [`results/precomputed`](results/precomputed/), along with the exact commands used to produce them in [`results/precomputed/_metadata`](results/precomputed/_metadata/). These results were produced by running the full evaluation on a [CloudLab c6525-25g node](www.utah.cloudlab.us/portal/show-nodetype.php?type=c6525-25g), on Ubuntu 22.04.2 LTS.
 
 
-## Key Result: Bug Detection Effectiveness (§7.1, §7.2) (1 hour)
+## Key Result: Bug Detection Effectiveness (1h) (§7.1, §7.2)
 
 This experiment runs SaSh on all 61 buggy programs, their fixed versions, and all buggy variants mentioned in the paper. It then compares the output to the programs' ground truths. The programs, along with the ground truths, can be found in [`benchmarks/bugs_and_variants`](benchmarks/bugs_and_variants/).
 
@@ -130,7 +159,7 @@ Precomputed figure, found in [`results/precomputed/figures/main-eval.png`](resul
 </p>
 
 
-## Additional Results: Performance Analysis — Timeout Sweep (§7.3) (3.5 hours)
+## Additional Results: Performance Analysis — Timeout Sweep (3.5h) (§7.3)
 
 This experiment runs SaSh on all 61 buggy programs and their fixed versions with different timeouts (1s-100s) and three configurations: base symbolic execution, optimistic execution without risk-directed exploration, and full SaSh. The goal is to see the effect of the timeout choice and the optimizations on the bug-finding effectiveness of the system.
 
@@ -150,7 +179,7 @@ Precomputed figure, found in [`results/precomputed/figures/timeout-sweep.png`](r
 </p>
 
 
-## Additional Results: Performance Analysis — Koala (§7.3) (1.5 hours)
+## Additional Results: Performance Analysis — Koala (1.5h) (§7.3)
 
 This experiment runs SaSh on all 119 programs from the Koala benchmark suite to measure the time required for complete analysis (full exploration of each program), with a cap at 15 minutes.
 
@@ -169,11 +198,11 @@ Precomputed figure, found in [`results/precomputed/figures/koala.png`](results/p
 </p>
 
 
-# Optional: Bugs Found in the Wild (4 hours)
+# Optional: Bugs Found in the Wild (4h) (§7.4)
 
 The file [`benchmarks/bug_reports.md`](benchmarks/bug_reports.md) contains links to all 70 bugs SaSh identified in open-source projects, including PyTorch, Kubernetes, Next.js, vLLM, the P4 Compiler, and others. Reviewers may inspect the linked issues and pull requests to verify that the bugs were reported and, in many cases, confirmed and fixed by maintainers.
 
 
-# Contact Us
+# Contact
 
 For questions please contact `lukas_lazarek@brown.edu`, or open an issue on GitHub.

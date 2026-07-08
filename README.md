@@ -44,7 +44,7 @@ This is the same class of bug responsible for the 2015 Steam updater incident[^s
 [^steam]: [https://github.com/ValveSoftware/steam-for-linux/issues/3671](https://github.com/ValveSoftware/steam-for-linux/issues/3671)
 
 
-### Conditional data loss from moving files
+### Possible data loss from moving files
 
 This script moves two files to the same destination:
 
@@ -72,6 +72,7 @@ SaSh can be installed natively on Linux and MacOS, or used through Docker.
 
 All dependencies of SaSh are listed in the [Dockerfile](Dockerfile) and [pyproject.toml](pyproject.toml).
 The following installation instructions make use of these configurations as appropriate.
+
 
 ### Manual Installation
 
@@ -154,7 +155,7 @@ Additionally, the Dockerfile provides an additional target for development (`dev
 
 ```bash
 docker build --target dev -t sash-dev .
-docker run --rm -it -v $(pwd):/app sash-dev /bin/bash
+docker run --rm -it -v $(pwd):/app -v /app/.venv sash-dev
 # Again, remember to add '--privileged' if you need to use CRIU
 ```
 
@@ -167,7 +168,6 @@ To run all tests, use `uv run pytest`.
 To ensure correct [test discovery](https://docs.pytest.org/en/7.1.x/explanation/goodpractices.html#conventions-for-python-test-discovery) when writing new tests:
 * Test files should be named with the prefix `test_` (e.g., `test_example.py`).
 * Test functions should also start with `test_` (e.g., `def test_example(): ...`).
-
 
 
 # Contact
