@@ -1,6 +1,8 @@
 # SaSh: Ahead-of-time Analysis of Shell Program Effects
 
-[Artifact Available](#artifact-available-10-minutes) | [Artifact Functional](#artifact-functional-20-minutes) | [Results Reproduced](#results-reproduced-6-hours) | [Bugs in the Wild](#optional-bugs-found-in-the-wild) | [Contact](#contact-us)
+Quick jump: [Artifact Available](#artifact-available-10-minutes) | [Artifact Functional](#artifact-functional-20-minutes) | [Results Reproduced](#results-reproduced-6-hours) | [Bugs in the Wild](#optional-bugs-found-in-the-wild) | [Contact](#contact-us)
+
+This is the artifact for paper #133 Ahead-of-time Analysis of Shell Program Effects. It contains all code, data, and experiment scripts to support the paper's contributions.
 
 The paper makes the following contributions:
 
@@ -72,6 +74,9 @@ The artifact contains all code and data relevant to the paper:
 | Bug reports filed in open-source projects | [`benchmarks/bug_reports.md`](benchmarks/bug_reports.md) | §7.4 |
 
 
+### Dependencies
+All dependencies of SaSh are listed in the [Dockerfile](Dockerfile) and [pyproject.toml](pyproject.toml).
+
 ## Minimal Working Example
 
 To verify basic functionality, run SaSh on one of its benchmarks:
@@ -97,7 +102,7 @@ sash benchmarks/bugs_and_variants/sf-access_del_resource/fixed.sh
 The ground truth, which includes the source of the script as well as information about ShellCheck's output on it can be found in: [`benchmarks/bugs_and_variants/sf-access_del_resource/info.yaml`](benchmarks/bugs_and_variants/sf-access_del_resource/info.yaml).
 
 
-# Results Reproduced (6h, optionally 10h)
+# Results Reproduced (key result 1h; all results 10h)
 
 > Reviewers reproduce the paper's main evaluation figures and tables
 
