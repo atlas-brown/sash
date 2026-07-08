@@ -5,8 +5,7 @@ Quick jump: [Examples](#examples) | [Installation](#installation) | [Contributin
 This is the artifact for paper #133 Ahead-of-time Analysis of Shell Program Effects. It contains all code, data, and experiment scripts to support the paper's contributions.
 
 > [!NOTE]
-> **Artifact evaluation:**
-> To evaluate the system of our SOSP'26 paper titled *"Ahead-of-time Analysis of Shell Program Effects"*, jump straight into [INSTRUCTIONS.md](INSTRUCTIONS.md).
+> If you're **evaluating the artifact** of the aforementioned paper, jump straight into [INSTRUCTIONS.md](INSTRUCTIONS.md).
 
 SaSh is a static analysis tool for the Unix shell, using symbolic execution to find bugs in shell programs.
 It currently supports the set of features and syntax defined by the POSIX standard.
