@@ -1,15 +1,16 @@
 # SaSh: Ahead-of-time Analysis of Shell Program Effects
 
-Quick jump: [Artifact Available](#artifact-available-10-minutes) | [Artifact Functional](#artifact-functional-20-minutes) | [Results Reproduced](#results-reproduced-6-hours) | [Bugs in the Wild](#optional-bugs-found-in-the-wild) | [Contact](#contact)
+Quick jump: [Artifact Available](#artifact-available-10-minutes) | [Artifact Functional](#artifact-functional-20-minutes) | [Results Reproduced](#results-reproduced-6-hours) | [Bugs in the Wild](#optional-bugs-found-in-the-wild)
 
-This is the artifact for paper #133 Ahead-of-time Analysis of Shell Program Effects. It contains all code, data, and experiment scripts to support the paper's contributions.
+This is the artifact for paper #133 "Ahead-of-time Analysis of Shell Program Effects" accepted at SOSP'26.
+It contains all code, data, and experiment scripts to support the paper's contributions.
 
-The paper makes the following contributions:
+The paper makes the following claims on pg. 2 (comments to AEC reviews after `:`):
 
-1. **An optimistic symbolic execution engine (§3)**: This is a system implemented in python, able to analyze shell programs and report potential bugs.
-2. **Effect and environment modeling (§4)**: These are submodules of the symbolic execution engine, enabling coarse reasoning about file system effects of shell commands using a non-hierarchical file system model.
-3. **Abstract expansion domain (§5)**: This is a submodule of the symbolic execution engine, enabling tractable reasoning about shell expansion outcomes for finding field-splitting and other related bugs.
-4. **Risk-directed path prioritization (§6)**: This is a submodule of the symbolic execution engine, implementing domain-specific optimizations that steer analysis toward program fragments likely to exhibit dangerous behavior.
+1. **An optimistic symbolic execution engine (§3)**: a system that analyzes shell programs using symbolic execution and reports bugs corresponding to classes of misbehavior.
+2. **Effect and environment modeling (§4)**: two subsystems: (1) a non-hierarchical model of the file system and (2) specifications that describe the effects of common shell commands over this model.
+3. **Abstract expansion domain (§5)**: a subsystem implementing an abstract domain for shell expansion, tailor-made for uncovering field-splitting-related bugs.
+4. **Risk-directed path prioritization (§6)**: a subsystem implementing several domain-specific optimizations that steer analysis toward program fragments likely to exhibit dangerous behavior.
 
 SaSh is evaluated on 61 real-world shell programs containing 116 documented bugs (§7.1), compared against ShellCheck (§7.2), and characterized for performance across time budgets and 119 programs from [the Koala benchmark suite](https://kben.sh/) (§7.3). It has also uncovered 70 previously unknown bugs in open-source projects including PyTorch, Kubernetes, Next.js, and vLLM.
 
@@ -26,19 +27,17 @@ This artifact targets the following badges:
 
 Reviewers should confirm the following:
 
-* **Repository**: The artifact is available at [https://github.com/atlas-brown/sash](https://github.com/atlas-brown/sash) (branch `sosp26-ae` will be frozen) and archived at [Zenodo](https://zenodo.org/) (DOI TBD).
-* **License**: The artifact contains an MIT license ([LICENSE](LICENSE)), allowing comparison and extension.
-* **"read me" file**: The top-level [INSTRUCTIONS.md](INSTRUCTIONS.md) references the paper and provides installation instructions. The top-level [README.md](README.md) does so as well.
-
+1. **Repository**: The artifact is available at [https://github.com/atlas-brown/sash](https://github.com/atlas-brown/sash) (branch `sosp26-ae` will be frozen) and archived at [Zenodo](https://zenodo.org/) (DOI TBD).
+2. **License**: The artifact contains an MIT license ([LICENSE](LICENSE)), allowing comparison and extension.
+3. **Documentation**: The top-level [INSTRUCTIONS.md](INSTRUCTIONS.md) and [README.md](README.md) reference the paper and provide installation instructions.
 
 # Artifact Functional (10 minutes)
 
 > Reviewers install SaSh, verify key components, and run a minimal example
 
-[!CAUTION] Shell programs (files with a `.sh` suffix) inside `benchmarks/bugs_and_variants` are buggy and should never be executed. Many of them perform unsafe operations that can lead to permanent data loss.
+[!CAUTION] Shell programs (files with a `.sh` suffix) inside `benchmarks/bugs_and_variants` are buggy and should _not_ be executed. Many of them perform unsafe operations that can lead to permanent data loss.
 
 SaSh can be installed natively or via Docker on Linux and MacOS.
-
 
 ### Docker Installation (recommended, ~1.4gb required)
 
@@ -56,7 +55,6 @@ sash --help  # Verify sash is runnable
 
 For the rest of this file, instructions assume you are inside the `sash` container, and specifically the `/app` directory.
 
-
 ### Manual Installation (~0.4gb required)
 
 First, install the following dependencies:
@@ -66,7 +64,7 @@ First, install the following dependencies:
 * `autoconf`
 * `libtool`
 * `g++-13` or `clang-17` (or newer)
-* [`uv`](https://github.com/astral-sh/uv) (recommended) or `pipx`
+* `uv` (recommended) or `pipx`
 
 You already have `g++-13` or `clang-17` if you are on Debian 13, Ubuntu 23, or newer.
 You probably already have `clang-17` if you've installed the [`xcode` command line tools](https://developer.apple.com/documentation/xcode/command-line-tools).
@@ -95,9 +93,9 @@ The artifact contains all code and data relevant to the paper:
 | Filesystem model, command specifications | [`src/sash/fs.py`](src/sash/fs.py), [`src/sash/specs.py`](src/sash/specs.py) | §4 |
 | Symbolic word expansion | [`src/sash/symb.py:281–1289`](src/sash/symb.py) | §5 |
 | Risk-directed exploration | [`src/sash/dfs_targeted.py`](src/sash/dfs_targeted.py), [`src/sash/symb.py:2968–3185`](src/sash/symb.py) | §6 |
+| Evaluation scripts | [`scripts/eval.sh`](scripts/eval.sh) and other scripts in the same directory | §7 |
 | 61 real buggy programs (116 bugs) and 42 synthetic variants | [`benchmarks/bugs_and_variants/`](benchmarks/bugs_and_variants/) | §7.1, §7.2 |
 | 119 Koala benchmark programs | [`benchmarks/koala/`](benchmarks/koala/) | §7.3 |
-| Evaluation scripts | [`scripts/eval.sh`](scripts/eval.sh) and other scripts in the same directory | §7 |
 | Bug reports filed in open-source projects | [`benchmarks/bug_reports.md`](benchmarks/bug_reports.md) | §7.4 |
 
 
@@ -226,8 +224,3 @@ Precomputed figure of the full experiment, found in [`results/precomputed/figure
 # Optional: Bugs Found in the Wild (4h) (§7.4)
 
 The file [`benchmarks/bug_reports.md`](benchmarks/bug_reports.md) contains links to all 70 bugs SaSh identified in open-source projects, including PyTorch, Kubernetes, Next.js, vLLM, the P4 Compiler, and others. Reviewers may inspect the linked issues and pull requests to verify that the bugs were reported and, in many cases, confirmed and fixed by maintainers.
-
-
-# Contact
-
-For questions please contact `lukas_lazarek@brown.edu`, or open an issue on GitHub.

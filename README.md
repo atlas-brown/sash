@@ -1,8 +1,9 @@
 # SaSh: Ahead-of-time Analysis of Shell Program Effects
 
-Quick jump: [Examples](#examples) | [Installation](#installation) | [Contributing](#contributing)
+Quick jump: [Examples](#examples) | [Installation](#installation) | [Contributing](#contributing) | [Citation](#citation) | [Contact](#contact)
 
-This is the artifact for paper #133 Ahead-of-time Analysis of Shell Program Effects. It contains all code, data, and experiment scripts to support the paper's contributions.
+This is the artifact for the paper "Ahead-of-time Analysis of Shell Program Effects" accepted at SOSP'26.
+It contains all code, data, and experiment scripts to support the paper's contributions.
 
 > [!NOTE]
 > If you're **evaluating the artifact** of the aforementioned paper, jump straight into [INSTRUCTIONS.md](INSTRUCTIONS.md).
@@ -18,6 +19,7 @@ sash program.sh
 ```
 
 
+
 ## Examples
 
 
@@ -27,15 +29,17 @@ Consider a script that captures the output of a command and later uses that valu
 
 ```bash
 #!/bin/sh
-ROOT="$(some-command)"
+ROOT="$(cd ${0%/*} && echo $PWD)"
 rm -rf "$ROOT/"*
 ```
 
-If `some-command` fails or produces no output, `$ROOT` is empty. The shell then expands `"$ROOT/"*` to `/*`, and `rm -rf` deletes every user-writable file on the system.
+If the `cd` fails, `$ROOT` becomes empty.
+Then, `"$ROOT/"*` expand to `/*`, making `rm -rf` delete every user-writable file on the system.
 
 SaSh detects this ahead of time:
 
 ```
+$ sash install.sh
 > Line 3 (error): Word splitting or empty variable could lead to deletion of system file /*
 ```
 
@@ -56,15 +60,13 @@ mv b target
 
 If `target` is a directory, both files end up inside it and the operation is safe. If `target` is a regular file, the first `mv` renames `a` to `target`, and the second `mv` renames `b` to `target`, silently overwriting `a`.
 
-SaSh warns about the risk, but notes the condition under which it applies:
+SaSh warns about the risk:
 
 ```
+$ sash organize.sh
 > Line 3 (error): Command 'mv' deletes the following paths, one of which has not been read, potentially causing loss of data: target
     but only if unknown paths are assumed to be files
 ```
-
-The qualification is important: SaSh distinguishes between bugs that will occur in all environments and those that depend on the state of the filesystem.
-
 
 ## Installation
 
@@ -83,10 +85,10 @@ Make sure you have the following installed:
 * `autoconf`
 * `libtool`
 * `g++-13` or `clang-17` (or newer)
-* [`uv`](https://github.com/astral-sh/uv) (recommended) or `pipx`
+* `uv` (recommended) or `pipx`
 
 You already have `g++-13` or `clang-17` if you are on Debian 13, Ubuntu 23, or newer.
-You probably already have `clang-17` if you've installed the [`xcode` command line tools](https://developer.apple.com/documentation/xcode/command-line-tools).
+On MacOS, `clang-17` is part of the [`xcode` command line tools](https://developer.apple.com/documentation/xcode/command-line-tools).
 
 Obtain the repository:
 ```bash
@@ -169,6 +171,26 @@ To ensure correct [test discovery](https://docs.pytest.org/en/7.1.x/explanation/
 * Test files should be named with the prefix `test_` (e.g., `test_example.py`).
 * Test functions should also start with `test_` (e.g., `def test_example(): ...`).
 
+# Citation
+
+If you use SaSh in your research, please cite the paper:
+
+```
+@inproceedings{sash:sosp:2026,
+  title = {Ahead-of-time Analysis of Shell Program Effects},
+  author = {Lazarek, Lukas and Lamprou, Evangelos and Kapetanakis, George and Zhao, Eric and Zheng, Zhiwen and Greenberg, Michael and Kallas, Konstantinos and Vasilakis, Nikos},
+  year = {2026},
+  month = {sep},
+  booktitle = {Proceedings of the 32nd ACM Symposium on Operating Systems Principles},
+  location = {Prague, Czechia},
+  publisher = {Association for Computing Machinery},
+  address = {New York, NY, USA},
+  series = {SOSP '26},
+  url = {https://sigops.org/s/conferences/sosp/2026/},
+  keywords = {Unix, Linux, shell, static analysis, effects},
+  artifact = {https://github.com/atlas-brown/sash},
+}
+```
 
 # Contact
 
