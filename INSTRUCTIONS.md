@@ -148,7 +148,7 @@ To run the experiment:
 ./scripts/eval.sh --main
 ```
 
-**Outputs**:
+### Outputs
 - `results/figures/main-eval.png` (corresponds to Fig. 10)
 - `results/main-eval/results_t60.csv` (CSV with all results, used to create the aforementioned figure)
 
@@ -159,39 +159,64 @@ Precomputed figure, found in [`results/precomputed/figures/main-eval.png`](resul
 </p>
 
 
-## Additional Results: Performance Analysis — Timeout Sweep (3.5h) (§7.3)
+## Additional Results: Performance Analysis — Timeout Sweep (1h; optionally 3.5h) (§7.3)
 
 This experiment runs SaSh on all 61 buggy programs and their fixed versions with different timeouts (1s-100s) and three configurations: base symbolic execution, optimistic execution without risk-directed exploration, and full SaSh. The goal is to see the effect of the timeout choice and the optimizations on the bug-finding effectiveness of the system.
 
-To run the experiment:
+
+### Quick Run (1h)
+
+To run a subset of the experiment, for quick results that still showcase the importance of SaSh's optimizations, use the following command:
+```bash
+./scripts/eval.sh --sweep --sweep-timeouts 1,30,60
+```
+
+
+### Full Run (3.5h)
+
+To run the full experiment, recreating the exact results of the paper:
 ```bash
 ./scripts/eval.sh --sweep
 ```
 
-**Outputs**:
-- `results/figures/timeout-sweep.png` (corresponds to Fig. 11)
-- `results/timeout-sweep/results_t*_*.csv` (CSV with all results, used to create the aforementioned figure)
 
-Precomputed figure, found in [`results/precomputed/figures/timeout-sweep.png`](results/precomputed/figures/timeout-sweep.png):
+### Outputs
+- `results/figures/timeout-sweep.png` (corresponds to Fig. 11)
+- `results/timeout-sweep/results_t*_*.csv` (CSVs with all results, used to create the aforementioned figure)
+
+Precomputed figure of the full experiment, found in [`results/precomputed/figures/timeout-sweep.png`](results/precomputed/figures/timeout-sweep.png):
 
 <p align="center">
   <img src="results/precomputed/figures/timeout-sweep.png" alt="Timeout sweep results" height="200">
 </p>
 
 
-## Additional Results: Performance Analysis — Koala (1.5h) (§7.3)
+## Additional Results: Performance Analysis — Koala (0.5h; optionally 1.5h) (§7.3)
 
 This experiment runs SaSh on all 119 programs from the Koala benchmark suite to measure the time required for complete analysis (full exploration of each program), with a cap at 15 minutes.
 
+
+### Quick Run (0.5h)
+
+To run a subset of the experiment, for quick results that still showcase the performance of SaSh on a diverse collection of programs:
+```bash
+./scripts/eval.sh --koala --koala-timeout 30
+```
+
+
+### Full Run (1.5h)
+
+To run the full experiment, recreating the exact results of the paper:
 ```bash
 ./scripts/eval.sh --koala
 ```
 
-**Outputs**:
+
+### Outputs
 - `results/figures/koala.png` (corresponds to the inline CDF in §7.3)
 - `results/koala-eval/results_t900.csv` (CSV with all results, used to create the aforementioned figure)
 
-Precomputed figure, found in [`results/precomputed/figures/koala.png`](results/precomputed/figures/koala.png):
+Precomputed figure of the full experiment, found in [`results/precomputed/figures/koala.png`](results/precomputed/figures/koala.png):
 
 <p align="center">
   <img src="results/precomputed/figures/koala.png" alt="Koala runtime CDF" height="200">
