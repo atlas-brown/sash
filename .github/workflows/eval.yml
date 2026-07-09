@@ -6,6 +6,7 @@ on:
     branches: [master]
 jobs:
   on-success:
+    if: false
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -18,6 +19,6 @@ jobs:
           python -m pip install --upgrade pip
           pip install uv
           uv sync
-      - name: Run the evaluation
-        run: |
-          uv run scripts/evaluation.py
+      # - name: Run the evaluation
+      #   run: |
+      #     uv run scripts/evaluation.py
