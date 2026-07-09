@@ -90,13 +90,6 @@ Make sure you have the following installed:
 You already have `g++-13` or `clang-17` if you are on Debian 13, Ubuntu 23, or newer.
 On MacOS, `clang-17` is part of the [`xcode` command line tools](https://developer.apple.com/documentation/xcode/command-line-tools).
 
-Obtain the repository:
-```bash
-git clone https://github.com/atlas-brown/sash.git
-cd sash
-git checkout sosp26-ae
-```
-
 Then, run:
 ```bash
 CFLAGS="-std=gnu17" uv tool install git+https://github.com/atlas-brown/sash.git@sosp26-ae

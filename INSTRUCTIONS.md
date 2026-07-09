@@ -58,30 +58,19 @@ For the rest of this file, instructions assume you are inside the `sash` contain
 
 ### Manual Installation (~0.4gb required)
 
-First, install the following dependencies:
-* `cloc`
-* `make`
-* `automake`
-* `autoconf`
-* `libtool`
-* `g++-13` or `clang-17` (or newer)
-* `uv` (recommended) or `pipx`
-
-You already have `g++-13` or `clang-17` if you are on Debian 13, Ubuntu 23, or newer.
-You probably already have `clang-17` if you've installed the [`xcode` command line tools](https://developer.apple.com/documentation/xcode/command-line-tools).
-
-After all dependencies are installed, run:
+First, follow [the instructions in the README](README.md#manual-installation).
+This will install SaSh as an executable, but for the evaluation the benchmarks present in the repo are needed.
+Run the following:
 
 ```bash
+sash --help  # Verify sash is runnable
 git clone https://github.com/atlas-brown/sash.git
 cd sash
 git checkout sosp26-ae
 uv sync  # Install python dependencies (needed for running the evaluation)
-uv tool install .  # Install sash as an executable command
-uv tool update-shell  # Update your shell profile (.bashrc, .zshrc, etc.)
-source ~/.zshrc # Or whatever rc file you use
-sash --help  # Verify sash is runnable
 ```
+
+For the rest of this file, instructions assume you are inside the root of the repository, you can run `sash` as a command, and you have `uv` installed.
 
 
 ## Completeness
