@@ -168,7 +168,7 @@ To ensure correct [test discovery](https://docs.pytest.org/en/7.1.x/explanation/
 
 If you use SaSh in your research, please cite the paper:
 
-```
+```bibtex
 @inproceedings{sash:sosp:2026,
   title = {Ahead-of-time Analysis of Shell Program Effects},
   author = {Lazarek, Lukas and Lamprou, Evangelos and Kapetanakis, George and Zhao, Eric and Zheng, Zhiwen and Greenberg, Michael and Kallas, Konstantinos and Vasilakis, Nikos},
