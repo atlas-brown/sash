@@ -150,7 +150,7 @@ Additionally, the Dockerfile provides an additional target for development (`dev
 
 ```bash
 docker build --target dev -t sash-dev .
-docker run --rm -it -v $(pwd):/app -v /app/.venv sash-dev
+docker run --rm -it -v "$(pwd)":/app -v /app/.venv sash-dev
 # Again, remember to add '--privileged' if you need to use CRIU
 ```
 

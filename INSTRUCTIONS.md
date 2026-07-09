@@ -49,7 +49,7 @@ git clone https://github.com/atlas-brown/sash.git
 cd sash
 git checkout sosp26-ae
 docker build --target dev -t sash .
-docker run --rm -it -v $(pwd):/app -v /app/.venv sash  # You are now inside the container!
+docker run --rm -it -v "$(pwd)":/app -v /app/.venv sash  # You are now inside the container!
 uv tool install . && uv tool update-shell; source /root/.bashrc  # Install sash as an executable command inside the container
 sash --help  # Verify sash is runnable
 ```
