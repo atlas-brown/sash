@@ -70,7 +70,7 @@ git checkout sosp26-ae
 uv sync  # Install python dependencies (needed for running the evaluation)
 ```
 
-For the rest of this file, instructions assume you are inside the root of the repository, you can run `sash` as a command, and you have `uv` installed.
+> The following instructions assume you are inside the root of the repository, can run `sash` as a command, and have `uv` installed.
 
 
 ## Completeness
@@ -119,7 +119,7 @@ sash benchmarks/bugs_and_variants/sf-access_del_resource/fixed.sh
 The ground truth, which includes the source of the script as well as information about ShellCheck's output on it can be found in: [`benchmarks/bugs_and_variants/sf-access_del_resource/info.yaml`](benchmarks/bugs_and_variants/sf-access_del_resource/info.yaml).
 
 
-# Results Reproduced (key result 1h; all results 10h)
+# Results Reproduced (key results 1h; all results 10h)
 
 > Reviewers reproduce the paper's main evaluation figures and tables
 
