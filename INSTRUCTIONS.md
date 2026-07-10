@@ -31,6 +31,7 @@ Reviewers should confirm the following:
 2. **License**: The artifact contains an MIT license ([LICENSE](./LICENSE)), allowing comparison and extension.
 3. **Documentation**: The top-level [INSTRUCTIONS.md](INSTRUCTIONS.md) and [README.md](README.md) reference the paper and provide installation instructions.
 
+
 # Artifact Functional (10 minutes)
 
 > Reviewers install SaSh, verify key components, and run a minimal example
@@ -39,6 +40,7 @@ Reviewers should confirm the following:
 > Shell programs (files with a `.sh` suffix) inside `benchmarks/bugs_and_variants` are buggy and should _not_ be executed. Many of them perform unsafe operations that can lead to permanent data loss.
 
 SaSh can be installed natively or via Docker on Linux and MacOS.
+
 
 ### Docker Installation (recommended, ~1.4gb required)
 
@@ -54,7 +56,8 @@ uv tool install . && uv tool update-shell; source /root/.bashrc  # Install sash 
 sash --help  # Verify sash is runnable
 ```
 
-For the rest of this file, instructions assume you are inside the `sash` container, and specifically the `/app` directory.
+The rest of the instructions assume you are inside the `sash` container, and specifically the `/app` directory.
+
 
 ### Manual Installation (~0.4gb required)
 
@@ -70,7 +73,7 @@ git checkout sosp26-ae
 uv sync  # Install python dependencies (needed for running the evaluation)
 ```
 
-> The following instructions assume you are inside the root of the repository, can run `sash` as a command, and have `uv` installed.
+The rest of the instructions assume you are inside the root of the repository, can run `sash` as a command, and have `uv` installed.
 
 
 ## Completeness
@@ -202,7 +205,7 @@ To run the full experiment, recreating the exact results of the paper:
 
 ### Outputs
 - `results/figures/koala.png` (corresponds to the inline CDF in §7.3)
-- `results/koala-eval/results_t900.csv` (CSV with all results, used to create the aforementioned figure)
+- `results/koala-eval/results_t*.csv` (CSV with all results, used to create the aforementioned figure)
 
 Precomputed figure of the full experiment, found in [`results/precomputed/figures/koala.png`](results/precomputed/figures/koala.png):
 
