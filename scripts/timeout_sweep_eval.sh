@@ -173,19 +173,24 @@ for raw_t in "${TIMEOUTS[@]}"; do
         --seed "$((MOCK_SEED + seed_offset))"
       )
     else
-      cmd=(uv run scripts/evaluation.py -f -v --only "${ONLY_REGEX}" -t "${t}" -T "${t}" -c "${csv_path}")
+      # SaSh now expects a single total timeout (-t) covering execution+solver.
+      total_timeout=$(awk "BEGIN{printf \"%g\", ${t} + ${t}}")
+      cmd=(uv run scripts/evaluation.py -f -v --only "${ONLY_REGEX}" -t "${total_timeout}" -c "${csv_path}")
       if [[ -n "${JOBS}" ]]; then
         cmd+=(-j "${JOBS}")
       fi
       case "${dfs_mode}" in
         no_opts)
-          cmd+=(-D --fork-everywhere --disable-solver-optimizations)
+          # Disable optimistic forking, disable trace-collapsing, disable solver optimizations, and disable DFS
+          cmd+=(--disable-optimistic-forking --disable-trace-collapsing --disable-solver-optimizations --disable-dfs)
           ;;
         smart_forking)
-          cmd+=(-D --disable-solver-optimizations)
+          # Keep optimistic forking; disable solver optimizations and disable DFS
+          cmd+=(--disable-solver-optimizations --disable-dfs)
           ;;
         solver_opts)
-          cmd+=(-D)
+          # Keep solver optimizations; only disable DFS
+          cmd+=(--disable-dfs)
           ;;
       esac
     fi

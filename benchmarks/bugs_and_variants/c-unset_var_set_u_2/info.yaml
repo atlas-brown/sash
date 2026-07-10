@@ -1,0 +1,29 @@
+description: Audio watermark build
+
+sources:
+  - https://code.uplex.de/stefan/audiowmark/commit/95db9c5f0b7788aff65f2d85eaedd0c01ba960ac
+
+bugs:
+  bug00:
+    description: An unset variable is appended to itself while set -u is enabled
+    code: unbound_setu
+    shellcheck: null
+    notes:
+      - Unclear why ShellCheck does not detect this
+
+ground_truths:
+  # Base versions
+  - path: original.sh
+    kind: original
+    bugs:
+      bug00: { lines: [15] }
+
+  - path: posix.sh
+    kind: buggy
+    bugs:
+      bug00: { lines: [15] }
+
+  - path: fixed.sh
+    kind: fixed
+    bugs:
+      bug00: { regression_lines: [15], shellcheck: null }

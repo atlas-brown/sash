@@ -61,7 +61,7 @@ alias scp="scp -i \"$identity_file\""
 
 echo "Connecting to $user@$host"
 
-ssh "git clone sash-gh:atlas-brown/resash.git '$remote_root'" || true       # Clone the repo
+ssh "git clone sash-gh:atlas-brown/sash.git '$remote_root'" || true       # Clone the repo
 ssh "git --git-dir '$remote_root/.git' pull origin master"                  # Pull latest changes
 ssh "docker build -t sash -f '$remote_root/Dockerfile.new' '$remote_root'"  # Build Docker image
 ssh "docker run --rm --entrypoint uv sash run pytest"                       # Run tests inside Docker

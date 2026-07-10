@@ -28,7 +28,5 @@ trace_info.jsonl
 .mplconfig
 .cache/fontconfig
 
-*.pdf
-
 # Serialized state
 .resumable

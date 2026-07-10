@@ -1,0 +1,26 @@
+description: Deleted home directory
+
+sources:
+  - https://askubuntu.com/questions/1141336/accidentally-deleted-my-users-home-folder
+
+bugs:
+  bug00:
+    description: Detected issue code 'del_user_dir' in benchmark script
+    code: del_user_dir
+    shellcheck: null
+
+ground_truths:
+  - path: original.sh
+    kind: original
+    bugs:
+      bug00: { lines: [3] }
+
+  - path: posix.sh
+    kind: buggy
+    bugs:
+      bug00: { lines: [3] }
+
+  - path: fixed.sh
+    kind: fixed
+    bugs:
+      bug00: { regression_lines: [3], shellcheck: null }

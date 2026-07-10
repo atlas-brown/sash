@@ -1,0 +1,26 @@
+description: Claude null-output redirect
+
+sources:
+  - https://github.com/anthropics/claude-code/issues/17925
+
+bugs:
+  bug00:
+    description: Detected issue code 'data_loss' in benchmark script
+    code: data_loss
+    shellcheck: null
+
+ground_truths:
+  - path: original.sh
+    kind: original
+    bugs:
+      bug00: { lines: [6] }
+
+  - path: posix.sh
+    kind: buggy
+    bugs:
+      bug00: { lines: [6] }
+
+  - path: fixed.sh
+    kind: fixed
+    bugs:
+      bug00: { regression_lines: [6], shellcheck: null }

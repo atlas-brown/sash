@@ -11,9 +11,9 @@ import shlex
 from pathlib import Path
 from collections import Counter, defaultdict
 import yaml
-from benchmark_metadata import benchmark_key, benchmark_display_name, short_name
-from bug_depth_stats import compute_script_metrics
-import bugdepth
+from .benchmark_metadata import benchmark_key, benchmark_display_name, short_name
+from .bug_depth_stats import compute_script_metrics
+from . import bugdepth
 
 import matplotlib.pyplot as plt
 from matplotlib_set_diagrams import EulerDiagram
@@ -137,11 +137,14 @@ def git_toplevel():
 
 
 ROOT_DIR = git_toplevel()
-with (ROOT_DIR / "benchmarks" / "codes_out_of_scope.yaml").open(
-    "r", encoding="utf-8"
-) as f:
-    OOS_CODES = set(yaml.safe_load(f) or [])
-EXCLUDED_BUG_CODES = OOS_CODES
+if (ROOT_DIR / "benchmarks" / "codes_out_of_scope.yaml").exists():
+    with (ROOT_DIR / "benchmarks" / "codes_out_of_scope.yaml").open(
+        "r", encoding="utf-8"
+    ) as f:
+        OOS_CODES = set(yaml.safe_load(f) or [])
+    EXCLUDED_BUG_CODES = OOS_CODES
+else:
+    EXCLUDED_BUG_CODES = set()
 
 _benchmark_dir_cache = {}
 _shellcheck_map_cache = {}
@@ -720,7 +723,7 @@ def plot_bug_detection_euler(data, output_path):
     )
     plt.title(None)
     plt.tight_layout()
-    plt.savefig(output_path, format="pdf")
+    plt.savefig(output_path, format="png", dpi=300)
     plt.close()
 
 
@@ -827,7 +830,11 @@ def plot_bug_detection_bars(data, output_path):
     ax.set_xlim(0, max_total)
     ax.set_yticks([group_buggy, group_fixed], ["Buggy", "Fixed"], fontsize=tick_size)
     ax.set_ylim(0.28, 0.72)
-    ax.set_xlabel("Benchmark", loc="right", fontsize=tick_size)
+    try:
+        ax.set_xlabel("Benchmark", loc="right", fontsize=tick_size)
+    except TypeError:
+        # Older matplotlib doesn't support `loc` kwarg; fall back to right-aligned label.
+        ax.set_xlabel("Benchmark", fontsize=tick_size, ha="right")
 
     # Annotate row identity on the right side as axis tick labels.
     row_ticks = [
@@ -928,7 +935,7 @@ def plot_bug_detection_bars(data, output_path):
     )
 
     plt.tight_layout(rect=[0.0, 0.08, 1.0, 0.92])
-    plt.savefig(output_path, format="pdf")
+    plt.savefig(output_path, format="png", dpi=300)
     plt.close()
 
 
@@ -1262,7 +1269,7 @@ def plot_bug_detection_bars_split_versions(data, output_path):
         columnspacing=2.0,
     )
     fig.subplots_adjust(left=0.18, right=0.90, bottom=0.36, top=0.92, wspace=0.84)
-    plt.savefig(output_path, format="pdf")
+    plt.savefig(output_path, format="png", dpi=300)
     plt.close()
 
 
@@ -1747,7 +1754,7 @@ def plot_bug_detection_heatmap(data, output_path):
     )
 
     plt.tight_layout()
-    plt.savefig(output_path, format="pdf")
+    plt.savefig(output_path, format="png", dpi=300)
     plt.close()
 
 
@@ -1915,7 +1922,7 @@ def plot_bug_outcome_cells(data, output_path):
             outcomes["shell"][key] = (b_shell[i], f_shell[i])
 
     # Assertions requested earlier
-    assert len(orig_slots) == 116, f"Expected 116 original bug slots, found {len(orig_slots)}"
+    assert len(orig_slots) == 115, f"Expected 115 original bug slots, found {len(orig_slots)}"
     shell_yellow = sum(
         1 for k in orig_slots if outcome_code(*outcomes["shell"][k]) == "Y"
     )
@@ -2117,7 +2124,7 @@ def plot_bug_outcome_cells(data, output_path):
         ax1.set_xlabel("Bug Variant", fontsize=fontsize)
 
     plt.tight_layout()
-    plt.savefig(output_path, format="pdf")
+    plt.savefig(output_path, format="png", dpi=300)
     plt.close()
 
 
@@ -2213,7 +2220,7 @@ def plot_runtime(data, output_path):
     )
     plt.subplots_adjust(bottom=0.30)
     plt.tight_layout()
-    plt.savefig(output_path, format="pdf")
+    plt.savefig(output_path, format="png", dpi=300)
     plt.close()
 
 
@@ -2311,7 +2318,7 @@ def plot_coverage(data, output_path):
     )
     plt.subplots_adjust(left=0.11, right=0.98, bottom=0.43)
     plt.tight_layout(rect=(0, 0.08, 1, 1))
-    plt.savefig(output_path, format="pdf")
+    plt.savefig(output_path, format="png", dpi=300)
     plt.close()
 
 
@@ -2750,7 +2757,7 @@ def plot_coverage_by_config(timeout_sweep_dir, base_buggy_data, output_path):
     fig.add_artist(connector_fill)
     fig.add_artist(connector_left)
     fig.add_artist(connector_right)
-    plt.savefig(output_path, format="pdf")
+    plt.savefig(output_path, format="png", dpi=300)
     plt.close()
     return True
 
@@ -2994,7 +3001,7 @@ def plot_timeout_sweep_bug_catch(timeout_sweep_dir, output_path):
         ncol=2,
     )
     plt.subplots_adjust(bottom=0.42)
-    plt.savefig(output_path, format="pdf")
+    plt.savefig(output_path, format="png", dpi=300)
     plt.close()
 
 
@@ -3283,14 +3290,14 @@ def plot_koala_timeout_cdf(koala_sweep_dir, output_path):
     #     columnspacing=2.0,
     # )
     fig.subplots_adjust(left=0.24, right=0.92, bottom=0.40, top=0.94)
-    fig.savefig(output_path, format="pdf")
+    fig.savefig(output_path, format="png", dpi=300)
     plt.close(fig)
 
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "results_csv", type=str, help="Path to the input CSV file (e.g., results.csv)."
+        "results-csv", type=str, help="Path to the input CSV file (e.g., results.csv)."
     )
     parser.add_argument(
         "--output_dir",
@@ -3315,28 +3322,28 @@ def main():
     buggy_results = all_results[all_results["kind"] == "buggy"].copy()
     buggy_results["loc"] = buggy_results["benchmark"].apply(get_loc)
     plot_bug_detection_euler(
-        buggy_results, os.path.join(args.output_dir, "bug-detection-euler.pdf")
+        buggy_results, os.path.join(args.output_dir, "bug-detection-euler.png")
     )
     plot_bug_detection_bars(
-        all_results, os.path.join(args.output_dir, "bug-detection-bars.pdf")
+        all_results, os.path.join(args.output_dir, "bug-detection-bars.png")
     )
     plot_bug_detection_bars_split_versions(
         all_results,
-        os.path.join(args.output_dir, "bug-detection-bars-split-versions.pdf"),
+        os.path.join(args.output_dir, "bug-detection-bars-split-versions.png"),
     )
     plot_bug_detection_heatmap(
-        all_results, os.path.join(args.output_dir, "bug-detection-heatmap.pdf")
+        all_results, os.path.join(args.output_dir, "bug-detection-heatmap.png")
     )
     plot_bug_outcome_cells(
-        all_results, os.path.join(args.output_dir, "bug-detection-fingerprints.pdf")
+        all_results, os.path.join(args.output_dir, "bug-detection-fingerprints.png")
     )
-    plot_runtime(buggy_results, os.path.join(args.output_dir, "runtime.pdf"))
+    plot_runtime(buggy_results, os.path.join(args.output_dir, "runtime.png"))
     # Sweep inputs live next to the main results CSV, not in the figure output dir.
     timeout_sweep_dir = os.path.join(
         os.path.dirname(os.path.abspath(args.results_csv)),
         "timeout-sweep",
     )
-    coverage_output = os.path.join(args.output_dir, "coverage.pdf")
+    coverage_output = os.path.join(args.output_dir, "coverage.png")
     plotted_multi_config_coverage = plot_coverage_by_config(
         timeout_sweep_dir, buggy_results, coverage_output
     )
@@ -3349,7 +3356,7 @@ def main():
         plot_coverage(coverage_results, coverage_output)
     plot_timeout_sweep_bug_catch(
         timeout_sweep_dir,
-        os.path.join(args.output_dir, "timeout-sweep-bugs-caught.pdf"),
+        os.path.join(args.output_dir, "timeout-sweep-bugs-caught.png"),
     )
     koala_timeout_sweep_dir = os.path.join(
         os.path.dirname(os.path.abspath(args.results_csv)),
@@ -3357,7 +3364,7 @@ def main():
     )
     plot_koala_timeout_cdf(
         koala_timeout_sweep_dir,
-        os.path.join(args.output_dir, "koala-timeout-sweep-cdf.pdf"),
+        os.path.join(args.output_dir, "koala-timeout-sweep-cdf.png"),
     )
     full_coverage_stats = coverage_full_across_timeout_sweep(timeout_sweep_dir)
     bug_sweep_stats = bugs_caught_across_timeout_sweep(timeout_sweep_dir)

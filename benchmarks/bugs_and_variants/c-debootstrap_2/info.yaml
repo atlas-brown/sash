@@ -1,0 +1,29 @@
+description: Debian debootstrap 2
+
+bugs:
+  bug00:
+    description: Deletion of user-supplied directory without warning
+    code: word_split_del_sys_file
+    shellcheck: null
+
+sources:
+  - https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=833525
+  - https://salsa.debian.org/installer-team/debootstrap/-/commit/23504dcc3be1937404fdde3055529764a9a3461b
+  - https://salsa.debian.org/installer-team/debootstrap/-/commit/2cf272041781056b4bcc9f157ea5ee578129ae5e
+
+ground_truths:
+  # Base versions
+  - path: original.sh
+    kind: original
+    bugs:
+      bug00: { lines: [706] }
+
+  - path: posix.sh
+    kind: buggy
+    bugs:
+      bug00: { lines: [727] }
+
+  - path: fixed.sh
+    kind: fixed
+    bugs:
+      bug00: { regression_lines: [741], shellcheck: null }

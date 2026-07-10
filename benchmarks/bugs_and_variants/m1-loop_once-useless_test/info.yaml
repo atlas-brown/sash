@@ -1,0 +1,29 @@
+description: AutoTest config rename
+
+
+
+sources:
+  - https://stackoverflow.com/questions/48195715/sh-script-to-replace-text-in-multiple-files
+
+bugs:
+  bug00:
+    description: For loop only iterates once because its argument expands to one word
+    code: loop_once
+    shellcheck: null
+
+ground_truths:
+  # Base versions
+  - path: original.sh
+    kind: original
+    bugs:
+      bug00: { lines: [4] }
+
+  - path: posix.sh
+    kind: buggy
+    bugs:
+      bug00: { lines: [6] }
+
+  - path: fixed.sh
+    kind: fixed
+    bugs:
+      bug00: { regression_lines: [6], shellcheck: null }

@@ -1,0 +1,27 @@
+description: Repo archiver
+
+sources:
+  - https://github.com/djeada/Bash-Scripts/commit/3e28d0238393215d5b70432d067b719359176143
+
+bugs:
+  bug00:
+    description: Change directory into a file (due to missing -d flag in mktemp)
+    code: cmd_expected_path_state
+    shellcheck: null
+
+ground_truths:
+  # Base versions
+  - path: original.sh
+    kind: original
+    bugs:
+      bug00: { lines: [10] }
+
+  - path: posix.sh
+    kind: buggy
+    bugs:
+      bug00: { lines: [12] }
+
+  - path: fixed.sh
+    kind: fixed
+    bugs:
+      bug00: { regression_lines: [12], shellcheck: null }

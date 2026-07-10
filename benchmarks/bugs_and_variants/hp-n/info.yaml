@@ -1,0 +1,44 @@
+description: Node.js version manager
+
+
+
+sources:
+  - https://github.com/tj/n/commit/d36c2b88047e3eae27e80938a13b1313df0c1f82
+
+bugs:
+  bug00:
+    description: Directories under /usr/local are deleted when an environment variable is unset
+    code: del_sys_file
+    shellcheck: null
+    notes:
+      - ShellCheck warns specifically about deleting '/', which cannot happen here
+  bug01:
+    description: Arbitrary files can be deleted due to word splitting if an environment variable is set and contains spaces
+    code: word_split
+    shellcheck: SC2086
+
+ground_truths:
+  # Base versions
+  - path: original.sh
+    kind: original
+    bugs:
+      bug00: { lines: [144] }
+      bug01: { lines: [144] }
+
+  - path: posix.sh
+    kind: buggy
+    bugs:
+      bug00: { lines: [145] }
+      bug01: { lines: [145] }
+
+  - path: fixed.sh
+    kind: fixed
+    bugs:
+      bug00: { regression_lines: [146, 147], shellcheck: null }
+      # The command causing bug01 doesn't exist in the fixed version
+
+  # Variant
+  - path: variants/variant1.sh
+    kind: buggy_variant
+    bugs:
+      bug00: { lines: [145], shellcheck: null }

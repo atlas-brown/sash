@@ -1,9 +1,0 @@
-bugs:
-- line: tbd
-  description: A command that consumes stdin inside a while read loop
-
-note:
-- The actual command is missing, so we can't do much
-
-sources:
-- https://stackoverflow.com/questions/21999153/issue-on-read-file-using-a-while-loop-in-bash-sh

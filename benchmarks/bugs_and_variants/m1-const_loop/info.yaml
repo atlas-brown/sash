@@ -1,0 +1,29 @@
+description: DigitalOcean snapshot
+
+
+
+sources:
+  - https://unix.stackexchange.com/questions/560038/while-loop-deletes-all-files-and-becomes-stuck-in-loop
+
+bugs:
+  bug00:
+    description: While loop never terminates because its condition is constant
+    code: infinite_loop
+    shellcheck: null
+
+ground_truths:
+  # Base versions
+  - path: original.sh
+    kind: original
+    bugs:
+      bug00: { lines: [9] }
+
+  - path: posix.sh
+    kind: buggy
+    bugs:
+      bug00: { lines: [11] }
+
+  - path: fixed.sh
+    kind: fixed
+    bugs:
+      bug00: { regression_lines: [11], shellcheck: null }

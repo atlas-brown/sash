@@ -1,0 +1,38 @@
+description: OhMyZsh update script
+
+
+
+sources:
+  - https://github.com/ohmyzsh/ohmyzsh/commit/f7bf566555a2c0e87deba5dfb3e344f23f4a51bb
+
+bugs:
+  bug00:
+    description: Unset variable used
+    code: unbound
+    shellcheck: SC2154
+    notes:
+      - Only the first instance of an unset variable is reported by SaSh and ShellCheck
+      - The variable $ZSH seems to be unset as well, but it was not part of the reported bug (presumably it was set in the environment)
+
+ground_truths:
+  # Base versions
+  - path: original.sh
+    kind: original
+    bugs:
+      bug00: { lines: [55, 58] }
+
+  - path: posix.sh
+    kind: buggy
+    bugs:
+      bug00: { lines: [57, 60] }
+
+  - path: fixed.sh
+    kind: fixed
+    bugs:
+      bug00: { regression_lines: [57, 60], shellcheck: null }
+
+  # Variants
+  - path: variants/bug-init_func.sh
+    kind: buggy_variant
+    bugs:
+      bug00: { lines: [62, 65], shellcheck: null }

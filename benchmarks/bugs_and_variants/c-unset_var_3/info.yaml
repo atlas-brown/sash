@@ -1,0 +1,33 @@
+description: Vim config backup script
+
+sources:
+  - https://github.com/spf13/spf13-vim/commit/52355abace2a055ba41cf905f9e7f78d14f33398
+
+bugs:
+  bug00:
+    description: An unset variable is used ($file)
+    code: unbound
+    shellcheck: SC2153
+
+ground_truths:
+  # Base versions
+  - path: original.sh
+    kind: original
+    bugs:
+      bug00: { lines: [25] }
+
+  - path: posix.sh
+    kind: buggy
+    bugs:
+      bug00: { lines: [25] }
+
+  - path: fixed.sh
+    kind: fixed
+    bugs:
+      bug00: { regression_lines: [25], shellcheck: null }
+
+  # Variants
+  - path: variants/bug-define_later.sh
+    kind: buggy_variant
+    bugs:
+      bug00: { lines: [25], shellcheck: null }

@@ -83,6 +83,31 @@ def main():
     parser.add_argument("-D", "--enable-dfs", action="store_true",
                         help="Enable DFS for SaSh")
     parser.add_argument(
+        "--disable-optimistic-forking",
+        action="store_true",
+        help="Disable optimistic forking (force forks everywhere), mapping to SaSh's --disable-optimistic-forking",
+    )
+    parser.add_argument(
+        "--disable-trace-collapsing",
+        action="store_true",
+        help="Disable trace collapsing (mapping to SaSh's --disable-trace-collapsing)",
+    )
+    parser.add_argument(
+        "--disable-dfs",
+        action="store_true",
+        help="Disable all DFS passes (maps to SaSh --disable-dfs)",
+    )
+    parser.add_argument(
+        "--disable-targeted-dfs",
+        action="store_true",
+        help="Disable the targeted DFS pass (maps to SaSh --disable-targeted-dfs)",
+    )
+    parser.add_argument(
+        "--disable-unbound-as-empty-dfs",
+        action="store_true",
+        help="Disable unbound-as-empty DFS passes (maps to SaSh --disable-unbound-as-empty-dfs)",
+    )
+    parser.add_argument(
         "--fork-everywhere", action="store_true",
         help="Force symbolic execution to fork outside checked positions and disable trace collapsing."
     )
@@ -97,6 +122,9 @@ def main():
     parser.add_argument(
         "-c", "--csv", type=Path, default=Path("results/run_on_dir_results.csv"),
         help="Where to write the aggregated CSV results (default: results/run_on_dir_results.csv)"
+    )
+    parser.add_argument(
+        "--skip-harness", action="store_true", help="Skip analyzing the harness scripts"
     )
     parser.add_argument("-e", "--error-log", type=Path, default=Path("/dev/null"),
                         help="Where to write error logs (SaSh only)")
@@ -116,6 +144,10 @@ def main():
     timed_out = 0
     succeeded = 0
     rows = []
+
+    if args.skip_harness:
+        global ENTRYPOINT_SCRIPTS
+        ENTRYPOINT_SCRIPTS = set()
 
     for path in sorted(directory.rglob("*.sh")):
         # Default Koala mode: run core scripts under */scripts/* plus lifecycle entrypoints.
@@ -147,15 +179,45 @@ def main():
         else:
             # Run SaSh
             try:
+                # Map legacy flags to current sash.main kwargs.
+                sash_kwargs = {}
+                # New SaSh CLI uses a single total timeout (-t) that covers both execution and solver phases.
+                # Historically callers passed -t (exec) and -T (solver). If both are provided, sum them.
+                if args.timeout is not None and args.solver_timeout is not None:
+                    sash_kwargs["timeout"] = float(args.timeout) + float(args.solver_timeout)
+                elif args.timeout is not None:
+                    sash_kwargs["timeout"] = args.timeout
+                elif args.solver_timeout is not None:
+                    sash_kwargs["timeout"] = args.solver_timeout
+                # DFS flags: -D/--enable-dfs backwards compatibility; explicit disable flags override.
+                if args.disable_dfs:
+                    sash_kwargs["disable_targeted_dfs"] = True
+                    sash_kwargs["disable_unbound_as_empty_dfs"] = True
+                else:
+                    if not args.enable_dfs:
+                        sash_kwargs["disable_targeted_dfs"] = True
+                        sash_kwargs["disable_unbound_as_empty_dfs"] = True
+                    # explicit targeted/unbound flags
+                    if args.disable_targeted_dfs:
+                        sash_kwargs["disable_targeted_dfs"] = True
+                    if args.disable_unbound_as_empty_dfs:
+                        sash_kwargs["disable_unbound_as_empty_dfs"] = True
+
+                # Forking / trace collapsing
+                if args.fork_everywhere or args.disable_optimistic_forking:
+                    sash_kwargs["disable_optimistic_forking"] = True
+                if args.disable_trace_collapsing:
+                    sash_kwargs["disable_trace_collapsing"] = True
+
+                # Solver options
+                if args.disable_solver_optimizations:
+                    sash_kwargs["disable_solver_optimizations"] = True
+
                 report = sash.main.main(
-                    path.as_posix(),
-                    timeout=args.timeout,
-                    solver_timeout=args.solver_timeout,
+                    path,
                     log_file=args.error_log,
                     log_level="error",
-                    enable_dfs=args.enable_dfs,
-                    fork_everywhere=args.fork_everywhere,
-                    disable_solver_optimizations=args.disable_solver_optimizations,
+                    **sash_kwargs,
                 )
             except SystemExit as e:
                 crashed += 1

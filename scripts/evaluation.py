@@ -1,4 +1,4 @@
-#!/usr/bin/env -S uv run python3
+#! /usr/bin/env -S uv run
 from collections.abc import Callable
 import sys
 import yaml
@@ -11,20 +11,17 @@ import re
 import report
 
 from dataclasses import dataclass, field
-import sash.llm_main
 import sash.main
 from sash.main import build_cli as build_sash_cli
 import sash.reporter
-
-USE_LLM_ANALYZER = False
 
 
 def build_cli():
     # fmt: off
     parser = build_sash_cli(options_only=True)
     parser.description = "Evaluate SaSh"
-    parser.epilog = "Regardless of which flags are used to select which analyses to run, all detected benchmarks' info files will be validated against the schema"
-    parser.add_argument('-b', '--benchmarks', type=Path, default=ROOT_DIR / 'benchmarks', help='Path to the benchmarks directory, relative to the git toplevel (default: <git_toplevel>/benchmarks)')
+    parser.epilog = "Regardless of which flags are used to select which analyses to run, all detected benchmarks' info files will be validated against a schema, to make sure no important info is missing"
+    parser.add_argument('-b', '--benchmarks', type=Path, default=ROOT_DIR / 'benchmarks' / 'bugs_and_variants', help='Path to the benchmarks directory, relative to the git toplevel (default: <git_toplevel>/benchmarks)')
     parser.add_argument('-O', '--only', type=str, default='.*', help='Regex to filter benchmarks to run (default: run all)')
     parser.add_argument('-S', '--skip-buggy', action='store_true', help='Don\'t run the evaluation on the buggy versions of the benchmarks (default: false)')
     parser.add_argument('-f', '--fixed', action='store_true', help='Run the evaluation on the fixed versions of the benchmarks (default: false)')
@@ -34,9 +31,8 @@ def build_cli():
     parser.add_argument('-c', '--csv', type=Path, default=None, help='File to write CSV results to (default: no CSV output)')
     parser.add_argument('-H', '--html', type=Path, default=None, help='File to write HTML overview to (default: no HTML output)')
     parser.add_argument('-N', '--no-color', action='store_true', help='Disable colored output to stderr (default: false)')
-    parser.add_argument('-j', '--jobs', type=int, default=multiprocessing.cpu_count(), help='Number of parallel jobs (default: all available CPU cores)')
+    parser.add_argument('-j', '--jobs', type=int, default=1, help='Number of parallel jobs (default: 1, as introducing multiple threads can slow execution down and lead to different results for smaller timeouts; be aware)')
     parser.add_argument('-V', '--verbose', action='store_true', help='Enable printing of error reports or exceptions that occur, and raw output when ground truth is missing (default: false)')
-    parser.add_argument('--llm', action='store_true', help='Run the LLM-backed analyzer instead of symbolic SaSh (default: false)')
     return parser
     # fmt: on
 
@@ -57,7 +53,9 @@ def main(
     if no_color:
         disable_color()
 
-    # This should be the only possible early exit of the script
+    benchmarks_dir = benchmarks_dir.absolute()
+
+    # This should be the only possible early exit of the script, any other errors must be handled gracefully
     try:
         VALIDATOR.check_schema(INFO_SCHEMA)
     except jsonschema.SchemaError as e:
@@ -66,29 +64,28 @@ def main(
 
     eprint(f"{BOLD}Hello!{RESET}")
     oos_codes = load_oos_codes(benchmarks_dir)
-    eprint(f"Out-of-scope codes:")
-    for code in sorted(oos_codes):
-        eprint(f"  {code}")
+    if oos_codes:
+        eprint(f"Out-of-scope codes:")
+        for code in sorted(oos_codes):
+            eprint(f"  {code}")
 
     eprint(f"\n{BOLD}Preparing analyses{RESET}")
     stats = EvalStats()
     jobs: list[Job] = []
-    for categ_dir in benchmarks_dir.iterdir():
-        if categ_dir.is_dir() and not "_not_integrated" in categ_dir.parts:
-            for bench_dir in categ_dir.iterdir():
-                if bench_dir.is_dir() and bench_filter.match(bench_dir.as_posix()):
-                    jobs.extend(
-                        prepare_jobs(
-                            bench_dir,
-                            stats,
-                            oos_codes,
-                            eval_buggy=run_buggy,
-                            eval_fixed=run_fixed,
-                            eval_variants=run_variants,
-                            eval_only_variants=run_only_variants,
-                            verbose=verbose,
-                        )
-                    )
+    for bench_dir in sorted(benchmarks_dir.iterdir()):
+        if bench_dir.is_dir() and bench_filter.match(bench_dir.relative_to(benchmarks_dir).as_posix()):
+            jobs.extend(
+                prepare_jobs(
+                    bench_dir,
+                    stats,
+                    oos_codes,
+                    eval_buggy=run_buggy,
+                    eval_fixed=run_fixed,
+                    eval_variants=run_variants,
+                    eval_only_variants=run_only_variants,
+                    verbose=verbose,
+                )
+            )
     eprint("Done!")
 
     if len(jobs) == 0:
@@ -101,7 +98,11 @@ def main(
     )
 
     global SASH_KWARGS
-    with multiprocessing.Pool(processes=num_jobs) as pool:
+    with multiprocessing.Pool(
+        processes=num_jobs,
+        initializer=_init_worker,
+        initargs=(no_color,),
+    ) as pool:
         finished = pool.starmap(
             run_job,
             [
@@ -121,19 +122,18 @@ def main(
             eprint()  # Blank line for readability
 
     eprint(f"\n{BOLD}Printing aggregate results{RESET}")
-    eprint("Total benchmarks: ", stats.benchmarks)
-    eprint("  Skipped: ", stats.skipped)
+    eprint("Total benchmarks (pair of buggy + fixed scripts, with an optional variant): ", stats.benchmarks)
     eprint("Total analyses ran: ", stats.analyses)
     eprint("  Successful: ", stats.successful)
-    eprint("  Failed: ", stats.crashed)
+    eprint("  Failed (raised exception): ", stats.crashed)
     eprint("  Timed out: ", stats.timed_out)
     eprint("Total time: ", f"{stats.total_time:.2f}s")
     eprint("  Total execution time: ", f"{stats.exec_time:.2f}s")
     eprint("  Total solver time: ", f"{stats.solver_time:.2f}s")
-    eprint("Total known bugs: ", stats.buggy_expected_bugs)
+    eprint("Total known bugs (present in each benchmark's ground truth): ", stats.buggy_expected_bugs)
     eprint("  Out of these were detected: ", stats.buggy_detected_bugs)
     eprint("  Out of these were not detected: ", stats.buggy_undetected_bugs)
-    eprint("Total unknown bugs detected: ", stats.buggy_unexpected_bugs)
+    eprint("Total unknown bugs detected (not present in each benchmark's ground truth): ", stats.buggy_unexpected_bugs)
 
     if csv_file is not None:
         export_as_csv(
@@ -375,7 +375,8 @@ def process_finished_job(stats: EvalStats, job: FinishedJob):
         job.report is not None
     ), "How was a report not generated if the job didn't crash?"
 
-    et, st = split_report_times(job.report)
+    et = job.report.time
+    st = job.report.solver_time
     stats.exec_time += et
     stats.solver_time += st
     if job.timed_out:
@@ -412,15 +413,12 @@ def run_job(
     try:
         sash.reporter.Reporter.reset()  # I'm not sure this is needed, but just in case
 
-        if USE_LLM_ANALYZER:
-            report = sash.llm_main.main(file=job.benchmark)
-        else:
-            report = sash.main.main(
-                job.benchmark,
-                **{k: v for k, v in sash_kwargs.items() if v is not None},
-                log_level="DISABLED",
-                collect_debug_info=False,
-            )
+        report = sash.main.main(
+            job.benchmark,
+            **{k: v for k, v in sash_kwargs.items() if v is not None},
+            log_level="DISABLED",
+            collect_debug_info=False,
+        )
 
         finished = FinishedJob(
             benchmark=job.benchmark,
@@ -577,9 +575,12 @@ def load_info(benchmark_dir: Path) -> dict | None:
 
 def load_oos_codes(benchmarks_dir: Path) -> set[str]:
     oos_file = benchmarks_dir / "codes_out_of_scope.yaml"
-    with oos_file.open("r", encoding="utf-8") as f:
-        oos_codes = yaml.safe_load(f)
-    return set(oos_codes)
+    res = set()
+    if oos_file.exists():
+        with oos_file.open("r", encoding="utf-8") as f:
+            oos_codes = yaml.safe_load(f)
+            res.update(oos_codes)
+    return res
 
 
 def git_toplevel() -> Path:
@@ -623,6 +624,11 @@ def disable_color():
     UNDERLINE = ""
 
 
+def _init_worker(no_color: bool) -> None:
+    if no_color:
+        disable_color()
+
+
 # A RunResult is the format that the functions to export to CSV and HTML expect
 def job_to_run_result(job: FinishedJob) -> report.RunResult:
     if job.report is None:
@@ -658,17 +664,15 @@ def job_to_run_result(job: FinishedJob) -> report.RunResult:
     shellcheck_codes = [j.shellcheck_code for j in job.additional_info["expected"]]
     line_numbers = [j.line for j in job.additional_info["actual"]]
 
-    exec_time, solver_time = split_report_times(job.report)
-
     return report.RunResult(
         benchmark=job.benchmark.as_posix(),
         kind=job.additional_info["kind"],
         missing_gt=False,
         crashed=job.crashed,
         timed_out=job.timed_out,
-        time=exec_time + solver_time,
-        exec_time=exec_time,
-        solver_time=solver_time,
+        time=job.report.time + job.report.solver_time,
+        exec_time=job.report.time,
+        solver_time=job.report.solver_time,
         detected_all=job.additional_info["detected_all"],
         expected_results=expected_results,
         actual_results=actual_results,
@@ -708,6 +712,8 @@ def export_as_csv(
                 "\n"
             )
 
+    eprint(f"CSV report generated: {file.name}")
+
 
 def generate_html_report(
     filename: Path,
@@ -745,13 +751,7 @@ def generate_html_report(
         total_solver_time=total_solver_time,
     )
 
-
-def split_report_times(job_report: sash.reporter.Report) -> tuple[float, float]:
-    if USE_LLM_ANALYZER:
-        solver_time = job_report.solver_time
-        exec_time = max(job_report.time - solver_time, 0.0)
-        return exec_time, solver_time
-    return job_report.time, job_report.solver_time
+    eprint(f"HTML report generated: {filename}")
 
 
 ROOT_DIR = git_toplevel()
@@ -762,7 +762,7 @@ INFO_SCHEMA = {
     "type": "object",
     "required": ["sources", "bugs", "ground_truths"],
     "properties": {
-        "name": {"type": "string"},
+        "description": {"type": "string"},
         "sources": {
             "type": "array",
             "items": {"type": "string", "format": "uri"},
@@ -818,12 +818,12 @@ INFO_SCHEMA = {
                                 "properties": {
                                     "lines": {
                                         "type": "array",
-                                        "items": {"type": "integer", "minimum": 0},
+                                        "items": {"type": "integer"},
                                         "minItems": 1,
                                     },
                                     "regression_lines": {
                                         "type": "array",
-                                        "items": {"type": "integer", "minimum": 0},
+                                        "items": {"type": "integer"},
                                         "minItems": 1,
                                     },
                                     "shellcheck": {
@@ -863,7 +863,6 @@ UNDERLINE = "\033[4m"
 
 if __name__ == "__main__":
     args = build_cli().parse_args()
-    USE_LLM_ANALYZER = args.llm
 
     SASH_KWARGS = {
         "timeout": args.timeout,
@@ -872,8 +871,8 @@ if __name__ == "__main__":
         "targeted_dfs_timeout_pct": args.targeted_dfs_timeout_pct,
         "disable_optimistic_forking": args.disable_optimistic_forking,
         "disable_trace_collapsing": args.disable_trace_collapsing,
-        "disable_targeted_dfs": args.disable_targeted_dfs,
-        "disable_unbound_as_empty_dfs": args.disable_unbound_as_empty_dfs,
+        "disable_targeted_dfs": args.disable_dfs or args.disable_targeted_dfs,
+        "disable_unbound_as_empty_dfs": args.disable_dfs or args.disable_unbound_as_empty_dfs,
         "disable_solver": args.disable_solver,
         "disable_solver_optimizations": args.disable_solver_optimizations,
     }

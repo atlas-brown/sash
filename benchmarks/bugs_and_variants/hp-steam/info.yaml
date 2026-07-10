@@ -1,0 +1,36 @@
+description: Steam updater
+
+
+
+sources:
+  - https://github.com/indrora/steam_latest/blob/21cc14158c171f5912b04b83abf41205eb804b31/scripts/steam.sh
+  - https://github.com/icy/bash-coding-style/blob/master/examples/steam.sh
+
+bugs:
+  bug00:
+    description: Everything under / is deleted when the script is invoked in certain ways
+    code: word_split_del_sys_file
+    shellcheck: SC2115
+
+ground_truths:
+  # Base versions
+  - path: original.sh
+    kind: original
+    bugs:
+      bug00: { lines: [359] }
+
+  - path: posix.sh
+    kind: buggy
+    bugs:
+      bug00: { lines: [359] }
+
+  - path: fixed.sh
+    kind: fixed
+    bugs:
+      bug00: { regression_lines: [362] }
+
+  # Variants
+  - path: variants/bug-move_trailing_slash.sh
+    kind: buggy_variant
+    bugs:
+      bug00: { lines: [359], shellcheck: null }

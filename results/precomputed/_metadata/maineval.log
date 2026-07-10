@@ -1,0 +1,713 @@
+> Running main evaluation
+uv run scripts/evaluation.py --no-color -f -v -j 1 -t 60 -c results/main/main-eval/results_t60.csv
+Hello!
+
+Preparing analyses
+Done!
+
+Running analyses
+Running 142 analyses (on 61 benchmarks) using 1 processes
+[benchmarks/bugs_and_variants/c-unset_var_5/posix.sh] Running analysis
+[benchmarks/bugs_and_variants/c-unset_var_5/fixed.sh] Running analysis
+[benchmarks/bugs_and_variants/c-unset_var_5/variants/bug-assign_later.sh] Running analysis
+[benchmarks/bugs_and_variants/hp-backup_manager/posix.sh] Running analysis
+[benchmarks/bugs_and_variants/hp-backup_manager/fixed.sh] Running analysis
+[benchmarks/bugs_and_variants/hp-backup_manager/variants/bug-assign_first.sh] Running analysis
+[benchmarks/bugs_and_variants/wf-claude6/posix.sh] Running analysis
+[benchmarks/bugs_and_variants/wf-claude6/fixed.sh] Running analysis
+[benchmarks/bugs_and_variants/wf-capturing_empty_output/posix.sh] Running analysis
+[benchmarks/bugs_and_variants/wf-capturing_empty_output/fixed.sh] Running analysis
+[benchmarks/bugs_and_variants/m1-redir_to_func-redir_to_func/posix.sh] Running analysis
+[benchmarks/bugs_and_variants/m1-redir_to_func-redir_to_func/fixed.sh] Running analysis
+[benchmarks/bugs_and_variants/m2-loop_once/posix.sh] Running analysis
+[benchmarks/bugs_and_variants/m2-loop_once/fixed.sh] Running analysis
+[benchmarks/bugs_and_variants/wf-empty_path/posix.sh] Running analysis
+[benchmarks/bugs_and_variants/wf-empty_path/fixed.sh] Running analysis
+[benchmarks/bugs_and_variants/c-unset_func/posix.sh] Running analysis
+[benchmarks/bugs_and_variants/c-unset_func/fixed.sh] Running analysis
+[benchmarks/bugs_and_variants/c-unset_func/variants/bug-wrap_func.sh] Running analysis
+[benchmarks/bugs_and_variants/sf-cd_into_file/posix.sh] Running analysis
+[benchmarks/bugs_and_variants/sf-cd_into_file/fixed.sh] Running analysis
+[benchmarks/bugs_and_variants/wf-claude2/posix.sh] Running analysis
+[benchmarks/bugs_and_variants/wf-claude2/fixed.sh] Running analysis
+[benchmarks/bugs_and_variants/wf-claude3/posix.sh] Running analysis
+[benchmarks/bugs_and_variants/wf-claude3/fixed.sh] Running analysis
+[benchmarks/bugs_and_variants/c-unset_var_3/posix.sh] Running analysis
+[benchmarks/bugs_and_variants/c-unset_var_3/fixed.sh] Running analysis
+[benchmarks/bugs_and_variants/c-unset_var_3/variants/bug-define_later.sh] Running analysis
+[benchmarks/bugs_and_variants/wf-claude4/posix.sh] Running analysis
+[benchmarks/bugs_and_variants/wf-claude4/fixed.sh] Running analysis
+[benchmarks/bugs_and_variants/m2-loop_once-loop_once/posix.sh] Running analysis
+[benchmarks/bugs_and_variants/m2-loop_once-loop_once/fixed.sh] Running analysis
+[benchmarks/bugs_and_variants/m2-loop_once-loop_once/variants/bug-remove_quotes.sh] Running analysis
+[benchmarks/bugs_and_variants/m2-unset_var/posix.sh] Running analysis
+[benchmarks/bugs_and_variants/m2-unset_var/fixed.sh] Running analysis
+[benchmarks/bugs_and_variants/m2-unset_var/variants/bug-assign_later.sh] Running analysis
+[benchmarks/bugs_and_variants/sf-overwrite_file/posix.sh] Running analysis
+[benchmarks/bugs_and_variants/sf-overwrite_file/fixed.sh] Running analysis
+[benchmarks/bugs_and_variants/sf-overwrite_file_4/posix.sh] Running analysis
+[benchmarks/bugs_and_variants/sf-overwrite_file_4/fixed.sh] Running analysis
+[benchmarks/bugs_and_variants/hp-squid/posix.sh] Running analysis
+[benchmarks/bugs_and_variants/hp-squid/fixed.sh] Running analysis
+[benchmarks/bugs_and_variants/hp-squid/variants/bug-indirect_rm.sh] Running analysis
+[benchmarks/bugs_and_variants/hp-squid/variants/bug-unquoted_pid_dir.sh] Running analysis
+[benchmarks/bugs_and_variants/hp-steam/posix.sh] Running analysis
+[benchmarks/bugs_and_variants/hp-steam/fixed.sh] Running analysis
+[benchmarks/bugs_and_variants/hp-steam/variants/bug-move_trailing_slash.sh] Running analysis
+[benchmarks/bugs_and_variants/wf-unexpected_stdin/posix.sh] Running analysis
+[benchmarks/bugs_and_variants/wf-unexpected_stdin/fixed.sh] Running analysis
+[benchmarks/bugs_and_variants/hp-bumblebee/posix.sh] Running analysis
+[benchmarks/bugs_and_variants/hp-bumblebee/fixed.sh] Running analysis
+[benchmarks/bugs_and_variants/hp-bumblebee/variants/bug-rm_loop.sh] Running analysis
+[benchmarks/bugs_and_variants/sf-overwrite_file_2/posix.sh] Running analysis
+[benchmarks/bugs_and_variants/sf-overwrite_file_2/fixed.sh] Running analysis
+[benchmarks/bugs_and_variants/sf-access_del_resource/posix.sh] Running analysis
+[benchmarks/bugs_and_variants/sf-access_del_resource/fixed.sh] Running analysis
+[benchmarks/bugs_and_variants/c-unset_var_set_u_2/posix.sh] Running analysis
+[benchmarks/bugs_and_variants/c-unset_var_set_u_2/fixed.sh] Running analysis
+[benchmarks/bugs_and_variants/sf-access_after_mv/posix.sh] Running analysis
+[benchmarks/bugs_and_variants/sf-access_after_mv/fixed.sh] Running analysis
+[benchmarks/bugs_and_variants/wf-xargs_accident_rm/posix.sh] Running analysis
+[benchmarks/bugs_and_variants/wf-xargs_accident_rm/fixed.sh] Running analysis
+[benchmarks/bugs_and_variants/c-ignored_command_v/posix.sh] Running analysis
+[benchmarks/bugs_and_variants/c-ignored_command_v/fixed.sh] Running analysis
+[benchmarks/bugs_and_variants/m2-rm_root/posix.sh] Running analysis
+[benchmarks/bugs_and_variants/m2-rm_root/fixed.sh] Running analysis
+[benchmarks/bugs_and_variants/m2-rm_root/variants/bug-too_many_diffs.sh] Running analysis
+[benchmarks/bugs_and_variants/wf-claude5/posix.sh] Running analysis
+[benchmarks/bugs_and_variants/wf-claude5/fixed.sh] Running analysis
+[benchmarks/bugs_and_variants/c-debootstrap/posix.sh] Running analysis
+[benchmarks/bugs_and_variants/c-debootstrap/fixed.sh] Running analysis
+[benchmarks/bugs_and_variants/wf-xargs_del_files/posix.sh] Running analysis
+[benchmarks/bugs_and_variants/wf-xargs_del_files/fixed.sh] Running analysis
+[benchmarks/bugs_and_variants/wf-rm_root_2/posix.sh] Running analysis
+[benchmarks/bugs_and_variants/wf-rm_root_2/fixed.sh] Running analysis
+[benchmarks/bugs_and_variants/wf-rm_root_2/variants/bug-move_trailing_slash.sh] Running analysis
+[benchmarks/bugs_and_variants/wf-troll/posix.sh] Running analysis
+[benchmarks/bugs_and_variants/wf-troll/fixed.sh] Running analysis
+[benchmarks/bugs_and_variants/c-debootstrap_2/posix.sh] Running analysis
+[benchmarks/bugs_and_variants/c-debootstrap_2/fixed.sh] Running analysis
+[benchmarks/bugs_and_variants/wf-accident/posix.sh] Running analysis
+[benchmarks/bugs_and_variants/wf-accident/fixed.sh] Running analysis
+[benchmarks/bugs_and_variants/wf-wrong_mv/posix.sh] Running analysis
+[benchmarks/bugs_and_variants/wf-wrong_mv/fixed.sh] Running analysis
+[benchmarks/bugs_and_variants/c-makefile/posix.sh] Running analysis
+[benchmarks/bugs_and_variants/c-makefile/fixed.sh] Running analysis
+[benchmarks/bugs_and_variants/c-makefile/variants/bug-assign_first.sh] Running analysis
+[benchmarks/bugs_and_variants/wf-delete_slash/posix.sh] Running analysis
+[benchmarks/bugs_and_variants/wf-delete_slash/fixed.sh] Running analysis
+[benchmarks/bugs_and_variants/wf-delete_home_user/posix.sh] Running analysis
+[benchmarks/bugs_and_variants/wf-delete_home_user/fixed.sh] Running analysis
+[benchmarks/bugs_and_variants/c-const_cond/posix.sh] Running analysis
+[benchmarks/bugs_and_variants/c-const_cond/fixed.sh] Running analysis
+[benchmarks/bugs_and_variants/c-const_cond/variants/bug-assign_first.sh] Running analysis
+[benchmarks/bugs_and_variants/wf-replacement/posix.sh] Running analysis
+[benchmarks/bugs_and_variants/wf-replacement/fixed.sh] Running analysis
+[benchmarks/bugs_and_variants/wf-confused_mkdir/posix.sh] Running analysis
+[benchmarks/bugs_and_variants/wf-confused_mkdir/fixed.sh] Running analysis
+[benchmarks/bugs_and_variants/wf-posix2/posix.sh] Running analysis
+[benchmarks/bugs_and_variants/wf-posix2/fixed.sh] Running analysis
+[benchmarks/bugs_and_variants/c-unset_var_2/posix.sh] Running analysis
+[benchmarks/bugs_and_variants/c-unset_var_2/fixed.sh] Running analysis
+[benchmarks/bugs_and_variants/c-unset_var_2/variants/bug-define_later.sh] Running analysis
+[benchmarks/bugs_and_variants/c-cp_nonexistent/posix.sh] Running analysis
+[benchmarks/bugs_and_variants/c-cp_nonexistent/fixed.sh] Running analysis
+[benchmarks/bugs_and_variants/wf-silly_q/posix.sh] Running analysis
+[benchmarks/bugs_and_variants/wf-silly_q/fixed.sh] Running analysis
+[benchmarks/bugs_and_variants/wf-find_rm/posix.sh] Running analysis
+[benchmarks/bugs_and_variants/wf-find_rm/fixed.sh] Running analysis
+[benchmarks/bugs_and_variants/wf-sc_author/posix.sh] Running analysis
+[benchmarks/bugs_and_variants/wf-sc_author/fixed.sh] Running analysis
+[benchmarks/bugs_and_variants/wf-unset_var/posix.sh] Running analysis
+[benchmarks/bugs_and_variants/wf-unset_var/fixed.sh] Running analysis
+[benchmarks/bugs_and_variants/wf-unset_var/variants/bug-set_in_func.sh] Running analysis
+[benchmarks/bugs_and_variants/hp-itunes/posix.sh] Running analysis
+[benchmarks/bugs_and_variants/hp-itunes/fixed.sh] Running analysis
+[benchmarks/bugs_and_variants/hp-itunes/variants/bug-split_rm_args.sh] Running analysis
+[benchmarks/bugs_and_variants/m1-unset_var_1/posix.sh] Running analysis
+[benchmarks/bugs_and_variants/m1-unset_var_1/fixed.sh] Running analysis
+[benchmarks/bugs_and_variants/m1-unset_var_1/variants/bug-init_func.sh] Running analysis
+[benchmarks/bugs_and_variants/c-unset_var_set_u_1/posix.sh] Running analysis
+[benchmarks/bugs_and_variants/c-unset_var_set_u_1/fixed.sh] Running analysis
+[benchmarks/bugs_and_variants/wf-wrong_mkdir/posix.sh] Running analysis
+[benchmarks/bugs_and_variants/wf-wrong_mkdir/fixed.sh] Running analysis
+[benchmarks/bugs_and_variants/sf-overwrite_file_3/posix.sh] Running analysis
+[benchmarks/bugs_and_variants/sf-overwrite_file_3/fixed.sh] Running analysis
+[benchmarks/bugs_and_variants/m1-loop_once-useless_test/posix.sh] Running analysis
+[benchmarks/bugs_and_variants/m1-loop_once-useless_test/fixed.sh] Running analysis
+[benchmarks/bugs_and_variants/wf-move_home/posix.sh] Running analysis
+[benchmarks/bugs_and_variants/wf-move_home/fixed.sh] Running analysis
+[benchmarks/bugs_and_variants/m1-const_loop/posix.sh] Running analysis
+[benchmarks/bugs_and_variants/m1-const_loop/fixed.sh] Running analysis
+[benchmarks/bugs_and_variants/wf-claude_wipe/posix.sh] Running analysis
+[benchmarks/bugs_and_variants/wf-claude_wipe/fixed.sh] Running analysis
+[benchmarks/bugs_and_variants/wf-unset_var-cmd_always_fails/posix.sh] Running analysis
+[benchmarks/bugs_and_variants/wf-unset_var-cmd_always_fails/fixed.sh] Running analysis
+[benchmarks/bugs_and_variants/wf-unset_var-cmd_always_fails/variants/bug-assign_later.sh] Running analysis
+[benchmarks/bugs_and_variants/wf-for_mv/posix.sh] Running analysis
+[benchmarks/bugs_and_variants/wf-for_mv/fixed.sh] Running analysis
+[benchmarks/bugs_and_variants/hp-n/posix.sh] Running analysis
+[benchmarks/bugs_and_variants/hp-n/fixed.sh] Running analysis
+[benchmarks/bugs_and_variants/hp-n/variants/variant1.sh] Running analysis
+
+Printing per-analyis results
+[benchmarks/bugs_and_variants/c-unset_var_5/posix.sh] Analysis completed; exec: 8.75s, solver: 7.00s, total: 15.75s
+[benchmarks/bugs_and_variants/c-unset_var_5/posix.sh] All expected bugs detected (1 total)
+[benchmarks/bugs_and_variants/c-unset_var_5/posix.sh] 19 additional bugs detected
+
+[benchmarks/bugs_and_variants/c-unset_var_5/fixed.sh] Analysis completed; exec: 8.85s, solver: 7.06s, total: 15.91s
+[benchmarks/bugs_and_variants/c-unset_var_5/fixed.sh] No regression bugs detected (0 out of 1 expected missing bugs)
+[benchmarks/bugs_and_variants/c-unset_var_5/fixed.sh] 19 additional bugs detected
+
+[benchmarks/bugs_and_variants/c-unset_var_5/variants/bug-assign_later.sh] Analysis completed; exec: 9.00s, solver: 7.07s, total: 16.06s
+[benchmarks/bugs_and_variants/c-unset_var_5/variants/bug-assign_later.sh] All expected bugs detected (1 total)
+[benchmarks/bugs_and_variants/c-unset_var_5/variants/bug-assign_later.sh] 19 additional bugs detected
+
+[benchmarks/bugs_and_variants/hp-backup_manager/posix.sh] Analysis timed out; exec: 30.20s, solver: 38.88s, total: 69.07s
+[benchmarks/bugs_and_variants/hp-backup_manager/posix.sh] All expected bugs detected (1 total)
+[benchmarks/bugs_and_variants/hp-backup_manager/posix.sh] 98 additional bugs detected
+
+[benchmarks/bugs_and_variants/hp-backup_manager/fixed.sh] Analysis timed out; exec: 30.10s, solver: 34.36s, total: 64.45s
+[benchmarks/bugs_and_variants/hp-backup_manager/fixed.sh] No regression bugs detected (0 out of 1 expected missing bugs)
+[benchmarks/bugs_and_variants/hp-backup_manager/fixed.sh] 98 additional bugs detected
+
+[benchmarks/bugs_and_variants/hp-backup_manager/variants/bug-assign_first.sh] Analysis timed out; exec: 30.10s, solver: 38.45s, total: 68.56s
+[benchmarks/bugs_and_variants/hp-backup_manager/variants/bug-assign_first.sh] All expected bugs detected (1 total)
+[benchmarks/bugs_and_variants/hp-backup_manager/variants/bug-assign_first.sh] 98 additional bugs detected
+
+[benchmarks/bugs_and_variants/wf-claude6/posix.sh] Analysis completed; exec: 0.07s, solver: 0.19s, total: 0.26s
+[benchmarks/bugs_and_variants/wf-claude6/posix.sh] All expected bugs detected (1 total)
+
+[benchmarks/bugs_and_variants/wf-claude6/fixed.sh] Analysis completed; exec: 0.05s, solver: 0.16s, total: 0.21s
+[benchmarks/bugs_and_variants/wf-claude6/fixed.sh] No regression bugs detected (0 out of 1 expected missing bugs)
+[benchmarks/bugs_and_variants/wf-claude6/fixed.sh] 1 additional bugs detected
+
+[benchmarks/bugs_and_variants/wf-capturing_empty_output/posix.sh] Analysis completed; exec: 0.11s, solver: 0.03s, total: 0.15s
+[benchmarks/bugs_and_variants/wf-capturing_empty_output/posix.sh] All expected bugs detected (1 total)
+[benchmarks/bugs_and_variants/wf-capturing_empty_output/posix.sh] 1 additional bugs detected
+
+[benchmarks/bugs_and_variants/wf-capturing_empty_output/fixed.sh] Analysis completed; exec: 0.14s, solver: 0.03s, total: 0.17s
+[benchmarks/bugs_and_variants/wf-capturing_empty_output/fixed.sh] No regression bugs detected (0 out of 1 expected missing bugs)
+[benchmarks/bugs_and_variants/wf-capturing_empty_output/fixed.sh] 1 additional bugs detected
+
+[benchmarks/bugs_and_variants/m1-redir_to_func-redir_to_func/posix.sh] Analysis completed; exec: 0.20s, solver: 0.12s, total: 0.32s
+[benchmarks/bugs_and_variants/m1-redir_to_func-redir_to_func/posix.sh] All expected bugs detected (2 total)
+[benchmarks/bugs_and_variants/m1-redir_to_func-redir_to_func/posix.sh] 5 additional bugs detected
+
+[benchmarks/bugs_and_variants/m1-redir_to_func-redir_to_func/fixed.sh] Analysis completed; exec: 0.39s, solver: 0.97s, total: 1.36s
+[benchmarks/bugs_and_variants/m1-redir_to_func-redir_to_func/fixed.sh] No regression bugs detected (0 out of 2 expected missing bugs)
+[benchmarks/bugs_and_variants/m1-redir_to_func-redir_to_func/fixed.sh] 6 additional bugs detected
+
+[benchmarks/bugs_and_variants/m2-loop_once/posix.sh] Analysis completed; exec: 0.04s, solver: 0.01s, total: 0.05s
+[benchmarks/bugs_and_variants/m2-loop_once/posix.sh] All expected bugs detected (1 total)
+
+[benchmarks/bugs_and_variants/m2-loop_once/fixed.sh] Analysis completed; exec: 0.05s, solver: 0.01s, total: 0.06s
+[benchmarks/bugs_and_variants/m2-loop_once/fixed.sh] No regression bugs detected (0 out of 1 expected missing bugs)
+
+[benchmarks/bugs_and_variants/wf-empty_path/posix.sh] Analysis completed; exec: 0.19s, solver: 0.20s, total: 0.39s
+[benchmarks/bugs_and_variants/wf-empty_path/posix.sh] All expected bugs detected (12 total)
+
+[benchmarks/bugs_and_variants/wf-empty_path/fixed.sh] Analysis completed; exec: 0.17s, solver: 0.20s, total: 0.37s
+[benchmarks/bugs_and_variants/wf-empty_path/fixed.sh] No regression bugs detected (0 out of 12 expected missing bugs)
+
+[benchmarks/bugs_and_variants/c-unset_func/posix.sh] Analysis completed; exec: 3.82s, solver: 0.85s, total: 4.67s
+[benchmarks/bugs_and_variants/c-unset_func/posix.sh] All expected bugs detected (1 total)
+[benchmarks/bugs_and_variants/c-unset_func/posix.sh] 17 additional bugs detected
+
+[benchmarks/bugs_and_variants/c-unset_func/fixed.sh] Analysis completed; exec: 3.65s, solver: 0.79s, total: 4.44s
+[benchmarks/bugs_and_variants/c-unset_func/fixed.sh] No regression bugs detected (0 out of 1 expected missing bugs)
+[benchmarks/bugs_and_variants/c-unset_func/fixed.sh] 16 additional bugs detected
+
+[benchmarks/bugs_and_variants/c-unset_func/variants/bug-wrap_func.sh] Analysis completed; exec: 3.83s, solver: 0.85s, total: 4.68s
+[benchmarks/bugs_and_variants/c-unset_func/variants/bug-wrap_func.sh] All expected bugs detected (1 total)
+[benchmarks/bugs_and_variants/c-unset_func/variants/bug-wrap_func.sh] 17 additional bugs detected
+
+[benchmarks/bugs_and_variants/sf-cd_into_file/posix.sh] Analysis completed; exec: 0.36s, solver: 1.33s, total: 1.68s
+[benchmarks/bugs_and_variants/sf-cd_into_file/posix.sh] All expected bugs detected (1 total)
+[benchmarks/bugs_and_variants/sf-cd_into_file/posix.sh] 2 additional bugs detected
+
+[benchmarks/bugs_and_variants/sf-cd_into_file/fixed.sh] Analysis completed; exec: 0.35s, solver: 1.32s, total: 1.67s
+[benchmarks/bugs_and_variants/sf-cd_into_file/fixed.sh] No regression bugs detected (0 out of 1 expected missing bugs)
+[benchmarks/bugs_and_variants/sf-cd_into_file/fixed.sh] 2 additional bugs detected
+
+[benchmarks/bugs_and_variants/wf-claude2/posix.sh] Analysis completed; exec: 0.07s, solver: 0.08s, total: 0.15s
+[benchmarks/bugs_and_variants/wf-claude2/posix.sh] All expected bugs detected (2 total)
+
+[benchmarks/bugs_and_variants/wf-claude2/fixed.sh] Analysis completed; exec: 0.11s, solver: 0.21s, total: 0.32s
+[benchmarks/bugs_and_variants/wf-claude2/fixed.sh] No regression bugs detected (0 out of 2 expected missing bugs)
+
+[benchmarks/bugs_and_variants/wf-claude3/posix.sh] Analysis completed; exec: 0.08s, solver: 0.16s, total: 0.23s
+[benchmarks/bugs_and_variants/wf-claude3/posix.sh] All expected bugs detected (2 total)
+
+[benchmarks/bugs_and_variants/wf-claude3/fixed.sh] Analysis completed; exec: 0.00s, solver: 0.01s, total: 0.01s
+[benchmarks/bugs_and_variants/wf-claude3/fixed.sh] No regression bugs detected (0 out of 2 expected missing bugs)
+
+[benchmarks/bugs_and_variants/c-unset_var_3/posix.sh] Analysis timed out; exec: 9.14s, solver: 51.19s, total: 60.33s
+[benchmarks/bugs_and_variants/c-unset_var_3/posix.sh] All expected bugs detected (1 total)
+[benchmarks/bugs_and_variants/c-unset_var_3/posix.sh] 7 additional bugs detected
+
+[benchmarks/bugs_and_variants/c-unset_var_3/fixed.sh] Analysis timed out; exec: 9.65s, solver: 56.94s, total: 66.60s
+[benchmarks/bugs_and_variants/c-unset_var_3/fixed.sh] No regression bugs detected (0 out of 1 expected missing bugs)
+[benchmarks/bugs_and_variants/c-unset_var_3/fixed.sh] 6 additional bugs detected
+
+[benchmarks/bugs_and_variants/c-unset_var_3/variants/bug-define_later.sh] Analysis timed out; exec: 9.44s, solver: 50.60s, total: 60.04s
+[benchmarks/bugs_and_variants/c-unset_var_3/variants/bug-define_later.sh] All expected bugs detected (1 total)
+[benchmarks/bugs_and_variants/c-unset_var_3/variants/bug-define_later.sh] 7 additional bugs detected
+
+[benchmarks/bugs_and_variants/wf-claude4/posix.sh] Analysis completed; exec: 0.03s, solver: 0.03s, total: 0.06s
+[benchmarks/bugs_and_variants/wf-claude4/posix.sh] All expected bugs detected (1 total)
+
+[benchmarks/bugs_and_variants/wf-claude4/fixed.sh] Analysis completed; exec: 0.03s, solver: 0.01s, total: 0.03s
+[benchmarks/bugs_and_variants/wf-claude4/fixed.sh] No regression bugs detected (0 out of 1 expected missing bugs)
+
+[benchmarks/bugs_and_variants/m2-loop_once-loop_once/posix.sh] Analysis completed; exec: 0.37s, solver: 0.14s, total: 0.51s
+[benchmarks/bugs_and_variants/m2-loop_once-loop_once/posix.sh] All expected bugs detected (2 total)
+[benchmarks/bugs_and_variants/m2-loop_once-loop_once/posix.sh] 1 additional bugs detected
+
+[benchmarks/bugs_and_variants/m2-loop_once-loop_once/fixed.sh] Analysis completed; exec: 3.67s, solver: 7.26s, total: 10.93s
+[benchmarks/bugs_and_variants/m2-loop_once-loop_once/fixed.sh] No regression bugs detected (0 out of 2 expected missing bugs)
+[benchmarks/bugs_and_variants/m2-loop_once-loop_once/fixed.sh] 2 additional bugs detected
+
+[benchmarks/bugs_and_variants/m2-loop_once-loop_once/variants/bug-remove_quotes.sh] Analysis completed; exec: 0.38s, solver: 0.15s, total: 0.52s
+[benchmarks/bugs_and_variants/m2-loop_once-loop_once/variants/bug-remove_quotes.sh] All expected bugs detected (2 total)
+[benchmarks/bugs_and_variants/m2-loop_once-loop_once/variants/bug-remove_quotes.sh] 1 additional bugs detected
+
+[benchmarks/bugs_and_variants/m2-unset_var/posix.sh] Analysis completed; exec: 0.10s, solver: 0.07s, total: 0.17s
+[benchmarks/bugs_and_variants/m2-unset_var/posix.sh] All expected bugs detected (1 total)
+[benchmarks/bugs_and_variants/m2-unset_var/posix.sh] 1 additional bugs detected
+
+[benchmarks/bugs_and_variants/m2-unset_var/fixed.sh] Analysis completed; exec: 0.09s, solver: 0.08s, total: 0.17s
+[benchmarks/bugs_and_variants/m2-unset_var/fixed.sh] No regression bugs detected (0 out of 1 expected missing bugs)
+[benchmarks/bugs_and_variants/m2-unset_var/fixed.sh] 1 additional bugs detected
+
+[benchmarks/bugs_and_variants/m2-unset_var/variants/bug-assign_later.sh] Analysis completed; exec: 0.10s, solver: 0.07s, total: 0.17s
+[benchmarks/bugs_and_variants/m2-unset_var/variants/bug-assign_later.sh] All expected bugs detected (1 total)
+[benchmarks/bugs_and_variants/m2-unset_var/variants/bug-assign_later.sh] 1 additional bugs detected
+
+[benchmarks/bugs_and_variants/sf-overwrite_file/posix.sh] Analysis completed; exec: 0.19s, solver: 0.69s, total: 0.88s
+[benchmarks/bugs_and_variants/sf-overwrite_file/posix.sh] All expected bugs detected (2 total)
+
+[benchmarks/bugs_and_variants/sf-overwrite_file/fixed.sh] Analysis completed; exec: 0.20s, solver: 0.46s, total: 0.67s
+[benchmarks/bugs_and_variants/sf-overwrite_file/fixed.sh] No regression bugs detected (0 out of 2 expected missing bugs)
+[benchmarks/bugs_and_variants/sf-overwrite_file/fixed.sh] 1 additional bugs detected
+
+[benchmarks/bugs_and_variants/sf-overwrite_file_4/posix.sh] Analysis completed; exec: 0.07s, solver: 0.05s, total: 0.12s
+[benchmarks/bugs_and_variants/sf-overwrite_file_4/posix.sh] All expected bugs detected (2 total)
+
+[benchmarks/bugs_and_variants/sf-overwrite_file_4/fixed.sh] Analysis completed; exec: 0.07s, solver: 0.04s, total: 0.11s
+[benchmarks/bugs_and_variants/sf-overwrite_file_4/fixed.sh] No regression bugs detected (0 out of 2 expected missing bugs)
+
+[benchmarks/bugs_and_variants/hp-squid/posix.sh] Analysis timed out; exec: 30.10s, solver: 30.04s, total: 60.14s
+[benchmarks/bugs_and_variants/hp-squid/posix.sh] All expected bugs detected (4 total)
+[benchmarks/bugs_and_variants/hp-squid/posix.sh] 27 additional bugs detected
+
+[benchmarks/bugs_and_variants/hp-squid/fixed.sh] Analysis timed out; exec: 30.09s, solver: 30.05s, total: 60.14s
+[benchmarks/bugs_and_variants/hp-squid/fixed.sh] No regression bugs detected (0 out of 4 expected missing bugs)
+[benchmarks/bugs_and_variants/hp-squid/fixed.sh] 27 additional bugs detected
+
+[benchmarks/bugs_and_variants/hp-squid/variants/bug-indirect_rm.sh] Analysis timed out; exec: 30.29s, solver: 30.05s, total: 60.34s
+[benchmarks/bugs_and_variants/hp-squid/variants/bug-indirect_rm.sh] All expected bugs detected (2 total)
+[benchmarks/bugs_and_variants/hp-squid/variants/bug-indirect_rm.sh] 27 additional bugs detected
+
+[benchmarks/bugs_and_variants/hp-squid/variants/bug-unquoted_pid_dir.sh] Analysis timed out; exec: 30.09s, solver: 30.07s, total: 60.15s
+[benchmarks/bugs_and_variants/hp-squid/variants/bug-unquoted_pid_dir.sh] All expected bugs detected (2 total)
+[benchmarks/bugs_and_variants/hp-squid/variants/bug-unquoted_pid_dir.sh] 27 additional bugs detected
+
+[benchmarks/bugs_and_variants/hp-steam/posix.sh] Analysis timed out; exec: 30.11s, solver: 35.78s, total: 65.89s
+[benchmarks/bugs_and_variants/hp-steam/posix.sh] All expected bugs detected (1 total)
+[benchmarks/bugs_and_variants/hp-steam/posix.sh] 26 additional bugs detected
+
+[benchmarks/bugs_and_variants/hp-steam/fixed.sh] Analysis timed out; exec: 30.10s, solver: 33.18s, total: 63.27s
+[benchmarks/bugs_and_variants/hp-steam/fixed.sh] No regression bugs detected (0 out of 1 expected missing bugs)
+[benchmarks/bugs_and_variants/hp-steam/fixed.sh] 26 additional bugs detected
+
+[benchmarks/bugs_and_variants/hp-steam/variants/bug-move_trailing_slash.sh] Analysis timed out; exec: 30.09s, solver: 39.57s, total: 69.66s
+[benchmarks/bugs_and_variants/hp-steam/variants/bug-move_trailing_slash.sh] All expected bugs detected (1 total)
+[benchmarks/bugs_and_variants/hp-steam/variants/bug-move_trailing_slash.sh] 26 additional bugs detected
+
+[benchmarks/bugs_and_variants/wf-unexpected_stdin/posix.sh] Analysis completed; exec: 0.20s, solver: 0.14s, total: 0.34s
+[benchmarks/bugs_and_variants/wf-unexpected_stdin/posix.sh] All expected bugs detected (2 total)
+[benchmarks/bugs_and_variants/wf-unexpected_stdin/posix.sh] 2 additional bugs detected
+
+[benchmarks/bugs_and_variants/wf-unexpected_stdin/fixed.sh] Analysis completed; exec: 0.19s, solver: 0.14s, total: 0.33s
+[benchmarks/bugs_and_variants/wf-unexpected_stdin/fixed.sh] No regression bugs detected (0 out of 2 expected missing bugs)
+[benchmarks/bugs_and_variants/wf-unexpected_stdin/fixed.sh] 2 additional bugs detected
+
+[benchmarks/bugs_and_variants/hp-bumblebee/posix.sh] Analysis timed out; exec: 30.21s, solver: 30.07s, total: 60.28s
+[benchmarks/bugs_and_variants/hp-bumblebee/posix.sh] All expected bugs detected (1 total)
+[benchmarks/bugs_and_variants/hp-bumblebee/posix.sh] 16 additional bugs detected
+
+[benchmarks/bugs_and_variants/hp-bumblebee/fixed.sh] Analysis timed out; exec: 30.29s, solver: 30.07s, total: 60.36s
+[benchmarks/bugs_and_variants/hp-bumblebee/fixed.sh] No regression bugs detected (0 out of 1 expected missing bugs)
+[benchmarks/bugs_and_variants/hp-bumblebee/fixed.sh] 16 additional bugs detected
+
+[benchmarks/bugs_and_variants/hp-bumblebee/variants/bug-rm_loop.sh] Analysis timed out; exec: 30.30s, solver: 30.08s, total: 60.38s
+[benchmarks/bugs_and_variants/hp-bumblebee/variants/bug-rm_loop.sh] All expected bugs detected (1 total)
+[benchmarks/bugs_and_variants/hp-bumblebee/variants/bug-rm_loop.sh] 16 additional bugs detected
+
+[benchmarks/bugs_and_variants/sf-overwrite_file_2/posix.sh] Analysis completed; exec: 0.23s, solver: 1.39s, total: 1.62s
+[benchmarks/bugs_and_variants/sf-overwrite_file_2/posix.sh] All expected bugs detected (2 total)
+[benchmarks/bugs_and_variants/sf-overwrite_file_2/posix.sh] 1 additional bugs detected
+
+[benchmarks/bugs_and_variants/sf-overwrite_file_2/fixed.sh] Analysis completed; exec: 0.22s, solver: 4.89s, total: 5.10s
+[benchmarks/bugs_and_variants/sf-overwrite_file_2/fixed.sh] No regression bugs detected (0 out of 2 expected missing bugs)
+[benchmarks/bugs_and_variants/sf-overwrite_file_2/fixed.sh] 1 additional bugs detected
+
+[benchmarks/bugs_and_variants/sf-access_del_resource/posix.sh] Analysis completed; exec: 0.38s, solver: 1.46s, total: 1.84s
+[benchmarks/bugs_and_variants/sf-access_del_resource/posix.sh] All expected bugs detected (1 total)
+[benchmarks/bugs_and_variants/sf-access_del_resource/posix.sh] 3 additional bugs detected
+
+[benchmarks/bugs_and_variants/sf-access_del_resource/fixed.sh] Analysis completed; exec: 0.34s, solver: 2.13s, total: 2.47s
+[benchmarks/bugs_and_variants/sf-access_del_resource/fixed.sh] No regression bugs detected (0 out of 1 expected missing bugs)
+[benchmarks/bugs_and_variants/sf-access_del_resource/fixed.sh] 2 additional bugs detected
+
+[benchmarks/bugs_and_variants/c-unset_var_set_u_2/posix.sh] Analysis completed; exec: 0.12s, solver: 0.05s, total: 0.17s
+[benchmarks/bugs_and_variants/c-unset_var_set_u_2/posix.sh] All expected bugs detected (1 total)
+[benchmarks/bugs_and_variants/c-unset_var_set_u_2/posix.sh] 2 additional bugs detected
+
+[benchmarks/bugs_and_variants/c-unset_var_set_u_2/fixed.sh] Analysis completed; exec: 0.13s, solver: 0.05s, total: 0.19s
+[benchmarks/bugs_and_variants/c-unset_var_set_u_2/fixed.sh] No regression bugs detected (0 out of 1 expected missing bugs)
+[benchmarks/bugs_and_variants/c-unset_var_set_u_2/fixed.sh] 3 additional bugs detected
+
+[benchmarks/bugs_and_variants/sf-access_after_mv/posix.sh] Analysis completed; exec: 0.81s, solver: 5.35s, total: 6.16s
+[benchmarks/bugs_and_variants/sf-access_after_mv/posix.sh] All expected bugs detected (1 total)
+[benchmarks/bugs_and_variants/sf-access_after_mv/posix.sh] 11 additional bugs detected
+
+[benchmarks/bugs_and_variants/sf-access_after_mv/fixed.sh] Analysis completed; exec: 0.85s, solver: 9.23s, total: 10.08s
+[benchmarks/bugs_and_variants/sf-access_after_mv/fixed.sh] No regression bugs detected (0 out of 1 expected missing bugs)
+[benchmarks/bugs_and_variants/sf-access_after_mv/fixed.sh] 11 additional bugs detected
+
+[benchmarks/bugs_and_variants/wf-xargs_accident_rm/posix.sh] Analysis completed; exec: 0.11s, solver: 0.37s, total: 0.48s
+[benchmarks/bugs_and_variants/wf-xargs_accident_rm/posix.sh] All expected bugs detected (2 total)
+
+[benchmarks/bugs_and_variants/wf-xargs_accident_rm/fixed.sh] Analysis completed; exec: 0.00s, solver: 0.01s, total: 0.01s
+[benchmarks/bugs_and_variants/wf-xargs_accident_rm/fixed.sh] No regression bugs detected (0 out of 2 expected missing bugs)
+
+[benchmarks/bugs_and_variants/c-ignored_command_v/posix.sh] Analysis timed out; exec: 14.85s, solver: 45.39s, total: 60.24s
+[benchmarks/bugs_and_variants/c-ignored_command_v/posix.sh] All expected bugs detected (1 total)
+[benchmarks/bugs_and_variants/c-ignored_command_v/posix.sh] 4 additional bugs detected
+
+[benchmarks/bugs_and_variants/c-ignored_command_v/fixed.sh] Analysis timed out; exec: 14.89s, solver: 45.38s, total: 60.27s
+[benchmarks/bugs_and_variants/c-ignored_command_v/fixed.sh] No regression bugs detected (0 out of 1 expected missing bugs)
+[benchmarks/bugs_and_variants/c-ignored_command_v/fixed.sh] 4 additional bugs detected
+
+[benchmarks/bugs_and_variants/m2-rm_root/posix.sh] Analysis completed; exec: 0.27s, solver: 0.19s, total: 0.46s
+[benchmarks/bugs_and_variants/m2-rm_root/posix.sh] All expected bugs detected (18 total)
+[benchmarks/bugs_and_variants/m2-rm_root/posix.sh] 1 additional bugs detected
+
+[benchmarks/bugs_and_variants/m2-rm_root/fixed.sh] Analysis completed; exec: 0.18s, solver: 0.18s, total: 0.36s
+[benchmarks/bugs_and_variants/m2-rm_root/fixed.sh] No regression bugs detected (0 out of 18 expected missing bugs)
+[benchmarks/bugs_and_variants/m2-rm_root/fixed.sh] 1 additional bugs detected
+
+[benchmarks/bugs_and_variants/m2-rm_root/variants/bug-too_many_diffs.sh] Analysis completed; exec: 0.30s, solver: 0.19s, total: 0.50s
+[benchmarks/bugs_and_variants/m2-rm_root/variants/bug-too_many_diffs.sh] All expected bugs detected (17 total)
+[benchmarks/bugs_and_variants/m2-rm_root/variants/bug-too_many_diffs.sh] 2 additional bugs detected
+
+[benchmarks/bugs_and_variants/wf-claude5/posix.sh] Analysis completed; exec: 0.05s, solver: 0.17s, total: 0.22s
+[benchmarks/bugs_and_variants/wf-claude5/posix.sh] All expected bugs detected (1 total)
+[benchmarks/bugs_and_variants/wf-claude5/posix.sh] 1 additional bugs detected
+
+[benchmarks/bugs_and_variants/wf-claude5/fixed.sh] Analysis completed; exec: 0.05s, solver: 0.10s, total: 0.15s
+[benchmarks/bugs_and_variants/wf-claude5/fixed.sh] No regression bugs detected (0 out of 1 expected missing bugs)
+[benchmarks/bugs_and_variants/wf-claude5/fixed.sh] 1 additional bugs detected
+
+[benchmarks/bugs_and_variants/c-debootstrap/posix.sh] Analysis timed out; exec: 30.23s, solver: 36.69s, total: 66.92s
+[benchmarks/bugs_and_variants/c-debootstrap/posix.sh] All expected bugs detected (1 total)
+[benchmarks/bugs_and_variants/c-debootstrap/posix.sh] 24 additional bugs detected
+
+[benchmarks/bugs_and_variants/c-debootstrap/fixed.sh] Analysis timed out; exec: 30.22s, solver: 30.64s, total: 60.86s
+[benchmarks/bugs_and_variants/c-debootstrap/fixed.sh] No regression bugs detected (0 out of 1 expected missing bugs)
+[benchmarks/bugs_and_variants/c-debootstrap/fixed.sh] 25 additional bugs detected
+
+[benchmarks/bugs_and_variants/wf-xargs_del_files/posix.sh] Analysis completed; exec: 0.12s, solver: 0.12s, total: 0.24s
+[benchmarks/bugs_and_variants/wf-xargs_del_files/posix.sh] All expected bugs detected (1 total)
+
+[benchmarks/bugs_and_variants/wf-xargs_del_files/fixed.sh] Analysis completed; exec: 0.13s, solver: 0.16s, total: 0.30s
+[benchmarks/bugs_and_variants/wf-xargs_del_files/fixed.sh] No regression bugs detected (0 out of 1 expected missing bugs)
+[benchmarks/bugs_and_variants/wf-xargs_del_files/fixed.sh] 1 additional bugs detected
+
+[benchmarks/bugs_and_variants/wf-rm_root_2/posix.sh] Analysis timed out; exec: 4.85s, solver: 55.21s, total: 60.06s
+[benchmarks/bugs_and_variants/wf-rm_root_2/posix.sh] All expected bugs detected (1 total)
+[benchmarks/bugs_and_variants/wf-rm_root_2/posix.sh] 2 additional bugs detected
+
+[benchmarks/bugs_and_variants/wf-rm_root_2/fixed.sh] Analysis timed out; exec: 4.87s, solver: 55.15s, total: 60.02s
+[benchmarks/bugs_and_variants/wf-rm_root_2/fixed.sh] No regression bugs detected (0 out of 1 expected missing bugs)
+[benchmarks/bugs_and_variants/wf-rm_root_2/fixed.sh] 2 additional bugs detected
+
+[benchmarks/bugs_and_variants/wf-rm_root_2/variants/bug-move_trailing_slash.sh] Analysis timed out; exec: 4.87s, solver: 55.20s, total: 60.07s
+[benchmarks/bugs_and_variants/wf-rm_root_2/variants/bug-move_trailing_slash.sh] All expected bugs detected (1 total)
+[benchmarks/bugs_and_variants/wf-rm_root_2/variants/bug-move_trailing_slash.sh] 2 additional bugs detected
+
+[benchmarks/bugs_and_variants/wf-troll/posix.sh] Analysis completed; exec: 0.04s, solver: 0.04s, total: 0.08s
+[benchmarks/bugs_and_variants/wf-troll/posix.sh] All expected bugs detected (2 total)
+
+[benchmarks/bugs_and_variants/wf-troll/fixed.sh] Analysis completed; exec: 0.00s, solver: 0.01s, total: 0.01s
+[benchmarks/bugs_and_variants/wf-troll/fixed.sh] No regression bugs detected (0 out of 2 expected missing bugs)
+
+[benchmarks/bugs_and_variants/c-debootstrap_2/posix.sh] Analysis timed out; exec: 36.31s, solver: 30.03s, total: 66.33s
+[benchmarks/bugs_and_variants/c-debootstrap_2/posix.sh] 0 out of 1 expected bugs detected
+[benchmarks/bugs_and_variants/c-debootstrap_2/posix.sh] L727:word_split_del_sys_file is missing
+[benchmarks/bugs_and_variants/c-debootstrap_2/posix.sh] 17 additional bugs detected
+
+[benchmarks/bugs_and_variants/c-debootstrap_2/fixed.sh] Analysis timed out; exec: 36.10s, solver: 30.05s, total: 66.15s
+[benchmarks/bugs_and_variants/c-debootstrap_2/fixed.sh] No regression bugs detected (0 out of 1 expected missing bugs)
+[benchmarks/bugs_and_variants/c-debootstrap_2/fixed.sh] 17 additional bugs detected
+
+[benchmarks/bugs_and_variants/wf-accident/posix.sh] Analysis completed; exec: 0.05s, solver: 0.07s, total: 0.12s
+[benchmarks/bugs_and_variants/wf-accident/posix.sh] All expected bugs detected (3 total)
+
+[benchmarks/bugs_and_variants/wf-accident/fixed.sh] Analysis completed; exec: 0.04s, solver: 0.08s, total: 0.12s
+[benchmarks/bugs_and_variants/wf-accident/fixed.sh] No regression bugs detected (0 out of 3 expected missing bugs)
+[benchmarks/bugs_and_variants/wf-accident/fixed.sh] 1 additional bugs detected
+
+[benchmarks/bugs_and_variants/wf-wrong_mv/posix.sh] Analysis completed; exec: 0.02s, solver: 0.04s, total: 0.06s
+[benchmarks/bugs_and_variants/wf-wrong_mv/posix.sh] All expected bugs detected (1 total)
+
+[benchmarks/bugs_and_variants/wf-wrong_mv/fixed.sh] Analysis completed; exec: 0.00s, solver: 0.01s, total: 0.01s
+[benchmarks/bugs_and_variants/wf-wrong_mv/fixed.sh] No regression bugs detected (0 out of 1 expected missing bugs)
+
+[benchmarks/bugs_and_variants/c-makefile/posix.sh] Analysis timed out; exec: 15.82s, solver: 44.62s, total: 60.44s
+[benchmarks/bugs_and_variants/c-makefile/posix.sh] All expected bugs detected (2 total)
+[benchmarks/bugs_and_variants/c-makefile/posix.sh] 13 additional bugs detected
+
+[benchmarks/bugs_and_variants/c-makefile/fixed.sh] Analysis timed out; exec: 15.56s, solver: 44.76s, total: 60.32s
+[benchmarks/bugs_and_variants/c-makefile/fixed.sh] No regression bugs detected (0 out of 2 expected missing bugs)
+[benchmarks/bugs_and_variants/c-makefile/fixed.sh] 12 additional bugs detected
+
+[benchmarks/bugs_and_variants/c-makefile/variants/bug-assign_first.sh] Analysis timed out; exec: 16.02s, solver: 44.07s, total: 60.08s
+[benchmarks/bugs_and_variants/c-makefile/variants/bug-assign_first.sh] All expected bugs detected (2 total)
+[benchmarks/bugs_and_variants/c-makefile/variants/bug-assign_first.sh] 13 additional bugs detected
+
+[benchmarks/bugs_and_variants/wf-delete_slash/posix.sh] Analysis completed; exec: 0.05s, solver: 0.04s, total: 0.09s
+[benchmarks/bugs_and_variants/wf-delete_slash/posix.sh] All expected bugs detected (1 total)
+
+[benchmarks/bugs_and_variants/wf-delete_slash/fixed.sh] Analysis completed; exec: 0.00s, solver: 0.01s, total: 0.01s
+[benchmarks/bugs_and_variants/wf-delete_slash/fixed.sh] No regression bugs detected (0 out of 1 expected missing bugs)
+
+[benchmarks/bugs_and_variants/wf-delete_home_user/posix.sh] Analysis completed; exec: 0.03s, solver: 0.04s, total: 0.07s
+[benchmarks/bugs_and_variants/wf-delete_home_user/posix.sh] All expected bugs detected (1 total)
+
+[benchmarks/bugs_and_variants/wf-delete_home_user/fixed.sh] Analysis completed; exec: 0.00s, solver: 0.01s, total: 0.01s
+[benchmarks/bugs_and_variants/wf-delete_home_user/fixed.sh] No regression bugs detected (0 out of 1 expected missing bugs)
+
+[benchmarks/bugs_and_variants/c-const_cond/posix.sh] Analysis completed; exec: 1.37s, solver: 0.35s, total: 1.72s
+[benchmarks/bugs_and_variants/c-const_cond/posix.sh] All expected bugs detected (1 total)
+[benchmarks/bugs_and_variants/c-const_cond/posix.sh] 4 additional bugs detected
+
+[benchmarks/bugs_and_variants/c-const_cond/fixed.sh] Analysis completed; exec: 0.83s, solver: 0.65s, total: 1.48s
+[benchmarks/bugs_and_variants/c-const_cond/fixed.sh] No regression bugs detected (0 out of 1 expected missing bugs)
+[benchmarks/bugs_and_variants/c-const_cond/fixed.sh] 2 additional bugs detected
+
+[benchmarks/bugs_and_variants/c-const_cond/variants/bug-assign_first.sh] Analysis completed; exec: 1.52s, solver: 0.36s, total: 1.87s
+[benchmarks/bugs_and_variants/c-const_cond/variants/bug-assign_first.sh] All expected bugs detected (1 total)
+[benchmarks/bugs_and_variants/c-const_cond/variants/bug-assign_first.sh] 4 additional bugs detected
+
+[benchmarks/bugs_and_variants/wf-replacement/posix.sh] Analysis completed; exec: 0.06s, solver: 0.16s, total: 0.22s
+[benchmarks/bugs_and_variants/wf-replacement/posix.sh] All expected bugs detected (1 total)
+
+[benchmarks/bugs_and_variants/wf-replacement/fixed.sh] Analysis completed; exec: 0.00s, solver: 0.01s, total: 0.01s
+[benchmarks/bugs_and_variants/wf-replacement/fixed.sh] No regression bugs detected (0 out of 1 expected missing bugs)
+
+[benchmarks/bugs_and_variants/wf-confused_mkdir/posix.sh] Analysis completed; exec: 0.06s, solver: 0.07s, total: 0.13s
+[benchmarks/bugs_and_variants/wf-confused_mkdir/posix.sh] All expected bugs detected (2 total)
+
+[benchmarks/bugs_and_variants/wf-confused_mkdir/fixed.sh] Analysis completed; exec: 0.00s, solver: 0.01s, total: 0.01s
+[benchmarks/bugs_and_variants/wf-confused_mkdir/fixed.sh] No regression bugs detected (0 out of 2 expected missing bugs)
+
+[benchmarks/bugs_and_variants/wf-posix2/posix.sh] Analysis completed; exec: 0.06s, solver: 0.11s, total: 0.16s
+[benchmarks/bugs_and_variants/wf-posix2/posix.sh] All expected bugs detected (1 total)
+
+[benchmarks/bugs_and_variants/wf-posix2/fixed.sh] Analysis completed; exec: 0.00s, solver: 0.01s, total: 0.01s
+[benchmarks/bugs_and_variants/wf-posix2/fixed.sh] No regression bugs detected (0 out of 1 expected missing bugs)
+
+[benchmarks/bugs_and_variants/c-unset_var_2/posix.sh] Analysis completed; exec: 0.17s, solver: 0.23s, total: 0.39s
+[benchmarks/bugs_and_variants/c-unset_var_2/posix.sh] All expected bugs detected (1 total)
+[benchmarks/bugs_and_variants/c-unset_var_2/posix.sh] 2 additional bugs detected
+
+[benchmarks/bugs_and_variants/c-unset_var_2/fixed.sh] Analysis completed; exec: 0.16s, solver: 0.22s, total: 0.38s
+[benchmarks/bugs_and_variants/c-unset_var_2/fixed.sh] No regression bugs detected (0 out of 1 expected missing bugs)
+[benchmarks/bugs_and_variants/c-unset_var_2/fixed.sh] 4 additional bugs detected
+
+[benchmarks/bugs_and_variants/c-unset_var_2/variants/bug-define_later.sh] Analysis completed; exec: 0.19s, solver: 0.23s, total: 0.42s
+[benchmarks/bugs_and_variants/c-unset_var_2/variants/bug-define_later.sh] All expected bugs detected (1 total)
+[benchmarks/bugs_and_variants/c-unset_var_2/variants/bug-define_later.sh] 2 additional bugs detected
+
+[benchmarks/bugs_and_variants/c-cp_nonexistent/posix.sh] Analysis completed; exec: 0.29s, solver: 0.23s, total: 0.52s
+[benchmarks/bugs_and_variants/c-cp_nonexistent/posix.sh] All expected bugs detected (1 total)
+[benchmarks/bugs_and_variants/c-cp_nonexistent/posix.sh] 1 additional bugs detected
+
+[benchmarks/bugs_and_variants/c-cp_nonexistent/fixed.sh] Analysis completed; exec: 0.29s, solver: 0.16s, total: 0.45s
+[benchmarks/bugs_and_variants/c-cp_nonexistent/fixed.sh] No regression bugs detected (0 out of 1 expected missing bugs)
+[benchmarks/bugs_and_variants/c-cp_nonexistent/fixed.sh] 1 additional bugs detected
+
+[benchmarks/bugs_and_variants/wf-silly_q/posix.sh] Analysis completed; exec: 0.12s, solver: 0.38s, total: 0.50s
+[benchmarks/bugs_and_variants/wf-silly_q/posix.sh] All expected bugs detected (4 total)
+[benchmarks/bugs_and_variants/wf-silly_q/posix.sh] 3 additional bugs detected
+
+[benchmarks/bugs_and_variants/wf-silly_q/fixed.sh] Analysis completed; exec: 0.10s, solver: 0.48s, total: 0.58s
+[benchmarks/bugs_and_variants/wf-silly_q/fixed.sh] No regression bugs detected (0 out of 4 expected missing bugs)
+
+[benchmarks/bugs_and_variants/wf-find_rm/posix.sh] Analysis completed; exec: 0.08s, solver: 0.16s, total: 0.24s
+[benchmarks/bugs_and_variants/wf-find_rm/posix.sh] All expected bugs detected (2 total)
+
+[benchmarks/bugs_and_variants/wf-find_rm/fixed.sh] Analysis completed; exec: 0.00s, solver: 0.01s, total: 0.01s
+[benchmarks/bugs_and_variants/wf-find_rm/fixed.sh] No regression bugs detected (0 out of 2 expected missing bugs)
+
+[benchmarks/bugs_and_variants/wf-sc_author/posix.sh] Analysis completed; exec: 0.08s, solver: 0.08s, total: 0.16s
+[benchmarks/bugs_and_variants/wf-sc_author/posix.sh] All expected bugs detected (3 total)
+
+[benchmarks/bugs_and_variants/wf-sc_author/fixed.sh] Analysis completed; exec: 0.00s, solver: 0.01s, total: 0.01s
+[benchmarks/bugs_and_variants/wf-sc_author/fixed.sh] No regression bugs detected (0 out of 3 expected missing bugs)
+
+[benchmarks/bugs_and_variants/wf-unset_var/posix.sh] Analysis completed; exec: 0.05s, solver: 0.03s, total: 0.08s
+[benchmarks/bugs_and_variants/wf-unset_var/posix.sh] All expected bugs detected (1 total)
+
+[benchmarks/bugs_and_variants/wf-unset_var/fixed.sh] Analysis completed; exec: 0.05s, solver: 0.03s, total: 0.08s
+[benchmarks/bugs_and_variants/wf-unset_var/fixed.sh] No regression bugs detected (0 out of 1 expected missing bugs)
+
+[benchmarks/bugs_and_variants/wf-unset_var/variants/bug-set_in_func.sh] Analysis completed; exec: 0.08s, solver: 0.06s, total: 0.14s
+[benchmarks/bugs_and_variants/wf-unset_var/variants/bug-set_in_func.sh] All expected bugs detected (1 total)
+
+[benchmarks/bugs_and_variants/hp-itunes/posix.sh] Analysis completed; exec: 0.07s, solver: 0.10s, total: 0.17s
+[benchmarks/bugs_and_variants/hp-itunes/posix.sh] All expected bugs detected (1 total)
+[benchmarks/bugs_and_variants/hp-itunes/posix.sh] 1 additional bugs detected
+
+[benchmarks/bugs_and_variants/hp-itunes/fixed.sh] Analysis completed; exec: 0.07s, solver: 0.09s, total: 0.16s
+[benchmarks/bugs_and_variants/hp-itunes/fixed.sh] No regression bugs detected (0 out of 1 expected missing bugs)
+[benchmarks/bugs_and_variants/hp-itunes/fixed.sh] 1 additional bugs detected
+
+[benchmarks/bugs_and_variants/hp-itunes/variants/bug-split_rm_args.sh] Analysis completed; exec: 0.08s, solver: 0.10s, total: 0.18s
+[benchmarks/bugs_and_variants/hp-itunes/variants/bug-split_rm_args.sh] All expected bugs detected (1 total)
+
+[benchmarks/bugs_and_variants/m1-unset_var_1/posix.sh] Analysis completed; exec: 1.19s, solver: 0.79s, total: 1.97s
+[benchmarks/bugs_and_variants/m1-unset_var_1/posix.sh] All expected bugs detected (2 total)
+[benchmarks/bugs_and_variants/m1-unset_var_1/posix.sh] 3 additional bugs detected
+
+[benchmarks/bugs_and_variants/m1-unset_var_1/fixed.sh] Analysis completed; exec: 1.18s, solver: 0.92s, total: 2.11s
+[benchmarks/bugs_and_variants/m1-unset_var_1/fixed.sh] No regression bugs detected (0 out of 2 expected missing bugs)
+[benchmarks/bugs_and_variants/m1-unset_var_1/fixed.sh] 3 additional bugs detected
+
+[benchmarks/bugs_and_variants/m1-unset_var_1/variants/bug-init_func.sh] Analysis completed; exec: 1.20s, solver: 0.87s, total: 2.07s
+[benchmarks/bugs_and_variants/m1-unset_var_1/variants/bug-init_func.sh] All expected bugs detected (2 total)
+[benchmarks/bugs_and_variants/m1-unset_var_1/variants/bug-init_func.sh] 3 additional bugs detected
+
+[benchmarks/bugs_and_variants/c-unset_var_set_u_1/posix.sh] Analysis timed out; exec: 2.96s, solver: 64.72s, total: 67.68s
+[benchmarks/bugs_and_variants/c-unset_var_set_u_1/posix.sh] All expected bugs detected (1 total)
+[benchmarks/bugs_and_variants/c-unset_var_set_u_1/posix.sh] 3 additional bugs detected
+
+[benchmarks/bugs_and_variants/c-unset_var_set_u_1/fixed.sh] Analysis timed out; exec: 2.99s, solver: 59.28s, total: 62.27s
+[benchmarks/bugs_and_variants/c-unset_var_set_u_1/fixed.sh] No regression bugs detected (0 out of 1 expected missing bugs)
+[benchmarks/bugs_and_variants/c-unset_var_set_u_1/fixed.sh] 5 additional bugs detected
+
+[benchmarks/bugs_and_variants/wf-wrong_mkdir/posix.sh] Analysis completed; exec: 0.19s, solver: 0.31s, total: 0.50s
+[benchmarks/bugs_and_variants/wf-wrong_mkdir/posix.sh] All expected bugs detected (2 total)
+[benchmarks/bugs_and_variants/wf-wrong_mkdir/posix.sh] 1 additional bugs detected
+
+[benchmarks/bugs_and_variants/wf-wrong_mkdir/fixed.sh] Analysis completed; exec: 0.00s, solver: 0.01s, total: 0.01s
+[benchmarks/bugs_and_variants/wf-wrong_mkdir/fixed.sh] No regression bugs detected (0 out of 2 expected missing bugs)
+
+[benchmarks/bugs_and_variants/sf-overwrite_file_3/posix.sh] Analysis completed; exec: 0.41s, solver: 1.91s, total: 2.32s
+[benchmarks/bugs_and_variants/sf-overwrite_file_3/posix.sh] All expected bugs detected (1 total)
+[benchmarks/bugs_and_variants/sf-overwrite_file_3/posix.sh] 1 additional bugs detected
+
+[benchmarks/bugs_and_variants/sf-overwrite_file_3/fixed.sh] Analysis completed; exec: 0.42s, solver: 0.48s, total: 0.90s
+[benchmarks/bugs_and_variants/sf-overwrite_file_3/fixed.sh] No regression bugs detected (0 out of 1 expected missing bugs)
+[benchmarks/bugs_and_variants/sf-overwrite_file_3/fixed.sh] 1 additional bugs detected
+
+[benchmarks/bugs_and_variants/m1-loop_once-useless_test/posix.sh] Analysis completed; exec: 0.10s, solver: 0.26s, total: 0.36s
+[benchmarks/bugs_and_variants/m1-loop_once-useless_test/posix.sh] All expected bugs detected (1 total)
+[benchmarks/bugs_and_variants/m1-loop_once-useless_test/posix.sh] 2 additional bugs detected
+
+[benchmarks/bugs_and_variants/m1-loop_once-useless_test/fixed.sh] Analysis completed; exec: 0.25s, solver: 2.67s, total: 2.92s
+[benchmarks/bugs_and_variants/m1-loop_once-useless_test/fixed.sh] No regression bugs detected (0 out of 1 expected missing bugs)
+[benchmarks/bugs_and_variants/m1-loop_once-useless_test/fixed.sh] 3 additional bugs detected
+
+[benchmarks/bugs_and_variants/wf-move_home/posix.sh] Analysis completed; exec: 0.03s, solver: 0.09s, total: 0.12s
+[benchmarks/bugs_and_variants/wf-move_home/posix.sh] All expected bugs detected (1 total)
+
+[benchmarks/bugs_and_variants/wf-move_home/fixed.sh] Analysis completed; exec: 0.00s, solver: 0.01s, total: 0.01s
+[benchmarks/bugs_and_variants/wf-move_home/fixed.sh] No regression bugs detected (0 out of 1 expected missing bugs)
+
+[benchmarks/bugs_and_variants/m1-const_loop/posix.sh] Analysis completed; exec: 0.59s, solver: 17.05s, total: 17.64s
+[benchmarks/bugs_and_variants/m1-const_loop/posix.sh] All expected bugs detected (1 total)
+
+[benchmarks/bugs_and_variants/m1-const_loop/fixed.sh] Analysis completed; exec: 0.80s, solver: 17.99s, total: 18.80s
+[benchmarks/bugs_and_variants/m1-const_loop/fixed.sh] No regression bugs detected (0 out of 1 expected missing bugs)
+
+[benchmarks/bugs_and_variants/wf-claude_wipe/posix.sh] Analysis completed; exec: 0.05s, solver: 0.09s, total: 0.15s
+[benchmarks/bugs_and_variants/wf-claude_wipe/posix.sh] All expected bugs detected (1 total)
+
+[benchmarks/bugs_and_variants/wf-claude_wipe/fixed.sh] Analysis completed; exec: 0.04s, solver: 0.07s, total: 0.11s
+[benchmarks/bugs_and_variants/wf-claude_wipe/fixed.sh] No regression bugs detected (0 out of 1 expected missing bugs)
+
+[benchmarks/bugs_and_variants/wf-unset_var-cmd_always_fails/posix.sh] Analysis completed; exec: 1.59s, solver: 14.27s, total: 15.86s
+[benchmarks/bugs_and_variants/wf-unset_var-cmd_always_fails/posix.sh] All expected bugs detected (2 total)
+[benchmarks/bugs_and_variants/wf-unset_var-cmd_always_fails/posix.sh] 4 additional bugs detected
+
+[benchmarks/bugs_and_variants/wf-unset_var-cmd_always_fails/fixed.sh] Analysis completed; exec: 2.24s, solver: 21.85s, total: 24.09s
+[benchmarks/bugs_and_variants/wf-unset_var-cmd_always_fails/fixed.sh] No regression bugs detected (0 out of 2 expected missing bugs)
+[benchmarks/bugs_and_variants/wf-unset_var-cmd_always_fails/fixed.sh] 3 additional bugs detected
+
+[benchmarks/bugs_and_variants/wf-unset_var-cmd_always_fails/variants/bug-assign_later.sh] Analysis completed; exec: 1.64s, solver: 15.42s, total: 17.07s
+[benchmarks/bugs_and_variants/wf-unset_var-cmd_always_fails/variants/bug-assign_later.sh] All expected bugs detected (2 total)
+[benchmarks/bugs_and_variants/wf-unset_var-cmd_always_fails/variants/bug-assign_later.sh] 4 additional bugs detected
+
+[benchmarks/bugs_and_variants/wf-for_mv/posix.sh] Analysis completed; exec: 0.09s, solver: 0.44s, total: 0.54s
+[benchmarks/bugs_and_variants/wf-for_mv/posix.sh] All expected bugs detected (1 total)
+[benchmarks/bugs_and_variants/wf-for_mv/posix.sh] 2 additional bugs detected
+
+[benchmarks/bugs_and_variants/wf-for_mv/fixed.sh] Analysis completed; exec: 0.00s, solver: 0.01s, total: 0.01s
+[benchmarks/bugs_and_variants/wf-for_mv/fixed.sh] No regression bugs detected (0 out of 1 expected missing bugs)
+
+[benchmarks/bugs_and_variants/hp-n/posix.sh] Analysis timed out; exec: 30.45s, solver: 30.05s, total: 60.49s
+[benchmarks/bugs_and_variants/hp-n/posix.sh] All expected bugs detected (2 total)
+[benchmarks/bugs_and_variants/hp-n/posix.sh] 46 additional bugs detected
+
+[benchmarks/bugs_and_variants/hp-n/fixed.sh] Analysis timed out; exec: 30.16s, solver: 30.10s, total: 60.26s
+[benchmarks/bugs_and_variants/hp-n/fixed.sh] No regression bugs detected (0 out of 2 expected missing bugs)
+[benchmarks/bugs_and_variants/hp-n/fixed.sh] 41 additional bugs detected
+
+[benchmarks/bugs_and_variants/hp-n/variants/variant1.sh] Analysis timed out; exec: 30.21s, solver: 30.23s, total: 60.44s
+[benchmarks/bugs_and_variants/hp-n/variants/variant1.sh] All expected bugs detected (1 total)
+[benchmarks/bugs_and_variants/hp-n/variants/variant1.sh] 46 additional bugs detected
+
+Printing aggregate results
+Total benchmarks (pair of buggy + fixed scripts, with an optional variant):  61
+Total analyses ran:  142
+  Successful:  142
+  Failed (raised exception):  0
+  Timed out:  33
+Total time:  2295.10s
+  Total execution time:  809.99s
+  Total solver time:  1485.11s
+Total known bugs (present in each benchmark's ground truth):  158
+  Out of these were detected:  157
+  Out of these were not detected:  1
+Total unknown bugs detected (not present in each benchmark's ground truth):  689
+CSV report generated: results_t60.csv
+
+> Computing LoC
+uv run scripts/precompute_loc_cache.py --results-csv results/main/main-eval/results_t60.csv --output-csv results/main/benchmark_loc.csv
+Wrote 142 rows to results/main/benchmark_loc.csv
+
+> Generating LaTeX table
+% Total benchmarks: 61
+% Total bugs: 116
+% Bugs per benchmark: ~1.90
+% Timed out benchmarks: 12
+% Average LoC: 71.95
+% Average time: 4.73s
+The average runtime per program is 0.48 seconds, with a minimum of 0.02 seconds and a maximum of 8.75 seconds (excluding timeouts).
+
+> Generating plots
+uv run python -
+
+Done
+Outputs:
+
+  results/main/main-eval/results_t60.csv (evaluation of buggy programs, fixed programs, and variants)
+  results/main/benchmark_loc.csv (LoC information for all benchmarks)
+  results/main/table.tex (appendix)
+  results/main/figures/main-eval.pdf (bar plot)
+2324.51user 12.58system 38:44.22elapsed 100%CPU (0avgtext+0avgdata 2100608maxresident)k
+0inputs+2552outputs (3major+2989147minor)pagefaults 0swaps

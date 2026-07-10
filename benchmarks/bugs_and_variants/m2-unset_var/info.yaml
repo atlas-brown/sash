@@ -1,0 +1,33 @@
+description: Rsync directory copy script
+
+sources:
+  - https://stackoverflow.com/questions/48706718/error-with-bash-script-using-rsync-to-copy-directory-with-space-in-directory-nam
+
+bugs:
+  bug00:
+    description: An unset variable is used ($directorytocopy)
+    code: unbound
+    shellcheck: SC2154
+
+ground_truths:
+  # Base versions
+  - path: original.sh
+    kind: original
+    bugs:
+      bug00: { lines: [6] }
+
+  - path: posix.sh
+    kind: buggy
+    bugs:
+      bug00: { lines: [6] }
+
+  - path: fixed.sh
+    kind: fixed
+    bugs:
+      bug00: { regression_lines: [6], shellcheck: null }
+
+  # Variants
+  - path: variants/bug-assign_later.sh
+    kind: buggy_variant
+    bugs:
+      bug00: { lines: [6], shellcheck: null }

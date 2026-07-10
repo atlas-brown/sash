@@ -1,0 +1,33 @@
+description: Directory chmod loop
+
+sources:
+  - https://stackoverflow.com/questions/48919816/i-am-having-a-hard-time-why-the-if-statements-dont-work-in-shellscript
+
+bugs:
+  bug00:
+    description: For loop only iterates once because its argument doesn't word-split
+    code: loop_once
+    shellcheck: SC2066
+
+ground_truths:
+  # Base versions
+  - path: original.sh
+    kind: original
+    bugs:
+      bug00: { lines: [8, 15] }
+
+  - path: posix.sh
+    kind: buggy
+    bugs:
+      bug00: { lines: [8, 15] }
+
+  - path: fixed.sh
+    kind: fixed
+    bugs:
+      bug00: { regression_lines: [8, 15], shellcheck: null }
+
+  # Variants
+  - path: variants/bug-remove_quotes.sh
+    kind: buggy_variant
+    bugs:
+      bug00: { lines: [8, 15] }

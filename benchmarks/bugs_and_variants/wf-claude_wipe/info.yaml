@@ -1,0 +1,27 @@
+description: Claude cleanup output
+
+sources:
+  - https://www.reddit.com/r/ClaudeAI/comments/1pgxckk/claude_cli_deleted_my_entire_home_directory_wiped/
+
+bugs:
+  bug00:
+    description: Agent-generated code deletes the user's home directory
+    code: del_user_dir
+    shellcheck: null
+
+ground_truths:
+  # Base versions
+  - path: original.sh
+    kind: original
+    bugs:
+      bug00: { lines: [3] }
+
+  - path: posix.sh
+    kind: buggy
+    bugs:
+      bug00: { lines: [0] }
+
+  - path: fixed.sh
+    kind: fixed
+    bugs:
+      bug00: { regression_lines: [0], shellcheck: null }

@@ -1,0 +1,26 @@
+description: Unset PATH startup
+
+sources:
+  - https://segmentfault.com/q/1010000000158149
+
+bugs:
+  bug00:
+    description: Detected issue code 'not_a_command' in benchmark script
+    code: not_a_command
+    shellcheck: null
+
+ground_truths:
+  - path: original.sh
+    kind: original
+    bugs:
+      bug00: { lines: [21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32] }
+
+  - path: posix.sh
+    kind: buggy
+    bugs:
+      bug00: { lines: [21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32] }
+
+  - path: fixed.sh
+    kind: fixed
+    bugs:
+      bug00: { regression_lines: [21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32], shellcheck: null }

@@ -8,7 +8,7 @@ from collections import Counter
 import yaml
 import bugdepth
 from benchmark_metadata import (
-    BENCHMARK_NAMES,
+    BENCHMARK_DESCRIPTIONS,
     WILD_BENCHMARK_DESCRIPTIONS,
     benchmark_key,
     short_name,
@@ -24,10 +24,16 @@ parser.add_argument(
     help="Output full table with all benchmark rows (no omitted-lines summary).",
 )
 parser.add_argument(
-    "--results_csv",
+    "--results-csv",
     type=str,
     default="results/results.csv",
     help="Path to results CSV (default: results/results.csv).",
+)
+parser.add_argument(
+    "--loc-cache-path",
+    type=str,
+    default="results/benchmark_loc.csv",
+    help="Path to the precomputed LoC cache of the benchmarks"
 )
 parser.add_argument(
     "--wild",
@@ -40,7 +46,7 @@ results_path = args.results_csv
 results = pd.read_csv(results_path)
 buggy_results = results[results["kind"] == "buggy"].copy()
 fixed_results = results[results["kind"] == "fixed"].copy()
-loc_cache_path = Path("results/benchmark_loc.csv")
+loc_cache_path = Path(args.loc_cache_path)
 precompute_loc_script = Path(__file__).with_name("precompute_loc_cache.py")
 
 if not loc_cache_path.exists():
@@ -49,9 +55,9 @@ if not loc_cache_path.exists():
             [
                 sys.executable,
                 str(precompute_loc_script),
-                "--results_csv",
+                "--results-csv",
                 results_path,
-                "--output_csv",
+                "--output-csv",
                 str(loc_cache_path),
             ],
             check=True,
@@ -193,7 +199,7 @@ def table_time_cell(row):
     time = float(timing["time"])
     return f"{time:.2f}s" if time > EPSILON else "<1ms"
 
-names = BENCHMARK_NAMES
+names = BENCHMARK_DESCRIPTIONS
 
 sources = {
     "high_profile/c00-steam": r"\cite{steambugissue}",

@@ -1,0 +1,850 @@
+> Running Koala
+uv run scripts/run_on_dir.py /users/ubuntu/sash/benchmarks/koala -t 900 -c results/koala/koala-eval/results_t900.csv
+Walking directory: /users/ubuntu/sash/benchmarks/koala
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/.tools/standards/100-files/clean.sh ===
+// [DONE] exec=0.008377166001082514s solver=0.02443735300039407s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/.tools/standards/100-files/execute.sh ===
+// [DONE] exec=0.011944740999751957s solver=0.010594740000669844s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/.tools/standards/100-files/fetch.sh ===
+// [DONE] exec=0.011573591998967458s solver=0.021567449999565724s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/.tools/standards/100-files/install.sh ===
+// [DONE] exec=0.0006578280008397996s solver=0.004617329999746289s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/.tools/standards/100-files/scripts/main.sh ===
+// [DONE] exec=0.013477525000780588s solver=0.012914725999507937s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/.tools/standards/100-files/validate.sh ===
+// [DONE] exec=0.0006861620004201541s solver=0.004664146999857621s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/.tools/standards/read-write/clean.sh ===
+// [DONE] exec=0.0006612750003114343s solver=0.004737045999718248s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/.tools/standards/read-write/execute.sh ===
+// [DONE] exec=0.011511725999298505s solver=0.010401767000075779s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/.tools/standards/read-write/fetch.sh ===
+// [DONE] exec=0.0006857509997644229s solver=0.004743788000268978s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/.tools/standards/read-write/install.sh ===
+// [DONE] exec=0.0006347639991872711s solver=0.004512913999860757s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/.tools/standards/read-write/scripts/main.sh ===
+// [DONE] exec=0.009111728000789299s solver=0.004612993001501309s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/.tools/standards/read-write/scripts/sub.sh ===
+// [DONE] exec=0.0043794619996333495s solver=0.004932743999233935s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/.tools/standards/read-write/validate.sh ===
+// [DONE] exec=0.0006474689998867689s solver=0.004589587999362266s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/.tools/standards/shell-memory/clean.sh ===
+// [DONE] exec=0.006422256999940146s solver=0.02009596199968655s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/.tools/standards/shell-memory/execute.sh ===
+// [DONE] exec=0.01144494900108839s solver=0.01035832499837852s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/.tools/standards/shell-memory/fetch.sh ===
+// [DONE] exec=0.00794352000048093s solver=0.013311882999914815s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/.tools/standards/shell-memory/install.sh ===
+// [DONE] exec=0.0006628070004808251s solver=0.004558970000289264s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/.tools/standards/shell-memory/scripts/main.sh ===
+// [DONE] exec=0.0024808489997667493s solver=0.0046615440005552955s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/.tools/standards/shell-memory/validate.sh ===
+// [DONE] exec=0.0006538200013892492s solver=0.00441089100058889s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/.tools/standards/sleep/clean.sh ===
+// [DONE] exec=0.0006099580004956806s solver=0.0045059000003675465s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/.tools/standards/sleep/execute.sh ===
+// [DONE] exec=0.011227580000195303s solver=0.010373793998951442s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/.tools/standards/sleep/fetch.sh ===
+// [DONE] exec=0.000675049999699695s solver=0.004564881999613135s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/.tools/standards/sleep/install.sh ===
+// [DONE] exec=0.0006452449997595977s solver=0.0047339890006696805s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/.tools/standards/sleep/scripts/main.sh ===
+// [DONE] exec=0.0039647419998800615s solver=0.0046243329998105764s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/.tools/standards/sleep/validate.sh ===
+// [DONE] exec=0.0006016119987179991s solver=0.004600528000082704s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/.tools/standards/time-in-shell-subprocess/clean.sh ===
+// [DONE] exec=0.0006607140003325185s solver=0.004496843001106754s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/.tools/standards/time-in-shell-subprocess/execute.sh ===
+// [DONE] exec=0.0117610950001108s solver=0.010227910001049167s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/.tools/standards/time-in-shell-subprocess/fetch.sh ===
+// [DONE] exec=0.0006160390003060456s solver=0.004555061999781174s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/.tools/standards/time-in-shell-subprocess/install.sh ===
+// [DONE] exec=0.0006445740000344813s solver=0.004418967000674456s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/.tools/standards/time-in-shell-subprocess/scripts/main.sh ===
+// [DONE] exec=0.0025133399994956562s solver=0.004604656000083196s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/.tools/standards/time-in-shell-subprocess/scripts/sub.sh ===
+// [DONE] exec=0.016659294000419322s solver=0.00755837600081577s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/.tools/standards/time-in-shell-subprocess/validate.sh ===
+// [DONE] exec=0.0006300059994828189s solver=0.004674887999499333s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/.tools/standards/user-time/clean.sh ===
+// [DONE] exec=0.0006258680004975758s solver=0.004735724000056507s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/.tools/standards/user-time/execute.sh ===
+// [DONE] exec=0.011719235999407829s solver=0.0102029620011308s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/.tools/standards/user-time/fetch.sh ===
+// [DONE] exec=0.0006620459989790106s solver=0.0045283019990165485s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/.tools/standards/user-time/install.sh ===
+// [DONE] exec=0.0006387719986378215s solver=0.004546215999653214s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/.tools/standards/user-time/scripts/main.sh ===
+// [DONE] exec=0.0107086240004719s solver=0.0049439939994044835s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/.tools/standards/user-time/validate.sh ===
+// [DONE] exec=0.0007186920011008624s solver=0.004520908998529194s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/.tools/standards/user-time-in-shell/clean.sh ===
+// [DONE] exec=0.0006330309988697991s solver=0.004541838001387077s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/.tools/standards/user-time-in-shell/execute.sh ===
+// [DONE] exec=0.011388913999326178s solver=0.010373823999543674s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/.tools/standards/user-time-in-shell/fetch.sh ===
+// [DONE] exec=0.0006704120005451841s solver=0.004494627999520162s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/.tools/standards/user-time-in-shell/install.sh ===
+// [DONE] exec=0.0006689589990855893s solver=0.004766821000885102s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/.tools/standards/user-time-in-shell/scripts/main.sh ===
+// [DONE] exec=0.016976481001620414s solver=0.007470810000086203s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/.tools/standards/user-time-in-shell/validate.sh ===
+// [DONE] exec=0.0006272099999478087s solver=0.004581883000355447s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/.tools/standards/write-only/clean.sh ===
+// [DONE] exec=0.006222371001058491s solver=0.017989697998928023s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/.tools/standards/write-only/execute.sh ===
+// [DONE] exec=0.011222592000194709s solver=0.010349166999731096s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/.tools/standards/write-only/fetch.sh ===
+// [DONE] exec=0.006900607000716263s solver=0.010115617998962989s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/.tools/standards/write-only/install.sh ===
+// [DONE] exec=0.000680259998262045s solver=0.00449527099954139s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/.tools/standards/write-only/scripts/main.sh ===
+// [DONE] exec=0.021675072999641998s solver=0.012695202000031713s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/.tools/standards/write-only/validate.sh ===
+// [DONE] exec=0.000636728000245057s solver=0.004766570998981479s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/analytics/clean.sh ===
+// [DONE] exec=0.02233916300065175s solver=0.10182689199973538s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/analytics/execute.sh ===
+// [DONE] exec=29.362169011999868s solver=64.14844124499905s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/analytics/fetch.sh ===
+// [DONE] exec=1.3987549020002916s solver=32.561882211999546s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/analytics/install.sh ===
+// [DONE] exec=0.046497726998495637s solver=0.12491543699979957s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/analytics/scripts/nginx.sh ===
+// [DONE] exec=0.14731569300056435s solver=0.18425364899849228s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/analytics/scripts/pcaps.sh ===
+// [DONE] exec=0.10288287200091872s solver=0.26859008700012055s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/analytics/scripts/port-scan.sh ===
+// [DONE] exec=0.034029792999717756s solver=0.11487549199955538s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/analytics/scripts/ray-tracing.sh ===
+// [DONE] exec=0.02254409799934365s solver=0.07420107300094969s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/analytics/validate.sh ===
+// [DONE] exec=25.94791211899974s solver=46.194650346000344s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/bio/clean.sh ===
+// [DONE] exec=0.029177168999012792s solver=0.07746821000000637s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/bio/execute.sh ===
+sh: 111: Syntax error: redirection unexpected
+// [CRASH] SaSh crashed on /users/ubuntu/sash/benchmarks/koala/bio/execute.sh: name 'pathlib' is not defined
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/bio/fetch.sh ===
+// [TIMEOUT] exec=47.99525982199884s solver=853.9697468640006s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/bio/install.sh ===
+// [DONE] exec=5.946835306000139s solver=124.54899188000127s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/bio/scripts/PARAMS.sh ===
+// [DONE] exec=0.028722040000502602s solver=0.027162214000782114s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/bio/scripts/adapter.sh ===
+// [DONE] exec=0.2996623909984919s solver=0.6417870129989751s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/bio/scripts/bio.sh ===
+// [DONE] exec=0.5257320910004637s solver=2.6404073779995088s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/bio/scripts/data.sh ===
+// [DONE] exec=3.1264706589990965s solver=148.3448894180001s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/bio/scripts/run_5TERA.sh ===
+// [TIMEOUT] exec=15.140011042001788s solver=885.042021811998s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/bio/scripts/run_dRNASeq.sh ===
+// [DONE] exec=0.5383495759997459s solver=16.73869221899804s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/bio/validate.sh ===
+// [DONE] exec=53.06524061000164s solver=586.896788263999s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/ci-cd/clean.sh ===
+// [DONE] exec=0.0589798820001306s solver=0.1021053779986687s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/ci-cd/execute.sh ===
+sh: 75: Syntax error: "(" unexpected
+// [CRASH] SaSh crashed on /users/ubuntu/sash/benchmarks/koala/ci-cd/execute.sh: name 'pathlib' is not defined
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/ci-cd/fetch.sh ===
+sh: 8: Syntax error: "(" unexpected
+// [CRASH] SaSh crashed on /users/ubuntu/sash/benchmarks/koala/ci-cd/fetch.sh: name 'pathlib' is not defined
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/ci-cd/install.sh ===
+sh: 16: Syntax error: "(" unexpected
+// [CRASH] SaSh crashed on /users/ubuntu/sash/benchmarks/koala/ci-cd/install.sh: name 'pathlib' is not defined
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/ci-cd/riker/lsof/clean.sh ===
+// [DONE] exec=0.008026840001548408s solver=0.029623712001921376s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/ci-cd/riker/lsof/execute.sh ===
+// [DONE] exec=0.02205639600288123s solver=0.08674169400183018s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/ci-cd/riker/lsof/fetch.sh ===
+// [DONE] exec=0.019424047000939026s solver=0.06249074199877214s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/ci-cd/riker/lsof/install.sh ===
+// [DONE] exec=0.0063739530014572665s solver=0.006248267000046326s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/ci-cd/riker/lsof/validate.sh ===
+// [DONE] exec=0.024408548000792507s solver=0.03645163900000625s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/ci-cd/riker/lua/clean.sh ===
+// [DONE] exec=0.009127029003138887s solver=0.031911102996673435s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/ci-cd/riker/lua/execute.sh ===
+// [DONE] exec=0.021926442001131363s solver=0.08639159599988488s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/ci-cd/riker/lua/fetch.sh ===
+// [DONE] exec=0.022210745999473147s solver=0.12198070399972494s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/ci-cd/riker/lua/install.sh ===
+// [DONE] exec=0.006882748999487376s solver=0.0058911950000037905s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/ci-cd/riker/lua/validate.sh ===
+sh: 6: Syntax error: "(" unexpected
+// [CRASH] SaSh crashed on /users/ubuntu/sash/benchmarks/koala/ci-cd/riker/lua/validate.sh: name 'pathlib' is not defined
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/ci-cd/riker/memcached/clean.sh ===
+// [DONE] exec=0.009391516003233846s solver=0.031674117999500595s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/ci-cd/riker/memcached/execute.sh ===
+// [DONE] exec=0.022084038002503803s solver=0.08739548299854505s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/ci-cd/riker/memcached/fetch.sh ===
+// [DONE] exec=0.024537389999750303s solver=0.19099558100060676s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/ci-cd/riker/memcached/install.sh ===
+// [DONE] exec=0.007806355999491643s solver=0.006317696999758482s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/ci-cd/riker/memcached/validate.sh ===
+sh: 6: Syntax error: "(" unexpected
+// [CRASH] SaSh crashed on /users/ubuntu/sash/benchmarks/koala/ci-cd/riker/memcached/validate.sh: name 'pathlib' is not defined
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/ci-cd/riker/redis/clean.sh ===
+// [DONE] exec=0.009017923999635968s solver=0.028601731999515323s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/ci-cd/riker/redis/execute.sh ===
+// [DONE] exec=0.022318858998914948s solver=0.0850778160020127s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/ci-cd/riker/redis/fetch.sh ===
+// [DONE] exec=0.015910832000372466s solver=0.06232152499796939s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/ci-cd/riker/redis/install.sh ===
+// [DONE] exec=0.007539253998402273s solver=0.006367431000398938s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/ci-cd/riker/redis/validate.sh ===
+sh: 6: Syntax error: "(" unexpected
+// [CRASH] SaSh crashed on /users/ubuntu/sash/benchmarks/koala/ci-cd/riker/redis/validate.sh: name 'pathlib' is not defined
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/ci-cd/riker/sqlite/clean.sh ===
+// [DONE] exec=0.009382058000483084s solver=0.03361428499920294s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/ci-cd/riker/sqlite/execute.sh ===
+// [DONE] exec=0.021912044001510367s solver=0.08690845799719682s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/ci-cd/riker/sqlite/fetch.sh ===
+// [DONE] exec=0.01619384399964474s solver=0.06327999699715292s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/ci-cd/riker/sqlite/install.sh ===
+// [DONE] exec=0.008684286000061547s solver=0.006995341998845106s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/ci-cd/riker/sqlite/validate.sh ===
+sh: 9: Syntax error: "(" unexpected
+// [CRASH] SaSh crashed on /users/ubuntu/sash/benchmarks/koala/ci-cd/riker/sqlite/validate.sh: name 'pathlib' is not defined
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/ci-cd/riker/vim/clean.sh ===
+// [DONE] exec=0.008969081998657202s solver=0.031688684997789096s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/ci-cd/riker/vim/execute.sh ===
+// [DONE] exec=0.022113764000096126s solver=0.08569401500062668s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/ci-cd/riker/vim/fetch.sh ===
+// [DONE] exec=0.015649241002392955s solver=0.05982251599925803s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/ci-cd/riker/vim/install.sh ===
+// [DONE] exec=0.010081803000502987s solver=0.00660403599977144s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/ci-cd/riker/vim/validate.sh ===
+// [DONE] exec=0.0219505159984692s solver=0.019574509999074508s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/ci-cd/riker/xz/clean.sh ===
+// [DONE] exec=0.00985628000125871s solver=0.03201245300078881s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/ci-cd/riker/xz/execute.sh ===
+// [DONE] exec=0.022243827999773202s solver=0.08339542299654568s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/ci-cd/riker/xz/fetch.sh ===
+// [DONE] exec=0.012271349998627556s solver=0.019855618997098645s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/ci-cd/riker/xz/install.sh ===
+// [DONE] exec=0.005906493999646045s solver=0.006462468998506665s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/ci-cd/riker/xz/validate.sh ===
+sh: 11: Syntax error: "(" unexpected
+// [CRASH] SaSh crashed on /users/ubuntu/sash/benchmarks/koala/ci-cd/riker/xz/validate.sh: name 'pathlib' is not defined
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/ci-cd/riker/xz-clang/clean.sh ===
+// [DONE] exec=0.010136607997992542s solver=0.03226428700145334s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/ci-cd/riker/xz-clang/execute.sh ===
+// [DONE] exec=0.021895333000429673s solver=0.08575813599964022s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/ci-cd/riker/xz-clang/fetch.sh ===
+// [DONE] exec=0.012293642001168337s solver=0.0203358719991229s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/ci-cd/riker/xz-clang/install.sh ===
+// [DONE] exec=0.007454423997842241s solver=0.006532079998578411s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/ci-cd/riker/xz-clang/validate.sh ===
+sh: 11: Syntax error: "(" unexpected
+// [CRASH] SaSh crashed on /users/ubuntu/sash/benchmarks/koala/ci-cd/riker/xz-clang/validate.sh: name 'pathlib' is not defined
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/ci-cd/validate.sh ===
+sh: 6: Syntax error: "(" unexpected
+// [CRASH] SaSh crashed on /users/ubuntu/sash/benchmarks/koala/ci-cd/validate.sh: name 'pathlib' is not defined
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/covid/clean.sh ===
+// [DONE] exec=0.01748454100015806s solver=0.09151706199918408s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/covid/execute.sh ===
+// [DONE] exec=31.495419327999116s solver=115.64387776899821s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/covid/fetch.sh ===
+// [DONE] exec=0.04876503799823695s solver=0.18800695999743766s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/covid/install.sh ===
+// [DONE] exec=0.06149960100083263s solver=0.015862063999520615s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/covid/scripts/1.sh ===
+// [DONE] exec=0.011801589997048723s solver=0.014783354999963194s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/covid/scripts/2.sh ===
+// [DONE] exec=0.013894763997086557s solver=0.014416575999348424s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/covid/scripts/3.sh ===
+// [DONE] exec=0.014125088000582764s solver=0.014325755000754725s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/covid/scripts/4.sh ===
+// [DONE] exec=0.012005282998870825s solver=0.013954967998870416s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/covid/scripts/5.sh ===
+// [DONE] exec=0.006188305000250693s solver=0.006744501002685865s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/covid/validate.sh ===
+// [TIMEOUT] exec=451.0225306409993s solver=450.1798138609993s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/file-mod/clean.sh ===
+// [DONE] exec=0.021085540000058245s solver=0.09519082800034084s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/file-mod/execute.sh ===
+// [DONE] exec=41.18425711599775s solver=86.55436915099926s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/file-mod/fetch.sh ===
+// [DONE] exec=8.812250358998426s solver=281.7180327180031s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/file-mod/install.sh ===
+// [DONE] exec=0.01813114300239249s solver=0.005896296999708284s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/file-mod/scripts/compress_files.sh ===
+// [DONE] exec=0.01748953700007405s solver=0.06275357400227222s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/file-mod/scripts/encrypt_files.sh ===
+// [DONE] exec=0.028697273999569006s solver=0.06800810599816032s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/file-mod/scripts/img_convert.sh ===
+// [DONE] exec=0.026135379997867858s solver=0.07857699199666968s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/file-mod/scripts/thumbnail_generation.sh ===
+// [DONE] exec=0.006462109999120003s solver=0.007476375001715496s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/file-mod/scripts/to_mp3.sh ===
+// [DONE] exec=0.025276737000240246s solver=0.07089457899928675s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/file-mod/validate.sh ===
+// [DONE] exec=66.98840778399972s solver=56.61948793800184s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/inference/clean.sh ===
+// [DONE] exec=0.05277539300004719s solver=0.15144837700063363s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/inference/execute.sh ===
+// [TIMEOUT] exec=121.05036837499938s solver=779.2797406720019s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/inference/fetch.sh ===
+// [TIMEOUT] exec=13.009276816999773s solver=887.1679823570012s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/inference/install.sh ===
+// [DONE] exec=0.05456041800061939s solver=0.015004392000264488s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/inference/scripts/dpt_seq.sh ===
+// [DONE] exec=0.0926542339984735s solver=0.327174345999083s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/inference/scripts/image-annotation.sh ===
+// [DONE] exec=0.08274505400186172s solver=0.1783296879984846s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/inference/scripts/playlist-creation.sh ===
+// [DONE] exec=0.08682904200031771s solver=0.18281295700217015s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/inference/validate.sh ===
+// [DONE] exec=34.69745768099892s solver=315.3358709620006s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/ml/clean.sh ===
+// [DONE] exec=0.043658057002176065s solver=0.1419219700001122s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/ml/execute.sh ===
+// [DONE] exec=0.04591552100100671s solver=0.12270811700000195s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/ml/fetch.sh ===
+sh: 6: Syntax error: "(" unexpected
+// [CRASH] SaSh crashed on /users/ubuntu/sash/benchmarks/koala/ml/fetch.sh: name 'pathlib' is not defined
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/ml/install.sh ===
+// [DONE] exec=0.018252687998028705s solver=0.006752099998266203s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/ml/scripts/execute.sh ===
+// [DONE] exec=0.6021373709991167s solver=0.12099257199952262s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/ml/validate.sh ===
+sh: 6: Syntax error: "(" unexpected
+// [CRASH] SaSh crashed on /users/ubuntu/sash/benchmarks/koala/ml/validate.sh: name 'pathlib' is not defined
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/nlp/clean.sh ===
+// [DONE] exec=0.018336835000809515s solver=0.11272545300016645s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/nlp/execute.sh ===
+sh: 112: Syntax error: redirection unexpected
+// [CRASH] SaSh crashed on /users/ubuntu/sash/benchmarks/koala/nlp/execute.sh: name 'pathlib' is not defined
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/nlp/fetch.sh ===
+// [DONE] exec=0.6822088099979737s solver=23.187985904001835s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/nlp/install.sh ===
+// [DONE] exec=0.0018438549996062648s solver=0.007078694998199353s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/nlp/scripts/bigrams.sh ===
+// [DONE] exec=0.5905238129998907s solver=4.1339015570010815s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/nlp/scripts/bigrams_appear_twice.sh ===
+// [DONE] exec=0.530566721001378s solver=13.985219619000418s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/nlp/scripts/compare_exodus_genesis.sh ===
+// [DONE] exec=1.3664065699995263s solver=20.511631153000053s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/nlp/scripts/count_consonant_seq.sh ===
+// [DONE] exec=0.21390551699732896s solver=0.9588039199988998s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/nlp/scripts/count_morphs.sh ===
+// [DONE] exec=0.19254746200022055s solver=0.9682265910014394s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/nlp/scripts/count_trigrams.sh ===
+// [DONE] exec=0.6459468940010993s solver=9.573097756001516s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/nlp/scripts/count_vowel_seq.sh ===
+// [DONE] exec=0.2164207460009493s solver=0.9237977289994888s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/nlp/scripts/count_words.sh ===
+// [DONE] exec=0.21595470100146485s solver=0.8692331909987843s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/nlp/scripts/find_anagrams.sh ===
+// [DONE] exec=0.5956276979995891s solver=8.74286156999733s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/nlp/scripts/letter_words.sh ===
+// [DONE] exec=0.36968576799699804s solver=1.885437502998684s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/nlp/scripts/merge_upper.sh ===
+// [DONE] exec=0.24248248499861802s solver=0.9149085299977742s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/nlp/scripts/sort.sh ===
+// [DONE] exec=0.23399652400257764s solver=1.0053715969988843s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/nlp/scripts/sort_words_by_folding.sh ===
+// [DONE] exec=0.22466041700317874s solver=0.9035533080023015s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/nlp/scripts/sort_words_by_num_of_syllables.sh ===
+// [DONE] exec=0.6528737059998093s solver=6.8217961019981885s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/nlp/scripts/sort_words_by_rhyming.sh ===
+// [DONE] exec=0.2320069870002044s solver=0.9582729249996191s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/nlp/scripts/syllable_words_1.sh ===
+// [DONE] exec=0.25523511699793744s solver=0.9083453610001015s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/nlp/scripts/syllable_words_2.sh ===
+// [DONE] exec=0.2626928850004333s solver=1.0313178350006638s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/nlp/scripts/trigram_rec.sh ===
+// [DONE] exec=1.5542980039972463s solver=91.85050289100036s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/nlp/scripts/uppercase_by_token.sh ===
+// [DONE] exec=0.2254366100023617s solver=0.8923772130001453s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/nlp/scripts/uppercase_by_type.sh ===
+// [DONE] exec=0.24057085800086497s solver=1.0196135090009193s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/nlp/scripts/verses_2om_3om_2instances.sh ===
+// [DONE] exec=0.36973717200089595s solver=2.8301633869996294s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/nlp/scripts/vowel_sequencies_gr_1K.sh ===
+// [DONE] exec=0.2608495069980563s solver=0.946439706000092s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/nlp/scripts/words_no_vowels.sh ===
+// [DONE] exec=0.25019586100097513s solver=1.0661577910032065s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/nlp/validate.sh ===
+// [DONE] exec=30.251160200001323s solver=228.92298785100138s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/oneliners/clean.sh ===
+// [DONE] exec=0.0357530749970465s solver=0.18846811199910007s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/oneliners/execute.sh ===
+sh: 53: Syntax error: "(" unexpected (expecting "fi")
+// [CRASH] SaSh crashed on /users/ubuntu/sash/benchmarks/koala/oneliners/execute.sh: name 'pathlib' is not defined
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/oneliners/fetch.sh ===
+sh: 37: Syntax error: Bad for loop variable
+// [CRASH] SaSh crashed on /users/ubuntu/sash/benchmarks/koala/oneliners/fetch.sh: name 'pathlib' is not defined
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/oneliners/install.sh ===
+// [DONE] exec=0.05921923899950343s solver=0.017361349000566406s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/oneliners/scripts/bi-gram.aux.sh ===
+// [DONE] exec=0.1260890159974224s solver=1.4426704819998122s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/oneliners/scripts/bi-grams.sh ===
+// [DONE] exec=0.011687154998071492s solver=0.015195379000942921s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/oneliners/scripts/comm.sh ===
+// [DONE] exec=0.0037449079973157495s solver=0.00793609600077616s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/oneliners/scripts/diff.sh ===
+// [DONE] exec=0.0181088749995979s solver=0.0654343690002861s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/oneliners/scripts/nfa-regex.sh ===
+// [DONE] exec=0.006484797999291914s solver=0.014288293998106383s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/oneliners/scripts/opt-parallel.sh ===
+// [DONE] exec=0.010562671999650775s solver=0.006988735000049928s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/oneliners/scripts/set-diff.sh ===
+// [DONE] exec=0.020641504001105204s solver=0.07152020699868444s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/oneliners/scripts/sort-sort.sh ===
+// [DONE] exec=0.006369069997163024s solver=0.015448154001205694s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/oneliners/scripts/sort.sh ===
+// [DONE] exec=0.0033172840012412053s solver=0.015160603001277195s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/oneliners/scripts/spell.sh ===
+// [DONE] exec=0.0134522329972242s solver=0.01851498800169793s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/oneliners/scripts/top-n.sh ===
+// [DONE] exec=0.012083079000149155s solver=0.014989852003054693s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/oneliners/scripts/uniq-ips.sh ===
+// [DONE] exec=0.004011819997685961s solver=0.015266823000274599s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/oneliners/scripts/wf.sh ===
+// [DONE] exec=0.011435452001023805s solver=0.014763777999178274s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/oneliners/validate.sh ===
+// [DONE] exec=13.220068525999523s solver=59.93735603899768s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/pkg/clean.sh ===
+// [DONE] exec=0.029450072997860843s solver=0.159201590999146s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/pkg/execute.sh ===
+// [DONE] exec=11.014058636999835s solver=21.434139272998436s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/pkg/fetch.sh ===
+// [DONE] exec=0.3706221379979979s solver=3.391610728998785s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/pkg/install.sh ===
+// [DONE] exec=0.13497318700319738s solver=0.7596426060008525s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/pkg/scripts/pacaur.sh ===
+// [DONE] exec=0.5977199689987174s solver=25.256431241999962s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/pkg/scripts/proginf.sh ===
+// [DONE] exec=0.05587502699927427s solver=0.4728421049985627s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/pkg/validate.sh ===
+// [CRASH] SaSh crashed on /users/ubuntu/sash/benchmarks/koala/pkg/validate.sh: unreachable
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/repl/clean.sh ===
+// [DONE] exec=0.2578220190007414s solver=3.4156376120008645s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/repl/execute.sh ===
+// [TIMEOUT] exec=92.94021678399804s solver=807.1279318179986s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/repl/fetch.sh ===
+// [DONE] exec=0.03748563900080626s solver=0.1881656830009888s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/repl/install.sh ===
+// [DONE] exec=0.14672663300007116s solver=0.01747443999920506s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/repl/scripts/git-workflow.sh ===
+// [DONE] exec=0.4554060299997218s solver=6.958084792000591s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/repl/scripts/vps-audit-negate.sh ===
+// [TIMEOUT] exec=450.38420632600173s solver=450.0848048810003s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/repl/scripts/vps-audit.sh ===
+// [TIMEOUT] exec=480.3334052169994s solver=450.15828525500183s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/repl/validate.sh ===
+// [DONE] exec=10.998813710997638s solver=31.529780532997393s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/unixfun/clean.sh ===
+// [DONE] exec=0.026706546999776037s solver=0.1121477570013667s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/unixfun/execute.sh ===
+sh: 10: Syntax error: "(" unexpected
+// [CRASH] SaSh crashed on /users/ubuntu/sash/benchmarks/koala/unixfun/execute.sh: name 'pathlib' is not defined
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/unixfun/fetch.sh ===
+sh: 10: Syntax error: "(" unexpected
+// [CRASH] SaSh crashed on /users/ubuntu/sash/benchmarks/koala/unixfun/fetch.sh: name 'pathlib' is not defined
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/unixfun/install.sh ===
+// [DONE] exec=0.00074939900150639s solver=0.007095474000379909s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/unixfun/scripts/1.sh ===
+// [DONE] exec=0.005607336002867669s solver=0.015199245000985684s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/unixfun/scripts/10.sh ===
+// [DONE] exec=0.015741464998427546s solver=0.014765639996767277s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/unixfun/scripts/11.sh ===
+// [DONE] exec=0.016045617001509527s solver=0.015018184003565693s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/unixfun/scripts/12.sh ===
+// [DONE] exec=0.015255020000040531s solver=0.01501489899965236s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/unixfun/scripts/13.sh ===
+// [DONE] exec=0.008249714999692515s solver=0.014331533999211388s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/unixfun/scripts/14.sh ===
+// [DONE] exec=0.007278447999851778s solver=0.0150746600011189s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/unixfun/scripts/15.sh ===
+// [DONE] exec=0.007597858999361051s solver=0.015150985000218498s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/unixfun/scripts/16.sh ===
+// [DONE] exec=0.01164688499920885s solver=0.014509798002109164s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/unixfun/scripts/17.sh ===
+// [DONE] exec=0.008321550998516614s solver=0.01499985999907949s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/unixfun/scripts/18.sh ===
+// [DONE] exec=0.007144166000216501s solver=0.01419166000050609s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/unixfun/scripts/19.sh ===
+// [DONE] exec=0.009081569001864409s solver=0.016224313996644923s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/unixfun/scripts/2.sh ===
+// [DONE] exec=0.005606273000012152s solver=0.015056576998176752s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/unixfun/scripts/20.sh ===
+// [DONE] exec=0.010750707999250153s solver=0.014219653003237909s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/unixfun/scripts/21.sh ===
+// [DONE] exec=0.006484946999989916s solver=0.014388560000952566s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/unixfun/scripts/22.sh ===
+// [DONE] exec=0.0008953739998105448s solver=0.006930274001206271s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/unixfun/scripts/23.sh ===
+// [DONE] exec=0.012427040997863514s solver=0.015024847001768649s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/unixfun/scripts/24.sh ===
+// [DONE] exec=0.006152489997475641s solver=0.014649321001343196s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/unixfun/scripts/25.sh ===
+// [DONE] exec=0.005968523997580633s solver=0.014930510998965474s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/unixfun/scripts/26.sh ===
+// [DONE] exec=0.010696425997593906s solver=0.015502365000429563s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/unixfun/scripts/27.sh ===
+// [DONE] exec=0.001196519999211887s solver=0.007133135000913171s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/unixfun/scripts/28.sh ===
+// [DONE] exec=0.016702421999070793s solver=0.014945037000870798s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/unixfun/scripts/29.sh ===
+// [DONE] exec=0.008583673999964958s solver=0.015187733999482589s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/unixfun/scripts/3.sh ===
+// [DONE] exec=0.006897982999362284s solver=0.015411964999657357s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/unixfun/scripts/30.sh ===
+// [DONE] exec=0.01382176499828347s solver=0.015067587999510579s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/unixfun/scripts/31.sh ===
+// [DONE] exec=0.015254418998665642s solver=0.015282010001101298s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/unixfun/scripts/32.sh ===
+// [DONE] exec=0.008039109998208005s solver=0.01472654600001988s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/unixfun/scripts/33.sh ===
+// [DONE] exec=0.007262539002113044s solver=0.015008345999376616s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/unixfun/scripts/34.sh ===
+// [DONE] exec=0.012743136001517996s solver=0.014650383000116562s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/unixfun/scripts/35.sh ===
+// [DONE] exec=0.006302712998149218s solver=0.0148343200016825s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/unixfun/scripts/36.sh ===
+// [DONE] exec=0.012782980997144477s solver=0.014623081999161514s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/unixfun/scripts/4.sh ===
+// [DONE] exec=0.007684993001021212s solver=0.014999318998889066s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/unixfun/scripts/5.sh ===
+// [DONE] exec=0.006720850000419887s solver=0.015299542999855476s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/unixfun/scripts/6.sh ===
+// [DONE] exec=0.02550911500293296s solver=0.014930239001841983s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/unixfun/scripts/7.sh ===
+// [DONE] exec=0.007238554000650765s solver=0.014244189002056373s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/unixfun/scripts/8.sh ===
+// [DONE] exec=0.009450584002479445s solver=0.015153549000388011s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/unixfun/scripts/9.sh ===
+// [DONE] exec=0.013567857000452932s solver=0.014759628000319935s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/unixfun/validate.sh ===
+// [DONE] exec=10.914364009000565s solver=48.223879642999236s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/weather/clean.sh ===
+// [DONE] exec=0.028132790001109242s solver=0.09619941400160315s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/weather/execute.sh ===
+// [DONE] exec=13.488630749001459s solver=47.89876390400241s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/weather/fetch.sh ===
+// [DONE] exec=0.10998615299831727s solver=0.5264303879994259s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/weather/install.sh ===
+// [DONE] exec=0.1422061199991731s solver=0.018950690999190556s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/weather/scripts/temp-analytics.sh ===
+// [DONE] exec=0.03001586100072018s solver=0.07377383799757808s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/weather/scripts/tuft-weather.sh ===
+// [DONE] exec=0.5223515979996591s solver=7.589348053999856s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/weather/validate.sh ===
+// [DONE] exec=16.842933851999987s solver=67.77064782399975s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/web-search/clean.sh ===
+// [DONE] exec=0.033186164997459855s solver=0.2059785000019474s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/web-search/execute.sh ===
+// [DONE] exec=0.06236135499784723s solver=0.23808631700012484s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/web-search/fetch.sh ===
+// [DONE] exec=0.07651243900181726s solver=0.48512593200211995s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/web-search/install.sh ===
+// [DONE] exec=0.1729061730002286s solver=1.332715112999722s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/web-search/scripts/c/combine.sh ===
+// [DONE] exec=0.08998610100024962s solver=0.4578750019973086s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/web-search/scripts/c/invert.sh ===
+// [DONE] exec=0.00940208999963943s solver=0.007198425999376923s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/web-search/scripts/c/process.sh ===
+// [DONE] exec=0.010265553999488475s solver=0.027373363001970574s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/web-search/scripts/crawl.sh ===
+// [DONE] exec=0.022314028999971924s solver=0.11803075599891599s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/web-search/scripts/engine.sh ===
+// [DONE] exec=0.04262930100230733s solver=0.1236893669993151s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/web-search/scripts/index.sh ===
+// [DONE] exec=0.008419031000812538s solver=0.015091959001438227s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/web-search/scripts/query.sh ===
+// [DONE] exec=0.020799702000658726s solver=0.05946043999938411s
+
+=== Running on: /users/ubuntu/sash/benchmarks/koala/web-search/validate.sh ===
+sh: 16: Syntax error: redirection unexpected
+// [CRASH] SaSh crashed on /users/ubuntu/sash/benchmarks/koala/web-search/validate.sh: name 'pathlib' is not defined
+
+=== Summary ===
+  Files scanned: 270
+  Succeeded:     242
+  Crashed:       20
+  Timed out:     8
+  CSV:           results/koala/koala-eval/results_t900.csv
+
+> Generating plots
+uv run python -
+
+Done
+Outputs:
+
+  results/koala/koala-eval/results_t*.csv (evaluation of SaSh on the Koala benchmarks)
+  results/koala/figures/koala.pdf (CDF plot)
+10365.66user 16.22system 2:52:51elapsed 100%CPU (0avgtext+0avgdata 1090952maxresident)k
+0inputs+704outputs (15major+439899minor)pagefaults 0swaps

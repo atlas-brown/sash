@@ -1,0 +1,41 @@
+description: Filesystem preparation
+
+sources:
+  - https://stackoverflow.com/questions/48674985/mkdir-not-working-in-centos-7
+
+bugs:
+  bug00:
+    description: An unset variable is used ($OPTARGS)
+    code: unbound
+    shellcheck: SC2153
+  bug01:
+    description: Mkdir fails because its argument is always empty
+    code: command_can_only_fail
+    shellcheck: null
+
+ground_truths:
+  # Base versions
+  - path: original.sh
+    kind: original
+    bugs:
+      bug00: { lines: [9] }
+      bug01: { lines: [16] }
+
+  - path: posix.sh
+    kind: buggy
+    bugs:
+      bug00: { lines: [9] }
+      bug01: { lines: [16] }
+
+  - path: fixed.sh
+    kind: fixed
+    bugs:
+      bug00: { regression_lines: [9], shellcheck: null }
+      bug01: { regression_lines: [16], shellcheck: null }
+
+  # Variants
+  - path: variants/bug-assign_later.sh
+    kind: buggy_variant
+    bugs:
+      bug00: { lines: [9], shellcheck: null }
+      bug01: { lines: [16] }

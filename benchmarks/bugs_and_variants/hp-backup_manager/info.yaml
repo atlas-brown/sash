@@ -1,0 +1,42 @@
+description: Ubuntu backup manager
+
+
+
+sources:
+  - https://git.launchpad.net/ubuntu/+source/backup-manager/commit/lib/backup-methods.sh?id=59cdd322f7772d40b6aff25b6720796271f4deba
+
+notes:
+  - To produce posix.sh, some array loops and references were changed to normal variable loops and references, because the arrays in question are not defined in the script anyways
+  - The original fix uses PIPESTATUS, which is not POSIX compliant; the fixed version captures the exit code of the first command in the pipeline by storing it in a temporary variable
+
+bugs:
+  bug00:
+    description: Log file is deleted due to improper exit code checking
+    code: const_cond
+    shellcheck: SC2181
+    notes:
+      - ShellCheck warns about not checking exit codes indirectly; it's a 'style' check
+      - We used to think that line 203 (in the original) was also buggy, but it's only constant along one execution path
+
+ground_truths:
+  # Base versions
+  - path: original.sh
+    kind: original
+    bugs:
+      bug00: { lines: [179] }
+
+  - path: posix.sh
+    kind: buggy
+    bugs:
+      bug00: { lines: [179] }
+
+  - path: fixed.sh
+    kind: fixed
+    bugs:
+      bug00: { regression_lines: [183], shellcheck: null }
+
+  # Variants
+  - path: variants/bug-assign_first.sh
+    kind: buggy_variant
+    bugs:
+      bug00: { lines: [180], shellcheck: null }

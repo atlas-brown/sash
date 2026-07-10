@@ -1,0 +1,149 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  cat <<'EOF'
+Run SaSh on Koala benchmarks with a timeout/configuration sweep.
+
+Usage:
+  scripts/on_koala [options]
+
+Options:
+  --timeouts LIST    Comma-separated timeout values in seconds.
+                     Default: 1,10,20,30,40,50,60
+  --configs LIST     Comma-separated sweep configurations.
+                     Allowed: no_opts,smart_forking,solver_opts,dfs_on
+                     Default: no_opts,smart_forking,dfs_on
+  --output-dir DIR   Sweep output directory (repo-relative or absolute).
+                     Default: results/koala-timeout-sweep
+  --dry-run          Print commands without executing.
+  -h, --help         Show this help and exit.
+EOF
+}
+
+TIMEOUTS_CSV="1,10,20,30,40,50,60"
+CONFIGS_CSV="no_opts,smart_forking,dfs_on"
+OUTPUT_DIR="results/koala-timeout-sweep"
+DRY_RUN=0
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --timeouts)
+      TIMEOUTS_CSV="${2:-}"
+      shift 2
+      ;;
+    --output-dir)
+      OUTPUT_DIR="${2:-}"
+      shift 2
+      ;;
+    --configs)
+      CONFIGS_CSV="${2:-}"
+      shift 2
+      ;;
+    --dry-run)
+      DRY_RUN=1
+      shift
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "Unknown argument: $1" >&2
+      usage >&2
+      exit 2
+      ;;
+  esac
+done
+
+IFS=',' read -r -a TIMEOUTS <<< "${TIMEOUTS_CSV}"
+if [[ ${#TIMEOUTS[@]} -eq 0 ]]; then
+  echo "No timeouts specified" >&2
+  exit 2
+fi
+IFS=',' read -r -a CONFIGS <<< "${CONFIGS_CSV}"
+if [[ ${#CONFIGS[@]} -eq 0 ]]; then
+  echo "No sweep configurations specified" >&2
+  exit 2
+fi
+for raw_mode in "${CONFIGS[@]}"; do
+  mode="$(echo "${raw_mode}" | xargs)"
+  case "${mode}" in
+    no_opts|smart_forking|solver_opts|dfs_on) ;;
+    *)
+      echo "Invalid sweep configuration: '${mode}'" >&2
+      exit 2
+      ;;
+  esac
+done
+
+top=$(git rev-parse --show-toplevel)
+cd "$top" || exit 1
+
+koala_dir="${top}/benchmarks/_not_integrated/koala"
+if [[ ! -d "${koala_dir}" ]]; then
+  echo "Koala directory not found: ${koala_dir}" >&2
+  exit 1
+fi
+
+out_dir="${OUTPUT_DIR}"
+if [[ "${out_dir}" != /* ]]; then
+  out_dir="${top}/${out_dir}"
+fi
+mkdir -p "${out_dir}"
+
+echo "Repository: ${top}"
+echo "Koala dir:  ${koala_dir}"
+echo "Output dir: ${out_dir}"
+echo "Timeouts:   ${TIMEOUTS_CSV}"
+echo "Configs:    ${CONFIGS_CSV}"
+
+for raw_t in "${TIMEOUTS[@]}"; do
+  t="$(echo "${raw_t}" | xargs)"
+  if [[ -z "${t}" ]]; then
+    continue
+  fi
+  if ! [[ "${t}" =~ ^[0-9]+([.][0-9]+)?$ ]]; then
+    echo "Invalid timeout value: '${t}'" >&2
+    exit 2
+  fi
+
+  for raw_mode in "${CONFIGS[@]}"; do
+    mode="$(echo "${raw_mode}" | xargs)"
+    csv_path="${out_dir}/results_t${t}_${mode}.csv"
+    # SaSh now uses a single total timeout (-t) for both execution and solver phases.
+    total_timeout=$(awk "BEGIN{printf \"%g\", ${t} + ${t}}")
+    cmd=(
+      uv run "${top}/scripts/run_on_dir.py" "${koala_dir}"
+      -t "${total_timeout}"
+      -c "${csv_path}"
+    )
+    case "${mode}" in
+      no_opts)
+        cmd+=(--fork-everywhere --disable-solver-optimizations --disable-dfs)
+        ;;
+      smart_forking)
+        cmd+=(--disable-solver-optimizations --disable-dfs)
+        ;;
+      solver_opts)
+        cmd+=(--disable-dfs)
+        ;;
+      dfs_on)
+        # default/full SaSh
+        ;;
+    esac
+
+    echo
+    echo "=== Koala timeout ${t}s | ${mode} ==="
+    echo "${cmd[*]}"
+    if [[ ${DRY_RUN} -eq 0 ]]; then
+      "${cmd[@]}"
+      if [[ "${mode}" == "dfs_on" ]]; then
+        cp -f "${csv_path}" "${out_dir}/results_t${t}.csv"
+      fi
+    fi
+  done
+done
+
+echo
+echo "Done. CSV files are in: ${out_dir}"

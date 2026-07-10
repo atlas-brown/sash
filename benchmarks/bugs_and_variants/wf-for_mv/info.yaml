@@ -1,0 +1,26 @@
+description: Archive extract move
+
+sources:
+  - https://unix.stackexchange.com/questions/231513/bash-move-files-of-specific-pattern
+
+bugs:
+  bug00:
+    description: Detected issue code 'cmd_expected_path_state' in benchmark script
+    code: cmd_expected_path_state
+    shellcheck: null
+
+ground_truths:
+  - path: original.sh
+    kind: original
+    bugs:
+      bug00: { lines: [14] }
+
+  - path: posix.sh
+    kind: buggy
+    bugs:
+      bug00: { lines: [14] }
+
+  - path: fixed.sh
+    kind: fixed
+    bugs:
+      bug00: { regression_lines: [14], shellcheck: null }
