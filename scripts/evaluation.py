@@ -72,7 +72,7 @@ def main(
     eprint(f"\n{BOLD}Preparing analyses{RESET}")
     stats = EvalStats()
     jobs: list[Job] = []
-    for bench_dir in benchmarks_dir.iterdir():
+    for bench_dir in sorted(benchmarks_dir.iterdir()):
         if bench_dir.is_dir() and bench_filter.match(bench_dir.relative_to(benchmarks_dir).as_posix()):
             jobs.extend(
                 prepare_jobs(
