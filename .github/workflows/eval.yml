@@ -1,4 +1,4 @@
-name: Run evaluation
+name: Evaluation
 on:
   workflow_run:
     workflows: [Run tests]
