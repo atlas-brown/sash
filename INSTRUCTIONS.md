@@ -119,7 +119,7 @@ sash benchmarks/bugs_and_variants/sf-access_del_resource/fixed.sh
 The ground truth, which includes the source of the script as well as information about ShellCheck's output on it can be found in: [`benchmarks/bugs_and_variants/sf-access_del_resource/info.yaml`](benchmarks/bugs_and_variants/sf-access_del_resource/info.yaml).
 
 
-# Results Reproduced (key results 1h; all results 10h)
+# Results Reproduced (key results 40 min; all results 5 hr 40 min)
 
 > Reviewers reproduce the paper's main evaluation figures and tables
 
@@ -127,7 +127,7 @@ The ground truth, which includes the source of the script as well as information
 > Precomputed results and figures can be found in [`results/precomputed`](results/precomputed/), along with the exact commands used to produce them in [`results/precomputed/_metadata`](results/precomputed/_metadata/). These results were produced by running the full evaluation on a [CloudLab c6525-25g node](www.utah.cloudlab.us/portal/show-nodetype.php?type=c6525-25g), on Ubuntu 22.04.2 LTS.
 
 
-## Key Result: Bug Detection Effectiveness (1h) (§7.1, §7.2)
+## Key Result: Bug Detection Effectiveness (40 min) (§7.1, §7.2)
 
 This experiment runs SaSh on all 61 buggy programs, their fixed versions, and all buggy variants mentioned in the paper. It then compares the output to the programs' ground truths. The programs, along with the ground truths, can be found in [`benchmarks/bugs_and_variants`](benchmarks/bugs_and_variants/).
 
@@ -147,12 +147,12 @@ Precomputed figure, found in [`results/precomputed/figures/main-eval.png`](resul
 </p>
 
 
-## Additional Results: Performance Analysis — Timeout Sweep (1h; optionally 3.5h) (§7.3)
+## Additional Results: Performance Analysis — Timeout Sweep (1 hr; optionally 2 hr) (§7.3)
 
 This experiment runs SaSh on all 61 buggy programs and their fixed versions with different timeouts (1s-100s) and three configurations: base symbolic execution, optimistic execution without risk-directed exploration, and full SaSh. The goal is to see the effect of the timeout choice and the optimizations on the bug-finding effectiveness of the system.
 
 
-### Quick Run (1h)
+### Quick Run (1 hr)
 
 To run a subset of the experiment, for quick results that still showcase the importance of SaSh's optimizations, use the following command:
 ```bash
@@ -160,7 +160,7 @@ To run a subset of the experiment, for quick results that still showcase the imp
 ```
 
 
-### Full Run (3.5h)
+### Full Run (2 hr)
 
 To run the full experiment, recreating the exact results of the paper:
 ```bash
@@ -179,12 +179,12 @@ Precomputed figure of the full experiment, found in [`results/precomputed/figure
 </p>
 
 
-## Additional Results: Performance Analysis — Koala (0.5h; optionally 1.5h) (§7.3)
+## Additional Results: Performance Analysis — Koala (1 hr; optionally 3 hr) (§7.3)
 
 This experiment runs SaSh on all 119 programs from the Koala benchmark suite to measure the time required for complete analysis (full exploration of each program), with a cap at 15 minutes.
 
 
-### Quick Run (0.5h)
+### Quick Run (1 hr)
 
 To run a smaller version of the experiment, for quick results that still showcase the performance of SaSh on a diverse collection of programs:
 ```bash
@@ -192,7 +192,7 @@ To run a smaller version of the experiment, for quick results that still showcas
 ```
 
 
-### Full Run (1.5h)
+### Full Run (3 hr)
 
 To run the full experiment, recreating the exact results of the paper:
 ```bash
@@ -211,6 +211,6 @@ Precomputed figure of the full experiment, found in [`results/precomputed/figure
 </p>
 
 
-# Optional: Bugs Found in the Wild (4h) (§7.4)
+# Optional: Bugs Found in the Wild (3 hr) (§7.4)
 
 The file [`benchmarks/bug_reports.md`](benchmarks/bug_reports.md) contains links to all 70 bugs SaSh identified in open-source projects, including PyTorch, Kubernetes, Next.js, vLLM, the P4 Compiler, and others. Reviewers may inspect the linked issues and pull requests to verify that the bugs were reported and, in many cases, confirmed and fixed by maintainers.
