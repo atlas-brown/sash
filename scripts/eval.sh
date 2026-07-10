@@ -163,7 +163,7 @@ run_sweep() {
 run_koala() {
     echo "> Running Koala"
     if [[ -d "${KOALA_DIR}" ]]; then
-        koala_csv="${KOALA_RESULTS_DIR}/results_t${KOALA_TIMEOUT}.csv"
+        koala_csv="${KOALA_RESULTS_DIR}/results_t${KOALA_TIMEOUT}${SKIP_KOALA_HARNESS:+"_no_harness"}.csv"
         if [[ ${FORCE} -eq 0 && -f "${koala_csv}" ]]; then
             echo "Skipping existing: ${koala_csv}"
         else
