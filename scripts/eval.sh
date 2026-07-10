@@ -16,6 +16,7 @@ MAIN_JOBS=${MAIN_JOBS:-1}
 KOALA_TIMEOUT="${KOALA_TIMEOUT:-$((15 * 60))}" # 15 minutes
 SWEEP_TIMEOUTS_CSV="${SWEEP_TIMEOUTS_CSV:-1,10,20,30,40,50,60,70,80,90,100}"
 SWEEP_JOBS="${SWEEP_JOBS:-4}"
+SKIP_KOALA_HARNESS=""
 FORCE=0  # Ignore cached results when nonzero
 DRY_RUN=0
 
@@ -66,6 +67,10 @@ while [[ $# -gt 0 ]]; do
     --sweep-jobs)
         SWEEP_JOBS="${2:-}"
         shift 2
+        ;;
+    --skip-koala-harness)
+        SKIP_KOALA_HARNESS="--skip-harness"
+        shift
         ;;
     --force)
         FORCE=1
@@ -162,7 +167,7 @@ run_koala() {
         if [[ ${FORCE} -eq 0 && -f "${koala_csv}" ]]; then
             echo "Skipping existing: ${koala_csv}"
         else
-            run_cmd uv run scripts/run_on_dir.py "${KOALA_DIR}" -t "${KOALA_TIMEOUT}" -c "${koala_csv}"
+            run_cmd uv run scripts/run_on_dir.py "${KOALA_DIR}" $SKIP_KOALA_HARNESS -t "${KOALA_TIMEOUT}" -c "${koala_csv}"
         fi
     else
         echo "Koala directory missing; skipping Koala: ${KOALA_DIR}"

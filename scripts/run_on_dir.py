@@ -123,6 +123,9 @@ def main():
         "-c", "--csv", type=Path, default=Path("results/run_on_dir_results.csv"),
         help="Where to write the aggregated CSV results (default: results/run_on_dir_results.csv)"
     )
+    parser.add_argument(
+        "--skip-harness", action="store_true", help="Skip analyzing the harness scripts"
+    )
     parser.add_argument("-e", "--error-log", type=Path, default=Path("/dev/null"),
                         help="Where to write error logs (SaSh only)")
     args = parser.parse_args()
@@ -141,6 +144,10 @@ def main():
     timed_out = 0
     succeeded = 0
     rows = []
+
+    if args.skip_harness:
+        global ENTRYPOINT_SCRIPTS
+        ENTRYPOINT_SCRIPTS = set()
 
     for path in sorted(directory.rglob("*.sh")):
         # Default Koala mode: run core scripts under */scripts/* plus lifecycle entrypoints.

@@ -186,9 +186,9 @@ This experiment runs SaSh on all 119 programs from the Koala benchmark suite to 
 
 ### Quick Run (0.5h)
 
-To run a subset of the experiment, for quick results that still showcase the performance of SaSh on a diverse collection of programs:
+To run a smaller version of the experiment, for quick results that still showcase the performance of SaSh on a diverse collection of programs:
 ```bash
-./scripts/eval.sh --koala --koala-timeout 30
+./scripts/eval.sh --koala --skip-koala-harness --koala-timeout 60
 ```
 
 
