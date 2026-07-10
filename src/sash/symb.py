@@ -2965,6 +2965,7 @@ def symbexec_file(file: str,
     returning_trace_stash = []
     context_line = None
 
+    # Run all DFS passes before running BFS
     try:
         def constant_word(arg: list[AST.ArgChar]) -> str | None:
             chars: list[str] = []
@@ -3160,6 +3161,7 @@ def symbexec_file(file: str,
             main_stop = stop if (stop is not None) else _set_timer(exec_timeout)
             stop_event = main_stop if main_stop is not None else stop_event
 
+        # Run the BFS pass
         traces = symb_engine(nodes, replace(config, branch_policy=branch_policy_half_n_half_if_too_many))
         logging.info(
             "Symbolic execution completed with %d traces, %d DFS solver traces, and %d DFS fallback traces",

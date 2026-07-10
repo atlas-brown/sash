@@ -79,10 +79,10 @@ The artifact contains all code and data relevant to the paper:
 
 | Component | Location | Paper Reference |
 |-----------|----------|-----------------|
-| Symbolic execution engine | [`src/sash/symb.py:1290–3200`](src/sash/symb.py) | §3 |
+| Symbolic execution engine | [`src/sash/symb.py:1290–3202`](src/sash/symb.py#L1290) | §3 |
 | Filesystem model, command specifications | [`src/sash/fs.py`](src/sash/fs.py), [`src/sash/specs.py`](src/sash/specs.py) | §4 |
-| Symbolic word expansion | [`src/sash/symb.py:281–1289`](src/sash/symb.py) | §5 |
-| Risk-directed exploration | [`src/sash/dfs_targeted.py`](src/sash/dfs_targeted.py), [`src/sash/symb.py:2968–3185`](src/sash/symb.py) | §6 |
+| Symbolic word expansion | [`src/sash/symb.py:281–1289`](src/sash/symb.py#L281) | §5 |
+| Risk-directed exploration | [`src/sash/dfs_targeted.py`](src/sash/dfs_targeted.py), [`src/sash/symb.py:2968–3163`](src/sash/symb.py#L2968) | §6 |
 | Evaluation scripts | [`scripts/eval.sh`](scripts/eval.sh) and other scripts in the same directory | §7 |
 | 61 real buggy programs (116 bugs) and 42 synthetic variants | [`benchmarks/bugs_and_variants/`](benchmarks/bugs_and_variants/) | §7.1, §7.2 |
 | 119 Koala benchmark programs | [`benchmarks/koala/`](benchmarks/koala/) | §7.3 |
