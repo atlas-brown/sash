@@ -27,7 +27,7 @@ This artifact targets the following badges:
 
 Reviewers should confirm the following:
 
-1. **Repository**: The artifact is available at [https://github.com/atlas-brown/sash](https://github.com/atlas-brown/sash) (branch `sosp26-ae` will be frozen) and archived at [Zenodo](https://zenodo.org/) (DOI TBD).
+1. **Repository**: The artifact is available at [https://github.com/atlas-brown/sash](https://github.com/atlas-brown/sash) (branch `sosp26-ae` will be frozen) and archived at [Zenodo](https://zenodo.org/records/21288698) (DOI: 10.5281/zenodo.21288698).
 2. **License**: The artifact contains an MIT license ([LICENSE](./LICENSE)), allowing comparison and extension.
 3. **Documentation**: The top-level [INSTRUCTIONS.md](INSTRUCTIONS.md) and [README.md](README.md) reference the paper and provide installation instructions.
 
