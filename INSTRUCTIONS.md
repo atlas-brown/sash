@@ -3,7 +3,6 @@
 Quick jump: [Artifact Available](#artifact-available-10-minutes) | [Artifact Functional](#artifact-functional-20-minutes) | [Results Reproduced](#results-reproduced-6-hours) | [Bugs in the Wild](#optional-bugs-found-in-the-wild)
 
 This is the artifact for paper #133 "Ahead-of-time Analysis of Shell Program Effects" accepted at SOSP'26.
-It contains all code, data, and experiment scripts to support the paper's contributions.
 
 The paper makes the following claims on pg. 2 (comments to AEC reviews after `:`):
 
@@ -11,8 +10,6 @@ The paper makes the following claims on pg. 2 (comments to AEC reviews after `:`
 2. **Effect and environment modeling (§4)**: two subsystems: (1) a non-hierarchical model of the file system and (2) specifications that describe the effects of common shell commands over this model.
 3. **Abstract expansion domain (§5)**: a subsystem implementing an abstract domain for shell expansion, tailor-made for uncovering field-splitting-related bugs.
 4. **Risk-directed path prioritization (§6)**: a subsystem implementing several domain-specific optimizations that steer analysis toward program fragments likely to exhibit dangerous behavior.
-
-SaSh is evaluated on 61 real-world shell programs containing 116 documented bugs (§7.1), compared against ShellCheck (§7.2), and characterized for performance across time budgets and 119 programs from [the Koala benchmark suite](https://kben.sh/) (§7.3). It has also uncovered 70 previously unknown bugs in open-source projects including PyTorch, Kubernetes, Next.js, and vLLM.
 
 This artifact targets the following badges:
 
