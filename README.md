@@ -45,7 +45,7 @@ $ sash install.sh
 > Line 3 (error): Word splitting or empty variable could lead to deletion of system file /*
 ```
 
-This is the same class of bug responsible for the 2015 Steam updater incident[^steam]. Detection requires reasoning about whether a variable can be empty and tracing that value to a destructive command.
+A similar bug was responsible for the 2015 Steam updater incident[^steam].
 
 [^steam]: [https://github.com/ValveSoftware/steam-for-linux/issues/3671](https://github.com/ValveSoftware/steam-for-linux/issues/3671)
 
