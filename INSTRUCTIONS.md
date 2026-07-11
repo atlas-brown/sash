@@ -116,6 +116,9 @@ Running the fixed version of the script, the warning should disappear:
 sash benchmarks/bugs_and_variants/sf-access_del_resource/fixed.sh
 ```
 
+SaSh will still report possible bugs corresponding to other program fragments.
+The evaluation from now on focuses on the specific bug that was fixed in each script.
+
 The ground truth, which includes the source of the script as well as information about ShellCheck's output on it can be found in: [`benchmarks/bugs_and_variants/sf-access_del_resource/info.yaml`](benchmarks/bugs_and_variants/sf-access_del_resource/info.yaml).
 
 
