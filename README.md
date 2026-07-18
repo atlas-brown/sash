@@ -1,5 +1,7 @@
 # SaSh: Ahead-of-time Analysis of Shell Program Effects
 
+[![Tests Passing](https://github.com/atlas-brown/sash/actions/workflows/test.yml/badge.svg)](https://github.com/atlas-brown/sash/actions/workflows/test.yml)
+
 Quick jump: [Examples](#examples) | [Installation](#installation) | [Contributing](#contributing) | [Citation](#citation) | [Contact](#contact)
 
 This is the artifact for the paper "Ahead-of-time Analysis of Shell Program Effects" accepted at SOSP'26.
@@ -43,7 +45,7 @@ $ sash install.sh
 > Line 3 (error): Word splitting or empty variable could lead to deletion of system file /*
 ```
 
-This is the same class of bug responsible for the 2015 Steam updater incident[^steam]. Detection requires reasoning about whether a variable can be empty and tracing that value to a destructive command.
+A similar bug was responsible for the 2015 Steam updater incident[^steam].
 
 [^steam]: [https://github.com/ValveSoftware/steam-for-linux/issues/3671](https://github.com/ValveSoftware/steam-for-linux/issues/3671)
 
@@ -187,4 +189,4 @@ If you use SaSh in your research, please cite the paper:
 
 # Contact
 
-For questions please contact `lukas_lazarek@brown.edu`, or open an issue on GitHub.
+For questions please contact `atlas@brown.edu`, or open an issue on GitHub.

@@ -3,7 +3,6 @@
 Quick jump: [Artifact Available](#artifact-available-10-minutes) | [Artifact Functional](#artifact-functional-20-minutes) | [Results Reproduced](#results-reproduced-6-hours) | [Bugs in the Wild](#optional-bugs-found-in-the-wild)
 
 This is the artifact for paper #133 "Ahead-of-time Analysis of Shell Program Effects" accepted at SOSP'26.
-It contains all code, data, and experiment scripts to support the paper's contributions.
 
 The paper makes the following claims on pg. 2 (comments to AEC reviews after `:`):
 
@@ -11,8 +10,6 @@ The paper makes the following claims on pg. 2 (comments to AEC reviews after `:`
 2. **Effect and environment modeling (§4)**: two subsystems: (1) a non-hierarchical model of the file system and (2) specifications that describe the effects of common shell commands over this model.
 3. **Abstract expansion domain (§5)**: a subsystem implementing an abstract domain for shell expansion, tailor-made for uncovering field-splitting-related bugs.
 4. **Risk-directed path prioritization (§6)**: a subsystem implementing several domain-specific optimizations that steer analysis toward program fragments likely to exhibit dangerous behavior.
-
-SaSh is evaluated on 61 real-world shell programs containing 116 documented bugs (§7.1), compared against ShellCheck (§7.2), and characterized for performance across time budgets and 119 programs from [the Koala benchmark suite](https://kben.sh/) (§7.3). It has also uncovered 70 previously unknown bugs in open-source projects including PyTorch, Kubernetes, Next.js, and vLLM.
 
 This artifact targets the following badges:
 
@@ -29,7 +26,7 @@ Reviewers should confirm the following:
 
 1. **Repository**: The artifact is available at [https://github.com/atlas-brown/sash](https://github.com/atlas-brown/sash) (branch `sosp26-ae` will be frozen) and archived at [Zenodo](https://zenodo.org/records/21288698) (DOI: 10.5281/zenodo.21288698).
 2. **License**: The artifact contains an MIT license ([LICENSE](./LICENSE)), allowing comparison and extension.
-3. **Documentation**: The top-level [INSTRUCTIONS.md](INSTRUCTIONS.md) and [README.md](README.md) reference the paper and provide installation instructions.
+3. **Documentation**: The top-level [INSTRUCTIONS.md](INSTRUCTIONS.md) and [README.md](README.md) go over all artifact contents, its mapping to the paper's contributions, and instructions for its installation and exercise.
 
 
 # Artifact Functional (10 minutes)
@@ -118,6 +115,9 @@ Running the fixed version of the script, the warning should disappear:
 ```bash
 sash benchmarks/bugs_and_variants/sf-access_del_resource/fixed.sh
 ```
+
+SaSh will still report possible bugs corresponding to other program fragments.
+The evaluation from now on focuses on the specific bug that was fixed in each script.
 
 The ground truth, which includes the source of the script as well as information about ShellCheck's output on it can be found in: [`benchmarks/bugs_and_variants/sf-access_del_resource/info.yaml`](benchmarks/bugs_and_variants/sf-access_del_resource/info.yaml).
 
