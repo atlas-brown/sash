@@ -189,4 +189,4 @@ If you use SaSh in your research, please cite the paper:
 
 # Contact
 
-For questions please contact `lukas_lazarek@brown.edu`, or open an issue on GitHub.
+For questions please contact `atlas@brown.edu`, or open an issue on GitHub.
