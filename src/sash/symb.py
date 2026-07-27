@@ -2412,6 +2412,8 @@ def handle_eval(traces: Traces,
     try:
         with tempfile.NamedTemporaryFile("w", suffix=".sh", delete=False) as temp_file:
             temp_path = temp_file.name
+            if context_line and context_line > 1:
+                temp_file.write("\n" * (context_line - 1))
             temp_file.write(eval_script)
             if not eval_script.endswith("\n"):
                 temp_file.write("\n")
