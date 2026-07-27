@@ -2370,12 +2370,11 @@ def handle_xargs(traces: Traces, node: AST.CommandNode, expanded_args: list[Fiel
             # we unroll the xargs into two invocations of the command, each time replacing
             # occurrences of thename with a command substitution that yields a fresh arbitrary each time
             # to capture the fact that each invocation may get different inputs
-            the_name_unexpanded = freeze_thing(node.arguments[2])
             mangled_cmdnode = deepcopy(node)
             mangled_cmdnode.arguments = mangled_cmdnode.arguments[3:]
             # Replace all occurrences of thename in the command with a command substitution that leads to a fresh arbitrary each time
             def replace_arg(arg: list[AST.ArgChar]) -> list[AST.ArgChar]:
-                if freeze_thing(arg) == the_name_unexpanded:
+                if _literal_argchars(arg) == thename:
                     return [AST.BArgChar(AST.CommandNode(node.line_number,
                                                          [],
                                                          [],
