@@ -1151,7 +1151,7 @@ def test_xargs_pipeline_consumes_empty_stdout(tmp_path):
 echo hi | xargs /bin/rm -f | xargs -I list echo list
 """)
     report = reset_and_run_main(script)
-    expected_error = reporter.UnexpectedStdin("xargs", 0)
+    expected_error = reporter.CapturingEmptyOutput("xargs", 0)
     assert_expected_report(report, [expected_error])
 
 

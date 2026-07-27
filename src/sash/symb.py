@@ -2712,7 +2712,7 @@ def handle_pipe_node(traces: Traces, node: AST.PipeNode, config: InterpConfig) -
             lhs = node.items[i - 1]
             rhs = cmd
             if _node_invocation_has_no_stdout(lhs) and _node_invocation_expects_stdin(rhs):
-                Reporter.add_issue(reporter.UnexpectedStdin(_node_invocation_name(rhs), context_line), config)
+                Reporter.add_issue(reporter.CapturingEmptyOutput(_node_invocation_name(rhs), context_line), config)
         t = guarded_interp_node(t, cmd, config)
     # Since traces can fork and merge, we need to match traces back to their original saved environments.
     # Thus, restore the environment of each trace to the environment of the first trace that matches its current state.
