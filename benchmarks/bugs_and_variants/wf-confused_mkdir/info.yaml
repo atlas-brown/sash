@@ -5,7 +5,7 @@ sources:
 
 bugs:
   bug00:
-    description: Detected issue code 'cmd_expected_path_state' in benchmark script
+    description: mkdir may fail on /tmp/one/two/tree (ln 3 due to being a file, ln 4 guaranteed due to ln 3)
     code: cmd_expected_path_state
     shellcheck: null
 
@@ -13,14 +13,13 @@ ground_truths:
   - path: original.sh
     kind: original
     bugs:
-      bug00: { lines: [3, 5] }
+      bug00: {lines: [3, 4]}
 
   - path: posix.sh
     kind: buggy
     bugs:
-      bug00: { lines: [3, 5] }
-
+      bug00: {lines: [3, 4]}
   - path: fixed.sh
     kind: fixed
     bugs:
-      bug00: { regression_lines: [3, 5], shellcheck: null }
+      bug00: {regression_lines: [3, 4], shellcheck: null}

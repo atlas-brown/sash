@@ -5,29 +5,28 @@ sources:
 
 bugs:
   bug00:
-    description: Detected issue code 'cmd_expected_path_state' in benchmark script
+    description: target of move may not be a directory
     code: cmd_expected_path_state
     shellcheck: null
   bug01:
-    description: Detected issue code 'unexpected_stdin' in benchmark script
-    code: unexpected_stdin
+    description: rm does not produce output, but used in pipeline
+    code: capturing_empty_output
     shellcheck: null
 
 ground_truths:
   - path: original.sh
     kind: original
     bugs:
-      bug00: { lines: [3] }
-      bug01: { lines: [3] }
+      bug00: {lines: [3]}
+      bug01: {lines: [3]}
 
   - path: posix.sh
     kind: buggy
     bugs:
-      bug00: { lines: [3] }
-      bug01: { lines: [3] }
-
+      bug00: {lines: [3]}
+      bug01: {lines: [3]}
   - path: fixed.sh
     kind: fixed
     bugs:
-      bug00: { regression_lines: [3], shellcheck: null }
-      bug01: { regression_lines: [3], shellcheck: null }
+      bug00: {regression_lines: [3], shellcheck: null}
+      bug01: {regression_lines: [3], shellcheck: null}

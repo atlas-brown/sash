@@ -1,4 +1,4 @@
 #!/bin/sh
 # https://github.com/koalaman/shellcheck/issues/910
-# FIXED: rm -rf "$(echo /)"
-# FIXED: eval "rm -rf /"
+
+# the "fixed" version of the script is not running the script at all
