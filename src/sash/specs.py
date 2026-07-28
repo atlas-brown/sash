@@ -280,6 +280,7 @@ def cp_spec(cmd: CmdInvocation) -> CmdSpec:
     srcs, dst = operands[:-1], operands[-1]
     if len(operands) > 2 or is_definitely_dir(dst) or any(will_definitely_expand(op) for op in srcs):
         # Copying to a directory
+        srcs = [s for s in srcs if not will_definitely_expand(s)]
         if "-R" not in flags:
             assertion    = RefineableConstraint(IsDir(dst) & And.from_field_iter(srcs, IsFile),
                                                 ((IsDir(dst), lambda line: reporter.ExpectedPathState("cp", 'directory', (dst,), line)),
@@ -792,6 +793,8 @@ class Mv(Cmd):
                         trimmed = Field_trimR(replace(src, count=WordCount(1, 1)), "*")
                         glob_srcs.append(trimmed)
                     case _:
+                        if will_definitely_expand(src):
+                            continue
                         other_srcs.append(src)
 
             # assertion    = IsDir(dst) \
@@ -1097,7 +1100,7 @@ def will_definitely_expand(field: Field) -> bool:
 
     # * Assumption: If a glob is present, it will match more than one path
     for part in field.content.parts:
-        if isinstance(part, str) and "*" in part:
+        if isinstance(part, str) and ("*" in part or "?" in part):
             return True
 
     return False
