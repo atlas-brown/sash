@@ -1,9 +1,9 @@
-class Sash < Formula
-  desc "Static analysis tool for the Unix shell (containerized via Docker)"
+class SaSh < Formula
+  desc "SaSh — static analysis for the Unix shell (runs via Docker)"
   homepage "https://github.com/davidkovach-fuentes/sash"
-  url "https://github.com/davidkovach-fuentes/sash/archive/refs/tags/v0.1.0.tar.gz"
-  sha256 "7beb61e8ae504e036d33f132c75e6c5d379151e469d5eada389cb3006ea043a0"
-  version "0.1.0"
+  version "0.1.1"
+  url "https://github.com/davidkovach-fuentes/sash/archive/refs/tags/v#{version}.tar.gz"
+  sha256 "1db19b40a26598da6087de20b9a2f9e829085161266211c68201744fc6126ca4"
   license "MIT"
 
   depends_on "docker"
@@ -13,7 +13,7 @@ class Sash < Formula
     libexec.install "scripts/sash-docker-pull.sh"
     (bin/"sash").write <<~EOS
       #!/bin/bash
-      export SASH_IMAGE="${SASH_IMAGE:-ghcr.io/davidkovach-fuentes/sash:0.1.0}"
+      export SASH_IMAGE="${SASH_IMAGE:-ghcr.io/davidkovach-fuentes/sash:#{version}}"
       exec "#{libexec}/sash-docker-pull.sh" "$@"
     EOS
     chmod 0755, bin/"sash"
@@ -21,7 +21,7 @@ class Sash < Formula
 
   def caveats
     <<~EOS
-      Needs Docker. Uses ghcr.io/davidkovach-fuentes/sash:0.1.0 by default
+      SaSh needs Docker. Uses ghcr.io/davidkovach-fuentes/sash:#{version} by default
       (pulls it if it is not already local).
 
         SASH_IMAGE=... sash file.sh
