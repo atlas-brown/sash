@@ -1,5 +1,5 @@
-class SaSh < Formula
-  desc "SaSh — static analysis for the Unix shell (runs via Docker)"
+class Sash < Formula
+  desc "SaSh: static analysis for the Unix shell (runs via Docker)"
   homepage "https://github.com/davidkovach-fuentes/sash"
   version "0.1.1"
   url "https://github.com/davidkovach-fuentes/sash/archive/refs/tags/v#{version}.tar.gz"
