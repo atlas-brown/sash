@@ -10,21 +10,24 @@ class Sash < Formula
 
   def install
     libexec.install "scripts/sash-docker.sh"
+    libexec.install "scripts/sash-docker-pull.sh"
     (bin/"sash").write <<~EOS
       #!/bin/bash
       export SASH_IMAGE="${SASH_IMAGE:-ghcr.io/davidkovach-fuentes/sash:0.1.0}"
-      exec "#{libexec}/sash-docker.sh" "$@"
+      exec "#{libexec}/sash-docker-pull.sh" "$@"
     EOS
+    chmod 0755, bin/"sash"
   end
 
   def caveats
     <<~EOS
-      sash runs via Docker and pulls ghcr.io/davidkovach-fuentes/sash when needed.
+      Needs Docker. Uses ghcr.io/davidkovach-fuentes/sash:0.1.0 by default
+      (pulls it if it is not already local).
 
-        Override the image:  SASH_IMAGE=... sash file.sh
-        Use Podman:          SASH_RUNTIME=podman sash file.sh
+        SASH_IMAGE=... sash file.sh
+        SASH_RUNTIME=podman sash file.sh
 
-      If the image cannot be pulled, build locally from the sash repo:
+      Build your own image instead:
 
         docker build --target sys -t sash .
         SASH_IMAGE=sash sash file.sh
