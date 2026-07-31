@@ -10,7 +10,7 @@ maintainer: "atlas@brown.edu"
 description: |
   SaSh is a static analysis tool for the Unix shell.
 vendor: SaSh
-homepage: https://github.com/davidkovach-fuentes/sash
+homepage: https://github.com/atlas-brown/sash
 license: MIT
 contents:
   - src: packaging/linux/staging/usr/bin/sash

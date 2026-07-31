@@ -75,15 +75,14 @@ The native install needs the dependencies listed in the [Dockerfile](Dockerfile)
 
 ### Homebrew
 
-<!-- TODO: switch url to atlas/tap -->
 ```sh
-brew tap davidkovach-fuentes/tap
+brew tap atlas-brown/tap
 brew install sash
 ```
 
 ### Debian / Ubuntu
 
-Download the `.deb` from [GitHub Releases](https://github.com/davidkovach-fuentes/sash/releases), then:
+Download the `.deb` from [GitHub Releases](https://github.com/atlas-brown/sash/releases), then:
 
 ```sh
 sudo apt install ./sash_*.deb
@@ -91,7 +90,7 @@ sudo apt install ./sash_*.deb
 
 ### Fedora
 
-Download the `.rpm` from [GitHub Releases](https://github.com/davidkovach-fuentes/sash/releases), then:
+Download the `.rpm` from [GitHub Releases](https://github.com/atlas-brown/sash/releases), then:
 
 ```sh
 sudo dnf install ./sash-*.rpm
