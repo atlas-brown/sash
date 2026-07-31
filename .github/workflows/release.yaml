@@ -1,0 +1,83 @@
+name: Release
+
+# On v* tags (or manual run): build .deb + .rpm with nFPM and attach them to
+# the GitHub Release for that tag.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version without the leading v (when not triggered by a tag)"
+        required: true
+        type: string
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  packages:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Resolve version
+        id: ver
+        run: |
+          if [[ "${GITHUB_REF_TYPE}" == "tag" && "${GITHUB_REF_NAME}" == v* ]]; then
+            VERSION="${GITHUB_REF_NAME#v}"
+          else
+            VERSION="${{ inputs.version }}"
+          fi
+          if [[ -z "${VERSION}" ]]; then
+            echo "VERSION is empty" >&2
+            exit 1
+          fi
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "tag=v${VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Stage package tree
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+          IMAGE: ghcr.io/${{ github.repository }}
+        run: |
+          stage=packaging/linux/staging
+          mkdir -p "$stage/usr/bin" "$stage/usr/libexec/sash"
+          install -m 0755 scripts/sash-docker.sh "$stage/usr/libexec/sash/sash-docker.sh"
+          install -m 0755 scripts/sash-docker-pull.sh "$stage/usr/libexec/sash/sash-docker-pull.sh"
+          printf '%s\n' \
+            '#!/bin/bash' \
+            "export SASH_IMAGE=\"\${SASH_IMAGE:-${IMAGE}:${VERSION}}\"" \
+            'exec /usr/libexec/sash/sash-docker-pull.sh "$@"' \
+            > "$stage/usr/bin/sash"
+          chmod 0755 "$stage/usr/bin/sash"
+
+      - name: Install nFPM
+        run: |
+          NFPM_VERSION=2.41.3
+          curl -sL "https://github.com/goreleaser/nfpm/releases/download/v${NFPM_VERSION}/nfpm_${NFPM_VERSION}_Linux_x86_64.tar.gz" \
+            | tar -xz -C /usr/local/bin nfpm
+          nfpm --version
+
+      - name: Build deb and rpm
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          mkdir -p dist
+          nfpm package --config packaging/linux/nfpm.yaml --packager deb --target dist/
+          nfpm package --config packaging/linux/nfpm.yaml --packager rpm --target dist/
+          ls -la dist/
+
+      - name: Upload packages to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.ver.outputs.tag }}
+          name: ${{ steps.ver.outputs.tag }}
+          generate_release_notes: true
+          files: |
+            dist/*.deb
+            dist/*.rpm
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

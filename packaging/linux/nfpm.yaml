@@ -1,0 +1,27 @@
+# nFPM config for SaSh .deb / .rpm packages.
+# Set VERSION in the environment (git tag without the leading v).
+name: sash
+arch: all
+platform: linux
+version: ${VERSION}
+section: utils
+priority: optional
+maintainer: "atlas@brown.edu"
+description: |
+  SaSh is a static analysis tool for the Unix shell.
+vendor: SaSh
+homepage: https://github.com/atlas-brown/sash
+license: MIT
+contents:
+  - src: packaging/linux/staging/usr/bin/sash
+    dst: /usr/bin/sash
+    file_info:
+      mode: 0755
+  - src: packaging/linux/staging/usr/libexec/sash/sash-docker.sh
+    dst: /usr/libexec/sash/sash-docker.sh
+    file_info:
+      mode: 0755
+  - src: packaging/linux/staging/usr/libexec/sash/sash-docker-pull.sh
+    dst: /usr/libexec/sash/sash-docker-pull.sh
+    file_info:
+      mode: 0755

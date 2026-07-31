@@ -15,7 +15,7 @@ RUN apt-get update && \
         make \
         cloc \
         shfmt \
-        ca-certificates \
+        ca-certificates && \
     update-ca-certificates && \
     rm -rf /var/lib/apt/lists/*
 

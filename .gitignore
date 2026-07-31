@@ -20,6 +20,9 @@ wheels/
 # Virtual environments
 .venv/
 
+# nFPM staging tree (built in CI)
+packaging/linux/staging/
+
 # Other
 .env
 tmp/
