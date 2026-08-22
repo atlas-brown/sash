@@ -129,7 +129,7 @@ stop() {
 		echo
 	fi
     contents="$SQUID_PIDFILE_DIR/" # diff: set a variable and delete that
-    rm -rf $SQUID_PIDFILE_DIR # bug here: SQUID_PIDFILE_DIR may contain spaces
+    rm -rf "$contents"* # bug here: SQUID_PIDFILE_DIR may contain spaces
     unset contents
 	return $RETVAL
 }
@@ -144,7 +144,7 @@ restart() {
 	RETVAL=$?
 	if [ $RETVAL -eq 0 ] ; then
         contents="$SQUID_PIDFILE_DIR/" # diff: set a variable and delete that
-		rm -rf $SQUID_PIDFILE_DIR # bug here: SQUID_PIDFILE_DIR may contain spaces
+		rm -rf "$contents"* # bug here: SQUID_PIDFILE_DIR may contain spaces
         unset contents
 		start
 	else
