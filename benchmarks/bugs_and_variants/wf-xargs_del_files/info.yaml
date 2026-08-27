@@ -6,7 +6,7 @@ sources:
 bugs:
   bug00:
     description: Detected issue code 'cmd_expected_path_state' in benchmark script
-    code: cmd_expected_path_state
+    code: data_loss
     shellcheck: null
 
 ground_truths:

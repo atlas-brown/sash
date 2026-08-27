@@ -27,7 +27,7 @@ ground_truths:
   - path: fixed.sh
     kind: fixed
     bugs:
-      bug00: { regression_lines: [362] }
+      bug00: { regression_lines: [364] }
 
   # Variants
   - path: variants/bug-move_trailing_slash.sh

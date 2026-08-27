@@ -7,7 +7,7 @@ bugs:
   bug00:
     description: An unset variable is used ($file)
     code: unbound
-    shellcheck: SC2153
+    shellcheck: SC2154
 
 ground_truths:
   # Base versions

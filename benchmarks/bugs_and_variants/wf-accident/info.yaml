@@ -6,11 +6,11 @@ sources:
 
 bugs:
   bug00:
-    description: Detected issue code 'cmd_expected_path_state' in benchmark script
+    description: argument may become '*' and not exist
     code: cmd_expected_path_state
     shellcheck: null
   bug01:
-    description: Detected issue code 'del_sys_file' in benchmark script
+    description: deletes everything in PWD
     code: del_sys_file
     shellcheck: null
 
@@ -30,5 +30,5 @@ ground_truths:
   - path: fixed.sh
     kind: fixed
     bugs:
-      bug00: { regression_lines: [4], shellcheck: null }
-      bug01: { regression_lines: [3, 4], shellcheck: null }
+      bug00: {regression_lines: [3], shellcheck: null}
+      bug01: {regression_lines: [2, 3], shellcheck: null}

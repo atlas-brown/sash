@@ -438,7 +438,7 @@ class PreSplitWord:
             if not current_text:
                 return
             joined = "".join(text for text, _ in current_text)
-            has_glob = any(eligible and "*" in text for text, eligible in current_text)
+            has_glob = any(eligible and ("*" in text or "?" in text) for text, eligible in current_text)
             min_words = 1
             max_words: int | float = 1
             if has_glob:
@@ -450,7 +450,7 @@ class PreSplitWord:
                     if not eligible:
                         only_globs = False
                         break
-                    if any(ch != "*" for ch in text):
+                    if any(ch not in {"*", "?"} for ch in text):
                         only_globs = False
                         break
                 if only_globs:

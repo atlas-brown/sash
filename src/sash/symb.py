@@ -2370,12 +2370,11 @@ def handle_xargs(traces: Traces, node: AST.CommandNode, expanded_args: list[Fiel
             # we unroll the xargs into two invocations of the command, each time replacing
             # occurrences of thename with a command substitution that yields a fresh arbitrary each time
             # to capture the fact that each invocation may get different inputs
-            the_name_unexpanded = freeze_thing(node.arguments[2])
             mangled_cmdnode = deepcopy(node)
             mangled_cmdnode.arguments = mangled_cmdnode.arguments[3:]
             # Replace all occurrences of thename in the command with a command substitution that leads to a fresh arbitrary each time
             def replace_arg(arg: list[AST.ArgChar]) -> list[AST.ArgChar]:
-                if freeze_thing(arg) == the_name_unexpanded:
+                if _literal_argchars(arg) == thename:
                     return [AST.BArgChar(AST.CommandNode(node.line_number,
                                                          [],
                                                          [],
@@ -2413,6 +2412,8 @@ def handle_eval(traces: Traces,
     try:
         with tempfile.NamedTemporaryFile("w", suffix=".sh", delete=False) as temp_file:
             temp_path = temp_file.name
+            if context_line and context_line > 1:
+                temp_file.write("\n" * (context_line - 1))
             temp_file.write(eval_script)
             if not eval_script.endswith("\n"):
                 temp_file.write("\n")
@@ -2713,7 +2714,7 @@ def handle_pipe_node(traces: Traces, node: AST.PipeNode, config: InterpConfig) -
             lhs = node.items[i - 1]
             rhs = cmd
             if _node_invocation_has_no_stdout(lhs) and _node_invocation_expects_stdin(rhs):
-                Reporter.add_issue(reporter.UnexpectedStdin(_node_invocation_name(rhs), context_line), config)
+                Reporter.add_issue(reporter.CapturingEmptyOutput(_node_invocation_name(rhs), context_line), config)
         t = guarded_interp_node(t, cmd, config)
     # Since traces can fork and merge, we need to match traces back to their original saved environments.
     # Thus, restore the environment of each trace to the environment of the first trace that matches its current state.
