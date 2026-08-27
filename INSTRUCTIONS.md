@@ -121,6 +121,7 @@ The evaluation from now on focuses on the specific bug that was fixed in each sc
 
 The ground truth, which includes the source of the script as well as information about ShellCheck's output on it can be found in: [`benchmarks/bugs_and_variants/sf-access_del_resource/info.yaml`](benchmarks/bugs_and_variants/sf-access_del_resource/info.yaml).
 
+Note: Optionally, use `./scripts/shellcheck_eval.py` to verify that ShellCheck's output matches the ground truth.
 
 # Results Reproduced (key results 40 min; all results 8 hr 40 min)
 
