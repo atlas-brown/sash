@@ -32,6 +32,7 @@ jobs:
 
   ppa-source-check:
     needs: dist
+    if: success() && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: true
@@ -74,6 +75,7 @@ jobs:
             dist/ppa/asash_*_source.buildinfo
 
   deb:
+    if: github.event_name != 'pull_request'
     strategy:
       matrix:
         include:
@@ -112,6 +114,7 @@ jobs:
 
   # Binary .rpm for GitHub Releases
   rpm:
+    if: github.event_name != 'pull_request'
     strategy:
       matrix:
         include:
