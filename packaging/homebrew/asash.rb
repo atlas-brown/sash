@@ -1,4 +1,4 @@
-class Sash < Formula
+class Asash < Formula
   desc "Static analysis for the Unix shell (runs via Docker)"
   homepage "https://github.com/atlas-brown/sash"
   url "https://github.com/atlas-brown/sash/archive/refs/tags/v0.1.2.tar.gz"
@@ -12,14 +12,14 @@ class Sash < Formula
   end
 
   def install
-    libexec.install "scripts/sash-docker.sh", "scripts/sash-docker-pull.sh"
+    libexec.install "scripts/asash-docker.sh", "scripts/asash-docker-pull.sh"
 
     image_tag = build.head? ? "latest" : version.to_s
 
-    (bin/"sash").write <<~SH
+    (bin/"asash").write <<~SH
       #!/usr/bin/env bash
-      export SASH_IMAGE="${SASH_IMAGE:-ghcr.io/atlas-brown/sash:#{image_tag}}"
-      exec "#{libexec}/sash-docker-pull.sh" "$@"
+      export ASASH_IMAGE="${ASASH_IMAGE:-ghcr.io/atlas-brown/sash:#{image_tag}}"
+      exec "#{libexec}/asash-docker-pull.sh" "$@"
     SH
   end
 
@@ -34,8 +34,8 @@ class Sash < Formula
   end
 
   test do
-    assert_path_exists libexec/"sash-docker-pull.sh"
-    assert_match 'SASH_IMAGE="${SASH_IMAGE:-ghcr.io/atlas-brown/sash:',
-                 (bin/"sash").read
+    assert_path_exists libexec/"asash-docker-pull.sh"
+    assert_match 'ASASH_IMAGE="${ASASH_IMAGE:-ghcr.io/atlas-brown/sash:',
+                 (bin/"asash").read
   end
 end
