@@ -214,14 +214,14 @@ jobs:
           [ -s ~/.ssh/known_hosts ] || { echo "ssh-keyscan got no host key from ppa.launchpad.net" >&2; exit 1; }
           ssh-keygen -lf ~/.ssh/known_hosts
 
-          # the owner is PPA_LOGIN; PPA_TARGET (ppa:owner/name) supplies the name
           ppa=${PPA_TARGET#ppa:}
+          owner=${ppa%%/*}
           name=${ppa#*/}
           cat > ~/.dput.cf <<EOF
           [ppa-sftp]
           fqdn = ppa.launchpad.net
           method = sftp
-          incoming = ~${PPA_LOGIN}/ubuntu/${name}/
+          incoming = ~${owner}/ubuntu/${name}/
           login = ${PPA_LOGIN}
           allow_unsigned_uploads = 0
           EOF
