@@ -16,33 +16,17 @@ SaSh can be installed natively on Linux and MacOS, or used through Docker.
 All dependencies of SaSh are listed in the [Dockerfile](Dockerfile) and [pyproject.toml](pyproject.toml).
 The following installation instructions make use of these configurations as appropriate.
 
+### Ubuntu
 
-### Manual
+SaSh is installable as a Launchpad PPA.
 
-Make sure you have the following installed:
-* `git`
-* `make`
-* `automake`
-* `autoconf`
-* `libtool`
-* `g++-13` or `clang-17` (or newer)
-* `uv` (recommended) or `pipx`
-
-You already have `g++-13` or `clang-17` if you are on Debian 13, Ubuntu 23, or newer.
-On MacOS, `clang-17` is part of the [`xcode` command line tools](https://developer.apple.com/documentation/xcode/command-line-tools).
-
-Then, run:
-```bash
-CFLAGS="-std=gnu17" uv tool install git+https://github.com/atlas-brown/sash.git
-uv tool update-shell  # If PATH needs to be updated
+```sh
+sudo add-apt-repository ppa:atlas-brown/asash
+sudo apt update
+sudo apt install -y asash
 ```
 
-Or:
-
-```bash
-CFLAGS="-std=gnu17" pipx install git+https://github.com/atlas-brown/sash.git
-pipx ensurepath  # If PATH needs to be updated
-```
+Alternatively, you may download the latest debian from releases.
 
 ### MacOS (using brew)
 
@@ -58,6 +42,51 @@ Requires [Docker](https://docs.docker.com/get-docker/).
 
 ```sh
 nix profile add github:atlas-brown/sash
+```
+
+### Release
+
+Get the latest debian or rpm package from the [Release Assets](https://github.com/atlas-brown/sash/releases):
+
+- `asash-<version>-1.fc<41|42>.aarch64.rpm`: SaSh rpm package for Fedora 41/42 on arm64 (aarch64)
+- `asash-<version>-1.fc<41|42>.x86_64.rpm`: SaSh rpm package for Fedora 41/42 on amd64 (x86_64)
+- `asash_<version>-1_debian-<bookworm|trixie>_amd64.deb`: SaSh debian package for Debian 12/13 on amd64 (x86_64)
+- `asash_<version>-1_debian-<bookworm|trixie>_arm64.deb`: SaSh debian package for Debian 12/13 on arm64 (aarch64)
+- `asash_<version>-1_ubuntu-22.04_amd64.deb`: SaSh debian package for Ubuntu 22.04 on amd64 (x86_64)
+- `asash_<version>-1_ubuntu-22.04_arm64.deb`: SaSh debian package for Ubuntu 22.04 on arm64 (aarch64)
+
+Install them with:
+
+- Debian: `sudo apt install -y ./asash*.deb`
+- Redhat: `sudo dnf install -y ./asash*.rpm`
+
+### Manual
+
+Make sure you have the following installed:
+
+- `git`
+- `make`
+- `automake`
+- `autoconf`
+- `libtool`
+- `g++-13` or `clang-17` (or newer)
+- `uv` (recommended) or `pipx`
+
+You already have `g++-13` or `clang-17` if you are on Debian 13, Ubuntu 23, or newer.
+On MacOS, `clang-17` is part of the [`xcode` command line tools](https://developer.apple.com/documentation/xcode/command-line-tools).
+
+Then, run:
+
+```bash
+CFLAGS="-std=gnu17" uv tool install git+https://github.com/atlas-brown/sash.git
+uv tool update-shell  # If PATH needs to be updated
+```
+
+Or:
+
+```bash
+CFLAGS="-std=gnu17" pipx install git+https://github.com/atlas-brown/sash.git
+pipx ensurepath  # If PATH needs to be updated
 ```
 
 ### Docker
@@ -123,7 +152,6 @@ A similar bug was responsible for the 2015 Steam updater incident[^steam].
 
 [^steam]: [https://github.com/ValveSoftware/steam-for-linux/issues/3671](https://github.com/ValveSoftware/steam-for-linux/issues/3671)
 
-
 ### Possible data loss from moving files
 
 This script moves two files to the same destination:
@@ -144,8 +172,6 @@ $ asash organize.sh
     but only if unknown paths are assumed to be files
 ```
 
-
-
 ## Contributing
 
 The project provides [a configuration file for containerized development](.devcontainer/devcontainer.json).
@@ -157,15 +183,15 @@ docker run --rm -it -v "$(pwd)":/app -v /app/.venv sash-dev
 # Again, remember to add '--privileged' if you need to use CRIU
 ```
 
-
 ### Testing
 
 This project uses [`pytest`](https://docs.pytest.org/).
 To run all tests, use `uv run pytest`.
 
 To ensure correct [test discovery](https://docs.pytest.org/en/7.1.x/explanation/goodpractices.html#conventions-for-python-test-discovery) when writing new tests:
-* Test files should be named with the prefix `test_` (e.g., `test_example.py`).
-* Test functions should also start with `test_` (e.g., `def test_example(): ...`).
+
+- Test files should be named with the prefix `test_` (e.g., `test_example.py`).
+- Test functions should also start with `test_` (e.g., `def test_example(): ...`).
 
 # Citation
 
