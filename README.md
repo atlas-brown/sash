@@ -18,7 +18,7 @@ The following installation instructions make use of these configurations as appr
 
 ### Ubuntu
 
-SaSh is installable as a Launchpad PPA.
+SaSh is installabe via the official [Launchpad PPA](https://launchpad.net/~atlas-brown/+archive/ubuntu/asash).
 
 ```sh
 sudo add-apt-repository ppa:atlas-brown/asash
@@ -58,7 +58,7 @@ Get the latest debian or rpm package from the [Release Assets](https://github.co
 Install them with:
 
 - Debian: `sudo apt install -y ./asash*.deb`
-- Redhat: `sudo dnf install -y ./asash*.rpm`
+- Red Hat: `sudo dnf install -y ./asash*.rpm`
 
 ### Manual
 
