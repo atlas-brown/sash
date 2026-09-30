@@ -55,4 +55,4 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 USER nonroot
 
 # Entry for system usage
-ENTRYPOINT ["/app/.venv/bin/asash"]
+ENTRYPOINT ["/app/.venv/bin/sash"]

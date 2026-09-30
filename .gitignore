@@ -33,3 +33,6 @@ trace_info.jsonl
 
 # Debian packaging: vendored dependencies
 /vendor/
+
+# Nix
+/result

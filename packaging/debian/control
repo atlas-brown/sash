@@ -18,6 +18,8 @@ Rules-Requires-Root: no
 Package: asash
 Architecture: amd64 arm64
 Depends: python3 (>= 3.10), ${shlibs:Depends}, ${misc:Depends}
+Conflicts: sash
+Replaces: sash
 Description: static analysis of shell programs using symbolic execution
  SaSh analyzes POSIX shell programs ahead of time, using symbolic
  execution to predict their effects on the file system and to find bugs

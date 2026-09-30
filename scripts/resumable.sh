@@ -11,7 +11,7 @@ die() {
 }
 
 command -v criu >/dev/null 2>&1 || die "criu is not installed"
-command -v asash >/dev/null 2>&1 || die "asash is not installed"
+command -v sash >/dev/null 2>&1 || die "sash is not installed"
 
 if (($# == 0)); then
     [[ -f "$checkpoint_dir/inventory.img" ]] || die "no checkpoint found in $checkpoint_dir"
@@ -24,13 +24,13 @@ fi
 rm -rf "$checkpoint_dir" "$image_dir"
 mkdir -p "$checkpoint_dir" "$image_dir"
 
-asash "$@" &
+sash "$@" &
 sash_pid="$!"
 
 (
     sleep "$checkpoint_t"
     if kill -0 "$sash_pid" 2>/dev/null; then
-        printf 'resumable.sh: checkpointing asash pid %s into %s\n' "$sash_pid" "$checkpoint_dir" >&2
+        printf 'resumable.sh: checkpointing sash pid %s into %s\n' "$sash_pid" "$checkpoint_dir" >&2
         if criu dump \
             --tree "$sash_pid" \
             --images-dir "$image_dir" \
@@ -41,7 +41,7 @@ sash_pid="$!"
             cp -p "$image_dir"/*.img "$checkpoint_dir"/
             kill -TERM "$sash_pid" 2>/dev/null || true
         else
-            printf 'resumable.sh: checkpoint failed; leaving asash running\n' >&2
+            printf 'resumable.sh: checkpoint failed; leaving sash running\n' >&2
         fi
     fi
 ) &

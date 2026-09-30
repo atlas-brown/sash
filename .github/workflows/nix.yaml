@@ -38,4 +38,4 @@ jobs:
         run: nix build -L .#asash
 
       - name: Smoke test
-        run: ./result/bin/asash --help
+        run: ./result/bin/sash --help

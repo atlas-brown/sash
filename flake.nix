@@ -44,7 +44,7 @@
     forAllSystems = lib.genAttrs lib.systems.flakeExposed;
     pyproject = builtins.fromTOML (builtins.readFile ./pyproject.toml);
     inherit (pyproject.project) name description version;
-    mainProgram = "asash";
+    mainProgram = "sash";
     workspace = uv2nix.lib.workspace.loadWorkspace {workspaceRoot = ./.;};
 
     overlay = workspace.mkPyprojectOverlay {
@@ -139,7 +139,7 @@
       system: let
         pkgs = nixpkgs.legacyPackages.${system};
         editablePythonSet = pythonSets.${system}.overrideScope editableOverlay;
-        virtualenv = editablePythonSet.mkVirtualEnv "asash-dev-env" workspace.deps.all;
+        virtualenv = editablePythonSet.mkVirtualEnv "sash-dev-env" workspace.deps.all;
       in {
         default = pkgs.mkShell {
           packages = [

@@ -61,11 +61,11 @@ for f in "%{buildroot}/opt/venvs/asash/bin/"*; do
 done
 sed -i "s|^home = .*|home = /usr/bin|" "%{buildroot}/opt/venvs/asash/pyvenv.cfg"
 
-ln -s /opt/venvs/asash/bin/asash "%{buildroot}/usr/bin/asash"
+ln -s /opt/venvs/asash/bin/sash "%{buildroot}/usr/bin/sash"
 
 %files
 /opt/venvs/asash
-/usr/bin/asash
+/usr/bin/sash
 
 %changelog
 * Thu Jan 01 2026 SaSh maintainers <atlas@brown.edu> - 0.1.0-1
