@@ -119,6 +119,7 @@ class State:
     terminated:                  bool                        = False # by `exit` or similar
     assertions:                  tuple[Assertion, ...]       = field(default_factory=tuple)
     fs_model:                    FSModel                     = field(default_factory=FSModel)
+    last_fs_update_line:         int | None                  = None
     is_returning:                bool                        = False # whether we're in the process of returning from a function (i.e. have executed a `return` but not yet popped the call stack)
     break_level:                 int                         = 0
     continue_level:              int                         = 0
@@ -217,8 +218,12 @@ class State:
     def set_options(self, options: set[str]) -> 'State':
         return replace(self, opts=self.opts.set_options(options))
 
-    def update_fs(self, constraints: Constraint) -> 'State':
-        return replace(self, fs_model=self.fs_model.apply_postcondition(constraints.normalized()))
+    def update_fs(self, constraints: Constraint, source_line: int | None = None) -> 'State':
+        return replace(
+            self,
+            fs_model=self.fs_model.apply_postcondition(constraints.normalized()),
+            last_fs_update_line=source_line if source_line is not None else self.last_fs_update_line,
+        )
 
     def set_last_exit_code(self, code: SymStr, confidence: Confidence, failure_postcond: Constraint | None = None) -> 'State':
         return replace(self,
@@ -356,7 +361,7 @@ class Trace:
                                 pathcond=prior_state.pathcond,
                                 fs_model=prior_state.fs_model)\
                                 .add_pathcond(last_state.last_cmd_failure_postcond)\
-                                .update_fs(last_state.last_cmd_failure_postcond)\
+                                .update_fs(last_state.last_cmd_failure_postcond, last_state.last_fs_update_line)\
                                 .set_last_exit_code(SymStr(("1",)), Confidence.SPECULATIVE)
             DebugLogger.log_trace_extension(prior_state, new_state)
             return replace(self, states=self.states[:-1] + (new_state,))

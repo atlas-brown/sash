@@ -570,6 +570,26 @@ def file_spec(cmd: CmdInvocation) -> CmdSpec:
     return CmdSpec(check, success_postcond, Empty(), io)
 
 
+def ls_spec(cmd: CmdInvocation) -> CmdSpec:
+    # https://pubs.opengroup.org/onlinepubs/9799919799/utilities/ls.html
+    (name, flags, _, operands) = (cmd.cmd_name, cmd.flags, cmd.options, cmd.operands)
+
+    assert name == SymStr(("ls",)), f"Expected ls command, got: {name}"
+
+    operands = tuple(filter(lambda o : o.try_to_str() and (not o.try_to_str().startswith('-')), operands))
+
+    if len(operands) == 0:
+        operands = [Field.create_constant(".")]
+
+    check = SimpleConstraint(
+        And.from_field_iter(operands, lambda op: IsFile(op) | IsDir(op)),
+        lambda line: reporter.ExpectedPathState("ls", 'files or directories', tuple(operands), line),
+    )
+    success_postcond = And.from_field_iter(operands, IsRead)
+
+    return CmdSpec(check, success_postcond, Empty(), IOType.STDOUT)
+
+
 def env_spec(cmd: CmdInvocation) -> CmdSpec:
     # https://pubs.opengroup.org/onlinepubs/9799919799/utilities/env.html
 

@@ -173,8 +173,19 @@ def is_definitely_non_empty(field: Field, trace: "Trace") -> bool:
     logging.debug("Checking path conditions for non-emptiness implications, have %d conditions", len(trace.latest_state.pathcond))
     return any(constraint_implies_non_empty(core, cond.constraint) for cond in trace.latest_state.pathcond)
 
+def protected_path_variants() -> tuple[str, ...]:
+    variants = []
+    for path in PROTECTED_PATHS:
+        variants.append(path)
+        if path.endswith("*"):
+            continue
+        variants.append(path + "/" if path != "/" else "/*")
+        variants.append(path + "/*" if path != "/" else "/*")
+        variants.append(path + ".")
+    return tuple(dict.fromkeys(variants))
+
 def is_protected(path):
-    return any(path in [p, p + "/", p + "/*"] for p in PROTECTED_PATHS)
+    return path in protected_path_variants()
 
 def is_flag(field: Field) -> bool:
     field_str = field.try_to_str()

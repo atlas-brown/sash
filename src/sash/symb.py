@@ -1647,7 +1647,7 @@ def handle_commandnode(traces: Traces,
                 t_success_precond = [t for t in t_precond if not _pathcond_contradicts(t.latest_state, knowledge_after_exec)]
                 t_success = trace_map(t_success_precond,
                                       lambda s: s.add_pathcond(knowledge_before_exec)\
-                                                 .update_fs(knowledge_after_exec)\
+                                                 .update_fs(knowledge_after_exec, context_line)\
                                                  .add_pathcond(knowledge_after_exec)\
                                                  .update_known_commands(knowledge_after_exec)\
                                                  .set_last_exit_code(SymStr(("0",)),
@@ -1659,7 +1659,7 @@ def handle_commandnode(traces: Traces,
                 if config.in_checked_position or config.force_fork_all:
                     t_failure_precond = [t for t in t_precond if not _pathcond_contradicts(t.latest_state, spec.failure_postcond)]
                     t_failure = trace_map(t_failure_precond,
-                                          lambda s: s.update_fs(spec.failure_postcond)\
+                                          lambda s: s.update_fs(spec.failure_postcond, context_line)\
                                                      .add_pathcond(spec.failure_postcond)\
                                                      .update_known_commands(spec.failure_postcond)\
                                                      .set_last_exit_code(SymStr(("1",)),
@@ -1774,12 +1774,23 @@ def handle_rm(expanded_args: tuple[Field, ...], trace: Trace, node: AST.CommandN
             case _:
                 return True
 
+    def is_immediate_children_of(field: Field, base: Field) -> bool:
+        if util.field_core_key(field) != util.field_core_key(base):
+            return False
+        return (
+            isinstance(field.content, CompletelyArbitrary)
+            and field.content.suffix is not None
+            and field.content.suffix.try_to_str() == "/*"
+        )
+
     at_pwd_init = pwdval is not None and start_pwdval is not None and same_location(pwdval.as_field(), start_pwdval.as_field())
     home_level = home_depth(pwdval.as_field(), homeval.as_field()) if (pwdval is not None and homeval is not None) else None
     at_home_top_level = home_level is not None and home_level <= 1
+    pwd_path = pwdval.try_to_str() if pwdval is not None else None
+    at_protected_pwd = pwd_path is not None and util.is_protected(pwd_path)
     # TODO: Replace this heuristic with a proper "current working directory" abstraction independent of env-field shape.
     if (
-        (at_pwd_init or at_home_top_level)
+        (at_pwd_init or at_home_top_level or at_protected_pwd)
         and any(arg.try_to_str() == "*" for arg in non_flag_args)
     ):
         Reporter.add_issue(reporter.DeleteSystemFile(pwdval.try_to_str() or "PWD", context_line), config)
@@ -1794,7 +1805,7 @@ def handle_rm(expanded_args: tuple[Field, ...], trace: Trace, node: AST.CommandN
                                                         node.pretty(),
                                                         context_line, priority=11, include_fs=False))
 
-    protected_paths = PROTECTED_PATHS
+    protected_paths = util.protected_path_variants()
     if protected_paths:
         protected_checks = tuple(
             (
@@ -1834,6 +1845,8 @@ def handle_rm(expanded_args: tuple[Field, ...], trace: Trace, node: AST.CommandN
                 Reporter.add_issue(reporter.DeleteSystemFile(path, context_line), config)
             if util.is_user_directory(path):
                 Reporter.add_issue(reporter.DeleteUserDirectory(path, context_line), config)
+        elif homeval is not None and is_immediate_children_of(arg_field, homeval.as_field()):
+            Reporter.add_issue(reporter.DeleteUserDirectory("HOME/*", context_line), config)
 
         def maybe_report_protected_split(content: CompletelyArbitrary, max_words: int | float) -> None:
             if content.maybe_empty and content.quoted and not definitely_non_empty:
@@ -1859,10 +1872,10 @@ def handle_rm(expanded_args: tuple[Field, ...], trace: Trace, node: AST.CommandN
                 maybe_report_protected_split(content, max_words)
 
     return (
-        trace.extend(lambda s: s.update_fs(spec.success_postcond)\
+        trace.extend(lambda s: s.update_fs(spec.success_postcond, context_line)\
                                 .add_pathcond(spec.success_postcond)\
                                 .set_last_exit_code(SymStr(("0",)), Confidence.SPECULATIVE, spec.failure_postcond)),
-        trace.extend(lambda s: s.update_fs(spec.failure_postcond)\
+        trace.extend(lambda s: s.update_fs(spec.failure_postcond, context_line)\
                                 .add_pathcond(spec.failure_postcond)\
                                 .set_last_exit_code(SymStr(("1",)), Confidence.SPECULATIVE, spec.failure_postcond))
     )
@@ -2504,6 +2517,9 @@ def handle_eval(traces: Traces,
 def handle_case(traces: Traces, node: AST.CaseNode, config: InterpConfig) -> Traces:
     t1, case_arg_fields = expand_args_dumb(traces, [node.argument], config)
 
+    def is_catchall_pattern(pattern: list[AST.ArgChar]) -> bool:
+        return "".join(argchar.pretty() for argchar in pattern) == "*"
+
     cases_to_run = list(node.cases)
     # if config.branch_policy_pre is not None:
     #     selection = config.branch_policy_pre(node)
@@ -2524,6 +2540,8 @@ def handle_case(traces: Traces, node: AST.CaseNode, config: InterpConfig) -> Tra
         res.extend(guarded_interp_node(trace_map(t1, lambda s: s.add_pathcond(Description(f"case_L{context_line}_pattern_{case['cpattern']}:matched"))),
                                         case["cbody"],
                                         config))
+    if not any(is_catchall_pattern(pattern) for case in cases_to_run for pattern in case["cpattern"]):
+        res.extend(trace_map(t1, lambda s: s.add_pathcond(Description(f"case_L{context_line}_no_pattern_matched"))))
     return res
 
 
@@ -2623,7 +2641,7 @@ def handle_file_redir_node(traces: Traces, node: AST.FileRedirNode, config: Inte
                 DebugLogger.log_assertion(assertion_constraint, t.latest_state, context_line, config.current_pass)
             else:
                 t_precond = t
-            t_postcond = t_precond.extend(t_precond.latest_state.update_fs(And.from_field_iter(redir_args, IsFile)))
+            t_postcond = t_precond.extend(t_precond.latest_state.update_fs(And.from_field_iter(redir_args, IsFile), context_line))
 
         elif node.redir_type == "Append": # >>
             # NOTE: asserting IsFile also implicitly asserts that the file is *unread*
@@ -2634,7 +2652,7 @@ def handle_file_redir_node(traces: Traces, node: AST.FileRedirNode, config: Inte
                 DebugLogger.log_assertion(assertion_constraint, t.latest_state, context_line, config.current_pass)
             else:
                 t_precond = t
-            t_postcond = t_precond.extend(t_precond.latest_state.update_fs(And.from_field_iter(redir_args, IsFile)))
+            t_postcond = t_precond.extend(t_precond.latest_state.update_fs(And.from_field_iter(redir_args, IsFile), context_line))
 
         elif node.redir_type == "From": # <
             # The targets of the redirection were read from
@@ -2645,7 +2663,7 @@ def handle_file_redir_node(traces: Traces, node: AST.FileRedirNode, config: Inte
                 DebugLogger.log_assertion(assertion_constraint, t.latest_state, context_line, config.current_pass)
             else:
                 t_precond = t
-            t_postcond = t_precond.extend(t_precond.latest_state.update_fs(And.from_field_iter(redir_args, IsRead)))
+            t_postcond = t_precond.extend(t_precond.latest_state.update_fs(And.from_field_iter(redir_args, IsRead), context_line))
 
         elif node.redir_type == "FromTo":
             # Conservatively assume the file is opened for reading
@@ -2656,7 +2674,7 @@ def handle_file_redir_node(traces: Traces, node: AST.FileRedirNode, config: Inte
                 DebugLogger.log_assertion(assertion_constraint, t.latest_state, context_line, config.current_pass)
             else:
                 t_precond = t
-            t_postcond = t_precond.extend(t_precond.latest_state.update_fs(And.from_field_iter(redir_args, IsRead)))
+            t_postcond = t_precond.extend(t_precond.latest_state.update_fs(And.from_field_iter(redir_args, IsRead), context_line))
 
         else:
             assert False, f"Unexpected redirection type: {node.redir_type}"

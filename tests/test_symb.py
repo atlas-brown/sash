@@ -224,6 +224,20 @@ def test_delete_system_file(tmp_path):
     report = reset_and_run_main(script)
     assert_expected_report(report, [])
 
+    script = write_script(tmp_path, "cd /\nrm -rf *\n")
+    report = reset_and_run_main(script)
+    expected_error = reporter.DeleteSystemFile("/", 0)
+    assert_expected_report(report, [expected_error])
+
+    script = write_script(tmp_path, "cd /usr\nrm -rf *\n")
+    report = reset_and_run_main(script)
+    expected_error = reporter.DeleteSystemFile("/usr", 0)
+    assert_expected_report(report, [expected_error])
+
+    script = write_script(tmp_path, "cd /tmp\nrm -rf *\n")
+    report = reset_and_run_main(script)
+    assert_expected_report(report, [])
+
     script = write_script(tmp_path, 'cd dir\nrm -rf "$PWD"\n')
     report = reset_and_run_main(script, solver=True)
     assert_expected_report(report, [])
@@ -413,8 +427,54 @@ def test_home_not_deleted_global_invariant(tmp_path):
     assert_expected_report(report, [])
 
     report = reset_and_run_main(script, solver=True)
-    expected_warning = reporter.DeleteUserDirectory("HOME", 0)
+    expected_warning = reporter.DeleteUserDirectory("HOME", 1)
     assert_expected_report(report, [expected_warning])
+
+def test_home_deletion_invariant_reports_fs_update_line(tmp_path):
+    script = write_script(tmp_path, "echo lol\necho lol\necho lol\necho lol\nrm -rf ~\n")
+    report = reset_and_run_main(script, solver=True)
+    home_deletion_issues = [
+        issue
+        for issue in report.issues
+        if isinstance(issue, reporter.DeleteUserDirectory) and issue.message == "Deletes user directory 'HOME'"
+    ]
+    assert len(home_deletion_issues) == 1
+    assert home_deletion_issues[0].line == 5
+
+def test_home_deletion_invariant_with_multiple_home_deleting_rms(tmp_path):
+    script = write_script(tmp_path, "rm -rf ~\necho lol\nrm -rf \"$HOME\"\n")
+    report = reset_and_run_main(script, solver=True)
+    home_deletion_issues = [
+        issue
+        for issue in report.issues
+        if isinstance(issue, reporter.DeleteUserDirectory) and issue.message == "Deletes user directory 'HOME'"
+    ]
+    assert len(home_deletion_issues) == 1
+    assert home_deletion_issues[0].line == 3
+
+def test_rm_home_glob_reports_user_directory(tmp_path):
+    script = write_script(tmp_path, "rm -rf ~/*\n")
+    report = reset_and_run_main(script)
+    home_glob_issues = [
+        issue
+        for issue in report.issues
+        if isinstance(issue, reporter.DeleteUserDirectory)
+    ]
+    assert len(home_glob_issues) == 1
+    assert home_glob_issues[0].message == "Deletes user directory 'HOME/*'"
+    assert home_glob_issues[0].line == 1
+
+def test_rm_protected_glob_reports_system_file(tmp_path):
+    script = write_script(tmp_path, "rm -rf /usr/local/share/*\n")
+    report = reset_and_run_main(script, solver=True)
+    system_glob_issues = [
+        issue
+        for issue in report.issues
+        if isinstance(issue, reporter.DeleteSystemFile)
+    ]
+    assert len(system_glob_issues) == 1
+    assert system_glob_issues[0].message == "May delete system file '/usr/local/share/*'"
+    assert system_glob_issues[0].line == 1
 
 
 def test_delete_system_file_with_escaped_cmd_name(tmp_path):
@@ -664,6 +724,30 @@ esac
     report = reset_and_run_main(script)
     expected_error = reporter.DeleteSystemFile("/usr", 0)
     assert_expected_report(report, [expected_error])
+
+def test_case_without_catchall_has_unmatched_path(tmp_path):
+    script = write_script(tmp_path, """
+case "$1" in
+    prod) T=/srv/prod ;;
+    staging) T=/srv/staging ;;
+esac
+rm -rf "$T"/*
+""")
+    report = reset_and_run_main(script, solver=True, enable_dfs=True)
+    expected_error1 = reporter.UnboundID("T", 0)
+    expected_error2 = reporter.WordSplitCouldDeleteSystemFile("/*", 0)
+    expected_error3 = reporter.DeleteSystemFile("/*", 0)
+    assert_expected_report(report, [expected_error1, expected_error2, expected_error3])
+
+    script = write_script(tmp_path, """
+case "$1" in
+    prod) T=/srv/prod ;;
+    *) T=/srv/default ;;
+esac
+rm -rf "$T"/*
+""")
+    report = reset_and_run_main(script, solver=True, enable_dfs=True)
+    assert_expected_report(report, [])
 
 def test_and_or(tmp_path):
     # A case statement should handle all branches correctly
